@@ -1,19 +1,15 @@
 use yew::prelude::*;
-use web_sys::{ console, MouseEvent };
-use yew:: Callback;
-use gloo_console::log;
 
-#[function_component(App)]
-fn app() -> Html {
-  console::log_1(&"hello world".into());
+use crate::components::{ Text, Background };
 
-  let onclick =  Callback::from(|e: MouseEvent | {
-    log!("the event is ", e);
-  });
+mod components;
+mod utils;
+
+#[function_component]
+fn App() -> Html {
   html! {
     <>
-      <h1>{ "Hello World" }</h1>
-      <button {onclick}>{ "click"}</button>
+      <Background />
     </>
   }
 }
