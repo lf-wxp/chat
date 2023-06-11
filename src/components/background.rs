@@ -1,14 +1,12 @@
 use std::rc::Rc;
-
 use stylist::{self, style};
 use yew::{function_component, html, use_effect_with_deps, use_node_ref, Html};
 
-use crate::utils::ribbon::{ColorSet, Position, Ribbons};
-
+use crate::utils::{ribbon::{ColorSet, Position, Ribbons}, style};
 
 #[function_component]
 pub fn Background() -> Html {
-  let class_name = get_style().unwrap_or_default();
+  let class_name = get_class_name();
   let canvas_ref = Rc::new(use_node_ref());
   let canvas_ref_clone = canvas_ref.clone();
 
@@ -37,23 +35,38 @@ pub fn Background() -> Html {
   );
 
   html! {
-    <canvas ref={canvas_ref.as_ref()} class={class_name} />
+    <div class={class_name}>
+      <canvas ref={canvas_ref.as_ref()} />
+      <div class="mask" />
+    </div>
   }
 }
 
-fn get_style() -> Result<String, stylist::Error> {
-  Ok(
+fn get_class_name() -> String {
+  style::get_class_name(
     style!(
       // A CSS string literal
       r#"
-      width: 100vw;
-      height: 100vh;
-      position: absolute;
-      left: 0;
-      top: 0;
+        block-size: 100%;
+        inline-size: 100%;
+        position: fixed;
+        z-index: -1;
+        inset-block: 0;
+        
+        .mask {
+          block-size: 100%;
+          inline-size: 100%;
+          position: absolute;
+          inset-block: 0;
+          backdrop-filter: blur(10px);
+        }
+
+        canvas {
+          background: #161c20;
+          block-size: 100%;
+          inline-size: 100%;
+        }
     "#
-    )?
-    .get_class_name()
-    .to_owned(),
+    )
   )
 }

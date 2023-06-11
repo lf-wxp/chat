@@ -1,8 +1,12 @@
+use bounce::use_atom_value;
 use gloo_console::log;
+use stylist::{self, style};
 use web_sys::MouseEvent;
 use yew::prelude::*;
 use yew::Callback;
-use stylist::{self, style};
+
+use crate::store::Theme;
+use crate::utils::style;
 
 #[function_component]
 pub fn Text() -> Html {
@@ -10,23 +14,25 @@ pub fn Text() -> Html {
     log!("the event is ", e);
   });
 
-  let class_name = get_style().unwrap_or_default();
+  let class_name = get_class_name();
+  let theme = use_atom_value::<Theme>();
 
   html! {
     <>
-      <h1 class={class_name}>{"hello world"}</h1>
+      <h1 class={class_name}>{"theme is "}{&theme}</h1>
       <button {onclick}>{ "click hello"}</button>
     </>
   }
 }
 
-fn get_style() -> Result<String, stylist::Error> {
-  Ok(style!(
-    // A CSS string literal
-    r#"
-      background-color: red;
-      color: blue;
+fn get_class_name() -> String {
+  style::get_class_name(
+    style!(
+      r#"
+        position: static;
+        background-color: red;
+        color: blue;
     "#
-  )?.get_class_name().to_owned())
-
+    )
+  )
 }

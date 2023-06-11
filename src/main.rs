@@ -1,16 +1,26 @@
+use bounce::BounceRoot;
 use yew::prelude::*;
 
-use crate::components::{ Text, Background };
+use crate::components::{Background, Side, Text};
 
 mod components;
+mod store;
 mod utils;
 
 #[function_component]
 fn App() -> Html {
   html! {
-    <>
-      <Background />
-    </>
+    <BounceRoot>
+      <section>
+        <div>
+          <Side />
+        </div>
+        <div>
+          <Background />
+          <Text />
+        </div>
+      </section>
+    </BounceRoot>
   }
 }
 
