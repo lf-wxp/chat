@@ -2,7 +2,10 @@ use std::rc::Rc;
 use stylist::{self, style};
 use yew::{function_component, html, use_effect_with_deps, use_node_ref, Html};
 
-use crate::utils::{ribbon::{ColorSet, Position, Ribbons}, style};
+use crate::utils::{
+  ribbon::{ColorSet, Position, Ribbons},
+  style,
+};
 
 #[function_component]
 pub fn Background() -> Html {
@@ -43,10 +46,9 @@ pub fn Background() -> Html {
 }
 
 fn get_class_name() -> String {
-  style::get_class_name(
-    style!(
-      // A CSS string literal
-      r#"
+  style::get_class_name(style!(
+    // A CSS string literal
+    r#"
         block-size: 100%;
         inline-size: 100%;
         position: fixed;
@@ -62,11 +64,22 @@ fn get_class_name() -> String {
         }
 
         canvas {
-          background: #161c20;
+          background-image: linear-gradient(
+            55deg,
+            hsl(332deg 53% 24%) 0%,
+            hsl(332deg 51% 23%) -1%,
+            hsl(332deg 48% 22%) -1%,
+            hsl(332deg 45% 21%) -2%,
+            hsl(331deg 41% 20%) -1%,
+            hsl(330deg 37% 19%) 0%,
+            hsl(328deg 31% 17%) 3%,
+            hsl(323deg 24% 16%) 10%,
+            hsl(300deg 12% 14%) 23%,
+            hsl(207deg 18% 12%) 68%
+          );
           block-size: 100%;
           inline-size: 100%;
         }
     "#
-    )
-  )
+  ))
 }

@@ -30,7 +30,6 @@ fn get_class_name() -> String {
     style!(
       r#"
         position: static;
-        background-color: red;
         color: blue;
     "#
     )
