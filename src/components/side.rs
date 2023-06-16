@@ -44,7 +44,7 @@ fn get_class_name() -> String {
         .icon {
           inline-size: 30px;
           block-size: 30px;
-          color: teal;
+          color: #8896a4;
           font-size: 16px;
           display: flex;
           flex-flow: column nowrap;
@@ -62,6 +62,7 @@ fn get_class_name() -> String {
         
         .icon:hover {
           background: var(--theme-color);
+          color: #51b66d;
         }
     "#
     )
