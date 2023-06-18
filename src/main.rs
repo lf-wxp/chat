@@ -1,11 +1,15 @@
 use bounce::BounceRoot;
-use utils::style;
 use stylist::{self, style};
 use yew::prelude::*;
+use yew_router::{BrowserRouter, Switch};
 
-use components::{Background, Side, Text};
+use components::{Background, Side};
+use route::{switch, Route};
+use utils::style;
 
 mod components;
+mod page;
+mod route;
 mod store;
 mod utils;
 
@@ -14,24 +18,25 @@ fn App() -> Html {
   let class_name = get_class_name();
 
   html! {
-    <BounceRoot>
-      <section class={class_name}>
-        <Background />
-        <div class={"side"}>
-          <Side />
-        </div>
-        <div class="content">
-          <Text />
-        </div>
-      </section>
-    </BounceRoot>
+    <BrowserRouter>
+      <BounceRoot>
+        <section class={class_name}>
+          <Background />
+          <div class={"side"}>
+            <Side />
+          </div>
+          <div class="content">
+            <Switch<Route> render={switch}/>
+          </div>
+        </section>
+      </BounceRoot>
+    </BrowserRouter>
   }
 }
 
 fn get_class_name() -> String {
-  style::get_class_name(
-    style!(
-      r#"
+  style::get_class_name(style!(
+    r#"
         display: flex;
         flex-flow: nowrap; 
         inline-size: 100%;
@@ -48,8 +53,7 @@ fn get_class_name() -> String {
           flex: 1 1 auto;
         }
     "#
-    )
-  )
+  ))
 }
 
 fn main() {
