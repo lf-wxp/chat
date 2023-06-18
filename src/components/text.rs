@@ -26,7 +26,7 @@ pub fn Text() -> Html {
   html! {
     <>
       <h1 class={class_name}>{"theme is "}{&theme}</h1>
-      <h1>{"volume is "}{&volume_value.0}</h1>
+      <h1>{format!("volume is {:?}", volume_value)}</h1>
       <button {onclick}>{ "click hello"}</button>
     </>
   }

@@ -13,23 +13,42 @@ use crate::utils::style;
 #[function_component]
 pub fn VolumeSet() -> Html {
   let slide_node_ref = use_node_ref();
-  let volume = use_atom::<Volume>();
+  let volume_handle = use_atom::<Volume>();
   let volume_value = use_atom_value::<Volume>();
   let class_name = get_class_name();
-  let indicator_style = format!("inset-block-start: {}%", volume_value.0);
-  let slide_style = format!("block-size: {}%", volume_value.0);
+  let indicator_style = format!("inset-block-start: {}%", volume_value.value);
+  let slide_style = format!("block-size: {}%", volume_value.value);
 
   let onclick = {
     let slide = slide_node_ref.clone();
+    let volume_handle = volume_handle.clone();
     Callback::from(move |e: MouseEvent| {
       let span = slide.cast::<HtmlInputElement>();
-      if let Some(span) = span  {
+      if let Some(span) = span {
         let val = e.offset_y() as f64 / span.client_height() as f64;
+        let volume = Volume {
+          value: (val * 100.0) as u8,
+          mute: false,
+        };
         log!("the event is ", val * 100.0);
-        volume.set(Volume((val * 100.0) as u8));
+        volume_handle.set(volume);
       }
     })
   };
+
+  let toggle_mute = {
+    let volume_value = volume_value.clone();
+    let volume_handle = volume_handle.clone();
+    Callback::from(move |_| {
+      let volume = Volume {
+        value: volume_value.value,
+        mute: !volume_value.mute,
+      };
+      volume_handle.set(volume);
+    })
+  };
+
+  let icon_id = if volume_value.mute { IconId::FontAwesomeSolidVolumeXmark} else { IconId::FontAwesomeSolidVolumeHigh };
 
   html! {
     <section class={class_name}>
@@ -39,15 +58,14 @@ pub fn VolumeSet() -> Html {
           <span class={"indicator"} style={indicator_style} />
         </span>
       </div>
-      <Icon icon_id={IconId::FontAwesomeSolidVolumeHigh} width={"16px"} height={"16px"}/>
+      <Icon {icon_id} width={"16px"} height={"16px"} onclick={toggle_mute} />
     </section>
   }
 }
 
 fn get_class_name() -> String {
-  style::get_class_name(
-    style!(
-      r#"
+  style::get_class_name(style!(
+    r#"
         inline-size: 30px;
         block-size: 30px;
         display: flex;
@@ -98,6 +116,7 @@ fn get_class_name() -> String {
           inline-size: 4px;
           border-radius: 4px;
           position: absolute;
+          transition: all 0.1s ease-in-out;
           background: #60bb7a;
         }
         .indicator {
@@ -106,11 +125,11 @@ fn get_class_name() -> String {
           display: block;
           inset-inline-start: 0;
           position: absolute;
+          transition: all 0.1s ease-in-out;
           border-radius: 50%;
           background: white;
           transform: translateY(-25%) translateX(-25%);
         }
     "#
-    )
-  )
+  ))
 }

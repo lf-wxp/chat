@@ -23,11 +23,17 @@ impl Display for Theme {
 }
 
 
-#[derive(Atom, PartialEq)]
-pub struct Volume(pub u8);
+#[derive(Atom, PartialEq, Debug)]
+pub struct Volume {
+  pub value: u8,
+  pub mute: bool,
+}
 
 impl Default for Volume {
   fn default() -> Self {
-   Volume(50) 
+   Volume {
+    value: 50,
+    mute: false,
+   }
   }
 }
