@@ -3,9 +3,11 @@ use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 use yew::NodeRef;
 
+use crate::utils::{get_window, request_animation_frame};
+
 use super::{
   ribbon::Ribbon,
-  util::{get_window, request_animation_frame, ColorSet, Position},
+  util::{ColorSet, Position},
 };
 pub struct Ribbons {
   pub canvas: Rc<NodeRef>,

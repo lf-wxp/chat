@@ -1,9 +1,11 @@
 use derivative::Derivative;
 
+use crate::utils::random;
+
 use super::{
   point::Point,
   section::Section,
-  util::{random, Dir, Position},
+  util::{Dir, Position},
 };
 
 #[derive(Derivative)]

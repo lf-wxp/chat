@@ -12,6 +12,7 @@ mod page;
 mod route;
 mod store;
 mod utils;
+mod hook;
 
 #[function_component]
 fn App() -> Html {

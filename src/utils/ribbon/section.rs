@@ -3,9 +3,11 @@ use std::f64::consts::PI;
 use wasm_bindgen::JsValue;
 use web_sys::CanvasRenderingContext2d;
 
+use crate::utils::num_in_range;
+
 use super::{
   point::{Point, PointAction},
-  util::{num_in_range, Dir},
+  util::{Dir},
 };
 
 #[derive(Debug, PartialEq, Clone, Copy)]
