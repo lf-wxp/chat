@@ -32,6 +32,11 @@ pub fn VolumeSet() -> Html {
   } else {
     "indicator "
   };
+  let slide_class = if volume_value.mute {
+    "slide mute"
+  } else {
+    "slide"
+  };
 
   let volume_click = {
     let slide = slide_node_ref.clone();
@@ -85,16 +90,15 @@ pub fn VolumeSet() -> Html {
     }
   });
 
-  let indicator = indicator_clicked.clone();
   use_event_with_window("mouseup", move |_: MouseEvent| {
-    *indicator.borrow_mut() = false;
+    *indicator_clicked.borrow_mut() = false;
   });
 
   html! {
     <section class={class_name}>
       <div class={"slide-box"}>
         <span ref={slide_node_ref} class={"slide-bg"} onclick={volume_click} >
-          <span class={"slide"} style={slide_style} />
+          <span class={slide_class} style={slide_style} />
           <span class={indicator_class} style={indicator_style} {onmousedown} { onmouseup} />
         </span>
       </div>
@@ -157,6 +161,10 @@ fn get_class_name() -> String {
           border-radius: 4px;
           position: absolute;
           background: #60bb7a;
+          transition: background 0.2s ease;
+        }
+        .slide.mute {
+          background: #7f8c8d;
         }
         .indicator {
           inline-size: 8px;

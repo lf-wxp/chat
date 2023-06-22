@@ -44,7 +44,7 @@ fn get_class_name() -> String {
         justify-content: center;
         align-items: center;
         cursor: pointer;
-        border-radius: 30%;
+        border-radius: var(--radius);
         transition: all 0.2s ease;
         margin-block: 10px;
 

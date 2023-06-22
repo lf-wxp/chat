@@ -1,7 +1,7 @@
 use stylist::{self, style};
 use yew::prelude::*;
 
-use crate::{utils::style, components::Text};
+use crate::{utils::style, components::{Text, Avatar}};
 
 #[function_component]
 pub fn Home() -> Html {
@@ -10,6 +10,9 @@ pub fn Home() -> Html {
   html! {
     <section class={class_name}>
     {{"home"}}
+      <Avatar name={"user"} />
+      <Avatar name={"master"} />
+      <Avatar name={"test"} />
       <Text />
     </section>
   }
