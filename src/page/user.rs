@@ -1,7 +1,7 @@
 use stylist::{self, style};
 use yew::prelude::*;
 
-use crate::utils::style;
+use crate::{components::UserList, utils::style};
 
 #[function_component]
 pub fn User() -> Html {
@@ -9,7 +9,7 @@ pub fn User() -> Html {
 
   html! {
     <section class={class_name}>
-    {{"user"}}
+      <UserList />
     </section>
   }
 }

@@ -29,6 +29,7 @@ fn get_class_name() -> String {
         display: inline-block;
         block-size: 40px;
         inline-size: 40px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
     "#
     )
   )
