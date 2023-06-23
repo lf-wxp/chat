@@ -1,12 +1,6 @@
 use bounce::Atom;
-use fake::faker::name::raw::*;
-use fake::locales::*;
-use fake::{
-  uuid::UUIDv1,
-  Dummy, Fake, Faker,
-};
-use gloo_console::log;
-use pinyin::{ToPinyin};
+use fake::{faker::name::raw::*, locales::*, uuid::UUIDv1, Dummy, Fake, Faker};
+use pinyin::ToPinyin;
 use std::fmt::{self, Display};
 
 #[derive(Atom, PartialEq)]
@@ -57,11 +51,22 @@ impl Volume {
   }
 }
 
-
+struct RandomName;
+impl Dummy<RandomName> for String {
+  fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &RandomName, rng: &mut R) -> Self {
+    let x = rng.gen_range(0..=1);
+    if x % 2 == 0 {
+      FirstName(ZH_CN).fake()
+    } else {
+      FirstName(EN).fake()
+    }
+  }
+}
 #[derive(PartialEq, Debug, Dummy, Clone)]
 pub struct User {
   #[dummy(faker = "UUIDv1")]
   pub uuid: String,
+  #[dummy(faker = "RandomName")]
   pub name: String,
 }
 
@@ -76,31 +81,23 @@ pub struct Users(pub Vec<User>);
 
 impl Dummy<Faker> for Users {
   fn dummy_with_rng<R: rand::Rng + ?Sized>(_: &Faker, _rng: &mut R) -> Self {
-    Users(
-      (0..10)
-        .map(|x| {
-          let name = if x % 2 == 0 {
-            FirstName(ZH_CN).fake()
-          } else {
-            FirstName(EN).fake()
-          };
-          User {
-            uuid: UUIDv1.fake(),
-            name,
-          }
-        })
-        .collect::<Vec<User>>(),
-    )
+    Users((0..10).map(|_| Faker.fake::<User>()).collect::<Vec<User>>())
   }
 }
 
 impl Users {
   pub fn group_with_alphabet(&self) -> Vec<UserGroup> {
-    let mut group = ('a'..'z').into_iter().map(|x| UserGroup {
-      letter: x.to_string(),
+    let mut group = ('a'..'z')
+      .into_iter()
+      .map(|x| UserGroup {
+        letter: x.to_string(),
+        users: vec![],
+      })
+      .collect::<Vec<UserGroup>>();
+    group.push(UserGroup {
+      letter: "#".to_string(),
       users: vec![],
-    }).collect::<Vec<UserGroup>>();
-    group.push(UserGroup { letter: "#".to_string(), users: vec![] });
+    });
 
     self.0.iter().for_each(|x| {
       let User { name, uuid: _ } = x;

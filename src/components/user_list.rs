@@ -1,7 +1,6 @@
 use bounce::use_atom_value;
 use gloo_console::log;
 use stylist::{self, style};
-
 use yew::prelude::*;
 
 use crate::components::Avatar;
