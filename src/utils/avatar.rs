@@ -31,7 +31,7 @@ fn rect_builder(val: u32) -> String {
     !!(val / 5)
   };
   format!(
-    "<rect x=\"{}\" y=\"{}\" width=\"1\" height=\"1\"/>",
+    "<rect x=\"{}\" y=\"{}\" width=\"1\" height=\"1\" />",
     x,
     val % 5
   )
@@ -48,7 +48,7 @@ fn avatar(seed: String, saturation: u32, lightness: u32, hash_fn: impl Fn(&str) 
       acc
     }
   });
-  let prefix = format!("<svg viewBox=\"-1.5 -1.5 8 8\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"hsl({} {}% {}%)\">", hue, saturation, lightness);
+  let prefix = format!("<svg viewBox=\"-1.5 -1.5 8 8\" xmlns=\"http://www.w3.org/9000/svg\" fill=\"hsla({} {}% {}%)\" >", hue, saturation, lightness);
 
   format!("{}{}</svg>", prefix, rect)
 }

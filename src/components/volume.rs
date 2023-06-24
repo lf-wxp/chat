@@ -96,13 +96,13 @@ pub fn VolumeSet() -> Html {
 
   html! {
     <section class={class_name}>
-      <div class={"slide-box"}>
-        <span ref={slide_node_ref} class={"slide-bg"} onclick={volume_click} >
+      <div class="slide-box">
+        <span ref={slide_node_ref} class="slide-bg" onclick={volume_click} >
           <span class={slide_class} style={slide_style} />
           <span class={indicator_class} style={indicator_style} {onmousedown} { onmouseup} />
         </span>
       </div>
-      <Icon {icon_id} width={"16px"} height={"16px"} onclick={toggle_mute} />
+      <Icon {icon_id} width="16px" height="16px" onclick={toggle_mute} />
     </section>
   }
 }

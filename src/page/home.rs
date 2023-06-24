@@ -10,9 +10,9 @@ pub fn Home() -> Html {
   html! {
     <section class={class_name}>
     {{"home"}}
-      <Avatar name={"user"} />
-      <Avatar name={"master"} />
-      <Avatar name={"test"} />
+      <Avatar name="user" />
+      <Avatar name="master" />
+      <Avatar name="test" />
       <Text />
     </section>
   }

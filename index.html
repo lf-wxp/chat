@@ -5,6 +5,8 @@
       :root {
         --padding: 10px;
         --theme-color: #161c20;
+        --theme-color-rgb: 22, 28, 32;
+        --font-color: white;
         --radius: 9px;
       }
       body {
@@ -17,6 +19,21 @@
       ul {
         margin: 0;
         padding: 0;
+      }
+      .scroll-bar {
+        &::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        &::-webkit-scrollbar-thumb {
+          border: 2px solid transparent;
+          background-clip: content-box;
+          background-color: rgba(var(--theme-color-rgb), 0.5);
+          border-radius: 15px;
+        }
+      }
+      * {
+        box-sizing: border-box;
       }
     </style>
   </head>

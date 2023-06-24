@@ -27,7 +27,7 @@ pub fn NavItem(props: &Props) -> Html {
 
   html! {
       <span class={class_name} onclick={icon_click}>
-        <Icon  icon_id={props.icon.clone()} width={"16px"} height={"16px"}/>
+        <Icon  icon_id={props.icon.clone()} width="16px" height="16px" />
       </span>
     }
 }

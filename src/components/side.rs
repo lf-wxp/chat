@@ -37,13 +37,13 @@ pub fn Side() -> Html {
 
   html! {
     <side class={class_name}>
-      <div class={"side-nav"}>
+      <div class="side-nav">
         { for nav_items.iter().map(|item|{
           html!{
             <NavItem key={item.route.clone()} route={item.route.clone()} icon={item.icon} />
         }})}
       </div>
-      <div class={"side-set"}>
+      <div class="side-set">
         <VolumeSet />
       </div>
     </side>

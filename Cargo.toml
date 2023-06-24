@@ -31,4 +31,6 @@ yew_icons = {version = "0.7.2", features = [
   "HeroiconsMiniSolidHome",
   "FontAwesomeSolidVolumeHigh",
   "FontAwesomeSolidVolumeXmark",
+  "BootstrapSearch",
+  "FontAwesomeSolidXmark"
 ]}
