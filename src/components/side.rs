@@ -1,10 +1,12 @@
 use stylist::{self, style};
 use yew::prelude::*;
-use yew_icons::{IconId};
+use yew_icons::IconId;
 
-use crate::utils::style;
-use crate::components::{NavItem, VolumeSet};
-use crate::route::Route;
+use crate::{
+  components::{NavItem, VolumeSet},
+  route::Route,
+  utils::style,
+};
 
 #[derive(Debug, Clone)]
 struct Nav {

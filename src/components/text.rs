@@ -1,14 +1,13 @@
-use bounce::use_atom;
-use bounce::use_atom_value;
+use bounce::{use_atom, use_atom_value};
 use gloo_console::log;
 use stylist::{self, style};
 use web_sys::MouseEvent;
-use yew::prelude::*;
-use yew::Callback;
+use yew::{prelude::*, Callback};
 
-use crate::store::Theme;
-use crate::store::Volume;
-use crate::utils::style;
+use crate::{
+  store::{Theme, Volume},
+  utils::style,
+};
 
 #[function_component]
 pub fn Text() -> Html {
@@ -22,7 +21,6 @@ pub fn Text() -> Html {
     log!("the event is ", e);
   });
 
-
   html! {
     <>
       <h1 class={class_name}>{"theme is "}{&theme}</h1>
@@ -33,12 +31,10 @@ pub fn Text() -> Html {
 }
 
 fn get_class_name() -> String {
-  style::get_class_name(
-    style!(
-      r#"
+  style::get_class_name(style!(
+    r#"
         position: static;
         color: blue;
     "#
-    )
-  )
+  ))
 }

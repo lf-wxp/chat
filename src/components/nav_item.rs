@@ -1,12 +1,9 @@
 use stylist::style;
-use yew::prelude::*;
-use yew::Properties;
+use yew::{prelude::*, Properties};
 use yew_icons::{Icon, IconId};
-use yew_router::prelude::use_navigator;
-use yew_router::prelude::use_route;
+use yew_router::prelude::{use_navigator, use_route};
 
-use crate::route::Route;
-use crate::utils::style;
+use crate::{route::Route, utils::style};
 
 #[derive(Properties, PartialEq)]
 pub struct Props {

@@ -2,9 +2,11 @@ use bounce::use_atom_value;
 use stylist::{self, style};
 use yew::prelude::*;
 
-use crate::components::{Avatar};
-use crate::store::{Users, FilterWord};
-use crate::utils::style;
+use crate::{
+  components::Avatar,
+  store::{FilterWord, Users},
+  utils::style,
+};
 
 #[function_component]
 pub fn UserList() -> Html {

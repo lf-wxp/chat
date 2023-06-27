@@ -1,16 +1,16 @@
 use bounce::{use_atom, use_atom_value};
 use gloo_console::log;
 use stylist::{self, style};
-use web_sys::HtmlInputElement;
-use web_sys::MouseEvent;
-use yew::prelude::*;
-use yew::Callback;
+use web_sys::{HtmlInputElement, MouseEvent};
+use yew::{prelude::*, Callback};
 use yew_hooks::use_event_with_window;
 use yew_icons::{Icon, IconId};
 
-use crate::hook::{use_movement, Movement};
-use crate::store::Volume;
-use crate::utils::style;
+use crate::{
+  hook::{use_movement, Movement},
+  store::Volume,
+  utils::{class_name_determine, style},
+};
 
 #[function_component]
 pub fn VolumeSet() -> Html {
@@ -27,16 +27,8 @@ pub fn VolumeSet() -> Html {
     IconId::FontAwesomeSolidVolumeHigh
   };
   let indicator_clicked = use_mut_ref(|| false);
-  let indicator_class = if *indicator_clicked.borrow() {
-    "indicator active"
-  } else {
-    "indicator "
-  };
-  let slide_class = if volume_value.mute {
-    "slide mute"
-  } else {
-    "slide"
-  };
+  let indicator_class = class_name_determine(*indicator_clicked.borrow(), "indicator", "active");
+  let slide_class = class_name_determine(volume_value.mute, "slide", "mute");
 
   let volume_click = {
     let slide = slide_node_ref.clone();

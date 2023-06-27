@@ -2,12 +2,10 @@ use bounce::{use_atom, use_atom_value};
 use stylist::{self, style};
 use wasm_bindgen::JsCast;
 use web_sys::HtmlInputElement;
-use yew::prelude::*;
-use yew::Callback;
+use yew::{prelude::*, Callback};
 use yew_icons::{Icon, IconId};
 
-use crate::store::FilterWord;
-use crate::utils::style;
+use crate::{store::FilterWord, utils::style};
 
 #[function_component]
 pub fn Search() -> Html {
