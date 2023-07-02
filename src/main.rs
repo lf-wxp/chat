@@ -13,6 +13,7 @@ mod route;
 mod store;
 mod utils;
 mod hook;
+mod model;
 
 #[function_component]
 fn App() -> Html {

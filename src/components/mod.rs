@@ -6,6 +6,7 @@ pub mod volume;
 pub mod avatar;
 pub mod user_list;
 pub mod search;
+pub mod dropdown;
 
 pub use text::*;
 pub use background::*;
@@ -15,3 +16,4 @@ pub use volume::*;
 pub use avatar::*;
 pub use user_list::*;
 pub use search::*;
+pub use dropdown::*;

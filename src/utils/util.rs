@@ -1,6 +1,8 @@
-use std::ops::Range;
 use rand::{self, Rng};
+use std::ops::Range;
 use wasm_bindgen::{prelude::Closure, JsCast};
+use yew::{virtual_dom::{VNode, Attributes, ApplyAttributeAs }, AttrValue};
+use indexmap::{self, IndexMap};
 
 pub fn random(rang: Range<u16>) -> u16 {
   rand::thread_rng().gen_range(rang)
@@ -28,4 +30,37 @@ pub fn request_animation_frame(f: &Closure<dyn FnMut()>) {
 
 pub fn class_name_determine(condition: bool, name: &str, append: &str) -> String {
   format!("{} {}", name, if condition { append } else { "" })
+}
+
+pub fn get_vnode_attr(vnode: VNode, attr: &str) -> String {
+  match vnode {
+    VNode::VTag(vtag) => vtag
+      .attributes
+      .iter()
+      .find(|&(key, _value)| key == attr)
+      .map_or("".to_string(), |(_key, val)| val.to_string()),
+    _ => "".to_string(),
+  }
+}
+
+pub fn append_vnode_attr(vnode: VNode, key: &'static str, val: String) -> VNode {
+  let pre_val = get_vnode_attr(vnode.clone(), key);
+
+  match vnode {
+    VNode::VTag(mut vtag) => { 
+      let mut indexmap = IndexMap::new();
+      indexmap.insert(AttrValue::from(key), (AttrValue::from(format!("{} {}", pre_val, val)), ApplyAttributeAs::Attribute));
+      let attr = Attributes::IndexMap(indexmap);
+      vtag.set_attributes(attr); 
+      return VNode::VTag(vtag)
+    },
+    _ => vnode.clone(), 
+  }
+}
+
+pub fn add_child(vnode: VNode, child: VNode) -> VNode {
+  match vnode {
+    VNode::VTag(mut vtag) =>  {vtag.add_child(child); return VNode::VTag(vtag)},
+    _ => vnode.clone(),
+  }
 }

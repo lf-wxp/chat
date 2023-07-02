@@ -1,9 +1,11 @@
 use bounce::use_atom_value;
+use gloo_console::log;
 use stylist::{self, style};
 use yew::prelude::*;
 
 use crate::{
-  components::Avatar,
+  components::{Avatar, Dropdown},
+  model::Option,
   store::{FilterWord, Users},
   utils::style,
 };
@@ -13,6 +15,21 @@ pub fn UserList() -> Html {
   let class_name = get_class_name();
   let users = use_atom_value::<Users>();
   let filter_word = use_atom_value::<FilterWord>();
+
+  let options = vec![
+    Option {
+      value: "voice".to_string(),
+      label: "语音通话".to_string(),
+    },
+    Option {
+      value: "video".to_string(),
+      label: "视频通话".to_string(),
+    },
+  ];
+
+  let onclick = Callback::from(move |x: String| {
+    log!("the click", x);
+  });
 
   html! {
     <div class={class_name}>
@@ -25,10 +42,12 @@ pub fn UserList() -> Html {
               <div class="user-list">
               { for item.users.iter().map(|x| {
                 html! {
-                  <div class="user">
-                    <Avatar name={x.name.clone()} />
-                    <span class="user-name">{x.name.clone()}</span>
-                  </div>
+                  <Dropdown options={options.clone()} onclick={onclick.clone()}>
+                    <div class="user">
+                      <Avatar name={x.name.clone()} />
+                      <span class="user-name">{x.name.clone()}</span>
+                    </div>
+                  </Dropdown>
                 }
               })}
             </div>
@@ -61,7 +80,15 @@ fn get_class_name() -> String {
         display: flex;
         align-items: center;
         margin-block: 20px;
-        block-size: 40px;
+        block-size: 50px;
+        padding-block: 5px;
+        padding-inline: 5px;
+        transition: background 0.2s ease;
+        cursor: pointer;
+        border-radius: var(--radius);
+      }
+      .user:hover {
+        background: rgba(var(--theme-color-rgb), 0.5);
       }
       .user-name {
         color: var(--font-color);
