@@ -7,6 +7,8 @@ pub mod avatar;
 pub mod user_list;
 pub mod search;
 pub mod dropdown;
+pub mod chat;
+pub mod chat_message;
 
 pub use text::*;
 pub use background::*;
@@ -17,3 +19,5 @@ pub use avatar::*;
 pub use user_list::*;
 pub use search::*;
 pub use dropdown::*;
+pub use chat::*;
+pub use chat_message::*;

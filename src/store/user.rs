@@ -1,30 +1,26 @@
 use bounce::Atom;
-use fake::{
-  faker::name::raw::FirstName,
-  locales::{EN, ZH_CN},
-  uuid::UUIDv1,
-  Dummy, Fake, Faker,
-};
+use fake::{uuid::UUIDv1, Dummy, Fake, Faker};
 use pinyin::ToPinyin;
 
-struct RandomName;
-impl Dummy<RandomName> for String {
-  fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &RandomName, rng: &mut R) -> Self {
-    let x = rng.gen_range(0..=1);
-    if x % 2 == 0 {
-      FirstName(ZH_CN).fake()
-    } else {
-      FirstName(EN).fake()
-    }
-  }
-}
-#[derive(PartialEq, Debug, Dummy, Clone)]
+use crate::utils::faker::RandomName;
+
+#[derive(PartialEq, Debug, Dummy, Clone, Atom)]
 pub struct User {
   #[dummy(faker = "UUIDv1")]
   pub uuid: String,
   #[dummy(faker = "RandomName")]
   pub name: String,
 }
+
+impl Default for User {
+  fn default() -> Self {
+    #[cfg(feature = "fake")]
+    return Faker.fake::<User>();
+    #[cfg(not(feature = "fake"))]
+    return User { uuid: "".to_string(), name: "".to_string() };
+  }
+}
+
 
 #[derive(Debug, Clone)]
 pub struct UserGroup {
@@ -64,7 +60,8 @@ impl Users {
         let py_name = (&name[..])
           .to_pinyin()
           .into_iter()
-          .map(|x| x.map_or("".to_string(), |x| x.first_letter().to_string())).collect::<String>();
+          .map(|x| x.map_or("".to_string(), |x| x.first_letter().to_string()))
+          .collect::<String>();
         name.contains(&keyword) || py_name.contains(&keyword)
       })
       .for_each(|x| {

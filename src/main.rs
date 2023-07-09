@@ -3,7 +3,7 @@ use stylist::{self, style};
 use yew::prelude::*;
 use yew_router::{BrowserRouter, Switch};
 
-use components::{Background, Side};
+use components::{Background, Side, Chat};
 use route::{switch, Route};
 use utils::style;
 
@@ -30,6 +30,7 @@ fn App() -> Html {
           <div class="content">
             <Switch<Route> render={switch}/>
           </div>
+          <Chat />
         </section>
       </BounceRoot>
     </BrowserRouter>
