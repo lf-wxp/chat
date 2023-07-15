@@ -9,6 +9,8 @@ pub mod search;
 pub mod dropdown;
 pub mod chat;
 pub mod chat_message;
+pub mod chat_box;
+pub mod emoji_box;
 
 pub use text::*;
 pub use background::*;
@@ -21,3 +23,5 @@ pub use search::*;
 pub use dropdown::*;
 pub use chat::*;
 pub use chat_message::*;
+pub use chat_box::*;
+pub use emoji_box::*;

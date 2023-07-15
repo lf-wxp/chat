@@ -1,6 +1,4 @@
 use stylist::{self, style};
-use wasm_bindgen::JsCast;
-use web_sys::HtmlElement;
 use yew::prelude::*;
 
 use crate::model::Option;
@@ -16,15 +14,13 @@ pub struct Props {
 #[function_component]
 pub fn Dropdown(props: &Props) -> Html {
   let class_name = get_class_name();
-  let click = props.onclick.clone();
-
-  let onclick = Callback::from(move |e: MouseEvent| {
-    let li = e.target().and_then(|t| t.dyn_into::<HtmlElement>().ok());
-    if let Some(li) = li {
-      let value = li.dataset().get("value").unwrap_or("".to_string());
-      click.emit(value);
+  let view_item = |item: &Option| {
+    let onclick = props.onclick.clone();
+    let call_item = item.value.to_string();
+    html! {
+      <li onclick={onclick.reform(move |_| call_item.clone())}>{item.label.clone()}</li>
     }
-  });
+  };
 
   html! {
     {for props.children.iter().map(|child| {
@@ -32,11 +28,7 @@ pub fn Dropdown(props: &Props) -> Html {
       add_child(child, html!{
         <section class="dropdown-content">
           <ul>
-          {for props.options.iter().map(|item| {
-            html!{
-              <li data-value={item.value.clone()} onclick={onclick.clone()}>{item.label.clone()}</li>
-            }
-          })}
+          {for props.options.iter().map(view_item)}
           </ul>
         </section>
       })

@@ -1,9 +1,10 @@
 use bounce::{use_atom, use_atom_value};
+use gloo_console::log;
 use stylist::{self, style};
 use yew::prelude::*;
 
 use crate::{
-  components::ChatMessage,
+  components::{ChatMessage, EmojiBox},
   model::MessageAlignment,
   store::{MessageBunch, User},
   utils::style,
@@ -42,6 +43,10 @@ pub fn Chat() -> Html {
     }
   };
 
+  let emoji_callback = |emoji: String| {
+    log!("the emoji is ", emoji);
+  };
+
   html! {
     <div class={class_name}>
       { for test_message.iter().map(|msg| html! {
@@ -49,10 +54,11 @@ pub fn Chat() -> Html {
             uuid={Some(msg.uuid.clone())}
             name={get_name(msg.name.clone())}
             alignment={get_alignment(msg.uuid.clone())}
-            time={msg.time.clone()}
+            time={msg.time}
             message={msg.message.clone()}
           />
          })}
+      <EmojiBox onclick={emoji_callback} />
     </div>
   }
 }
