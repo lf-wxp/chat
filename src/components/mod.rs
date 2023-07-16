@@ -10,6 +10,7 @@ pub mod dropdown;
 pub mod chat;
 pub mod chat_message;
 pub mod chat_box;
+pub mod chat_text;
 pub mod emoji_box;
 
 pub use text::*;
@@ -24,4 +25,5 @@ pub use dropdown::*;
 pub use chat::*;
 pub use chat_message::*;
 pub use chat_box::*;
+pub use chat_text::*;
 pub use emoji_box::*;

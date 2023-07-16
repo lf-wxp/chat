@@ -1,8 +1,11 @@
+use indexmap::{self, IndexMap};
 use rand::{self, Rng};
 use std::ops::Range;
 use wasm_bindgen::{prelude::Closure, JsCast};
-use yew::{virtual_dom::{VNode, Attributes, ApplyAttributeAs }, AttrValue};
-use indexmap::{self, IndexMap};
+use yew::{
+  virtual_dom::{ApplyAttributeAs, Attributes, VNode},
+  AttrValue,
+};
 
 pub fn random(rang: Range<u16>) -> u16 {
   rand::thread_rng().gen_range(rang)
@@ -47,20 +50,36 @@ pub fn append_vnode_attr(vnode: VNode, key: &'static str, val: String) -> VNode 
   let pre_val = get_vnode_attr(vnode.clone(), key);
 
   match vnode {
-    VNode::VTag(mut vtag) => { 
+    VNode::VTag(mut vtag) => {
       let mut indexmap = IndexMap::new();
-      indexmap.insert(AttrValue::from(key), (AttrValue::from(format!("{} {}", pre_val, val)), ApplyAttributeAs::Attribute));
+      indexmap.insert(
+        AttrValue::from(key),
+        (
+          AttrValue::from(format!("{} {}", pre_val, val)),
+          ApplyAttributeAs::Attribute,
+        ),
+      );
       let attr = Attributes::IndexMap(indexmap);
-      vtag.set_attributes(attr); 
-      return VNode::VTag(vtag)
-    },
-    _ => vnode.clone(), 
+      vtag.set_attributes(attr);
+      return VNode::VTag(vtag);
+    }
+    _ => vnode.clone(),
   }
 }
 
 pub fn add_child(vnode: VNode, child: VNode) -> VNode {
   match vnode {
-    VNode::VTag(mut vtag) =>  {vtag.add_child(child); return VNode::VTag(vtag)},
+    VNode::VTag(mut vtag) => {
+      vtag.add_child(child);
+      return VNode::VTag(vtag);
+    }
     _ => vnode.clone(),
   }
+}
+pub fn get_target<T, H>(e: T) -> Option<H>
+where
+  T: AsRef<web_sys::Event>,
+  H: JsCast,
+{
+  e.as_ref().target().and_then(|t| t.dyn_into::<H>().ok())
 }

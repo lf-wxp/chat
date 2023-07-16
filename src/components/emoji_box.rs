@@ -168,7 +168,7 @@ pub fn EmojiBox(props: &Props) -> Html {
     }
   };
 
-  use_click_exclusive(vec![format!(".{}", class_name.clone())], callback);
+  use_click_exclusive(vec![format!(".{}", class_name)], callback);
 
   html! {
     <div class={class_name}>
