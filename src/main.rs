@@ -1,19 +1,21 @@
 use bounce::BounceRoot;
+use model::ChatHistory;
+use std::cell::OnceCell;
 use stylist::{self, style};
 use yew::prelude::*;
 use yew_router::{BrowserRouter, Switch};
 
-use components::{Background, Side, Chat};
+use components::{Background, Chat, FakeSet, Side};
 use route::{switch, Route};
 use utils::style;
 
 mod components;
+mod hook;
+mod model;
 mod page;
 mod route;
 mod store;
 mod utils;
-mod hook;
-mod model;
 
 #[function_component]
 fn App() -> Html {
@@ -22,6 +24,7 @@ fn App() -> Html {
   html! {
     <BrowserRouter>
       <BounceRoot>
+        <FakeSet />
         <section class={class_name}>
           <Background />
           <div class={"side"}>
@@ -59,6 +62,13 @@ fn get_class_name() -> String {
   ))
 }
 
+static mut CHAT_HISTORY: OnceCell<ChatHistory> = OnceCell::new();
+
+pub fn get_chat_history() -> Option<&'static mut ChatHistory> {
+  unsafe { CHAT_HISTORY.get_mut() }
+}
+
 fn main() {
+  unsafe { CHAT_HISTORY.get_or_init(|| ChatHistory::default()) };
   yew::Renderer::<App>::new().render();
 }

@@ -4,7 +4,7 @@ use fake::{
   Dummy, Fake,
 };
 
-use crate::model::Message;
+use crate::model::{Message, MessageState};
 
 pub struct RandomName;
 impl Dummy<RandomName> for String {
@@ -17,9 +17,17 @@ impl Dummy<RandomName> for String {
     }
   }
 }
+
 pub struct FakeMessage;
 impl Dummy<FakeMessage> for Message {
   fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &FakeMessage, _rng: &mut R) -> Self {
     Message::Text(Sentence(ZH_CN, 2..10).fake())
+  }
+}
+
+pub struct FakeMessageState;
+impl Dummy<FakeMessageState> for MessageState {
+  fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &FakeMessageState, _rng: &mut R) -> Self {
+    MessageState::Success
   }
 }

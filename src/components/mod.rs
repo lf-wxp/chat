@@ -12,6 +12,7 @@ pub mod chat_message;
 pub mod chat_box;
 pub mod chat_text;
 pub mod emoji_box;
+pub mod fake_set;
 
 pub use text::*;
 pub use background::*;
@@ -27,3 +28,4 @@ pub use chat_message::*;
 pub use chat_box::*;
 pub use chat_text::*;
 pub use emoji_box::*;
+pub use fake_set::*;

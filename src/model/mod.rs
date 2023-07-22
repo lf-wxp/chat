@@ -1,20 +1,11 @@
-use js_sys::ArrayBuffer;
+pub mod chat_history;
+pub mod message;
+
+pub use chat_history::*;
+pub use message::*;
 
 #[derive(PartialEq, Clone)]
 pub struct Option<T = String> {
   pub label: String,
   pub value: T,
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum Message {
-  Text(String),
-  Audio(ArrayBuffer),
-  File(ArrayBuffer),  
-}
-
-#[derive(PartialEq, Clone)]
-pub enum MessageAlignment {
-  Left,
-  Right,
 }

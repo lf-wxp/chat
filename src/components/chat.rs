@@ -1,31 +1,20 @@
-use bounce::{use_atom, use_atom_value};
+use bounce::use_atom_value;
 use stylist::{self, style};
 use yew::prelude::*;
 
 use crate::{
-  components::{ChatMessage, ChatBox},
+  components::{ChatBox, ChatMessage},
+  hook::use_chat_history,
   model::MessageAlignment,
-  store::{MessageBunch, User},
+  store::User,
   utils::style,
 };
 
 #[function_component]
 pub fn Chat() -> Html {
   let class_name = format!("{} scroll-bar", get_class_name());
-  let current_user_handle = use_atom::<User>();
   let current_user = use_atom_value::<User>();
-  let message = &use_atom_value::<MessageBunch>().0;
-  let test_message = message.values().collect::<Vec<_>>()[0];
-
-  // for test
-  let len = test_message.len();
-  let first = test_message.get(len - 1).unwrap().clone();
-  use_effect(move || {
-    current_user_handle.set(User {
-      uuid: first.uuid.clone(),
-      name: first.name.clone(),
-    });
-  });
+  let test_message = use_chat_history();
 
   let get_alignment = |uuid: String| {
     if uuid == current_user.uuid {
