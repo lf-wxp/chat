@@ -1,17 +1,22 @@
-use gloo_console::log;
+use bounce::use_atom_value;
 use stylist::{self, style};
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
 
 use crate::{
   components::{ChatText, EmojiBox},
+  hook::use_chat,
+  model::{ChatMessage, Message},
+  store::User,
   utils::style,
 };
 
 #[function_component]
 pub fn ChatBox() -> Html {
   let class_name = get_class_name();
+  let user_name = use_atom_value::<User>();
   let text = use_state(|| "".to_string());
+  let (add, update_state) = use_chat();
 
   let emoji_callback = {
     let text = text.clone();
@@ -23,7 +28,11 @@ pub fn ChatBox() -> Html {
   let send_callback = {
     let text = text.clone();
     move |_| {
-      log!("send", (*text).clone());
+      add(ChatMessage::new(
+        user_name.name.clone(),
+        Message::Text((*text).clone()),
+      ));
+      text.set("".to_string());
     }
   };
 

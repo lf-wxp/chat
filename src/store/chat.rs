@@ -2,15 +2,15 @@ use bounce::Atom;
 use std::fmt::{self, Display};
 
 #[derive(Atom, PartialEq, Clone)]
-pub struct Conversation(pub String);
+pub struct Chat(pub String);
 
-impl Default for Conversation {
+impl Default for Chat {
   fn default() -> Self {
-    Conversation("".to_string())
+    Chat("".to_string())
   }
 }
 
-impl Display for Conversation {
+impl Display for Chat {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", self.0)
   }

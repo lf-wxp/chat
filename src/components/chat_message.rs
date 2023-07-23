@@ -1,4 +1,3 @@
-use bounce::use_atom_value;
 use chrono::prelude::*;
 use stylist::{self, style};
 use yew::prelude::*;
@@ -6,7 +5,6 @@ use yew::prelude::*;
 use crate::{
   components::Avatar,
   model::{Message, MessageAlignment},
-  store::User,
   utils::style,
 };
 
@@ -22,13 +20,7 @@ pub struct Props {
 #[function_component]
 pub fn ChatMessage(props: &Props) -> Html {
   let class_name = get_class_name();
-  let current_user = use_atom_value::<User>();
-  let uuid = props
-    .uuid
-    .clone()
-    .unwrap_or("".to_string().into())
-    .to_string();
-  let content_class = if current_user.uuid == uuid {
+  let content_class = if props.alignment == MessageAlignment::Right {
     "current".to_string()
   } else {
     "".to_string()
@@ -80,6 +72,7 @@ fn get_class_name() -> String {
           border-radius: var(--radius);
           padding: 10px;
           color: var(--font-color);
+          word-break: break-all;
         }
         .message-content {
           margin-inline: 5px;

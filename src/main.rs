@@ -1,6 +1,4 @@
 use bounce::BounceRoot;
-use model::ChatHistory;
-use std::cell::OnceCell;
 use stylist::{self, style};
 use yew::prelude::*;
 use yew_router::{BrowserRouter, Switch};
@@ -62,13 +60,6 @@ fn get_class_name() -> String {
   ))
 }
 
-static mut CHAT_HISTORY: OnceCell<ChatHistory> = OnceCell::new();
-
-pub fn get_chat_history() -> Option<&'static mut ChatHistory> {
-  unsafe { CHAT_HISTORY.get_mut() }
-}
-
 fn main() {
-  unsafe { CHAT_HISTORY.get_or_init(|| ChatHistory::default()) };
   yew::Renderer::<App>::new().render();
 }

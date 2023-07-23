@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use yew::prelude::*;
 
 use crate::{
-  get_chat_history,
-  store::{Conversation, User},
+  store::{Chat, User},
+  utils::get_chat_history,
 };
 
 #[hook]
@@ -15,7 +15,7 @@ pub fn use_fake_set() -> () {
     Some(chat_history) => &chat_history.0,
     None => &binding,
   };
-  let conversation_handle = use_atom::<Conversation>();
+  let conversation_handle = use_atom::<Chat>();
   let current_user_handle = use_atom::<User>();
   let binding = "".to_owned();
   let first_conversation = chat_history.keys().next().unwrap_or(&binding);
@@ -26,7 +26,7 @@ pub fn use_fake_set() -> () {
     .last()
     .unwrap()
     .clone();
-  conversation_handle.set(Conversation((*first_conversation).clone()));
+  conversation_handle.set(Chat((*first_conversation).clone()));
   use_effect(move || {
     current_user_handle.set(User {
       uuid: last_message.uuid.clone(),

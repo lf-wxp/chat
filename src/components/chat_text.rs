@@ -15,6 +15,21 @@ pub struct Props {
 #[function_component]
 pub fn ChatText(props: &Props) -> Html {
   let class_name = get_class_name();
+  let textarea_ref = use_node_ref();
+
+  let resize_textarea = {
+    let textarea_ref = textarea_ref.clone();
+    move || {
+      let textarea = textarea_ref
+        .cast::<HtmlTextAreaElement>()
+        .expect("div_ref not attached to div element");
+      textarea.set_attribute("style", "height: auto").unwrap();
+      let scroll_height = textarea.scroll_height();
+      textarea
+        .set_attribute("style", &format!("height: {}px", scroll_height)[..])
+        .unwrap();
+    }
+  };
 
   let onsend = {
     let send = props.onsend.clone();
@@ -34,20 +49,21 @@ pub fn ChatText(props: &Props) -> Html {
     })
   };
 
-  let onresize = Callback::from(move |e: InputEvent| {
-    let target = get_target::<InputEvent, HtmlTextAreaElement>(e);
-    if let Some(target) = target {
-      target.set_attribute("style", "height: auto").unwrap();
-      let scroll_height = target.scroll_height();
-      target
-        .set_attribute("style", &format!("height: {}px", scroll_height)[..])
-        .unwrap();
-    }
-  });
+  let onresize = {
+    let resize = resize_textarea.clone();
+    Callback::from(move |_: InputEvent| {
+      resize();
+    })
+  };
+
+  let text = props.text.clone();
+  let resize = resize_textarea.clone();
+  use_effect_with_deps(move |_| resize(), text);
 
   html! {
     <div class={class_name}>
       <textarea
+        ref={textarea_ref}
         value={props.text.clone()}
         class="textarea scroll-bar"
         onblur={onchange}

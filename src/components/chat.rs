@@ -1,12 +1,11 @@
-use bounce::use_atom_value;
+use bounce::{use_atom_value, use_selector_value};
 use stylist::{self, style};
 use yew::prelude::*;
 
 use crate::{
   components::{ChatBox, ChatMessage},
-  hook::use_chat_history,
   model::MessageAlignment,
-  store::User,
+  store::{HistoryMessage, User},
   utils::style,
 };
 
@@ -14,10 +13,10 @@ use crate::{
 pub fn Chat() -> Html {
   let class_name = format!("{} scroll-bar", get_class_name());
   let current_user = use_atom_value::<User>();
-  let test_message = use_chat_history();
+  let history_message = use_selector_value::<HistoryMessage>();
 
-  let get_alignment = |uuid: String| {
-    if uuid == current_user.uuid {
+  let get_alignment = |name: String| {
+    if name == current_user.name {
       MessageAlignment::Right
     } else {
       MessageAlignment::Left
@@ -33,11 +32,11 @@ pub fn Chat() -> Html {
 
   html! {
     <div class={class_name}>
-      { for test_message.iter().map(|msg| html! {
+      { for history_message.0.iter().map(|msg| html! {
           <ChatMessage
             uuid={Some(msg.uuid.clone())}
             name={get_name(msg.name.clone())}
-            alignment={get_alignment(msg.uuid.clone())}
+            alignment={get_alignment(msg.name.clone())}
             time={msg.time}
             message={msg.message.clone()}
           />

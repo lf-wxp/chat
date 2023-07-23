@@ -7,6 +7,8 @@ use yew::{
   AttrValue,
 };
 
+use crate::{utils::get_chat_history, model::ChatMessage};
+
 pub fn random(rang: Range<u16>) -> u16 {
   rand::thread_rng().gen_range(rang)
 }
@@ -82,4 +84,10 @@ where
   H: JsCast,
 {
   e.as_ref().target().and_then(|t| t.dyn_into::<H>().ok())
+}
+
+pub fn get_history(chat: &str) -> Option<&'static mut Vec<ChatMessage>> {
+  get_chat_history()
+    .and_then(|x| Some(&mut x.0))
+    .and_then(|x| x.get_mut(chat))
 }
