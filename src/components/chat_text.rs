@@ -3,12 +3,24 @@ use web_sys::HtmlTextAreaElement;
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
 
-use crate::utils::{get_target, style};
+use crate::utils::{get_target, get_textarea_selection_offset, style};
+
+#[derive(Clone)]
+pub struct Selection {
+  pub start: Option<u32>,
+  pub end: Option<u32>,
+}
+
+#[derive(Clone)]
+pub struct ChatValue {
+  pub value: String,
+  pub selection: Selection,
+}
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
   pub text: String,
-  pub onchange: Callback<String>,
+  pub onchange: Callback<ChatValue>,
   pub onsend: Callback<()>,
 }
 
@@ -38,13 +50,16 @@ pub fn ChatText(props: &Props) -> Html {
     })
   };
 
-  let onchange = {
+  let onblur = {
     let change = props.onchange.clone();
     Callback::from(move |e: FocusEvent| {
       let target = get_target::<FocusEvent, HtmlTextAreaElement>(e);
       if let Some(target) = target {
         let value = target.value();
-        change.emit(value);
+        change.emit(ChatValue {
+          value: value.clone(),
+          selection: get_textarea_selection_offset(target, &value),
+        });
       }
     })
   };
@@ -57,7 +72,7 @@ pub fn ChatText(props: &Props) -> Html {
   };
 
   let text = props.text.clone();
-  let resize = resize_textarea.clone();
+  let resize = resize_textarea;
   use_effect_with_deps(move |_| resize(), text);
 
   html! {
@@ -66,7 +81,7 @@ pub fn ChatText(props: &Props) -> Html {
         ref={textarea_ref}
         value={props.text.clone()}
         class="textarea scroll-bar"
-        onblur={onchange}
+        onblur={onblur}
         oninput={onresize}
         rows="1"
       />
@@ -77,6 +92,7 @@ pub fn ChatText(props: &Props) -> Html {
   }
 }
 
+#[allow(non_upper_case_globals)]
 fn get_class_name() -> String {
   style::get_class_name(style!(
     r#"

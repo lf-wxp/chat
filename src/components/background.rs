@@ -45,9 +45,9 @@ pub fn Background() -> Html {
   }
 }
 
+#[allow(non_upper_case_globals)]
 fn get_class_name() -> String {
   style::get_class_name(style!(
-    // A CSS string literal
     r#"
         block-size: 100%;
         inline-size: 100%;

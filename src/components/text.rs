@@ -30,6 +30,7 @@ pub fn Text() -> Html {
   }
 }
 
+#[allow(non_upper_case_globals)]
 fn get_class_name() -> String {
   style::get_class_name(style!(
     r#"

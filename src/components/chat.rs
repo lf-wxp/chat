@@ -11,7 +11,7 @@ use crate::{
 
 #[function_component]
 pub fn Chat() -> Html {
-  let class_name = format!("{} scroll-bar", get_class_name());
+  let class_name = get_class_name();
   let current_user = use_atom_value::<User>();
   let history_message = use_selector_value::<HistoryMessage>();
 
@@ -32,6 +32,7 @@ pub fn Chat() -> Html {
 
   html! {
     <div class={class_name}>
+      <div class="history-message scroll-bar">
       { for history_message.0.iter().map(|msg| html! {
           <ChatMessage
             uuid={Some(msg.uuid.clone())}
@@ -41,20 +42,32 @@ pub fn Chat() -> Html {
             message={msg.message.clone()}
           />
          })}
-      <ChatBox />
+      </div>
+      <div class="chat-box">
+        <ChatBox />
+      </div>
     </div>
   }
 }
 
+#[allow(non_upper_case_globals)]
 fn get_class_name() -> String {
   style::get_class_name(style!(
     r#"
         inline-size: 300px;
         block-size: 100%;
-        overflow: auto;
+        display: flex;
+        flex-flow: column nowrap;
 
-        &>div {
+        .history-message {
+          flex: 1;  
+          overflow: auto;
+        }
+        .history-message >div {
           margin-block-end: 30px;
+        }
+        .chat-box {
+          flex: 0; 
         }
     "#
   ))

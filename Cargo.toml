@@ -8,7 +8,7 @@ fake = []
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bounce = "0.6.1"
+bounce = "0.7.0"
 chrono = "0.4.26"
 derivative = "2.2.0"
 fake = {version = "2.6.1", features = ["derive", "uuid", "chrono"]}
@@ -16,14 +16,16 @@ getrandom = {version = "0.2.10", features = ["js"]}
 gloo-console = "0.2.3"
 gloo-events = "0.1.2"
 gloo-render = "0.1.1"
+gloo-utils = "0.1.7"
 indexmap = "1.9.3"
 js-sys = "0.3.63"
 nanoid = "0.4.0"
 pinyin = "0.10.0"
 rand = "0.8.5"
 stylist = {version = "0.12.0", features = ["yew_integration"]}
+unicode-segmentation = "1.10.1"
 wasm-bindgen = "0.2.86"
-web-sys = {version = "0.3.63", features = ["Document", "Element", "Window", "HtmlCanvasElement", "CanvasRenderingContext2d", "DomStringMap"]}
+web-sys = {version = "0.3.63", features = ["Document", "Element", "Window", "HtmlCanvasElement", "CanvasRenderingContext2d", "DomStringMap", "HtmlTextAreaElement"]}
 yew = {version = "0.20.0", features = ["csr"]}
 yew-hooks = "0.2.0"
 yew-router = "0.17.0"
