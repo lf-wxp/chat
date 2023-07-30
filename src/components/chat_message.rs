@@ -5,7 +5,7 @@ use yew::prelude::*;
 use crate::{
   components::Avatar,
   model::{Message, MessageAlignment},
-  utils::style,
+  utils::{create_base64_string, style},
 };
 
 #[derive(Properties, PartialEq)]
@@ -34,7 +34,14 @@ pub fn ChatMessage(props: &Props) -> Html {
       <div class={"message-content"}>
         <time>{{ props.time.format("%d/%m/ %H:%M") }}</time>
         if let Message::Text(text) = &props.message {
-          <div class="message">{{ text }}</div>
+          <div class="message">
+            {{ text }}
+          </div>
+        }
+        if let Message::Image(buffer) = &props.message {
+          <div class="message img">
+            <img src={create_base64_string(buffer)} />
+          </div>
         }
       </div>
     </div>
@@ -75,6 +82,15 @@ fn get_class_name() -> String {
           color: var(--font-color);
           word-break: break-all;
         }
+        .message.img {
+          background: none;
+          overflow: hidden;
+          padding: 0;
+        }
+        .message img {
+          max-inline-size: 100%;
+          border-radius: var(--radius);
+        }
         .message-content {
           margin-inline: 5px;
           flex: 1 1 auto;
@@ -87,7 +103,7 @@ fn get_class_name() -> String {
           --time-dot-bg: #50b66d;
           margin-inline-start: 45px; 
         }
-        &.current .message {
+        &.current .message, &.current time {
           align-self: flex-end;    
         }
     "#

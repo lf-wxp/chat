@@ -5,6 +5,7 @@ pub enum Message {
   Text(String),
   Audio(ArrayBuffer),
   File(ArrayBuffer),
+  Image(ArrayBuffer),
 }
 
 #[derive(PartialEq, Clone, Debug)]

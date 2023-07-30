@@ -1,13 +1,18 @@
+use futures::channel::oneshot;
+use gloo_console::log;
 use indexmap::{self, IndexMap};
+use js_sys::{ArrayBuffer, Uint8Array};
 use rand::{self, Rng};
-use std::ops::Range;
+use std::{cell::RefCell, ops::Range, rc::Rc};
 use unicode_segmentation::UnicodeSegmentation;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
-use web_sys::{window, HtmlTextAreaElement, Window};
+use web_sys::{window, FileReader, HtmlTextAreaElement, Window, Blob, Url, BlobPropertyBag};
 use yew::{
   virtual_dom::{ApplyAttributeAs, Attributes, VNode},
   AttrValue,
 };
+use base64::{Engine as _, engine::general_purpose};
+
 
 use crate::{components::Selection, model::ChatMessage, utils::get_chat_history};
 
@@ -130,4 +135,68 @@ pub fn get_textarea_selection_offset(html: HtmlTextAreaElement, value: &str) -> 
     start: get_selection_offset(html.selection_start(), value),
     end: get_selection_offset(html.selection_end(), value),
   }
+}
+
+pub async fn read_file(file: web_sys::File) -> Result<js_sys::ArrayBuffer, JsValue> {
+  let file_reader = FileReader::new().unwrap();
+  let file_reader_clone = file_reader.clone();
+  let (tx, rx) = oneshot::channel::<Result<JsValue, JsValue>>();
+  let tx = Rc::new(RefCell::new(Some(tx)));
+
+  {
+    let tx = tx.clone();
+    let file_reader_ok = file_reader.clone();
+    let onload = Closure::once(move || {
+      let result = file_reader_ok.result().unwrap();
+      let tx_opt = tx.borrow_mut().take();
+      if let Some(tx) = tx_opt {
+        let _ = tx.send(Ok(result));
+      }
+    });
+
+    file_reader.set_onload(Some(onload.as_ref().unchecked_ref()));
+    onload.forget();
+  }
+
+  {
+    let tx = tx.clone();
+    let file_reader_none = file_reader.clone();
+    let onerror = Closure::once(move || {
+      let error = file_reader_none.error().unwrap();
+      let tx_opt = tx.borrow_mut().take();
+      if let Some(tx) = tx_opt {
+        let _ = tx.send(Err(error.into()));
+      }
+    });
+
+    file_reader_clone.set_onerror(Some(onerror.as_ref().unchecked_ref()));
+    onerror.forget();
+  }
+
+  file_reader.read_as_array_buffer(&file)?;
+  let result = rx
+    .await
+    .map_err(|_| JsValue::from_str("oneshot channel canceled"))?;
+  result.map(|v| v.dyn_into().unwrap())
+}
+
+pub fn create_image_url(array_buffer: &ArrayBuffer, mime_type: &str) -> Result<String, JsValue> {
+  let blob = Blob::new_with_u8_array_sequence_and_options(
+    &Uint8Array::new(array_buffer),
+    BlobPropertyBag::new().type_(mime_type),
+  )?;
+
+  let url = Url::create_object_url_with_blob(&blob)?;
+  log!("url", url.clone());
+  Ok(url)
+} 
+
+pub fn create_base64_string(array_buffer: &ArrayBuffer) -> String {
+  let uint8_array = Uint8Array::new(&array_buffer);
+  let length = uint8_array.length() as usize;
+  let mut vec = vec![0; length];
+  uint8_array.copy_to(&mut vec);
+
+  let base64 = general_purpose::STANDARD.encode(&vec);
+  format!("data:image/png;base64,{}", base64)
 }

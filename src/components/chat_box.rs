@@ -1,10 +1,12 @@
 use bounce::use_atom_value;
+use gloo_console::log;
+use js_sys::ArrayBuffer;
 use stylist::{self, style};
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
 
 use crate::{
-  components::{ChatText, ChatValue, EmojiBox, Selection},
+  components::{ChatText, ChatValue, EmojiBox, ImageInput, Selection},
   hook::{use_chat, use_click_exclusive},
   model::{ChatMessage, Message},
   store::User,
@@ -21,7 +23,7 @@ pub fn ChatBox() -> Html {
     start: None,
     end: None,
   });
-  let (add, update_state) = use_chat();
+  let (add_message, update_message_state) = use_chat();
 
   let emoji_class = class_name_determine(*visible, "tool-icon", "active");
 
@@ -62,6 +64,8 @@ pub fn ChatBox() -> Html {
   let send_callback = {
     let text = text.clone();
     let visible = visible.clone();
+    let add = add_message.clone();
+    let user_name = user_name.clone();
     move |_| {
       add(ChatMessage::new(
         user_name.name.clone(),
@@ -95,6 +99,16 @@ pub fn ChatBox() -> Html {
     }
   };
 
+  let image_input_callback = {
+    let add = add_message.clone();
+    Callback::from(move |buffer: ArrayBuffer| {
+      add(ChatMessage::new(
+        user_name.name.clone(),
+        Message::Image(buffer),
+      ));
+    })
+  };
+
   use_click_exclusive(vec![format!(".{}", class_name)], callback);
 
   html! {
@@ -107,7 +121,7 @@ pub fn ChatBox() -> Html {
       </div>
       <div class="chat-tool">
         <Icon onclick={emoji_visible_callback} icon_id={IconId::BootstrapEmojiSmile} class={Classes::from(emoji_class)} width="16px" height="16px" />
-        <Icon icon_id={IconId::FontAwesomeRegularImages} class="tool-icon" width="16px" height="16px" />
+        <ImageInput onchange={image_input_callback} />
         <Icon icon_id={IconId::HeroiconsSolidMicrophone} class="tool-icon" width="16px" height="16px" />
       </div>
     </div>

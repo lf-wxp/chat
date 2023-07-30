@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use bounce::{use_atom, use_atom_value};
 use yew::prelude::*;
 
@@ -8,12 +10,12 @@ use crate::{
 };
 
 #[hook]
-pub fn use_chat() -> (Box<dyn Fn(ChatMessage)>, Box<dyn Fn(String, MessageState)>) {
+pub fn use_chat() -> (Rc<dyn Fn(ChatMessage)>, Rc<dyn Fn(String, MessageState)>) {
   let chat = use_atom_value::<Chat>();
   let refresh = use_atom::<Refresh>();
   let add = {
     let chat = chat.clone();
-    Box::new(move |chat_message: ChatMessage| {
+    Rc::new(move |chat_message: ChatMessage| {
       get_history(&chat.0).and_then(|x| {
         x.push(chat_message);
         refresh.set(refresh.refresh());
@@ -21,7 +23,7 @@ pub fn use_chat() -> (Box<dyn Fn(ChatMessage)>, Box<dyn Fn(String, MessageState)
       });
     })
   };
-  let update_state = Box::new(move |uuid: String, state: MessageState| {
+  let update_state = Rc::new(move |uuid: String, state: MessageState| {
     get_history(&chat.0).and_then(|x| {
       x.iter_mut().find(|x| x.uuid == uuid).and_then(|x| {
         x.state = state;
