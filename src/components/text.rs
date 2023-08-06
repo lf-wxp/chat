@@ -6,7 +6,7 @@ use yew::{prelude::*, Callback};
 
 use crate::{
   store::{Theme, Volume},
-  utils::style,
+  utils::style, components::{use_notify, NoticeTag},
 };
 
 #[function_component]
@@ -15,10 +15,11 @@ pub fn Text() -> Html {
   let theme = use_atom_value::<Theme>();
   let theme_set = use_atom::<Theme>();
   let volume_value = use_atom_value::<Volume>();
+  let notify = use_notify();
 
   let onclick = Callback::from(move |e: MouseEvent| {
     theme_set.set(Theme::Light);
-    log!("the event is ", e);
+    notify("content".to_string(), NoticeTag::Info, Some(3));
   });
 
   html! {

@@ -6,7 +6,7 @@ use web_sys::HtmlInputElement;
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
 
-use crate::utils::{get_target, read_file, style};
+use crate::utils::{get_target, read_file, style };
 
 #[derive(Properties, PartialEq)]
 pub struct Props {

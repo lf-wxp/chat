@@ -14,6 +14,7 @@ pub mod chat_text;
 pub mod emoji_box;
 pub mod fake_set;
 pub mod image_input;
+pub mod notify;
 
 pub use text::*;
 pub use background::*;
@@ -31,3 +32,4 @@ pub use chat_text::*;
 pub use emoji_box::*;
 pub use fake_set::*;
 pub use image_input::*;
+pub use notify::*;
