@@ -1,9 +1,10 @@
 use stylist::{self, style};
 use yew::prelude::*;
+use yew_icons::{Icon, IconId};
 
 use super::NoticeContext;
 use crate::{
-  components::{use_remove_notify, Notice, NoticeState},
+  components::{use_remove_notify, Notice, NoticeState, NoticeTag},
   utils::style,
 };
 
@@ -27,6 +28,21 @@ pub fn Notify() -> Html {
     }
   });
 
+  let icon_id = |item: Notice| match item.tag {
+    NoticeTag::Success => IconId::BootstrapCheckCircleFill,
+    _ => IconId::BootstrapInfoCircleFill,
+  };
+
+  let icon_class = |item: Notice| {
+    let theme = match item.tag {
+      NoticeTag::Success => "success",
+      NoticeTag::Danger => "danger",
+      NoticeTag::Info => "info",
+      NoticeTag::Warning => "warning",
+    };
+    Classes::from(format!("icon {theme}"))
+  };
+
   html! {
     if notice_list.iter().len() > 0 {
       <div class={class_name} >
@@ -38,6 +54,12 @@ pub fn Notify() -> Html {
               class={class_fn(item.clone())}
               onanimationend={remove_fn.reform(move |_| notice.clone())}
             >
+              <Icon
+                icon_id={icon_id(item.clone())}
+                class={icon_class(item.clone())}
+                width="16px"
+                height="16px"
+              />
               {item.content.clone()}
             </div>
         }})}
@@ -67,9 +89,26 @@ fn get_class_name() -> String {
           margin-block-end: 10px;
           transition: all 0.2s ease;
           animation: fadeIn 0.2s;
+          display: flex;
+          align-items: center;
         }
         .perish {
           animation: fadeOut 0.2s;
+        }
+        .icon {
+          margin-inline-end: 5px;
+        }
+        .icon.danger {
+          color: var(--danger-color);
+        }
+        .icon.warning {
+          color: var(--warning-color);
+        }
+        .icon.info {
+          color: var(--info-color);
+        }
+        .icon.success {
+          color: var(--success-color);
         }
 
         @keyframes fadeIn {

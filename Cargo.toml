@@ -56,4 +56,6 @@ yew_icons = {version = "0.7.2", features = [
   "BootstrapSendFill",
   "HeroiconsSolidMicrophone",
   "FontAwesomeRegularImages",
+  "BootstrapCheckCircleFill",
+  "BootstrapInfoCircleFill",
 ]}
