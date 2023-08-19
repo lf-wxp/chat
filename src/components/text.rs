@@ -17,7 +17,7 @@ pub fn Text() -> Html {
   let volume_value = use_atom_value::<Volume>();
   let notify = use_notify();
 
-  let onclick = Callback::from(move |e: MouseEvent| {
+  let onclick = Callback::from(move |_e: MouseEvent| {
     theme_set.set(Theme::Light);
     notify("content".to_string(), NoticeTag::Info, Some(3));
   });

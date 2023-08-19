@@ -15,6 +15,13 @@ pub enum NoticeTag {
 pub enum NoticeAction {
   Append(Notice),
   Remove(String),
+  PreRemove(String),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum NoticeState {
+  Exist,
+  Perish,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -23,6 +30,7 @@ pub struct Notice {
   pub content: String,
   pub tag: NoticeTag,
   pub duration: Option<u32>,
+  pub state: NoticeState,
 }
 
 impl Notice {
@@ -33,11 +41,12 @@ impl Notice {
       content,
       tag,
       duration,
+      state: NoticeState::Exist,
     }
   }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct NoticeList(pub Vec<Notice>);
 
 impl Reducible for NoticeList {
@@ -60,15 +69,27 @@ impl Reducible for NoticeList {
         notices.remove(idx);
         Rc::new(NoticeList(notices))
       }
+      NoticeAction::PreRemove(id) => {
+        let idx = self
+          .0
+          .iter()
+          .position(|x| x.id == id)
+          .unwrap_or(usize::MAX);
+        let mut notices = self.0.clone();
+        if let Some(notice) = notices.get_mut(idx) {
+          notice.state = NoticeState::Perish;
+        }
+        Rc::new(NoticeList(notices))
+      }
     }
   }
 }
 
-impl Default for NoticeList {
-  fn default() -> Self {
-    NoticeList(vec![])
-  }
-}
+// impl Default for NoticeList {
+//   fn default() -> Self {
+//     NoticeList(vec![])
+//   }
+// }
 
 pub type NoticeContext = UseReducerHandle<NoticeList>;
 
@@ -80,7 +101,7 @@ pub struct NotifyProviderProps {
 
 #[function_component]
 pub fn NotifyProvider(props: &NotifyProviderProps) -> Html {
-  let notice = use_reducer(|| NoticeList::default());
+  let notice = use_reducer(NoticeList::default);
 
   html! {
     <ContextProvider<NoticeContext> context={notice}>
