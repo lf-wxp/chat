@@ -2,11 +2,14 @@ use gloo_console::log;
 use js_sys::ArrayBuffer;
 use stylist::{self, style};
 use wasm_bindgen::JsCast;
-use web_sys::HtmlInputElement;
+use web_sys::{File, HtmlInputElement};
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
 
-use crate::utils::{get_target, read_file, style };
+use crate::{
+  components::{use_notify, NoticeTag},
+  utils::{get_target, read_file, style},
+};
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
@@ -17,6 +20,7 @@ pub struct Props {
 pub fn ImageInput(props: &Props) -> Html {
   let class_name = get_class_name();
   let input_node_ref = use_node_ref();
+  let notify = use_notify();
 
   let onclick = {
     let input_node_ref = input_node_ref.clone();
@@ -29,6 +33,18 @@ pub fn ImageInput(props: &Props) -> Html {
       }
     })
   };
+  let validate = move |file: &File| -> bool {
+    let size = file.size();
+    if (size / 1024f64) > 1024f64 {
+      notify(
+        "Image size limit over 1M".to_string(),
+        NoticeTag::Warning,
+        Some(3),
+      );
+      return false;
+    }
+    true
+  };
 
   let onchange = {
     let change = props.onchange.clone();
@@ -36,8 +52,13 @@ pub fn ImageInput(props: &Props) -> Html {
       let target = get_target::<Event, HtmlInputElement>(e);
       if let Some(target) = target {
         let change = change.clone();
+        let validate = validate.clone();
         if let Some(file) = target.files().and_then(|x| x.get(0)) {
           wasm_bindgen_futures::spawn_local(async move {
+            let valid = validate(&file);
+            if !valid {
+              return;
+            };
             let buffer = read_file(file).await.unwrap();
             change.emit(buffer);
           });
