@@ -25,6 +25,7 @@ js-sys = "0.3.64"
 nanoid = "0.4.0"
 pinyin = "0.10.0"
 rand = "0.8.5"
+serde = {version = "1.0.183", features = ["derive"]}
 stylist = {version = "0.12.1", features = ["yew_integration"]}
 unicode-segmentation = "1.10.1"
 wasm-bindgen = "0.2.87"
@@ -38,7 +39,20 @@ web-sys = {version = "0.3.64", features = [
   "DomStringMap",
   "HtmlTextAreaElement",
   "Blob",
+  "BlobEvent",
+  "BlobPropertyBag",
   "Url",
+  "MediaRecorder",
+  "MediaStreamConstraints",
+  "AudioContext",
+  "AnalyserNode",
+  "MediaStream",
+  "MediaDevices",
+  "Navigator",
+  "EventListener",
+  "EventTarget",
+  "BaseAudioContext",
+  "MediaStreamAudioSourceNode"
 ]}
 yew = {version = "0.20.0", features = ["csr"]}
 yew-hooks = "0.2.0"
