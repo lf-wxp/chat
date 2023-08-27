@@ -16,21 +16,18 @@ pub fn use_chat() -> (Rc<dyn Fn(ChatMessage)>, Rc<dyn Fn(String, MessageState)>)
   let add = {
     let chat = chat.clone();
     Rc::new(move |chat_message: ChatMessage| {
-      get_history(&chat.0).and_then(|x| {
+      if let Some(x) = get_history(&chat.0) {
         x.push(chat_message);
         refresh.set(refresh.refresh());
-        Some(())
-      });
+      }
     })
   };
   let update_state = Rc::new(move |uuid: String, state: MessageState| {
-    get_history(&chat.0).and_then(|x| {
-      x.iter_mut().find(|x| x.uuid == uuid).and_then(|x| {
+    if let Some(x) = get_history(&chat.0) {
+      if let Some(x) = x.iter_mut().find(|x| x.uuid == uuid) {
         x.state = state;
-        Some(())
-      });
-      Some(())
-    });
+      };
+    }
   });
   (add, update_state)
 }

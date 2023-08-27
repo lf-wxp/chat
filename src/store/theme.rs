@@ -1,15 +1,36 @@
 use bounce::Atom;
 use std::fmt::{self, Display};
 
-#[derive(Atom, PartialEq)]
+pub struct ThemeColor {
+  pub theme_color: String,
+  pub primary_color: String,
+  pub ancillary_color: String,
+  pub font_color: String,
+}
+
+#[derive(Atom, PartialEq, Default)]
 pub enum Theme {
   Light,
+  #[default]
   Dark,
 }
 
-impl Default for Theme {
-  fn default() -> Self {
-    Theme::Dark
+impl Theme {
+  pub fn get_color(&self) -> ThemeColor {
+    match *self {
+      Theme::Dark => ThemeColor {
+        theme_color: "#161c20".to_string(),
+        ancillary_color: "#262d33".to_string(),
+        primary_color: "#51b66d".to_string(),
+        font_color: "white".to_string(),
+      },
+      Theme::Light => ThemeColor {
+        theme_color: "#161c20".to_string(),
+        primary_color: "#51b66d".to_string(),
+        ancillary_color: "#262d33".to_string(),
+        font_color: "white".to_string(),
+      },
+    }
   }
 }
 

@@ -1,5 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
+use gloo_console::log;
 use gloo_utils::format::JsValueSerdeExt;
 use js_sys::Array;
 use serde::Serialize;
@@ -14,18 +15,22 @@ use web_sys::{
 use super::{get_window, request_animation_frame};
 
 #[derive(Serialize)]
-struct Constraints {
+pub struct Constraints {
   device_id: String,
   echo_cancellation: bool,
 }
 
-struct VisualizeColor {
-  background: String,
-  rect_color: String,
-  opacity: f64,
+#[derive(Clone)]
+pub struct VisualizeColor {
+  pub background: String,
+  pub rect_color: String,
+  pub opacity: f64,
 }
-struct WaveRecorder {
-  chunks: Rc<RefCell<Vec<Blob>>>,
+
+
+#[derive(Clone)]
+pub struct WaveRecorder {
+  pub chunks: Rc<RefCell<Vec<Blob>>>,
   recorder: Option<MediaRecorder>,
   canvas: Option<HtmlCanvasElement>,
   visualize_color: VisualizeColor,
@@ -75,13 +80,19 @@ impl WaveRecorder {
     self.canvas.as_ref().ok_or("Failed to get canvas ")
   }
 
+  pub fn set_canvas(&mut self, canvas: Option<HtmlCanvasElement>) -> () {
+    self.canvas = canvas;
+  }
+
   pub async fn start(&mut self) -> Result<(), JsValue> {
     let stream = self.get_media().await?;
     if let Some(canvas) = &self.canvas {
       let recorder = MediaRecorder::new_with_media_stream(&stream).ok();
       self.recorder = recorder;
       self.bind_event()?;
-      self.get_recorder()?.start()?;
+      self.get_recorder()?.start_with_time_slice(100)?;
+      self.visualize_stream_connect(stream)?;
+      self.animate_drawing();
     }
     Ok(())
   }
@@ -89,7 +100,9 @@ impl WaveRecorder {
   pub fn bind_event(&mut self) -> Result<(), JsValue> {
     let chunks = self.chunks.clone();
     let callback = Closure::wrap(Box::new(move |event: BlobEvent| {
+      log!("dataavailable");
       if let Some(blob) = event.data() {
+        log!("the blob", blob.clone());
         chunks.borrow_mut().push(blob);
       }
     }) as Box<dyn FnMut(_)>);
@@ -100,7 +113,7 @@ impl WaveRecorder {
     Ok(())
   }
 
-  pub async fn stop(&mut self) -> Result<(), JsValue> {
+  pub async fn stop(&mut self) -> Result<Blob, JsValue> {
     let stop_promise = js_sys::Promise::new(&mut |resolve, reject| {
       let chunks = self.chunks.borrow();
       let blob_parts = Array::new_with_length(chunks.len() as u32);
@@ -119,8 +132,9 @@ impl WaveRecorder {
       );
     });
     self.get_recorder()?.stop()?;
-    JsFuture::from(stop_promise).await?;
-    Ok(())
+    let js_blob = JsFuture::from(stop_promise).await?;
+    let blob = wasm_bindgen::JsCast::unchecked_into::<Blob>(js_blob);
+    Ok(blob)
   }
 
   pub fn set_color(&mut self, visualize_color: VisualizeColor) {
@@ -211,11 +225,12 @@ impl WaveRecorder {
     Ok(())
   }
 
-  pub fn animate_drawing(self) -> () {
+  pub fn animate_drawing(&self) -> () {
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
+    let wave = self.clone();
     *g.borrow_mut() = Some(Closure::new(move || {
-      self.visualize().unwrap();
+      wave.visualize();
       request_animation_frame(f.borrow().as_ref().unwrap());
     }));
     request_animation_frame(g.borrow().as_ref().unwrap());

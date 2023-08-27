@@ -53,7 +53,7 @@ fn get_class_name() -> String {
       
       :hover, &.active {
         background: var(--theme-color);
-        color: #51b66d;
+        color: var(--primary-color);
       }
     "#
   ))
