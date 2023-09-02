@@ -1,15 +1,15 @@
 use gloo_console::log;
 use js_sys::ArrayBuffer;
 use stylist::{self, style};
-use wasm_bindgen::JsCast;
+use wasm_bindgen_futures::spawn_local;
 use web_sys::{Blob, File, HtmlInputElement};
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
 
 use crate::{
   components::{use_notify, NoticeTag},
-  utils::{get_target, read_file, style, wave_recorder},
   hook::use_wave_recorder,
+  utils::{get_dpr, get_target, read_file, style, wave_recorder},
 };
 
 #[derive(Properties, PartialEq)]
@@ -22,19 +22,41 @@ pub fn VoiceInput(props: &Props) -> Html {
   let class_name = get_class_name();
   let visible = use_state(|| false);
   let (canvas_node_ref, start, end) = use_wave_recorder();
-
+  let get_blob = {
+    let onchange = props.onchange.clone();
+    move |blob: Blob| {
+      onchange.emit(blob);
+    }
+  };
   let onclick = {
     let visible = visible.clone();
+    let get_blob = get_blob.clone();
     Callback::from(move |_| {
-      visible.set(!*visible);
+      let val = !*visible;
+      visible.set(val);
+      if val {
+        start();
+      } else {
+        let end = end.clone();
+        let get_blob = get_blob.clone();
+        let future = async move {
+          if let Ok(blob) = end().await {
+            get_blob(blob);
+          }
+        };
+        spawn_local(future);
+      }
     })
   };
+
+  let width = format!("{}", get_dpr() * 200.0);
+  let height = format!("{}", get_dpr() * 40.0);
 
   html! {
     <div class={class_name}>
       if *visible {
         <div class="popup">
-          <canvas ref={canvas_node_ref} width="200" height="40"/>
+          <canvas ref={canvas_node_ref} {width} {height} />
         </div>
       }
       <Icon {onclick} icon_id={IconId::HeroiconsSolidMicrophone} class="icon" width="16px" height="16px" />
@@ -62,6 +84,7 @@ fn get_class_name() -> String {
       .popup {
         inline-size: 200px;
         block-size: 40px;
+        padding: 5px;
         position: absolute;
         background: rgba(var(--theme-color-rgb, 0.7));
         border-radius: calc(var(--radius) / 2);
@@ -69,6 +92,8 @@ fn get_class_name() -> String {
         left: 0;
       }
       .popup canvas {
+        width: 100%;
+        height: 100%;
         overflow: hidden;
         border-radius: calc(var(--radius) / 2);
       }

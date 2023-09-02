@@ -1,6 +1,4 @@
 use std::{cell::RefCell, rc::Rc};
-
-use gloo_console::log;
 use gloo_utils::format::JsValueSerdeExt;
 use js_sys::Array;
 use serde::Serialize;
@@ -27,7 +25,6 @@ pub struct VisualizeColor {
   pub opacity: f64,
 }
 
-
 #[derive(Clone)]
 pub struct WaveRecorder {
   pub chunks: Rc<RefCell<Vec<Blob>>>,
@@ -37,7 +34,7 @@ pub struct WaveRecorder {
   constraints: MediaStreamConstraints,
   audio_ctx: Option<AudioContext>,
   analyser: Option<AnalyserNode>,
-  animation_handler: Option<u8>,
+  running: Rc<RefCell<bool>>,
 }
 
 impl WaveRecorder {
@@ -59,7 +56,7 @@ impl WaveRecorder {
       constraints,
       audio_ctx: None,
       analyser: None,
-      animation_handler: Some(0),
+      running: Rc::new(RefCell::new(false)),
     })
   }
   pub async fn get_media(&self) -> Result<MediaStream, JsValue> {
@@ -86,11 +83,12 @@ impl WaveRecorder {
 
   pub async fn start(&mut self) -> Result<(), JsValue> {
     let stream = self.get_media().await?;
-    if let Some(canvas) = &self.canvas {
+    if let Some(_) = &self.canvas {
       let recorder = MediaRecorder::new_with_media_stream(&stream).ok();
       self.recorder = recorder;
       self.bind_event()?;
       self.get_recorder()?.start_with_time_slice(100)?;
+      *self.running.borrow_mut() = true;
       self.visualize_stream_connect(stream)?;
       self.animate_drawing();
     }
@@ -100,9 +98,7 @@ impl WaveRecorder {
   pub fn bind_event(&mut self) -> Result<(), JsValue> {
     let chunks = self.chunks.clone();
     let callback = Closure::wrap(Box::new(move |event: BlobEvent| {
-      log!("dataavailable");
       if let Some(blob) = event.data() {
-        log!("the blob", blob.clone());
         chunks.borrow_mut().push(blob);
       }
     }) as Box<dyn FnMut(_)>);
@@ -124,14 +120,16 @@ impl WaveRecorder {
       options.type_("audio/ogg; codecs=opus");
       Blob::new_with_u8_array_sequence_and_options(&blob_parts, &options).map_or_else(
         |err| {
-          let _ = reject.call0(&err);
+          let _ = reject.call1(&JsValue::undefined(), &err);
         },
         |blob| {
-          let _ = resolve.call0(&blob);
+          let _ = resolve.call1(&JsValue::undefined(), &blob);
         },
       );
     });
     self.get_recorder()?.stop()?;
+    *self.running.borrow_mut() = false;
+    self.chunks.borrow_mut().clear();
     let js_blob = JsFuture::from(stop_promise).await?;
     let blob = wasm_bindgen::JsCast::unchecked_into::<Blob>(js_blob);
     Ok(blob)
@@ -142,7 +140,6 @@ impl WaveRecorder {
   }
 
   pub fn visualize_stream_connect(&mut self, stream: MediaStream) -> Result<(), JsValue> {
-    let canvas = self.get_canvas()?;
     self.audio_ctx = AudioContext::new().ok();
     self.analyser = self
       .audio_ctx
@@ -189,9 +186,9 @@ impl WaveRecorder {
       .as_ref()
       .ok_or("Failed to get buffer length")?
       .frequency_bin_count();
-    let mut data_array: Vec<u8> = vec![];
+    let mut data_array: Vec<u8> = vec![0; buffer_length.try_into().unwrap()];
     let mut x = 0f64;
-    let bar_width = 2f64;
+    let bar_width = 4f64;
     let canvas_context = self
       .get_canvas()?
       .get_context("2d")?
@@ -208,7 +205,6 @@ impl WaveRecorder {
     canvas_context.set_global_alpha(self.visualize_color.opacity);
     canvas_context.set_fill_style(&JsValue::from_str(&self.visualize_color.background));
     canvas_context.fill_rect(0f64, 0f64, canvas_width as f64, canvas_height as f64);
-
     for i in 0..buffer_length {
       let bar_height = (data_array.get(i as usize).unwrap_or(&0) / 4) as f64;
       canvas_context.set_fill_style(&JsValue::from_str(&self.visualize_color.rect_color));
@@ -230,8 +226,10 @@ impl WaveRecorder {
     let g = f.clone();
     let wave = self.clone();
     *g.borrow_mut() = Some(Closure::new(move || {
-      wave.visualize();
-      request_animation_frame(f.borrow().as_ref().unwrap());
+      let _ = wave.visualize();
+      if *wave.running.borrow() {
+        request_animation_frame(f.borrow().as_ref().unwrap());
+      }
     }));
     request_animation_frame(g.borrow().as_ref().unwrap());
   }

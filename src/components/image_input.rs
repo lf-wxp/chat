@@ -1,4 +1,3 @@
-use gloo_console::log;
 use js_sys::ArrayBuffer;
 use stylist::{self, style};
 use wasm_bindgen::JsCast;
@@ -8,7 +7,7 @@ use yew_icons::{Icon, IconId};
 
 use crate::{
   components::{use_notify, NoticeTag},
-  utils::{get_target, read_file, style},
+  utils::{get_target, read_file, style, global},
 };
 
 #[derive(Properties, PartialEq)]
@@ -35,7 +34,7 @@ pub fn ImageInput(props: &Props) -> Html {
   };
   let validate = move |file: &File| -> bool {
     let size = file.size();
-    if (size / 1024f64) > 1024f64 {
+    if (size / 1024f64) > (global::IMAGE_FILE_SIZE * 1024f64) {
       notify(
         "Image size limit over 1M".to_string(),
         NoticeTag::Warning,

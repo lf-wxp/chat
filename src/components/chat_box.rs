@@ -117,6 +117,7 @@ pub fn ChatBox() -> Html {
       //   user_name.name.clone(),
       //   Message::Image(buffer),
       // ));
+      log!("input voice", blob);
     })
   };
 

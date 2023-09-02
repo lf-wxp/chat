@@ -1,18 +1,16 @@
-use futures::channel::oneshot;
-use gloo_console::log;
+use base64::{engine::general_purpose, Engine as _};
 use indexmap::{self, IndexMap};
 use js_sys::{ArrayBuffer, Uint8Array};
 use rand::{self, Rng};
-use std::{cell::RefCell, ops::Range, rc::Rc};
+use wasm_bindgen_futures::JsFuture;
+use std::ops::Range;
 use unicode_segmentation::UnicodeSegmentation;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
-use web_sys::{window, FileReader, HtmlTextAreaElement, Window, Blob, Url, BlobPropertyBag};
+use web_sys::{window, Blob, BlobPropertyBag, FileReader, HtmlTextAreaElement, Url, Window, Event};
 use yew::{
   virtual_dom::{ApplyAttributeAs, Attributes, VNode},
   AttrValue,
 };
-use base64::{Engine as _, engine::general_purpose};
-
 
 use crate::{components::Selection, model::ChatMessage, utils::get_chat_history};
 
@@ -32,6 +30,13 @@ pub fn num_in_range(start: f64, end: f64, num: f64) -> f64 {
 
 pub fn get_window() -> Window {
   window().expect("no global `window` exists")
+}
+
+pub fn get_dpr() -> f64 {
+  if let Some(w) = window() {
+    return w.device_pixel_ratio();
+  }
+  1.0
 }
 
 pub fn request_animation_frame(f: &Closure<dyn FnMut()>) {
@@ -138,46 +143,25 @@ pub fn get_textarea_selection_offset(html: HtmlTextAreaElement, value: &str) -> 
 }
 
 pub async fn read_file(file: web_sys::File) -> Result<js_sys::ArrayBuffer, JsValue> {
-  let file_reader = FileReader::new().unwrap();
-  let file_reader_clone = file_reader.clone();
-  let (tx, rx) = oneshot::channel::<Result<JsValue, JsValue>>();
-  let tx = Rc::new(RefCell::new(Some(tx)));
-
-  {
-    let tx = tx.clone();
+  let promise = js_sys::Promise::new(&mut |resolve, reject| {
+    let file_reader = FileReader::new().unwrap();
     let file_reader_ok = file_reader.clone();
-    let onload = Closure::once(move || {
-      let result = file_reader_ok.result().unwrap();
-      let tx_opt = tx.borrow_mut().take();
-      if let Some(tx) = tx_opt {
-        let _ = tx.send(Ok(result));
-      }
-    });
-
-    file_reader.set_onload(Some(onload.as_ref().unchecked_ref()));
-    onload.forget();
-  }
-
-  {
-    let tx = tx.clone();
-    let file_reader_none = file_reader.clone();
-    let onerror = Closure::once(move || {
-      let error = file_reader_none.error().unwrap();
-      let tx_opt = tx.borrow_mut().take();
-      if let Some(tx) = tx_opt {
-        let _ = tx.send(Err(error.into()));
-      }
-    });
-
-    file_reader_clone.set_onerror(Some(onerror.as_ref().unchecked_ref()));
-    onerror.forget();
-  }
-
-  file_reader.read_as_array_buffer(&file)?;
-  let result = rx
-    .await
-    .map_err(|_| JsValue::from_str("oneshot channel canceled"))?;
-  result.map(|v| v.dyn_into().unwrap())
+    let load = Closure::wrap(Box::new(move |_event: Event| {
+      let array_buffer: js_sys::ArrayBuffer = file_reader_ok.result().unwrap().dyn_into().unwrap();
+      let _ = resolve.call1(&JsValue::undefined(), &array_buffer);
+    }) as Box<dyn FnMut(_)>);
+    let error = Closure::wrap(Box::new(move |err: JsValue| {
+      let _ = reject.call1(&JsValue::undefined(), &err);
+    }) as Box<dyn FnMut(_)>);
+    let _ = file_reader.add_event_listener_with_callback("load", load.as_ref().unchecked_ref());
+    let _ = file_reader.add_event_listener_with_callback("error", error.as_ref().unchecked_ref());
+    let _ = file_reader.read_as_array_buffer(&file);
+    load.forget();
+    error.forget();
+  });
+  let array_buffer = JsFuture::from(promise).await?;
+  let array_buffer: js_sys::ArrayBuffer = array_buffer.dyn_into()?;
+  Ok(array_buffer)
 }
 
 pub fn create_image_url(array_buffer: &ArrayBuffer, mime_type: &str) -> Result<String, JsValue> {
@@ -187,9 +171,8 @@ pub fn create_image_url(array_buffer: &ArrayBuffer, mime_type: &str) -> Result<S
   )?;
 
   let url = Url::create_object_url_with_blob(&blob)?;
-  log!("url", url.clone());
   Ok(url)
-} 
+}
 
 pub fn create_base64_string(array_buffer: &ArrayBuffer) -> String {
   let uint8_array = Uint8Array::new(&array_buffer);

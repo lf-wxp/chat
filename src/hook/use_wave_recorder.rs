@@ -1,7 +1,7 @@
 use std::rc::Rc;
+use std::pin::Pin;
 
 use bounce::use_atom_value;
-use gloo_console::log;
 use wasm_bindgen::JsValue;
 use web_sys::{Blob, HtmlCanvasElement};
 use yew::prelude::*;
@@ -15,7 +15,7 @@ use crate::{
 pub fn use_wave_recorder() -> (
   NodeRef,
   Rc<dyn Fn()>,
-  Rc<dyn Fn() -> Box<dyn futures::Future<Output = Result<Blob, JsValue>>>>,
+  Rc<dyn Fn() -> Pin<Box<dyn futures::Future<Output = Result<Blob, JsValue>>>>>,
 ) {
   let canvas_node_ref = use_node_ref();
   let theme = use_atom_value::<Theme>();
@@ -45,7 +45,7 @@ pub fn use_wave_recorder() -> (
         if let Ok(recorder) = recorder.as_ref().borrow_mut().as_mut() {
           let canvas = canvas.cast::<HtmlCanvasElement>();
           recorder.set_canvas(canvas);
-          recorder.start().await;
+          let _ = recorder.start().await;
         };
       };
       wasm_bindgen_futures::spawn_local(fut);
@@ -57,13 +57,13 @@ pub fn use_wave_recorder() -> (
     let recorder = recorder.clone();
     Rc::new(move || {
       let recorder = recorder.clone();
-      Box::new(async move {
+      Box::pin(async move {
         if let Ok(recorder) = recorder.as_ref().borrow_mut().as_mut() {
           recorder.stop().await
         } else {
           Err(JsValue::from_str("no blob"))
         }
-      }) as Box<dyn futures::Future<Output = Result<Blob, JsValue>>>
+      }) as Pin<Box<dyn futures::Future<Output = Result<Blob, JsValue>>>>
     })
   };
 
