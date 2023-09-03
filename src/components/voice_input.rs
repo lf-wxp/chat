@@ -1,15 +1,12 @@
-use gloo_console::log;
-use js_sys::ArrayBuffer;
 use stylist::{self, style};
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{Blob, File, HtmlInputElement};
+use web_sys::Blob;
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
 
 use crate::{
-  components::{use_notify, NoticeTag},
   hook::use_wave_recorder,
-  utils::{get_dpr, get_target, read_file, style, wave_recorder},
+  utils::{get_dpr, style},
 };
 
 #[derive(Properties, PartialEq)]

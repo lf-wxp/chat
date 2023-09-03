@@ -78,13 +78,13 @@ impl Ribbon {
     ribbon
   }
 
-  fn create_sections(&mut self) -> () {
+  fn create_sections(&mut self) {
     let mut color = f64::from(random(0..360));
     let mut delay = 0.0;
     let mut point_1 = Point::new(self.start_x, self.start_y);
     let mut point_2 = Point::new(self.start_x, self.start_y);
-    let mut move_x = 0.0;
-    let mut move_y = 0.0;
+    let mut move_x;
+    let mut move_y;
     let mut stop = 500;
     loop {
       if stop <= 0 {
@@ -94,18 +94,18 @@ impl Ribbon {
       let rand_num = || f64::from(random(0..2));
       move_x = ((rand_num() - 0.2) * self.move_speed).round();
       move_y = ((rand_num() - 0.5) * self.height * 0.25).round();
-      let mut point_3 = Point::from(point_2.clone());
+      let mut point_3 = Point::from(point_2);
 
       match self.dir {
         Dir::Right => {
           point_3.add(move_x, move_y);
-          if &point_2.x >= &self.max {
+          if point_2.x >= self.max {
             break;
           }
         }
         Dir::Left => {
           point_3.subtract(move_x, move_y);
-          if &point_2.x <= &self.min {
+          if point_2.x <= self.min {
             break;
           }
         }
@@ -130,7 +130,7 @@ impl Ribbon {
     }
   }
 
-  pub fn set_done(&mut self) -> () {
+  pub fn set_done(&mut self) {
     self.is_done = true;
   }
 }

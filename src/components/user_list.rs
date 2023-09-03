@@ -33,7 +33,7 @@ pub fn UserList() -> Html {
 
   html! {
     <div class={class_name}>
-      { for users.group_with_alphabet(filter_word.0.clone()).iter().filter(|item| item.users.len() > 0).map(|item| {
+      { for users.group_with_alphabet(filter_word.0.clone()).iter().filter(|item| !item.users.is_empty()).map(|item| {
         html!{
           <section class="user-group">
               <header class="group-tag">

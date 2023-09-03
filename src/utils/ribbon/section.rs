@@ -7,7 +7,7 @@ use crate::utils::num_in_range;
 
 use super::{
   point::{Point, PointAction},
-  util::{Dir},
+  util::Dir,
 };
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -21,11 +21,11 @@ pub struct Section {
 }
 
 impl Section {
-  fn points_update_batch(&mut self, callback: &dyn Fn(&mut Point) -> ()) -> () {
+  fn points_update_batch(&mut self, callback: &dyn Fn(&mut Point)) {
     self.points.iter_mut().for_each(callback);
   }
 
-  fn points_update_batch_action(&mut self, action: PointAction, x: f64, y: f64) -> () {
+  fn points_update_batch_action(&mut self, action: PointAction, x: f64, y: f64) {
     match action {
       PointAction::Add => {
         self.points_update_batch(&|point| point.add(x, y));
@@ -61,7 +61,7 @@ impl Section {
     self.phase >= 1.0 && self.alpha <= 0.0
   }
 
-  pub fn update_section(&mut self, is_animate: bool) -> () {
+  pub fn update_section(&mut self, is_animate: bool) {
     if self.delay <= 0.0 {
       self.phase += 0.02;
       self.alpha = self.phase.sin();
@@ -85,7 +85,7 @@ impl Section {
   }
 
   pub fn get_points(&self) -> [Point; 3] {
-    self.points.clone()
+    self.points
   }
 
   pub fn get_style(&self, saturation: String, brightness: String) -> String {
@@ -103,7 +103,7 @@ impl Section {
     stroke_size: f64,
     saturation: String,
     brightness: String,
-  ) -> () {
+  ) {
     let points = self.get_points();
     let style = self.get_style(saturation, brightness);
     ctx.save();

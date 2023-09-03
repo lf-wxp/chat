@@ -85,12 +85,6 @@ impl Reducible for NoticeList {
   }
 }
 
-// impl Default for NoticeList {
-//   fn default() -> Self {
-//     NoticeList(vec![])
-//   }
-// }
-
 pub type NoticeContext = UseReducerHandle<NoticeList>;
 
 #[derive(Properties, Debug, PartialEq)]

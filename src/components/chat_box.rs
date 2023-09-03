@@ -24,7 +24,7 @@ pub fn ChatBox() -> Html {
     start: None,
     end: None,
   });
-  let (add_message, update_message_state) = use_chat();
+  let (add_message, _update_message_state) = use_chat();
 
   let emoji_class = class_name_determine(*visible, "tool-icon", "active");
 

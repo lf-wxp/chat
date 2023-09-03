@@ -22,9 +22,9 @@ pub enum Route {
   NotFound,
 }
 
-impl Into<Key> for Route {
-  fn into(self) -> Key {
-    match self {
+impl From<Route> for Key {
+  fn from(val: Route) -> Self {
+    match val {
       Route::Home => Key::from(Rc::<str>::from("home")),
       Route::User => Key::from(Rc::<str>::from("user")),
       Route::Video => Key::from(Rc::<str>::from("video")),

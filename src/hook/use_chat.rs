@@ -9,8 +9,11 @@ use crate::{
   utils::get_history,
 };
 
+type AddAction = Rc<dyn Fn(ChatMessage)>;
+type UpdateAction = Rc<dyn Fn(String, MessageState)>;
+
 #[hook]
-pub fn use_chat() -> (Rc<dyn Fn(ChatMessage)>, Rc<dyn Fn(String, MessageState)>) {
+pub fn use_chat() -> (AddAction, UpdateAction) {
   let chat = use_atom_value::<Chat>();
   let refresh = use_atom::<Refresh>();
   let add = {

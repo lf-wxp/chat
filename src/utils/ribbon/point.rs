@@ -9,48 +9,48 @@ impl Point {
     Point { x, y }
   }
 
-  pub fn set(&mut self, x: f64, y: f64) -> () {
+  pub fn set(&mut self, x: f64, y: f64) {
     self.x = x;
     self.y = y;
   }
 
-  pub fn multiple(&mut self, x: f64, y: f64) -> () {
+  pub fn multiple(&mut self, x: f64, y: f64) {
     self.x *= x;
     self.y *= y;
   }
 
-  pub fn divide(&mut self, x: f64, y: f64) -> () {
+  pub fn divide(&mut self, x: f64, y: f64) {
     self.x /= x;
     self.y /= y;
   }
 
-  pub fn add(&mut self, x: f64, y: f64) -> () {
+  pub fn add(&mut self, x: f64, y: f64) {
     self.x += x;
     self.y += y;
   }
 
-  pub fn subtract(&mut self, x: f64, y: f64) -> () {
+  pub fn subtract(&mut self, x: f64, y: f64) {
     self.x -= x;
     self.y -= y;
   }
 
-  pub fn clamp_x(&mut self, min: f64, max: f64) -> () {
+  pub fn clamp_x(&mut self, min: f64, max: f64) {
     self.x = min.max(self.x.max(max));
   }
 
-  pub fn clamp_y(&mut self, min: f64, max: f64) -> () {
+  pub fn clamp_y(&mut self, min: f64, max: f64) {
     self.y = min.max(self.y.max(max));
   }
 
-  pub fn flip_x(&mut self) -> () {
+  pub fn flip_x(&mut self) {
     self.x *= -1.0;
   }
 
-  pub fn flip_y(&mut self) -> () {
+  pub fn flip_y(&mut self) {
     self.y *= -1.0;
   }
 
-  pub fn copy(&mut self, point: Point) -> () {
+  pub fn copy(&mut self, point: Point) {
     let Point { x, y } = point;
     self.x = x;
     self.y = y;

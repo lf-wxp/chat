@@ -41,7 +41,7 @@ fn avatar(seed: String, saturation: u32, lightness: u32, hash_fn: impl Fn(&str) 
   let hash = hash_fn(&seed);
   let hue = (hash % COLORS_NB) * (360 / COLORS_NB);
   let size = if !seed.is_empty() { 25 } else { 0 };
-  let rect = (0..size).into_iter().fold("".to_owned(), |acc: String, val| {
+  let rect = (0..size).fold("".to_owned(), |acc: String, val| {
     if hash & (1 << (val % 15)) > 0 {
       format!("{}{}", acc, rect_builder(val))
     } else {

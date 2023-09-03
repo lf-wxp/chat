@@ -39,8 +39,7 @@ impl Dummy<Faker> for Users {
 
 impl Users {
   pub fn group_with_alphabet(&self, keyword: String) -> Vec<UserGroup> {
-    let mut group = ('a'..'z')
-      .into_iter()
+    let mut group = ('a'..='z')
       .map(|x| UserGroup {
         letter: x.to_string(),
         users: vec![],
@@ -59,7 +58,6 @@ impl Users {
         let keyword = keyword.to_lowercase();
         let py_name = (&name[..])
           .to_pinyin()
-          .into_iter()
           .map(|x| x.map_or("".to_string(), |x| x.first_letter().to_string()))
           .collect::<String>();
         name.contains(&keyword) || py_name.contains(&keyword)

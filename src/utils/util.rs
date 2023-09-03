@@ -129,9 +129,7 @@ pub fn get_string_len(s: &str) -> usize {
 
 pub fn get_selection_offset(result: Result<Option<u32>, JsValue>, value: &str) -> Option<u32> {
   result.map_or(None, |x| {
-    x.map_or(None, |x| {
-      Some(get_correct_selection_start(value, x).try_into().unwrap())
-    })
+    x.map(|x| get_correct_selection_start(value, x).try_into().unwrap())
   })
 }
 
@@ -175,7 +173,7 @@ pub fn create_image_url(array_buffer: &ArrayBuffer, mime_type: &str) -> Result<S
 }
 
 pub fn create_base64_string(array_buffer: &ArrayBuffer) -> String {
-  let uint8_array = Uint8Array::new(&array_buffer);
+  let uint8_array = Uint8Array::new(array_buffer);
   let length = uint8_array.length() as usize;
   let mut vec = vec![0; length];
   uint8_array.copy_to(&mut vec);

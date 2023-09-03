@@ -6,7 +6,7 @@ use yew::NodeRef;
 use crate::utils::{get_window, request_animation_frame};
 
 use super::{
-  ribbon::Ribbon,
+  ribbon_item::Ribbon,
   util::{ColorSet, Position},
 };
 pub struct Ribbons {
@@ -23,13 +23,13 @@ pub struct Ribbons {
 }
 
 impl Ribbons {
-  pub fn resize(&mut self) -> () {
+  pub fn resize(&mut self) {
     if let Some(canvas) = self.get_canvas() {
       Ribbons::resize_stage(&canvas)
     }
   }
 
-  pub fn resize_stage(canvas: &HtmlCanvasElement) -> () {
+  pub fn resize_stage(canvas: &HtmlCanvasElement) {
     let container = canvas.parent_element();
     let (width, height) =
       container.map_or_else(|| (0, 0), |e| (e.client_width(), e.client_height()));
@@ -58,7 +58,7 @@ impl Ribbons {
     (canvas.client_width() as f64, canvas.client_height() as f64)
   }
 
-  pub fn add_ribbon(&mut self) -> () {
+  pub fn add_ribbon(&mut self) {
     let (width, height) = self.get_size();
     let ribbon = Ribbon::new(
       width,
@@ -72,7 +72,7 @@ impl Ribbons {
     self.ribbons.push(ribbon);
   }
 
-  fn clear_finished_ribbon(&mut self) -> () {
+  fn clear_finished_ribbon(&mut self) {
     let ribbons: Vec<Ribbon> = self
       .ribbons
       .clone()
@@ -82,7 +82,7 @@ impl Ribbons {
     self.ribbons = ribbons;
   }
 
-  pub fn draw(&mut self) -> () {
+  pub fn draw(&mut self) {
     if let Ok(ctx) = self.get_ctx() {
       self.clear_rect();
       self.clear_finished_ribbon();
@@ -113,7 +113,7 @@ impl Ribbons {
     }
   }
 
-  pub fn animate_drawing(mut self) -> () {
+  pub fn animate_drawing(mut self) {
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
     *g.borrow_mut() = Some(Closure::new(move || {
@@ -123,14 +123,14 @@ impl Ribbons {
     request_animation_frame(g.borrow().as_ref().unwrap());
   }
 
-  fn clear_rect(&mut self) -> () {
+  fn clear_rect(&mut self) {
     if let Ok(ctx) = self.get_ctx() {
       let (width, height) = self.get_size();
       ctx.clear_rect(0.0, 0.0, width, height);
     }
   }
 
-  pub fn bind_event(&mut self) -> () {
+  pub fn bind_event(&mut self) {
     let window = get_window();
     if let Some(canvas) = self.get_canvas() {
       let closure = Closure::<dyn Fn(_)>::new(move |_event: web_sys::Event| {
@@ -143,7 +143,7 @@ impl Ribbons {
     }
   }
 
-  pub fn init(mut self) -> () {
+  pub fn init(mut self) {
     self.resize();
     self.bind_event();
     self.animate_drawing();

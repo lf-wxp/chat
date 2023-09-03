@@ -77,13 +77,13 @@ impl WaveRecorder {
     self.canvas.as_ref().ok_or("Failed to get canvas ")
   }
 
-  pub fn set_canvas(&mut self, canvas: Option<HtmlCanvasElement>) -> () {
+  pub fn set_canvas(&mut self, canvas: Option<HtmlCanvasElement>) {
     self.canvas = canvas;
   }
 
   pub async fn start(&mut self) -> Result<(), JsValue> {
     let stream = self.get_media().await?;
-    if let Some(_) = &self.canvas {
+    if self.canvas.is_some() {
       let recorder = MediaRecorder::new_with_media_stream(&stream).ok();
       self.recorder = recorder;
       self.bind_event()?;
@@ -109,7 +109,7 @@ impl WaveRecorder {
     Ok(())
   }
 
-  pub async fn stop(&mut self) -> Result<Blob, JsValue> {
+  pub async fn stop(&self) -> Result<Blob, JsValue> {
     let stop_promise = js_sys::Promise::new(&mut |resolve, reject| {
       let chunks = self.chunks.borrow();
       let blob_parts = Array::new_with_length(chunks.len() as u32);
@@ -157,7 +157,7 @@ impl WaveRecorder {
       .ok_or("Failed to get audio context")?
       .create_media_stream_source(&stream)?;
     let analyser = self.analyser.as_ref().ok_or("Failed to get analyser")?;
-    source.connect_with_audio_node(&analyser)?;
+    source.connect_with_audio_node(analyser)?;
     Ok(())
   }
 
@@ -210,18 +210,18 @@ impl WaveRecorder {
       canvas_context.set_fill_style(&JsValue::from_str(&self.visualize_color.rect_color));
       WaveRecorder::draw_rounded_rect(
         &canvas_context,
-        x.into(),
+        x,
         canvas_height as f64 / 2.0 - (bar_height / 2.0),
-        bar_width.into(),
+        bar_width,
         bar_height,
-        bar_width as f64 / 2.0,
+        bar_width / 2.0,
       )?;
       x += bar_width * 2.0 + 1.0;
     }
     Ok(())
   }
 
-  pub fn animate_drawing(&self) -> () {
+  pub fn animate_drawing(&self) {
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
     let wave = self.clone();

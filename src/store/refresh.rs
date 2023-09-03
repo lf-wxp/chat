@@ -1,14 +1,8 @@
 use bounce::Atom;
 use std::fmt::{self, Display};
 
-#[derive(Atom, PartialEq)]
+#[derive(Atom, PartialEq, Default)]
 pub struct Refresh(bool);
-
-impl Default for Refresh {
-  fn default() -> Self {
-    Refresh(false)
-  }
-}
 
 impl Refresh {
   pub fn refresh(&self) -> Self {
