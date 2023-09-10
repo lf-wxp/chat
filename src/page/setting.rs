@@ -1,7 +1,7 @@
 use stylist::{self, style};
 use yew::prelude::*;
 
-use crate::utils::style;
+use crate::{utils::style, components::WaveTest};
 
 #[function_component]
 pub fn Setting() -> Html {
@@ -10,6 +10,7 @@ pub fn Setting() -> Html {
   html! {
     <section class={class_name}>
     {{"setting"}}
+    <WaveTest />
     </section>
   }
 }

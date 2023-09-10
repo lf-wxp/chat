@@ -2,11 +2,11 @@ use base64::{engine::general_purpose, Engine as _};
 use indexmap::{self, IndexMap};
 use js_sys::{ArrayBuffer, Uint8Array};
 use rand::{self, Rng};
-use wasm_bindgen_futures::JsFuture;
 use std::ops::Range;
 use unicode_segmentation::UnicodeSegmentation;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
-use web_sys::{window, Blob, BlobPropertyBag, FileReader, HtmlTextAreaElement, Url, Window, Event};
+use wasm_bindgen_futures::JsFuture;
+use web_sys::{window, Blob, BlobPropertyBag, Event, FileReader, HtmlTextAreaElement, Url, Window};
 use yew::{
   virtual_dom::{ApplyAttributeAs, Attributes, VNode},
   AttrValue,

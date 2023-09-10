@@ -1,8 +1,8 @@
-use std::{cell::RefCell, rc::Rc};
 use gloo_utils::format::JsValueSerdeExt;
 use js_sys::Array;
 use serde::Serialize;
 use serde_json::error;
+use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -10,19 +10,14 @@ use web_sys::{
   HtmlCanvasElement, MediaRecorder, MediaStream, MediaStreamConstraints,
 };
 
+use crate::model::VisualizeColor;
+
 use super::{get_window, request_animation_frame};
 
 #[derive(Serialize)]
 pub struct Constraints {
   device_id: String,
   echo_cancellation: bool,
-}
-
-#[derive(Clone)]
-pub struct VisualizeColor {
-  pub background: String,
-  pub rect_color: String,
-  pub opacity: f64,
 }
 
 #[derive(Clone)]
@@ -161,25 +156,6 @@ impl WaveRecorder {
     Ok(())
   }
 
-  pub fn draw_rounded_rect(
-    ctx: &CanvasRenderingContext2d,
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
-    radius: f64,
-  ) -> Result<(), JsValue> {
-    ctx.begin_path();
-    ctx.move_to(x + radius, y);
-    ctx.arc_to(x + width, y, x + width, y + height, radius)?;
-    ctx.arc_to(x + width, y + height, x, y + height, radius)?;
-    ctx.arc_to(x, y + height, x, y, radius)?;
-    ctx.arc_to(x, y, x + width, y, radius)?;
-    ctx.close_path();
-    ctx.fill();
-    Ok(())
-  }
-
   fn visualize(&self) -> Result<(), JsValue> {
     let buffer_length = self
       .analyser
@@ -205,11 +181,11 @@ impl WaveRecorder {
     canvas_context.set_global_alpha(self.visualize_color.opacity);
     canvas_context.set_fill_style(&JsValue::from_str(&self.visualize_color.background));
     canvas_context.fill_rect(0f64, 0f64, canvas_width as f64, canvas_height as f64);
+    canvas_context.begin_path();
     for i in 0..buffer_length {
       let bar_height = (data_array.get(i as usize).unwrap_or(&0) / 4) as f64;
       canvas_context.set_fill_style(&JsValue::from_str(&self.visualize_color.rect_color));
-      WaveRecorder::draw_rounded_rect(
-        &canvas_context,
+      canvas_context.round_rect_with_f64(
         x,
         canvas_height as f64 / 2.0 - (bar_height / 2.0),
         bar_width,
@@ -218,6 +194,8 @@ impl WaveRecorder {
       )?;
       x += bar_width * 2.0 + 1.0;
     }
+    canvas_context.fill();
+    canvas_context.close_path();
     Ok(())
   }
 

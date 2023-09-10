@@ -8,7 +8,8 @@ use yew::prelude::*;
 
 use crate::{
   store::{Theme, ThemeColor},
-  utils::{VisualizeColor, WaveRecorder},
+  utils::WaveRecorder,
+  model::VisualizeColor,
 };
 
 type StartAction = Rc<dyn Fn()>;
