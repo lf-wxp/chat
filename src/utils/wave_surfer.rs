@@ -1,18 +1,23 @@
+use std::rc::Rc;
 use js_sys::ArrayBuffer;
-use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-  AudioContext, AudioContextOptions, Blob, CanvasRenderingContext2d, File, HtmlCanvasElement,
+  AudioContext, AudioContextOptions, Blob, CanvasRenderingContext2d, Event, File, HtmlAudioElement,
+  HtmlCanvasElement, Url,
 };
 
 use crate::model::VisualizeColor;
 
-use super::{get_dpr, get_window, read_file};
+use super::{array_buffer_to_blob_url, get_dpr, get_window, read_file, Timer, WaveProgress};
 
-#[derive(Clone)]
 pub struct WaveSurfer {
   canvas: HtmlCanvasElement,
+  audio: HtmlAudioElement,
+  progress: Rc<WaveProgress>,
   visualize_color: VisualizeColor,
+  is_initial: Option<bool>,
+  timer: Rc<Timer>,
 }
 
 impl WaveSurfer {
@@ -28,15 +33,26 @@ impl WaveSurfer {
     canvas.set_height((height * dpr) as u32);
     canvas.set_width((width * dpr) as u32);
     container_dom.append_child(&canvas)?;
+    let audio = document
+      .create_element("audio")?
+      .dyn_into::<HtmlAudioElement>()?;
+    let progress = WaveProgress::new(container_dom, visualize_color.clone())?;
     Ok(WaveSurfer {
       canvas,
+      audio,
+      progress: Rc::new(progress),
       visualize_color,
+      is_initial: None,
+      timer: Rc::new(Timer::new()),
     })
   }
 
-  pub async fn load_from_array_buffer(&self, array_buffer: ArrayBuffer) -> Result<(), JsValue> {
+  pub async fn load_from_array_buffer(&mut self, array_buffer: ArrayBuffer) -> Result<(), JsValue> {
     let mut options = AudioContextOptions::new();
     options.sample_rate(16000.0);
+    self.subscribe();
+    self.bind_event()?;
+    self.set_src(&array_buffer)?;
     let audio_ctx = AudioContext::new_with_context_options(&options)?;
     let decode_promise = audio_ctx.decode_audio_data(&array_buffer)?;
     let decode_buffer = JsFuture::from(decode_promise).await?;
@@ -46,27 +62,95 @@ impl WaveSurfer {
     Ok(())
   }
 
-  pub async fn load_from_blob(&self, blob: Blob) -> Result<(), JsValue> {
-    let file = File::new_with_blob_sequence(&JsValue::from(blob), "tmp.wav")?;
+  pub async fn load_from_blob(&mut self, blob: Blob) -> Result<(), JsValue> {
+    let file = File::new_with_blob_sequence(&JsValue::from(&blob), "tmp.wav")?;
     let array_buffer = read_file(file).await?;
     self.load_from_array_buffer(array_buffer).await
   }
 
-  pub async fn load_from_file(&self, file: File) -> Result<(), JsValue> {
+  pub async fn load_from_file(&mut self, file: File) -> Result<(), JsValue> {
     let array_buffer = read_file(file).await?;
     self.load_from_array_buffer(array_buffer).await
   }
 
-  pub async fn start(&self) -> Result<(), JsValue> {
+  pub fn start(&self) -> Result<(), JsValue> {
+    self.audio.play();
     Ok(())
   }
 
-  pub async fn stop(self) -> Result<(), JsValue> {
+  pub fn duration(&self) -> f64 {
+    self.audio.duration()
+  }
+
+  pub fn stop(self) -> Result<(), JsValue> {
+    self.audio.pause();
     Ok(())
   }
 
   pub fn set_color(&mut self, visualize_color: VisualizeColor) {
     self.visualize_color = visualize_color;
+  }
+
+  fn set_src(&self, array_buffer: &ArrayBuffer) -> Result<(), JsValue> {
+    let prev_url = self.audio.src();
+    Url::revoke_object_url(&prev_url)?;
+    let url = array_buffer_to_blob_url(array_buffer, "")?;
+    self.audio.set_src(&url);
+    Ok(())
+  }
+
+  fn subscribe(&self) {
+    if self.is_initial.is_some() {
+      return;
+    }
+    let audio = self.audio.clone();
+    let progress = self.progress.clone();
+    self.timer.subscribe(move || {
+      let time = audio.current_time();
+      let width = time / audio.duration() * 100.0;
+      let _ = progress.update_progress(format!("{}%", width));
+    });
+  }
+
+  fn bind_event(&mut self) -> Result<(), JsValue> {
+    if self.is_initial.is_some() {
+      return Ok(());
+    };
+    let audio_clone = self.audio.clone();
+    let progress = self.progress.clone();
+    let timeupdate_callback = Closure::wrap(Box::new(move |_: Event| {
+      let time = audio_clone.current_time();
+      let width = time / audio_clone.duration() * 100.0;
+      let _ = progress.update_progress(format!("{}%", width));
+    }) as Box<dyn FnMut(_)>);
+    self.is_initial = Some(true);
+    self.audio.add_event_listener_with_callback(
+      "timeupdate",
+      timeupdate_callback.as_ref().unchecked_ref(),
+    )?;
+    timeupdate_callback.forget();
+
+    let timer = self.timer.clone();
+    let play_callback = Closure::wrap(Box::new(move |_: Event| {
+      timer.as_ref().start();
+    }) as Box<dyn FnMut(_)>);
+    self
+      .audio
+      .add_event_listener_with_callback("play", play_callback.as_ref().unchecked_ref())?;
+    play_callback.forget();
+
+    let timer = self.timer.clone();
+    let end_callback = Closure::wrap(Box::new(move |_: Event| {
+      timer.as_ref().stop();
+    }) as Box<dyn FnMut(_)>);
+    self
+      .audio
+      .add_event_listener_with_callback("pause", end_callback.as_ref().unchecked_ref())?;
+    self
+      .audio
+      .add_event_listener_with_callback("emptied", end_callback.as_ref().unchecked_ref())?;
+    end_callback.forget();
+    Ok(())
   }
 
   fn visualize(&self, channel_data: Vec<f32>) -> Result<(), JsValue> {

@@ -55,7 +55,9 @@ web-sys = {version = "0.3.64", features = [
   "EventListener",
   "EventTarget",
   "BaseAudioContext",
-  "MediaStreamAudioSourceNode"
+  "MediaStreamAudioSourceNode",
+  "HtmlAudioElement",
+  "CssStyleDeclaration"
 ]}
 yew = {version = "0.20.0", features = ["csr"]}
 yew-hooks = "0.2.0"

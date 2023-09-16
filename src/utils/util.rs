@@ -162,11 +162,14 @@ pub async fn read_file(file: web_sys::File) -> Result<js_sys::ArrayBuffer, JsVal
   Ok(array_buffer)
 }
 
-pub fn create_image_url(array_buffer: &ArrayBuffer, mime_type: &str) -> Result<String, JsValue> {
-  let blob = Blob::new_with_u8_array_sequence_and_options(
-    &Uint8Array::new(array_buffer),
-    BlobPropertyBag::new().type_(mime_type),
-  )?;
+pub fn array_buffer_to_blob_url(
+  array_buffer: &ArrayBuffer,
+  mime_type: &str,
+) -> Result<String, JsValue> {
+  let array: js_sys::Array = js_sys::Array::new();
+  array.push(array_buffer);
+  let blob =
+    Blob::new_with_u8_array_sequence_and_options(&array, BlobPropertyBag::new().type_(mime_type))?;
 
   let url = Url::create_object_url_with_blob(&blob)?;
   Ok(url)

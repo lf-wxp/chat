@@ -39,7 +39,7 @@ pub fn WaveTest() -> Html {
             theme_color,
             ..
           } = theme.get_color();
-          if let Ok(wave_surfer) = WaveSurfer::new(
+          if let Ok(mut wave_surfer) = WaveSurfer::new(
             ".canvas_container".to_string(),
             VisualizeColor {
               background: theme_color,
@@ -48,6 +48,7 @@ pub fn WaveTest() -> Html {
             },
           ) {
             let _ = wave_surfer.load_from_array_buffer(buffer).await;
+            let _ = wave_surfer.start();
           }
         });
       }
