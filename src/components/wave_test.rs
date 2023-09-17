@@ -1,21 +1,25 @@
 use bounce::use_atom_value;
 use stylist::{self, style};
 use wasm_bindgen::JsCast;
-use web_sys::HtmlInputElement;
+use web_sys::{HtmlInputElement, Element};
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
 
 use crate::{
-  model::VisualizeColor,
-  store::{Theme, ThemeColor},
-  utils::{get_target, read_file, style, WaveSurfer},
+  hook::use_chat,
+  model::{ChatMessage, Message},
+  store::{Theme, ThemeColor, User},
+  utils::{get_target, read_file, style},
 };
 
 #[function_component]
 pub fn WaveTest() -> Html {
   let class_name = get_class_name();
   let input_node_ref = use_node_ref();
+  let wrap_node_ref = use_node_ref();
   let theme = use_atom_value::<Theme>();
+  let user_name = use_atom_value::<User>();
+  let (add_message, _update_message_state) = use_chat();
   let onclick = {
     let input_node_ref = input_node_ref.clone();
     Callback::from(move |_| {
@@ -27,29 +31,38 @@ pub fn WaveTest() -> Html {
       }
     })
   };
+  let wrap = wrap_node_ref.clone();
   let onchange = Callback::from(move |e: Event| {
     let target = get_target::<Event, HtmlInputElement>(e);
     let theme = theme.clone();
+    let add = add_message.clone();
+    let user_name = user_name.clone();
+    let wrap = wrap.clone();
     if let Some(target) = target {
       if let Some(file) = target.files().and_then(|x| x.get(0)) {
         wasm_bindgen_futures::spawn_local(async move {
           let buffer = read_file(file).await.unwrap();
+          add(ChatMessage::new(
+            user_name.name.clone(),
+            Message::Audio(buffer.clone()),
+          ));
           let ThemeColor {
             primary_color,
             theme_color,
             ..
           } = theme.get_color();
-          if let Ok(mut wave_surfer) = WaveSurfer::new(
-            ".canvas_container".to_string(),
-            VisualizeColor {
-              background: theme_color,
-              rect_color: primary_color,
-              opacity: 0.8,
-            },
-          ) {
-            let _ = wave_surfer.load_from_array_buffer(buffer).await;
-            let _ = wave_surfer.start();
-          }
+          // let wrap = wrap.cast::<Element>().unwrap();
+          // if let Ok(mut wave_surfer) = WaveSurfer::new(
+          //   wrap, 
+          //   VisualizeColor {
+          //     background: theme_color,
+          //     rect_color: primary_color,
+          //     opacity: 0.8,
+          //   },
+          // ) {
+          //   let _ = wave_surfer.load_from_array_buffer(buffer).await;
+          //   let _ = wave_surfer.start();
+          // }
         });
       }
     }
@@ -57,7 +70,7 @@ pub fn WaveTest() -> Html {
 
   html! {
     <div class={class_name}>
-      <div class="canvas_container"></div>
+      <div class="canvas_container" ref={wrap_node_ref}></div>
       <input type="file" accept="*/*" class="fake-input" ref={input_node_ref} {onchange} />
       <Icon {onclick} icon_id={IconId::FontAwesomeRegularImages} class="icon" width="16px" height="16px" />
     </div>

@@ -1,10 +1,11 @@
-use std::rc::Rc;
+use gloo_console::log;
 use js_sys::ArrayBuffer;
+use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
   AudioContext, AudioContextOptions, Blob, CanvasRenderingContext2d, Event, File, HtmlAudioElement,
-  HtmlCanvasElement, Url,
+  HtmlCanvasElement, Url, Element,
 };
 
 use crate::model::VisualizeColor;
@@ -14,33 +15,33 @@ use super::{array_buffer_to_blob_url, get_dpr, get_window, read_file, Timer, Wav
 pub struct WaveSurfer {
   canvas: HtmlCanvasElement,
   audio: HtmlAudioElement,
-  progress: Rc<WaveProgress>,
+  progress: Rc<RefCell<WaveProgress>>,
   visualize_color: VisualizeColor,
   is_initial: Option<bool>,
   timer: Rc<Timer>,
 }
 
 impl WaveSurfer {
-  pub fn new(container: String, visualize_color: VisualizeColor) -> Result<Self, JsValue> {
+  pub fn new(container: Element, visualize_color: VisualizeColor) -> Result<Self, JsValue> {
     let document = get_window().document().ok_or("error")?;
     let canvas = document
       .create_element("canvas")?
       .dyn_into::<HtmlCanvasElement>()?;
-    let container_dom = document.query_selector(&container)?.ok_or("error")?;
-    let height = container_dom.client_height();
-    let width = container_dom.client_width();
+    let height = container.client_height();
+    let width = container.client_width();
     let dpr = get_dpr() as i32;
     canvas.set_height((height * dpr) as u32);
     canvas.set_width((width * dpr) as u32);
-    container_dom.append_child(&canvas)?;
+    canvas.style().set_css_text("inline-size:100%; block-size:100%");
+    container.append_child(&canvas)?;
     let audio = document
       .create_element("audio")?
       .dyn_into::<HtmlAudioElement>()?;
-    let progress = WaveProgress::new(container_dom, visualize_color.clone())?;
+    let progress = WaveProgress::new(container, visualize_color.clone())?;
     Ok(WaveSurfer {
       canvas,
       audio,
-      progress: Rc::new(progress),
+      progress: Rc::new(RefCell::new(progress)),
       visualize_color,
       is_initial: None,
       timer: Rc::new(Timer::new()),
@@ -82,13 +83,14 @@ impl WaveSurfer {
     self.audio.duration()
   }
 
-  pub fn stop(self) -> Result<(), JsValue> {
+  pub fn stop(&self) -> Result<(), JsValue> {
     self.audio.pause();
     Ok(())
   }
 
-  pub fn set_color(&mut self, visualize_color: VisualizeColor) {
-    self.visualize_color = visualize_color;
+  pub fn set_color(&mut self, visualize_color: VisualizeColor) -> Result<(), JsValue> {
+    self.visualize_color = visualize_color.clone();
+    self.progress.borrow_mut().set_color(visualize_color)
   }
 
   fn set_src(&self, array_buffer: &ArrayBuffer) -> Result<(), JsValue> {
@@ -108,7 +110,7 @@ impl WaveSurfer {
     self.timer.subscribe(move || {
       let time = audio.current_time();
       let width = time / audio.duration() * 100.0;
-      let _ = progress.update_progress(format!("{}%", width));
+      let _ = progress.borrow_mut().update_progress(format!("{}%", width));
     });
   }
 
@@ -121,7 +123,7 @@ impl WaveSurfer {
     let timeupdate_callback = Closure::wrap(Box::new(move |_: Event| {
       let time = audio_clone.current_time();
       let width = time / audio_clone.duration() * 100.0;
-      let _ = progress.update_progress(format!("{}%", width));
+      let _ = progress.borrow_mut().update_progress(format!("{}%", width));
     }) as Box<dyn FnMut(_)>);
     self.is_initial = Some(true);
     self.audio.add_event_listener_with_callback(

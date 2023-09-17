@@ -1,11 +1,23 @@
 use bounce::Atom;
 use std::fmt::{self, Display};
 
+#[derive(Debug)]
 pub struct ThemeColor {
   pub theme_color: String,
   pub primary_color: String,
   pub ancillary_color: String,
   pub font_color: String,
+}
+
+impl ThemeColor {
+  pub fn new() -> ThemeColor {
+    ThemeColor {
+      theme_color: "".to_string(),
+      primary_color: "".to_string(),
+      ancillary_color: "".to_string(),
+      font_color: "".to_string(),
+    }
+  }
 }
 
 #[derive(Atom, PartialEq, Default)]

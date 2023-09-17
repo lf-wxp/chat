@@ -3,9 +3,9 @@ use stylist::{self, style};
 use yew::prelude::*;
 
 use crate::{
-  components::Avatar,
+  components::{Avatar, VoiceMessage},
   model::{Message, MessageAlignment},
-  utils::{create_base64_string, style},
+  utils::{array_buffer_to_blob_url, style},
 };
 
 #[derive(Properties, PartialEq)]
@@ -40,7 +40,12 @@ pub fn ChatMessage(props: &Props) -> Html {
         }
         if let Message::Image(buffer) = &props.message {
           <div class="message img">
-            <img src={create_base64_string(buffer)} />
+            <img src={array_buffer_to_blob_url(buffer, "").unwrap_or("".to_string())} />
+          </div>
+        }
+        if let Message::Audio(buffer) = &props.message {
+          <div class="message audio">
+            <VoiceMessage message={(*buffer).clone()} />
           </div>
         }
       </div>
@@ -86,6 +91,10 @@ fn get_class_name() -> String {
           background: none;
           overflow: hidden;
           padding: 0;
+        }
+        .message.audio {
+          inline-size: 100%;
+          block-size: 40px;
         }
         .message img {
           max-inline-size: 100%;
