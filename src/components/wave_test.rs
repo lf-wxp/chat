@@ -1,15 +1,15 @@
 use bounce::use_atom_value;
 use stylist::{self, style};
 use wasm_bindgen::JsCast;
-use web_sys::{HtmlInputElement, Element};
+use web_sys::HtmlInputElement;
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
 
 use crate::{
   hook::use_chat,
-  model::{ChatMessage, Message},
-  store::{Theme, ThemeColor, User},
-  utils::{get_target, read_file, style},
+  model::{ChatMessage, Message, MessageBinary},
+  store::User,
+  utils::{get_target, style},
 };
 
 #[function_component]
@@ -17,7 +17,6 @@ pub fn WaveTest() -> Html {
   let class_name = get_class_name();
   let input_node_ref = use_node_ref();
   let wrap_node_ref = use_node_ref();
-  let theme = use_atom_value::<Theme>();
   let user_name = use_atom_value::<User>();
   let (add_message, _update_message_state) = use_chat();
   let onclick = {
@@ -31,38 +30,17 @@ pub fn WaveTest() -> Html {
       }
     })
   };
-  let wrap = wrap_node_ref.clone();
   let onchange = Callback::from(move |e: Event| {
     let target = get_target::<Event, HtmlInputElement>(e);
-    let theme = theme.clone();
     let add = add_message.clone();
     let user_name = user_name.clone();
-    let wrap = wrap.clone();
     if let Some(target) = target {
       if let Some(file) = target.files().and_then(|x| x.get(0)) {
         wasm_bindgen_futures::spawn_local(async move {
-          let buffer = read_file(file).await.unwrap();
           add(ChatMessage::new(
             user_name.name.clone(),
-            Message::Audio(buffer.clone()),
+            Message::Audio(MessageBinary::File(file)),
           ));
-          let ThemeColor {
-            primary_color,
-            theme_color,
-            ..
-          } = theme.get_color();
-          // let wrap = wrap.cast::<Element>().unwrap();
-          // if let Ok(mut wave_surfer) = WaveSurfer::new(
-          //   wrap, 
-          //   VisualizeColor {
-          //     background: theme_color,
-          //     rect_color: primary_color,
-          //     opacity: 0.8,
-          //   },
-          // ) {
-          //   let _ = wave_surfer.load_from_array_buffer(buffer).await;
-          //   let _ = wave_surfer.start();
-          // }
         });
       }
     }

@@ -19,12 +19,14 @@ pub fn VoiceInput(props: &Props) -> Html {
   let class_name = get_class_name();
   let visible = use_state(|| false);
   let (canvas_node_ref, start, end) = use_wave_recorder();
+
   let get_blob = {
     let onchange = props.onchange.clone();
     move |blob: Blob| {
       onchange.emit(blob);
     }
   };
+
   let onclick = {
     let visible = visible.clone();
     let get_blob = get_blob.clone();

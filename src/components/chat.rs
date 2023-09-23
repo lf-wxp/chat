@@ -35,6 +35,7 @@ pub fn Chat() -> Html {
       <div class="history-message scroll-bar">
       { for history_message.0.iter().map(|msg| html! {
           <ChatMessage
+            key={msg.uuid.clone()}
             uuid={Some(msg.uuid.clone())}
             name={get_name(msg.name.clone())}
             alignment={get_alignment(msg.name.clone())}

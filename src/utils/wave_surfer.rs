@@ -1,16 +1,24 @@
-use gloo_console::log;
-use js_sys::ArrayBuffer;
-use std::{cell::RefCell, rc::Rc};
+use js_sys::{ArrayBuffer, Promise};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-  AudioContext, AudioContextOptions, Blob, CanvasRenderingContext2d, Event, File, HtmlAudioElement,
-  HtmlCanvasElement, Url, Element,
+  AudioContext, AudioContextOptions, Blob, CanvasRenderingContext2d, Element, Event, File,
+  HtmlAudioElement, HtmlCanvasElement, PointerEvent, Url,
 };
 
 use crate::model::VisualizeColor;
 
-use super::{array_buffer_to_blob_url, get_dpr, get_window, read_file, Timer, WaveProgress};
+use super::{array_buffer_to_blob_url, get_dpr, get_window, read_file, Timer, WaveProgress, get_duration};
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum WaveEvent {
+  PlayState,
+}
+
+pub enum WaveEventCallback {
+  PlayStateCallback(Rc<dyn Fn(bool)>),
+}
 
 pub struct WaveSurfer {
   canvas: HtmlCanvasElement,
@@ -19,6 +27,8 @@ pub struct WaveSurfer {
   visualize_color: VisualizeColor,
   is_initial: Option<bool>,
   timer: Rc<Timer>,
+  duration: f64,
+  handlers: Rc<RefCell<HashMap<WaveEvent, Vec<WaveEventCallback>>>>,
 }
 
 impl WaveSurfer {
@@ -32,7 +42,9 @@ impl WaveSurfer {
     let dpr = get_dpr() as i32;
     canvas.set_height((height * dpr) as u32);
     canvas.set_width((width * dpr) as u32);
-    canvas.style().set_css_text("inline-size:100%; block-size:100%");
+    canvas
+      .style()
+      .set_css_text("inline-size:100%; block-size:100%");
     container.append_child(&canvas)?;
     let audio = document
       .create_element("audio")?
@@ -45,21 +57,26 @@ impl WaveSurfer {
       visualize_color,
       is_initial: None,
       timer: Rc::new(Timer::new()),
+      duration: 0f64,
+      handlers: Rc::new(RefCell::new(HashMap::new())),
     })
   }
 
   pub async fn load_from_array_buffer(&mut self, array_buffer: ArrayBuffer) -> Result<(), JsValue> {
     let mut options = AudioContextOptions::new();
     options.sample_rate(16000.0);
-    self.subscribe();
-    self.bind_event()?;
     self.set_src(&array_buffer)?;
     let audio_ctx = AudioContext::new_with_context_options(&options)?;
     let decode_promise = audio_ctx.decode_audio_data(&array_buffer)?;
     let decode_buffer = JsFuture::from(decode_promise).await?;
     let decode_buffer = decode_buffer.dyn_into::<web_sys::AudioBuffer>()?;
     let channel_data = decode_buffer.get_channel_data(0)?;
+    self.duration = decode_buffer.duration();
     self.visualize(channel_data)?;
+    self.subscribe();
+    self.bind_event()?;
+    self.bind_seek()?;
+    self.bind_play_state()?;
     Ok(())
   }
 
@@ -74,23 +91,27 @@ impl WaveSurfer {
     self.load_from_array_buffer(array_buffer).await
   }
 
-  pub fn start(&self) -> Result<(), JsValue> {
-    self.audio.play();
-    Ok(())
+  pub fn start(&self) -> Result<Promise, JsValue> {
+    self.audio.play()
   }
 
-  pub fn duration(&self) -> f64 {
-    self.audio.duration()
+  pub fn get_duration(&self) -> f64 {
+    self.duration
   }
 
   pub fn stop(&self) -> Result<(), JsValue> {
-    self.audio.pause();
-    Ok(())
+    self.audio.pause()
   }
 
   pub fn set_color(&mut self, visualize_color: VisualizeColor) -> Result<(), JsValue> {
     self.visualize_color = visualize_color.clone();
     self.progress.borrow_mut().set_color(visualize_color)
+  }
+
+  pub fn on(&mut self, event_type: WaveEvent, handler: WaveEventCallback) {
+    let mut handlers = self.handlers.borrow_mut();
+    let entry = handlers.entry(event_type).or_insert_with(Vec::new);
+    entry.push(handler);
   }
 
   fn set_src(&self, array_buffer: &ArrayBuffer) -> Result<(), JsValue> {
@@ -114,6 +135,55 @@ impl WaveSurfer {
     });
   }
 
+  fn bind_play_state(&self) -> Result<(), JsValue> {
+    let audio = self.audio.clone();
+    let handlers = self.handlers.clone();
+    let sate_callback = Closure::wrap(Box::new(move |_: Event| {
+      if let Some(handlers) = handlers.borrow().get(&WaveEvent::PlayState) {
+        handlers
+          .iter()
+          .for_each(|handler| {
+            if let WaveEventCallback::PlayStateCallback(handler) = handler  {
+              handler(!(audio.ended() || audio.paused()));
+            }
+          })
+      }
+    }) as Box<dyn FnMut(_)>);
+    self.audio.add_event_listener_with_callback(
+      "play",
+      sate_callback.as_ref().unchecked_ref(),
+    )?;
+    self.audio.add_event_listener_with_callback(
+      "pause",
+      sate_callback.as_ref().unchecked_ref(),
+    )?;
+    self.audio.add_event_listener_with_callback(
+      "end",
+      sate_callback.as_ref().unchecked_ref(),
+    )?;
+    sate_callback.forget();
+    Ok(())
+  }
+
+  fn bind_seek(&self) -> Result<(), JsValue> {
+    let audio = self.audio.clone();
+    let duration = self.duration;
+    let click_callback = Closure::wrap(Box::new(move |event: PointerEvent| {
+      if let Some(canvas) = event
+        .current_target()
+        .and_then(|x| x.dyn_into::<HtmlCanvasElement>().ok())
+      {
+        let rate = event.offset_x() as f64 / canvas.client_width() as f64;
+        audio.set_current_time(duration * rate);
+      }
+    }) as Box<dyn FnMut(_)>);
+    self
+      .canvas
+      .add_event_listener_with_callback("click", click_callback.as_ref().unchecked_ref())?;
+    click_callback.forget();
+    Ok(())
+  }
+
   fn bind_event(&mut self) -> Result<(), JsValue> {
     if self.is_initial.is_some() {
       return Ok(());
@@ -125,6 +195,7 @@ impl WaveSurfer {
       let width = time / audio_clone.duration() * 100.0;
       let _ = progress.borrow_mut().update_progress(format!("{}%", width));
     }) as Box<dyn FnMut(_)>);
+
     self.is_initial = Some(true);
     self.audio.add_event_listener_with_callback(
       "timeupdate",
@@ -152,6 +223,7 @@ impl WaveSurfer {
       .audio
       .add_event_listener_with_callback("emptied", end_callback.as_ref().unchecked_ref())?;
     end_callback.forget();
+
     Ok(())
   }
 

@@ -1,12 +1,11 @@
 use gloo_utils::format::JsValueSerdeExt;
-use js_sys::Array;
 use serde::Serialize;
 use serde_json::error;
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-  AnalyserNode, AudioContext, Blob, BlobEvent, BlobPropertyBag, CanvasRenderingContext2d,
+  AnalyserNode, AudioContext, Blob, BlobEvent, CanvasRenderingContext2d,
   HtmlCanvasElement, MediaRecorder, MediaStream, MediaStreamConstraints,
 };
 
@@ -22,7 +21,6 @@ pub struct Constraints {
 
 #[derive(Clone)]
 pub struct WaveRecorder {
-  pub chunks: Rc<RefCell<Vec<Blob>>>,
   recorder: Option<MediaRecorder>,
   canvas: Option<HtmlCanvasElement>,
   visualize_color: VisualizeColor,
@@ -44,7 +42,6 @@ impl WaveRecorder {
     })?;
     constraints.audio(&audio_constraints);
     Ok(WaveRecorder {
-      chunks: Rc::new(RefCell::new(vec![])),
       recorder: None,
       canvas,
       visualize_color,
@@ -81,8 +78,7 @@ impl WaveRecorder {
     if self.canvas.is_some() {
       let recorder = MediaRecorder::new_with_media_stream(&stream).ok();
       self.recorder = recorder;
-      self.bind_event()?;
-      self.get_recorder()?.start_with_time_slice(100)?;
+      self.get_recorder()?.start()?;
       *self.running.borrow_mut() = true;
       self.visualize_stream_connect(stream)?;
       self.animate_drawing();
@@ -90,43 +86,24 @@ impl WaveRecorder {
     Ok(())
   }
 
-  pub fn bind_event(&mut self) -> Result<(), JsValue> {
-    let chunks = self.chunks.clone();
-    let callback = Closure::wrap(Box::new(move |event: BlobEvent| {
-      if let Some(blob) = event.data() {
-        chunks.borrow_mut().push(blob);
-      }
-    }) as Box<dyn FnMut(_)>);
-    self
-      .get_recorder()?
-      .add_event_listener_with_callback("dataavailable", callback.as_ref().unchecked_ref())?;
-    callback.forget();
-    Ok(())
-  }
-
   pub async fn stop(&self) -> Result<Blob, JsValue> {
     let stop_promise = js_sys::Promise::new(&mut |resolve, reject| {
-      let chunks = self.chunks.borrow();
-      let blob_parts = Array::new_with_length(chunks.len() as u32);
-      for (i, blob) in chunks.iter().enumerate() {
-        blob_parts.set(i as u32, blob.clone().into());
-      }
-      let mut options = BlobPropertyBag::new();
-      options.type_("audio/ogg; codecs=opus");
-      Blob::new_with_u8_array_sequence_and_options(&blob_parts, &options).map_or_else(
-        |err| {
-          let _ = reject.call1(&JsValue::undefined(), &err);
-        },
-        |blob| {
+      let callback = Closure::wrap(Box::new(move |event: BlobEvent| {
+        if let Some(blob) = event.data() {
           let _ = resolve.call1(&JsValue::undefined(), &blob);
-        },
-      );
+        } else {
+          let _ = reject.call1(&JsValue::undefined(), &JsValue::from("get blob error"));
+        }
+      }) as Box<dyn FnMut(_)>);
+      let _ = self
+        .get_recorder().unwrap()
+        .add_event_listener_with_callback("dataavailable", callback.as_ref().unchecked_ref());
+      callback.forget();
     });
     self.get_recorder()?.stop()?;
-    *self.running.borrow_mut() = false;
-    self.chunks.borrow_mut().clear();
     let js_blob = JsFuture::from(stop_promise).await?;
     let blob = wasm_bindgen::JsCast::unchecked_into::<Blob>(js_blob);
+    *self.running.borrow_mut() = false;
     Ok(blob)
   }
 

@@ -1,5 +1,4 @@
 use bounce::{use_atom, use_atom_value};
-use gloo_console::log;
 use stylist::{self, style};
 use web_sys::{HtmlInputElement, MouseEvent};
 use yew::{prelude::*, Callback};
@@ -42,7 +41,6 @@ pub fn VolumeSet() -> Html {
       if let Some(span) = span {
         let val = e.offset_y() as f64 / span.client_height() as f64;
         let volume = Volume::new((val * 100.0) as i8, false);
-        log!("the event is ", val * 100.0);
         volume_handle.set(volume);
       }
     })
@@ -76,7 +74,6 @@ pub fn VolumeSet() -> Html {
   let indicator = indicator_clicked.clone();
   use_movement(move |movement: Movement| {
     if *indicator.borrow() {
-      log!("value", volume_value.value + (-movement.y as i8));
       let volume = Volume::new(volume_value.value + (-movement.y as i8), volume_value.mute);
       volume_handle.set(volume);
     }

@@ -17,6 +17,7 @@ pub mod image_input;
 pub mod notify;
 pub mod voice_input;
 pub mod voice_message;
+pub mod image_message;
 pub mod wave_test;
 
 pub use text::*;
@@ -38,4 +39,5 @@ pub use image_input::*;
 pub use notify::*;
 pub use voice_input::*;
 pub use voice_message::*;
+pub use image_message::*;
 pub use wave_test::*;

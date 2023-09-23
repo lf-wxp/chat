@@ -1,6 +1,5 @@
 use std::pin::Pin;
 use std::rc::Rc;
-
 use bounce::use_atom_value;
 use wasm_bindgen::JsValue;
 use web_sys::{Blob, HtmlCanvasElement};

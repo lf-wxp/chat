@@ -1,26 +1,19 @@
-use gloo_console::log;
-use js_sys::ArrayBuffer;
 use stylist::{self, style};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
 
-use crate::{
-  hook::use_wave_surfer,
-  utils::style,
-};
+use crate::{hook::use_wave_surfer, utils::style, model::MessageBinary};
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
-  pub message: ArrayBuffer,
+  pub message: MessageBinary,
 }
 
 #[function_component]
 pub fn VoiceMessage(props: &Props) -> Html {
   let class_name = get_class_name();
-  let playing = use_state(|| false);
-  let duration = use_state(|| 0f64);
-  let (wrap_node, start, stop, load) = use_wave_surfer();
+  let (wrap_node, duration, playing, start, stop, load) = use_wave_surfer();
 
   let icon = if *playing {
     IconId::BootstrapPauseFill
@@ -28,25 +21,26 @@ pub fn VoiceMessage(props: &Props) -> Html {
     IconId::BootstrapPlayFill
   };
 
-  let onclick = {
-    Callback::from(move |_| {
-      let val = *playing;
-      if val {
-        stop();
-      } else {
-        start();
-      }
-      playing.set(!val);
-    })
-  };
-
-  let array_buffer = props.message.clone();
-  let duration = duration.clone();
-  use_effect(move || {
-    spawn_local(async move {
-      let _ = load(array_buffer).await;
-    });
+  let onclick = Callback::from(move |_| {
+    let val = *playing;
+    if val {
+      stop();
+    } else {
+      start();
+    }
   });
+
+  let message = props.message.clone();
+  let duration = duration.clone();
+  use_effect_with_deps(
+    move |_| {
+      spawn_local(async move {
+        let buffer = message.get_buffer().await;
+        let _ = load(buffer).await;
+      });
+    },
+    (),
+  );
 
   html! {
     <div class={class_name}>
@@ -69,12 +63,19 @@ fn get_class_name() -> String {
         .duration {
           font-size: 12px;
           color: var(--font-color);
+          margin-inline-start: 5px;
+        }
+        .duration:after {
+          content: "''";
+          font-weight: bolder;
         }
         .icon {
           cursor: pointer;
+          margin-inline-end: 5px;
         }
         .wrap {
           flex: 1 1 auto;
+          position: relative;
           inline-size: 0;
           block-size: 100%;
         }

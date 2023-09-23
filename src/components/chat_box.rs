@@ -1,5 +1,4 @@
 use bounce::use_atom_value;
-use gloo_console::log;
 use js_sys::ArrayBuffer;
 use stylist::{self, style};
 use web_sys::Blob;
@@ -9,7 +8,7 @@ use yew_icons::{Icon, IconId};
 use crate::{
   components::{ChatText, ChatValue, EmojiBox, ImageInput, Selection, VoiceInput},
   hook::{use_chat, use_click_exclusive},
-  model::{ChatMessage, Message},
+  model::{ChatMessage, Message, MessageBinary},
   store::User,
   utils::{class_name_determine, get_string_len, style},
 };
@@ -101,23 +100,24 @@ pub fn ChatBox() -> Html {
   };
 
   let image_input_callback = {
+    let user_name = user_name.clone();
     let add = add_message.clone();
     Callback::from(move |buffer: ArrayBuffer| {
       add(ChatMessage::new(
         user_name.name.clone(),
-        Message::Image(buffer),
+        Message::Image(MessageBinary::Buffer(buffer)),
       ));
     })
   };
 
   let voice_input_callback = {
     let add = add_message.clone();
+    let user_name = user_name.clone();
     Callback::from(move |blob: Blob| {
-      // add(ChatMessage::new(
-      //   user_name.name.clone(),
-      //   Message::Image(buffer),
-      // ));
-      log!("input voice", blob);
+      add(ChatMessage::new(
+        user_name.name.clone(),
+        Message::Audio(MessageBinary::Blob(blob)),
+      ));
     })
   };
 
