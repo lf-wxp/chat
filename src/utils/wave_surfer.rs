@@ -7,9 +7,10 @@ use web_sys::{
   HtmlAudioElement, HtmlCanvasElement, PointerEvent, Url,
 };
 
-use crate::model::VisualizeColor;
-
-use super::{array_buffer_to_blob_url, get_dpr, get_window, read_file, Timer, WaveProgress, get_duration};
+use crate::{
+  model::VisualizeColor,
+  utils::{array_buffer_to_blob_url, get_dpr, get_document, read_file, Timer, WaveProgress},
+};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum WaveEvent {
@@ -33,7 +34,7 @@ pub struct WaveSurfer {
 
 impl WaveSurfer {
   pub fn new(container: Element, visualize_color: VisualizeColor) -> Result<Self, JsValue> {
-    let document = get_window().document().ok_or("error")?;
+    let document = get_document();
     let canvas = document
       .create_element("canvas")?
       .dyn_into::<HtmlCanvasElement>()?;
@@ -140,27 +141,22 @@ impl WaveSurfer {
     let handlers = self.handlers.clone();
     let sate_callback = Closure::wrap(Box::new(move |_: Event| {
       if let Some(handlers) = handlers.borrow().get(&WaveEvent::PlayState) {
-        handlers
-          .iter()
-          .for_each(|handler| {
-            if let WaveEventCallback::PlayStateCallback(handler) = handler  {
-              handler(!(audio.ended() || audio.paused()));
-            }
-          })
+        handlers.iter().for_each(|handler| {
+          if let WaveEventCallback::PlayStateCallback(handler) = handler {
+            handler(!(audio.ended() || audio.paused()));
+          }
+        })
       }
     }) as Box<dyn FnMut(_)>);
-    self.audio.add_event_listener_with_callback(
-      "play",
-      sate_callback.as_ref().unchecked_ref(),
-    )?;
-    self.audio.add_event_listener_with_callback(
-      "pause",
-      sate_callback.as_ref().unchecked_ref(),
-    )?;
-    self.audio.add_event_listener_with_callback(
-      "end",
-      sate_callback.as_ref().unchecked_ref(),
-    )?;
+    self
+      .audio
+      .add_event_listener_with_callback("play", sate_callback.as_ref().unchecked_ref())?;
+    self
+      .audio
+      .add_event_listener_with_callback("pause", sate_callback.as_ref().unchecked_ref())?;
+    self
+      .audio
+      .add_event_listener_with_callback("end", sate_callback.as_ref().unchecked_ref())?;
     sate_callback.forget();
     Ok(())
   }

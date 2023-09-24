@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::closure::Closure;
 
-use super::request_animation_frame;
+use crate::utils::request_animation_frame;
 
 type TimerCallbacks = Rc<RefCell<Vec<Rc<RefCell<dyn FnMut()>>>>>;
 type RecursiveCallback = Rc<RefCell<Option<Closure<dyn FnMut()>>>>;

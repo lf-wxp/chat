@@ -15,7 +15,6 @@ pub fn use_notify() -> Rc<dyn Fn(String, NoticeTag, Option<u32>)> {
           let notice = notice.clone();
           let append_notice = append_notice.clone();
           let on_timeout = move || {
-            // notice.clone().dispatch(NoticeAction::Remove(append_notice.id));
             notice.clone().dispatch(NoticeAction::PreRemove(append_notice.id));
           };
           let time = gloo_timers::callback::Timeout::new(duration * 1000, on_timeout);

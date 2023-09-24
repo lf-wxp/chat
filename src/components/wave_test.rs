@@ -16,7 +16,6 @@ use crate::{
 pub fn WaveTest() -> Html {
   let class_name = get_class_name();
   let input_node_ref = use_node_ref();
-  let wrap_node_ref = use_node_ref();
   let user_name = use_atom_value::<User>();
   let (add_message, _update_message_state) = use_chat();
   let onclick = {
@@ -48,7 +47,6 @@ pub fn WaveTest() -> Html {
 
   html! {
     <div class={class_name}>
-      <div class="canvas_container" ref={wrap_node_ref}></div>
       <input type="file" accept="*/*" class="fake-input" ref={input_node_ref} {onchange} />
       <Icon {onclick} icon_id={IconId::FontAwesomeRegularImages} class="icon" width="16px" height="16px" />
     </div>
@@ -64,10 +62,6 @@ fn get_class_name() -> String {
       position: relative;
       margin-inline-start: 10px;
       .canvas_container {
-        block-size: 100%;
-      }
-      canvas {
-        inline-size: 100%;
         block-size: 100%;
       }
       .fake-input {

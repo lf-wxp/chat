@@ -1,15 +1,13 @@
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{Element, HtmlElement};
 
-use crate::model::VisualizeColor;
-
-use super::get_window;
+use crate::{model::VisualizeColor, utils::get_document};
 
 const BASE_CSS_TEXT: &str =
   "pointer-events:none; position: absolute; height: 100%; top: 0; left: 0;";
 
 fn create_element(css_text: &str) -> Result<HtmlElement, JsValue> {
-  let document = get_window().document().ok_or("error")?;
+  let document = get_document();
   let element = document.create_element("div")?.dyn_into::<HtmlElement>()?;
   let css_text = format!("{BASE_CSS_TEXT}{}", css_text);
   element.style().set_css_text(&css_text);

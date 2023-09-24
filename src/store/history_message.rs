@@ -1,9 +1,11 @@
 use bounce::{BounceStates, Selector};
 use std::rc::Rc;
 
-use crate::{model::ChatMessage, utils::get_history};
-
-use super::{Chat, Refresh};
+use crate::{
+  model::ChatMessage,
+  store::{Chat, Refresh},
+  utils::get_history,
+};
 
 #[derive(PartialEq)]
 pub struct HistoryMessage(pub Vec<ChatMessage>);

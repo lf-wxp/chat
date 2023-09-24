@@ -1,3 +1,4 @@
+use gloo_console::log;
 use gloo_utils::format::JsValueSerdeExt;
 use serde::Serialize;
 use serde_json::error;
@@ -5,13 +6,14 @@ use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-  AnalyserNode, AudioContext, Blob, BlobEvent, CanvasRenderingContext2d,
-  HtmlCanvasElement, MediaRecorder, MediaStream, MediaStreamConstraints,
+  AnalyserNode, AudioContext, Blob, BlobEvent, CanvasRenderingContext2d, HtmlCanvasElement,
+  MediaRecorder, MediaStream, MediaStreamConstraints,
 };
 
-use crate::model::VisualizeColor;
-
-use super::{get_window, request_animation_frame};
+use crate::{
+  model::VisualizeColor,
+  utils::{get_window, Timer},
+};
 
 #[derive(Serialize)]
 pub struct Constraints {
@@ -27,29 +29,35 @@ pub struct WaveRecorder {
   constraints: MediaStreamConstraints,
   audio_ctx: Option<AudioContext>,
   analyser: Option<AnalyserNode>,
-  running: Rc<RefCell<bool>>,
+  timer: Rc<Timer>,
+  this: Option<Rc<RefCell<Self>>>,
+  is_init: Rc<RefCell<bool>>,
 }
 
 impl WaveRecorder {
   pub fn new(
     visualize_color: VisualizeColor,
     canvas: Option<HtmlCanvasElement>,
-  ) -> Result<Self, error::Error> {
+  ) -> Result<Rc<RefCell<Self>>, error::Error> {
     let mut constraints = MediaStreamConstraints::new();
     let audio_constraints = JsValue::from_serde(&Constraints {
       device_id: "default".to_string(),
       echo_cancellation: true,
     })?;
     constraints.audio(&audio_constraints);
-    Ok(WaveRecorder {
+    let wave = Rc::new(RefCell::new(WaveRecorder {
       recorder: None,
       canvas,
       visualize_color,
       constraints,
       audio_ctx: None,
       analyser: None,
-      running: Rc::new(RefCell::new(false)),
-    })
+      this: None,
+      timer: Rc::new(Timer::new()),
+      is_init: Rc::new(RefCell::new(false)),
+    }));
+    wave.borrow_mut().this = Some(wave.clone());
+    Ok(wave)
   }
   pub async fn get_media(&self) -> Result<MediaStream, JsValue> {
     let window = get_window();
@@ -79,9 +87,9 @@ impl WaveRecorder {
       let recorder = MediaRecorder::new_with_media_stream(&stream).ok();
       self.recorder = recorder;
       self.get_recorder()?.start()?;
-      *self.running.borrow_mut() = true;
       self.visualize_stream_connect(stream)?;
-      self.animate_drawing();
+      self.subscribe();
+      self.timer.start();
     }
     Ok(())
   }
@@ -96,14 +104,15 @@ impl WaveRecorder {
         }
       }) as Box<dyn FnMut(_)>);
       let _ = self
-        .get_recorder().unwrap()
+        .get_recorder()
+        .unwrap()
         .add_event_listener_with_callback("dataavailable", callback.as_ref().unchecked_ref());
       callback.forget();
     });
     self.get_recorder()?.stop()?;
     let js_blob = JsFuture::from(stop_promise).await?;
     let blob = wasm_bindgen::JsCast::unchecked_into::<Blob>(js_blob);
-    *self.running.borrow_mut() = false;
+    self.timer.stop();
     Ok(blob)
   }
 
@@ -154,7 +163,7 @@ impl WaveRecorder {
       .get_byte_frequency_data(&mut data_array);
     let canvas_height = self.get_canvas()?.height();
     let canvas_width = self.get_canvas()?.width();
-
+    log!("background", &self.visualize_color.background);
     canvas_context.set_global_alpha(self.visualize_color.opacity);
     canvas_context.set_fill_style(&JsValue::from_str(&self.visualize_color.background));
     canvas_context.fill_rect(0f64, 0f64, canvas_width as f64, canvas_height as f64);
@@ -176,16 +185,14 @@ impl WaveRecorder {
     Ok(())
   }
 
-  pub fn animate_drawing(&self) {
-    let f = Rc::new(RefCell::new(None));
-    let g = f.clone();
-    let wave = self.clone();
-    *g.borrow_mut() = Some(Closure::new(move || {
-      let _ = wave.visualize();
-      if *wave.running.borrow() {
-        request_animation_frame(f.borrow().as_ref().unwrap());
-      }
-    }));
-    request_animation_frame(g.borrow().as_ref().unwrap());
+  fn subscribe(&self) {
+    if *self.is_init.borrow() { return; }
+    if let Some(wave) = &self.this {
+      let wave = wave.clone();
+      self.timer.subscribe(move || {
+        let _ = wave.borrow().visualize();
+      });
+    }
+    *self.is_init.borrow_mut() = true;
   }
 }

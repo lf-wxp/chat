@@ -1,15 +1,21 @@
+use bounce::use_atom_value;
 use std::rc::Rc;
 use stylist::{self, style};
-use yew::{function_component, html, use_effect_with_deps, use_node_ref, Html};
+use theme::Theme;
+use yew::{function_component, use_effect_with_deps, use_node_ref, Html, html};
 
-use crate::utils::{
-  ribbon::{ColorSet, Position, Ribbons},
-  style,
+use crate::{
+  store::theme,
+  utils::{
+    ribbon::{ColorSet, Position, Ribbons},
+    style,
+  },
 };
 
 #[function_component]
 pub fn Background() -> Html {
   let class_name = get_class_name();
+  let theme = use_atom_value::<Theme>();
   let canvas_ref = Rc::new(use_node_ref());
   let canvas_ref_clone = canvas_ref.clone();
 
@@ -39,7 +45,7 @@ pub fn Background() -> Html {
 
   html! {
     <div class={class_name}>
-      <canvas ref={canvas_ref.as_ref()} />
+      <canvas ref={canvas_ref.as_ref()} class={format!("{theme}")}  />
       <div class="mask" />
     </div>
   }
@@ -64,21 +70,15 @@ fn get_class_name() -> String {
         }
 
         canvas {
-          background-image: linear-gradient(
-            55deg,
-            hsl(332deg 53% 24%) 0%,
-            hsl(332deg 51% 23%) -1%,
-            hsl(332deg 48% 22%) -1%,
-            hsl(332deg 45% 21%) -2%,
-            hsl(331deg 41% 20%) -1%,
-            hsl(330deg 37% 19%) 0%,
-            hsl(328deg 31% 17%) 3%,
-            hsl(323deg 24% 16%) 10%,
-            hsl(300deg 12% 14%) 23%,
-            hsl(207deg 18% 12%) 68%
-          );
           block-size: 100%;
           inline-size: 100%;
+          transition: background 0.2s ease;
+        }
+        canvas.light {
+          background: radial-gradient(circle at 10% 20%, rgba(216, 241, 230, 0.46) 0.1%, rgba(233, 226, 226, 0.28) 90.1%);
+        }
+        canvas.dark {
+          background: linear-gradient(110.6deg, rgb(156, 116, 129) -18.3%, rgb(67, 54, 74) 16.4%, rgb(47, 48, 67) 68.2%, rgb(27, 23, 36) 99.1%);
         }
     "#
   ))

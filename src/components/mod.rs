@@ -19,6 +19,8 @@ pub mod voice_input;
 pub mod voice_message;
 pub mod image_message;
 pub mod wave_test;
+pub mod theme_switch;
+pub mod service;
 
 pub use text::*;
 pub use background::*;
@@ -41,3 +43,5 @@ pub use voice_input::*;
 pub use voice_message::*;
 pub use image_message::*;
 pub use wave_test::*;
+pub use theme_switch::*;
+pub use service::*;

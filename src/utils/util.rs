@@ -6,7 +6,10 @@ use std::ops::Range;
 use unicode_segmentation::UnicodeSegmentation;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{window, Blob, BlobPropertyBag, Event, FileReader, HtmlTextAreaElement, Url, Window, AudioContext, AudioBuffer};
+use web_sys::{
+  window, AudioBuffer, AudioContext, Blob, BlobPropertyBag, Document, Event, FileReader,
+  HtmlElement, HtmlTextAreaElement, Url, Window,
+};
 use yew::{
   virtual_dom::{ApplyAttributeAs, Attributes, VNode},
   AttrValue,
@@ -30,6 +33,20 @@ pub fn num_in_range(start: f64, end: f64, num: f64) -> f64 {
 
 pub fn get_window() -> Window {
   window().expect("no global `window` exists")
+}
+
+pub fn get_document() -> Document {
+  get_window()
+    .document()
+    .expect("no global `Document` exists")
+}
+
+pub fn query_selector(selector: &str) -> Option<HtmlElement> {
+  get_document()
+    .query_selector(selector)
+    .ok()
+    .and_then(|x| x)
+    .and_then(|x| x.dyn_into::<HtmlElement>().ok())
 }
 
 pub fn get_dpr() -> f64 {
@@ -186,13 +203,17 @@ pub fn create_base64_string(array_buffer: &ArrayBuffer) -> String {
 }
 
 pub async fn blob_to_array_buffer(blob: &Blob) -> Result<js_sys::ArrayBuffer, JsValue> {
-  JsFuture::from(blob.array_buffer()).await?.dyn_into::<js_sys::ArrayBuffer>()
+  JsFuture::from(blob.array_buffer())
+    .await?
+    .dyn_into::<js_sys::ArrayBuffer>()
 }
 
 pub async fn get_duration(array_buffer: &ArrayBuffer) -> Result<f64, JsValue> {
   let audio_context = AudioContext::new()?;
   let decode_promise = audio_context.decode_audio_data(array_buffer)?;
-  let audio_buffer = JsFuture::from(decode_promise).await?.dyn_into::<AudioBuffer>()?;
+  let audio_buffer = JsFuture::from(decode_promise)
+    .await?
+    .dyn_into::<AudioBuffer>()?;
   let duration = audio_buffer.duration();
   Ok(duration)
 }

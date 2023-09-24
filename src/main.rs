@@ -3,7 +3,7 @@ use stylist::{self, style};
 use yew::prelude::*;
 use yew_router::{BrowserRouter, Switch};
 
-use components::{Background, Chat, FakeSet, Side, NotifyProvider};
+use components::{Background, Chat, FakeSet, Side, NotifyProvider, Service};
 use route::{switch, Route};
 use utils::style;
 
@@ -23,6 +23,7 @@ fn App() -> Html {
     <BrowserRouter>
       <BounceRoot>
         <NotifyProvider>
+          <Service />
           <FakeSet />
           <section class={class_name}>
             <Background />
