@@ -8,6 +8,7 @@ pub mod wave_recorder;
 pub mod wave_surfer;
 pub mod wave_progress;
 pub mod timer;
+pub mod websocket;
 
 pub use util::*;
 pub use avatar::*;
@@ -19,3 +20,4 @@ pub use wave_recorder::*;
 pub use wave_surfer::*;
 pub use wave_progress::*;
 pub use timer::*;
+pub use websocket::*;
