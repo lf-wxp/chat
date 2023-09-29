@@ -30,6 +30,7 @@ pub struct WaveSurfer {
   timer: Rc<Timer>,
   duration: f64,
   handlers: Rc<RefCell<HashMap<WaveEvent, Vec<WaveEventCallback>>>>,
+  channel_data: Vec<f32>,
 }
 
 impl WaveSurfer {
@@ -60,6 +61,7 @@ impl WaveSurfer {
       timer: Rc::new(Timer::new()),
       duration: 0f64,
       handlers: Rc::new(RefCell::new(HashMap::new())),
+      channel_data: vec![],
     })
   }
 
@@ -73,7 +75,8 @@ impl WaveSurfer {
     let decode_buffer = decode_buffer.dyn_into::<web_sys::AudioBuffer>()?;
     let channel_data = decode_buffer.get_channel_data(0)?;
     self.duration = decode_buffer.duration();
-    self.visualize(channel_data)?;
+    self.channel_data = channel_data;
+    self.visualize()?;
     self.subscribe();
     self.bind_event()?;
     self.bind_seek()?;
@@ -106,7 +109,8 @@ impl WaveSurfer {
 
   pub fn set_color(&mut self, visualize_color: VisualizeColor) -> Result<(), JsValue> {
     self.visualize_color = visualize_color.clone();
-    self.progress.borrow_mut().set_color(visualize_color)
+    self.progress.borrow_mut().set_color(visualize_color)?;
+    self.visualize()
   }
 
   pub fn on(&mut self, event_type: WaveEvent, handler: WaveEventCallback) {
@@ -223,8 +227,8 @@ impl WaveSurfer {
     Ok(())
   }
 
-  fn visualize(&self, channel_data: Vec<f32>) -> Result<(), JsValue> {
-    let length = channel_data.len();
+  fn visualize(&self) -> Result<(), JsValue> {
+    let length = self.channel_data.len();
     let height = self.canvas.height() as f64;
     let width = self.canvas.width() as f64;
     let half_height = height / 2f64;
@@ -249,7 +253,7 @@ impl WaveSurfer {
     canvas_context.set_fill_style(&JsValue::from_str(&self.visualize_color.background));
     canvas_context.fill_rect(0f64, 0f64, width, height);
     canvas_context.set_fill_style(&JsValue::from_str(&self.visualize_color.rect_color));
-    channel_data.iter().enumerate().for_each(|(i, item)| {
+    self.channel_data.iter().enumerate().for_each(|(i, item)| {
       let x = (i as f64 * bar_index_scale).round();
       if x > prev_x {
         let top_bar_height = (max_top * half_height * v_scale).round();

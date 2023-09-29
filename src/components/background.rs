@@ -2,13 +2,14 @@ use bounce::use_atom_value;
 use std::rc::Rc;
 use stylist::{self, style};
 use theme::Theme;
-use yew::{function_component, use_effect_with_deps, use_node_ref, Html, html};
+use web_sys::HtmlCanvasElement;
+use yew::{function_component, html, use_effect_with_deps, use_node_ref, Html};
 
 use crate::{
   store::theme,
   utils::{
     ribbon::{ColorSet, Position, Ribbons},
-    style,
+    style, RibbonSet,
   },
 };
 
@@ -21,24 +22,27 @@ pub fn Background() -> Html {
 
   use_effect_with_deps(
     move |_| {
-      let ribbon_background = Ribbons {
-        canvas: canvas_ref_clone,
-        color_set: ColorSet {
-          saturation: "60%".to_owned(),
-          brightness: "50%".to_owned(),
-          alpha: 0.5,
-          cycle_speed: 9.0,
-        },
-        vertical_position: Position::Random,
-        horizontal_speed: 100.0,
-        ribbon_count: 3,
-        stroke_size: 0.0,
-        parallax_amount: -0.5,
-        animate_sections: false,
-        ribbons: vec![],
-        scroll: 0.0,
-      };
-      ribbon_background.init();
+      if let Some(canvas) = canvas_ref_clone.cast::<HtmlCanvasElement>() {
+        let ribbons = Ribbons::new(
+          canvas,
+          ColorSet {
+            saturation: "60%".to_owned(),
+            brightness: "50%".to_owned(),
+            alpha: 0.5,
+            cycle_speed: 9.0,
+          },
+          RibbonSet {
+            vertical_position: Position::Random,
+            horizontal_speed: 100.0,
+            ribbon_count: 3,
+            stroke_size: 0.0,
+            parallax_amount: -0.5,
+            animate_sections: false,
+            scroll: 0.0,
+          },
+        );
+        ribbons.borrow_mut().init();
+      }
     },
     (),
   );

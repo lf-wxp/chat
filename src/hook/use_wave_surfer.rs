@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use bounce::use_atom_value;
 use futures::Future;
+use gloo_console::log;
 use js_sys::ArrayBuffer;
 use wasm_bindgen::JsValue;
 use yew::prelude::*;
@@ -74,6 +75,28 @@ pub fn use_wave_surfer() -> ReturnTuple {
   };
   let wrap = wrap_node_ref.clone();
   let wrap_clone = wrap_node_ref.clone();
+
+  {
+    let wave = wave.clone();
+    let theme = theme.clone();
+    use_effect_with_deps(
+      move |theme| {
+        let ThemeColor {
+          font_color,
+          ..
+        } = theme.get_color();
+        if let Some(wave) = wave.borrow_mut().as_mut() {
+          log!("theme change");
+          let _ = wave.set_color(VisualizeColor {
+            background: "transparent".to_string(),
+            rect_color: font_color,
+            opacity: 0.8,
+          });
+        };
+      },
+      theme,
+    );
+  }
 
   use_effect_with_deps(
     move |_| {

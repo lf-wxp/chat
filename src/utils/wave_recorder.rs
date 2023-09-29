@@ -3,7 +3,11 @@ use gloo_utils::format::JsValueSerdeExt;
 use serde::Serialize;
 use serde_json::error;
 use std::{cell::RefCell, rc::Rc};
-use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
+use wasm_bindgen::{
+  prelude::Closure,
+  JsCast,
+  JsValue,
+};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
   AnalyserNode, AudioContext, Blob, BlobEvent, CanvasRenderingContext2d, HtmlCanvasElement,
@@ -111,7 +115,7 @@ impl WaveRecorder {
     });
     self.get_recorder()?.stop()?;
     let js_blob = JsFuture::from(stop_promise).await?;
-    let blob = wasm_bindgen::JsCast::unchecked_into::<Blob>(js_blob);
+    let blob = JsCast::unchecked_into::<Blob>(js_blob);
     self.timer.stop();
     Ok(blob)
   }
@@ -186,7 +190,9 @@ impl WaveRecorder {
   }
 
   fn subscribe(&self) {
-    if *self.is_init.borrow() { return; }
+    if *self.is_init.borrow() {
+      return;
+    }
     if let Some(wave) = &self.this {
       let wave = wave.clone();
       self.timer.subscribe(move || {
