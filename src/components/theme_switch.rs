@@ -10,13 +10,16 @@ pub fn ThemeSwitch() -> Html {
   let class_name = get_class_name();
   let theme = use_atom::<Theme>();
 
-  let onclick = {
+  let set_light = {
     let theme_clone = theme.clone();
     Callback::from(move |_: MouseEvent| {
-      if *theme_clone == Theme::Dark {
-        theme_clone.set(Theme::Light);
-        return;
-      }
+      theme_clone.set(Theme::Light);
+    })
+  };
+
+  let set_dark = {
+    let theme_clone = theme.clone();
+    Callback::from(move |_: MouseEvent| {
       theme_clone.set(Theme::Dark);
     })
   };
@@ -27,12 +30,12 @@ pub fn ThemeSwitch() -> Html {
   };
 
   html! {
-    <section class={class_name} {onclick}>
+    <section class={class_name}>
       <div class={format!("mask {}", *theme)} />
-      <span class={icon_class(Theme::Light)}>
+      <span class={icon_class(Theme::Light)} onclick={set_light}>
         <Icon  icon_id={IconId::BootstrapSunFill} width="16px" height="16px" />
       </span>
-      <span class={icon_class(Theme::Dark)}>
+      <span class={icon_class(Theme::Dark)} onclick={set_dark}>
         <Icon  icon_id={IconId::BootstrapMoonStarsFill} width="14px" height="14px" />
       </span>
     </section>
