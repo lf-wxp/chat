@@ -32,6 +32,7 @@ impl Ribbons {
       this: None,
     }));
     ribbons.borrow_mut().this = Some(ribbons.clone());
+    ribbons.borrow().init();
     ribbons
   }
 

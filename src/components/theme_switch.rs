@@ -53,7 +53,7 @@ fn get_class_name() -> String {
         cursor: pointer;
         block-size: var(--size);
         inline-size: calc(var(--size) * 2);
-        transition: all .2s ease;
+        transition: all .3s cubic-bezier(0.38, 0, 0.24, 1);
         align-items: center;
         display: flex;
         padding: var(--gap);

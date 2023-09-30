@@ -11,9 +11,11 @@ pub struct Websocket {
   onopen: Option<Box<dyn Fn()>>,
   onclose: Option<Box<dyn Fn()>>,
   this: Option<Rc<RefCell<Self>>>,
+  pending_message: Vec<SocketMessage>,
+  is_connected: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SocketMessage {
   Buffer(ArrayBuffer),
   Blob(Blob),
@@ -32,8 +34,11 @@ impl Websocket {
       onopen: None,
       onclose: None,
       this: None,
+      pending_message: vec![],
+      is_connected: false,
     }));
     client.borrow_mut().this = Some(client.clone());
+    client.borrow().bind_event();
     Ok(client)
   }
 
@@ -66,8 +71,9 @@ impl Websocket {
 
       let client_error = client.clone();
       let onerror_callback = Closure::<dyn FnMut(_)>::new(move |e: ErrorEvent| {
+        client_error.borrow_mut().is_connected = false;
         if let Some(onerror) = &client_error.borrow().onerror {
-          onerror(e) ;
+          onerror(e);
         }
       });
       self
@@ -77,6 +83,8 @@ impl Websocket {
 
       let client_open = client.clone();
       let onopen_callback = Closure::<dyn FnMut(_)>::new(move |_: MessageEvent| {
+        client_open.borrow_mut().is_connected = true;
+        client_open.borrow_mut().consume_pending_message();
         if let Some(onopen) = &client_open.borrow().onopen {
           onopen();
         }
@@ -88,6 +96,7 @@ impl Websocket {
 
       let client = client.clone();
       let onclose_callback = Closure::<dyn FnMut(_)>::new(move |_: MessageEvent| {
+        client.borrow_mut().is_connected = false;
         if let Some(onclose) = &client.borrow().onclose {
           onclose();
         }
@@ -114,12 +123,24 @@ impl Websocket {
   pub fn get_ws(&self) -> &WebSocket {
     &self.ws
   }
-  pub fn send(&self, message: SocketMessage) -> Result<(), JsValue> {
+  pub fn send(&mut self, message: SocketMessage) -> Result<(), JsValue> {
+    if !self.is_connected {
+      self.pending_message.push(message);
+      return Ok(());
+    }
     match message {
       SocketMessage::Buffer(buffer) => self.ws.send_with_array_buffer(&buffer),
       SocketMessage::Blob(blob) => self.ws.send_with_blob(&blob),
       SocketMessage::Str(str) => self.ws.send_with_str(&str.as_string().unwrap()),
       _ => Ok(()),
+    }
+  }
+  fn consume_pending_message(&mut self) {
+    if self.is_connected & !self.pending_message.is_empty() {
+      self.pending_message.clone().into_iter().for_each(|message| {
+        let _ = self.send(message);
+      });
+      self.pending_message.clear();
     }
   }
 }

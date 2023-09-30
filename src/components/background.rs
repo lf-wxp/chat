@@ -23,7 +23,7 @@ pub fn Background() -> Html {
   use_effect_with_deps(
     move |_| {
       if let Some(canvas) = canvas_ref_clone.cast::<HtmlCanvasElement>() {
-        let ribbons = Ribbons::new(
+        Ribbons::new(
           canvas,
           ColorSet {
             saturation: "60%".to_owned(),
@@ -41,7 +41,6 @@ pub fn Background() -> Html {
             scroll: 0.0,
           },
         );
-        ribbons.borrow_mut().init();
       }
     },
     (),

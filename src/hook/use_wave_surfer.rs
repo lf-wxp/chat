@@ -8,6 +8,7 @@ use gloo_console::log;
 use js_sys::ArrayBuffer;
 use wasm_bindgen::JsValue;
 use yew::prelude::*;
+use web_sys::Element;
 
 use crate::{
   model::VisualizeColor,
@@ -101,7 +102,7 @@ pub fn use_wave_surfer() -> ReturnTuple {
   use_effect_with_deps(
     move |_| {
       let ThemeColor { font_color, .. } = theme.get_color();
-      if let Some(wrap) = wrap_node_ref.clone().cast::<web_sys::Element>() {
+      if let Some(wrap) = wrap_node_ref.clone().cast::<Element>() {
         *wave.borrow_mut() = Some(
           WaveSurfer::new(
             wrap,
