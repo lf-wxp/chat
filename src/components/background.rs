@@ -1,5 +1,4 @@
 use bounce::use_atom_value;
-use std::rc::Rc;
 use stylist::{self, style};
 use theme::Theme;
 use web_sys::HtmlCanvasElement;
@@ -17,7 +16,7 @@ use crate::{
 pub fn Background() -> Html {
   let class_name = get_class_name();
   let theme = use_atom_value::<Theme>();
-  let canvas_ref = Rc::new(use_node_ref());
+  let canvas_ref = use_node_ref();
   let canvas_ref_clone = canvas_ref.clone();
 
   use_effect_with_deps(
@@ -48,7 +47,7 @@ pub fn Background() -> Html {
 
   html! {
     <div class={class_name}>
-      <canvas ref={canvas_ref.as_ref()} class={format!("{theme}")}  />
+      <canvas ref={canvas_ref} class={format!("{theme}")}  />
       <div class="mask" />
     </div>
   }

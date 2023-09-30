@@ -8,7 +8,7 @@ use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
   window, AudioBuffer, AudioContext, Blob, BlobPropertyBag, Document, Event, FileReader,
-  HtmlElement, HtmlTextAreaElement, Url, Window,
+  HtmlElement, HtmlTextAreaElement, MediaStream, MediaStreamConstraints, Url, Window,
 };
 use yew::{
   virtual_dom::{ApplyAttributeAs, Attributes, VNode},
@@ -216,4 +216,21 @@ pub async fn get_duration(array_buffer: &ArrayBuffer) -> Result<f64, JsValue> {
     .dyn_into::<AudioBuffer>()?;
   let duration = audio_buffer.duration();
   Ok(duration)
+}
+
+pub async fn get_media(audio_constraints: Option<&str>, video_constraints: Option<&str>) -> Result<MediaStream, JsValue> {
+  let mut constraints = MediaStreamConstraints::new();
+  if let Some(audio) = audio_constraints {
+    constraints.audio(&JsValue::from_str(audio));
+  }
+  if let Some(video) = video_constraints {
+    constraints.video(&JsValue::from_str(video));
+  }
+  let window = get_window();
+  let promise = window
+    .navigator()
+    .media_devices()?
+    .get_user_media_with_constraints(&constraints)?;
+  let result = JsFuture::from(promise).await?;
+  Ok(result.into())
 }

@@ -1,36 +1,22 @@
-use gloo_console::log;
-use gloo_utils::format::JsValueSerdeExt;
-use serde::Serialize;
 use serde_json::error;
 use std::{cell::RefCell, rc::Rc};
-use wasm_bindgen::{
-  prelude::Closure,
-  JsCast,
-  JsValue,
-};
+use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
   AnalyserNode, AudioContext, Blob, BlobEvent, CanvasRenderingContext2d, HtmlCanvasElement,
-  MediaRecorder, MediaStream, MediaStreamConstraints,
+  MediaRecorder, MediaStream,
 };
 
 use crate::{
   model::VisualizeColor,
-  utils::{get_window, Timer},
+  utils::{get_media, Timer},
 };
-
-#[derive(Serialize)]
-pub struct Constraints {
-  device_id: String,
-  echo_cancellation: bool,
-}
 
 #[derive(Clone)]
 pub struct WaveRecorder {
   recorder: Option<MediaRecorder>,
   canvas: Option<HtmlCanvasElement>,
   visualize_color: VisualizeColor,
-  constraints: MediaStreamConstraints,
   audio_ctx: Option<AudioContext>,
   analyser: Option<AnalyserNode>,
   timer: Rc<Timer>,
@@ -43,17 +29,10 @@ impl WaveRecorder {
     visualize_color: VisualizeColor,
     canvas: Option<HtmlCanvasElement>,
   ) -> Result<Rc<RefCell<Self>>, error::Error> {
-    let mut constraints = MediaStreamConstraints::new();
-    let audio_constraints = JsValue::from_serde(&Constraints {
-      device_id: "default".to_string(),
-      echo_cancellation: true,
-    })?;
-    constraints.audio(&audio_constraints);
     let wave = Rc::new(RefCell::new(WaveRecorder {
       recorder: None,
       canvas,
       visualize_color,
-      constraints,
       audio_ctx: None,
       analyser: None,
       this: None,
@@ -62,15 +41,6 @@ impl WaveRecorder {
     }));
     wave.borrow_mut().this = Some(wave.clone());
     Ok(wave)
-  }
-  pub async fn get_media(&self) -> Result<MediaStream, JsValue> {
-    let window = get_window();
-    let promise = window
-      .navigator()
-      .media_devices()?
-      .get_user_media_with_constraints(&self.constraints)?;
-    let result = JsFuture::from(promise).await?;
-    Ok(result.into())
   }
 
   fn get_recorder(&self) -> Result<&MediaRecorder, &str> {
@@ -86,7 +56,11 @@ impl WaveRecorder {
   }
 
   pub async fn start(&mut self) -> Result<(), JsValue> {
-    let stream = self.get_media().await?;
+    let stream = get_media(
+      Some("{ device_id: 'default',echo_cancellation: true }"),
+      None,
+    )
+    .await?;
     if self.canvas.is_some() {
       let recorder = MediaRecorder::new_with_media_stream(&stream).ok();
       self.recorder = recorder;
@@ -167,7 +141,6 @@ impl WaveRecorder {
       .get_byte_frequency_data(&mut data_array);
     let canvas_height = self.get_canvas()?.height();
     let canvas_width = self.get_canvas()?.width();
-    log!("background", &self.visualize_color.background);
     canvas_context.set_global_alpha(self.visualize_color.opacity);
     canvas_context.set_fill_style(&JsValue::from_str(&self.visualize_color.background));
     canvas_context.fill_rect(0f64, 0f64, canvas_width as f64, canvas_height as f64);

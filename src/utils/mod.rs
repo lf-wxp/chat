@@ -9,6 +9,7 @@ pub mod wave_surfer;
 pub mod wave_progress;
 pub mod timer;
 pub mod websocket;
+pub mod webrtc;
 
 pub use util::*;
 pub use avatar::*;
@@ -21,3 +22,4 @@ pub use wave_surfer::*;
 pub use wave_progress::*;
 pub use timer::*;
 pub use websocket::*;
+pub use webrtc::*;

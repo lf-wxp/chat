@@ -7,8 +7,8 @@ use futures::Future;
 use gloo_console::log;
 use js_sys::ArrayBuffer;
 use wasm_bindgen::JsValue;
-use yew::prelude::*;
 use web_sys::Element;
+use yew::prelude::*;
 
 use crate::{
   model::VisualizeColor,
@@ -82,10 +82,7 @@ pub fn use_wave_surfer() -> ReturnTuple {
     let theme = theme.clone();
     use_effect_with_deps(
       move |theme| {
-        let ThemeColor {
-          font_color,
-          ..
-        } = theme.get_color();
+        let ThemeColor { font_color, .. } = theme.get_color();
         if let Some(wave) = wave.borrow_mut().as_mut() {
           log!("theme change");
           let _ = wave.set_color(VisualizeColor {
@@ -103,17 +100,15 @@ pub fn use_wave_surfer() -> ReturnTuple {
     move |_| {
       let ThemeColor { font_color, .. } = theme.get_color();
       if let Some(wrap) = wrap_node_ref.clone().cast::<Element>() {
-        *wave.borrow_mut() = Some(
-          WaveSurfer::new(
-            wrap,
-            VisualizeColor {
-              background: "transparent".to_owned(),
-              rect_color: font_color,
-              opacity: 0.8,
-            },
-          )
-          .unwrap(),
-        );
+        *wave.borrow_mut() = WaveSurfer::new(
+          wrap,
+          VisualizeColor {
+            background: "transparent".to_owned(),
+            rect_color: font_color,
+            opacity: 0.8,
+          },
+        )
+        .ok();
       }
       || ()
     },

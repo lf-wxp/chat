@@ -1,7 +1,7 @@
 use stylist::{self, style};
 use yew::prelude::*;
 
-use crate::utils::style;
+use crate::{utils::style, components::VideoStream};
 
 #[function_component]
 pub fn Video() -> Html {
@@ -9,7 +9,7 @@ pub fn Video() -> Html {
 
   html! {
     <section class={class_name}>
-    {{"video"}}
+      <VideoStream />
     </section>
   }
 }
@@ -18,6 +18,7 @@ pub fn Video() -> Html {
 fn get_class_name() -> String {
   style::get_class_name(style!(
     r#"
+      
     "#
   ))
 }

@@ -50,6 +50,7 @@ web-sys = {version = "0.3.64", features = [
   "AnalyserNode",
   "AudioContextOptions",
   "MediaStream",
+  "MediaStreamTrack",
   "MediaDevices",
   "Navigator",
   "EventListener",
@@ -57,7 +58,16 @@ web-sys = {version = "0.3.64", features = [
   "BaseAudioContext",
   "MediaStreamAudioSourceNode",
   "HtmlAudioElement",
-  "CssStyleDeclaration"
+  "CssStyleDeclaration",
+  "MessageEvent",
+  "RtcPeerConnection",
+  "RtcSignalingState",
+  "RtcSdpType",
+  "RtcSessionDescriptionInit",
+  "RtcPeerConnectionIceEvent",
+  "RtcIceCandidate",
+  "RtcDataChannel",
+  "RtcDataChannelEvent",
 ]}
 yew = {version = "0.20.0", features = ["csr"]}
 yew-hooks = "0.2.0"
