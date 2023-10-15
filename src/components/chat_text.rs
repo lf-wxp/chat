@@ -73,7 +73,7 @@ pub fn ChatText(props: &Props) -> Html {
 
   let text = props.text.clone();
   let resize = resize_textarea;
-  use_effect_with_deps(move |_| resize(), text);
+  use_effect_with(text, move |_| resize());
 
   html! {
     <div class={class_name}>

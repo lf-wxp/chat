@@ -11,24 +11,29 @@ use crate::utils::{style, WebRTC};
 pub fn VideoStream() -> Html {
   let class_name = get_class_name();
   let video_node_ref = use_node_ref();
-  let webrtc:Rc<RefCell<Option<WebRTC>>> = use_mut_ref(Default::default);
+  let webrtc: Rc<RefCell<Option<WebRTC>>> = use_mut_ref(Default::default);
 
   let video_node_clone = video_node_ref.clone();
-  use_effect_with_deps(
-    move |_| {
+  let webrtc_clone = webrtc.clone();
+  let start_stream = {
+    Callback::from(move |_| {
+      let webrtc_clone = webrtc_clone.clone();
       if let Some(dom) = video_node_clone.cast::<HtmlMediaElement>() {
+        let webrtc_clone = webrtc_clone.clone();
         spawn_local(async move {
-          *webrtc.borrow_mut() = WebRTC::new(dom).await.ok();
+          *webrtc_clone.borrow_mut() = WebRTC::new(dom).await.ok();
         })
       }
-    },
-    (),
-  );
+    })
+  };
 
   html! {
-    <div class={class_name}>
-      <video ref={video_node_ref} autoplay={true} />
-    </div>
+    <>
+      <div class={class_name}>
+        <video ref={video_node_ref} autoplay={true} />
+      </div>
+      <button onclick={start_stream}>{{"stream"}}</button>
+    </>
   }
 }
 

@@ -32,15 +32,12 @@ pub fn VoiceMessage(props: &Props) -> Html {
 
   let message = props.message.clone();
   let duration = duration.clone();
-  use_effect_with_deps(
-    move |_| {
-      spawn_local(async move {
-        let buffer = message.get_buffer().await;
-        let _ = load(buffer).await;
-      });
-    },
-    (),
-  );
+  use_effect_with((),move |_| {
+    spawn_local(async move {
+      let buffer = message.get_buffer().await;
+      let _ = load(buffer).await;
+    });
+  });
 
   html! {
     <div class={class_name}>

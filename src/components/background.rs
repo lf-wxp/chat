@@ -2,7 +2,7 @@ use bounce::use_atom_value;
 use stylist::{self, style};
 use theme::Theme;
 use web_sys::HtmlCanvasElement;
-use yew::{function_component, html, use_effect_with_deps, use_node_ref, Html};
+use yew::{function_component, html, use_effect_with, use_node_ref, Html};
 
 use crate::{
   store::theme,
@@ -19,31 +19,28 @@ pub fn Background() -> Html {
   let canvas_ref = use_node_ref();
   let canvas_ref_clone = canvas_ref.clone();
 
-  use_effect_with_deps(
-    move |_| {
-      if let Some(canvas) = canvas_ref_clone.cast::<HtmlCanvasElement>() {
-        Ribbons::new(
-          canvas,
-          ColorSet {
-            saturation: "60%".to_owned(),
-            brightness: "50%".to_owned(),
-            alpha: 0.5,
-            cycle_speed: 9.0,
-          },
-          RibbonSet {
-            vertical_position: Position::Random,
-            horizontal_speed: 100.0,
-            ribbon_count: 3,
-            stroke_size: 0.0,
-            parallax_amount: -0.5,
-            animate_sections: false,
-            scroll: 0.0,
-          },
-        );
-      }
-    },
-    (),
-  );
+  use_effect_with((), move |_| {
+    if let Some(canvas) = canvas_ref_clone.cast::<HtmlCanvasElement>() {
+      Ribbons::new(
+        canvas,
+        ColorSet {
+          saturation: "60%".to_owned(),
+          brightness: "50%".to_owned(),
+          alpha: 0.5,
+          cycle_speed: 9.0,
+        },
+        RibbonSet {
+          vertical_position: Position::Random,
+          horizontal_speed: 100.0,
+          ribbon_count: 3,
+          stroke_size: 0.0,
+          parallax_amount: -0.5,
+          animate_sections: false,
+          scroll: 0.0,
+        },
+      );
+    }
+  });
 
   html! {
     <div class={class_name}>

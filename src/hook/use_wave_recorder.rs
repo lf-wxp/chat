@@ -68,23 +68,20 @@ pub fn use_wave_recorder() -> (NodeRef, StartAction, StopAction) {
   {
     let recorder = recorder.clone();
     let theme = theme.clone();
-    use_effect_with_deps(
-      move |theme| {
-        let ThemeColor {
-          theme_color,
-          primary_color,
-          ..
-        } = theme.get_color();
-        if let Ok(recorder) = recorder.borrow_mut().as_mut() {
-          recorder.borrow_mut().set_color(VisualizeColor {
-            background: theme_color,
-            rect_color: primary_color,
-            opacity: 0.8,
-          });
-        };
-      },
-      theme,
-    );
+    use_effect_with(theme,move |theme| {
+      let ThemeColor {
+        theme_color,
+        primary_color,
+        ..
+      } = theme.get_color();
+      if let Ok(recorder) = recorder.borrow_mut().as_mut() {
+        recorder.borrow_mut().set_color(VisualizeColor {
+          background: theme_color,
+          rect_color: primary_color,
+          opacity: 0.8,
+        });
+      };
+    });
   }
 
   (canvas_node_ref, start, stop)

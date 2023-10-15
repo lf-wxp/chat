@@ -80,40 +80,34 @@ pub fn use_wave_surfer() -> ReturnTuple {
   {
     let wave = wave.clone();
     let theme = theme.clone();
-    use_effect_with_deps(
-      move |theme| {
-        let ThemeColor { font_color, .. } = theme.get_color();
-        if let Some(wave) = wave.borrow_mut().as_mut() {
-          log!("theme change");
-          let _ = wave.set_color(VisualizeColor {
-            background: "transparent".to_string(),
-            rect_color: font_color,
-            opacity: 0.8,
-          });
-        };
-      },
-      theme,
-    );
+    use_effect_with(theme,move |theme| {
+      let ThemeColor { font_color, .. } = theme.get_color();
+      if let Some(wave) = wave.borrow_mut().as_mut() {
+        log!("theme change");
+        let _ = wave.set_color(VisualizeColor {
+          background: "transparent".to_string(),
+          rect_color: font_color,
+          opacity: 0.8,
+        });
+      };
+    });
   }
 
-  use_effect_with_deps(
-    move |_| {
-      let ThemeColor { font_color, .. } = theme.get_color();
-      if let Some(wrap) = wrap_node_ref.clone().cast::<Element>() {
-        *wave.borrow_mut() = WaveSurfer::new(
-          wrap,
-          VisualizeColor {
-            background: "transparent".to_owned(),
-            rect_color: font_color,
-            opacity: 0.8,
-          },
-        )
-        .ok();
-      }
-      || ()
-    },
-    wrap,
-  );
+  use_effect_with(wrap,move |_| {
+    let ThemeColor { font_color, .. } = theme.get_color();
+    if let Some(wrap) = wrap_node_ref.clone().cast::<Element>() {
+      *wave.borrow_mut() = WaveSurfer::new(
+        wrap,
+        VisualizeColor {
+          background: "transparent".to_owned(),
+          rect_color: font_color,
+          opacity: 0.8,
+        },
+      )
+      .ok();
+    }
+    || ()
+  });
 
   (wrap_clone, duration, playing, start, stop, load)
 }

@@ -42,7 +42,7 @@ impl Websocket {
     Ok(client)
   }
 
-  pub fn parseMessageEvent(e: MessageEvent) -> SocketMessage {
+  pub fn parse_message_event(e: MessageEvent) -> SocketMessage {
     if let Ok(buffer) = e.data().dyn_into::<ArrayBuffer>() {
       return SocketMessage::Buffer(buffer);
     }
@@ -60,7 +60,7 @@ impl Websocket {
       let client_message = client.clone();
       let onmessage_callback = Closure::<dyn FnMut(_)>::new(move |e: MessageEvent| {
         if let Some(onmessage) = &client_message.borrow().onmessage {
-          let message = Websocket::parseMessageEvent(e);
+          let message = Websocket::parse_message_event(e);
           onmessage(message);
         }
       });

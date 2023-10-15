@@ -9,7 +9,7 @@ fake = []
 
 [dependencies]
 base64 = "0.21.4"
-bounce = "0.8.0"
+bounce = "0.9.0"
 chrono = "0.4.31"
 derivative = "2.2.0"
 fake = {version = "2.8.0", features = ["derive", "uuid", "chrono"]}
@@ -20,14 +20,14 @@ gloo-events = "0.2.0"
 gloo-render = "0.2.0"
 gloo-timers = "0.3.0"
 gloo-utils = "0.2.0"
-indexmap = "1.9.3"
+indexmap = "2.0.2"
 js-sys = "0.3.64"
 nanoid = "0.4.0"
 pinyin = "0.10.0"
 rand = "0.8.5"
-serde = {version = "1.0.188", features = ["derive"]}
+serde = {version = "1.0.189", features = ["derive"]}
 serde_json = "1.0.107"
-stylist = {version = "0.12.1", features = ["yew_integration"]}
+stylist = {version = "0.13.0", features = ["yew_integration"]}
 unicode-segmentation = "1.10.1"
 wasm-bindgen = "0.2.87"
 wasm-bindgen-futures = "0.4.37"
@@ -69,10 +69,10 @@ web-sys = {version = "0.3.64", features = [
   "RtcDataChannel",
   "RtcDataChannelEvent",
 ]}
-yew = {version = "0.20.0", features = ["csr"]}
-yew-hooks = "0.2.0"
-yew-router = "0.17.0"
-yew_icons = {version = "0.7.3", features = [
+yew = {version = "0.21.0", features = ["csr"]}
+yew-hooks = "0.3.0"
+yew-router = "0.18.0"
+yew_icons = {version = "0.8.0", features = [
   "HeroiconsSolidUserGroup",
   "BootstrapCameraVideoFill",
   "LucideSettings",

@@ -18,17 +18,14 @@ pub fn ImageMessage(props: &Props) -> Html {
   let message_clone = message.clone();
 
   let src_clone = src.clone();
-  use_effect_with_deps(
-    move |_| {
-      let src_clone = src_clone.clone();
-      spawn_local(async move {
-        let url = message.get_url().await;
-        log!("url", &url);
-        src_clone.set(url);
-      });
-    },
-    message_clone,
-  );
+  use_effect_with(message_clone,move |_| {
+    let src_clone = src_clone.clone();
+    spawn_local(async move {
+      let url = message.get_url().await;
+      log!("url", &url);
+      src_clone.set(url);
+    });
+  });
 
   html! {
     <img class={class_name} src={(*src).clone()} />

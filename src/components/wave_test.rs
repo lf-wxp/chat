@@ -46,7 +46,7 @@ pub fn WaveTest() -> Html {
       }
     }
   });
-  use_effect_with_deps(move |_| {
+  use_effect_with((), move |_| {
     let ws_client = Websocket::new("ws://127.0.0.1:8888").unwrap();
     let mut client = ws_client.borrow_mut();
     client.set_onopen(Box::new(move || {
@@ -56,7 +56,7 @@ pub fn WaveTest() -> Html {
       log!("receive message", format!("{:?}", msg));
     }));
     client.send(SocketMessage::Str(JsString::from("hello"))).unwrap();
-  }, ());
+  });
 
   html! {
     <div class={class_name}>

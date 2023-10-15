@@ -32,7 +32,7 @@ pub fn ChatMessage(props: &Props) -> Html {
         <Avatar name={name} />
       }
       <div class={"message-content"}>
-        <time>{{ props.time.format("%d/%m/ %H:%M") }}</time>
+        <time>{{ props.time.format("%d/%m/ %H:%M").to_string() }}</time>
         if let Message::Text(text) = &props.message {
           <div class="message">
             {{ text }}
