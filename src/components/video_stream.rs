@@ -21,7 +21,9 @@ pub fn VideoStream() -> Html {
       if let Some(dom) = video_node_clone.cast::<HtmlMediaElement>() {
         let webrtc_clone = webrtc_clone.clone();
         spawn_local(async move {
-          *webrtc_clone.borrow_mut() = WebRTC::new(dom).await.ok();
+          *webrtc_clone.borrow_mut() = WebRTC::new().ok();
+          let _ = webrtc_clone.borrow_mut().as_mut().unwrap().set_stream().await;
+          webrtc_clone.borrow().as_ref().unwrap().set_dom_stream(dom);
         })
       }
     })

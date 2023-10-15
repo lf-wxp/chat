@@ -6,30 +6,34 @@ use super::get_media;
 
 pub struct WebRTC {
   peer_connection: RtcPeerConnection,
-  dom: HtmlMediaElement,
-  stream: MediaStream,
+  stream: Option<MediaStream>,
+  sdp: Option<String>,
+  remote_sdp: Option<String>,
 }
 
 impl WebRTC {
-  pub async fn new(video_dom: HtmlMediaElement) -> Result<Self, JsValue> {
+  pub fn new() -> Result<Self, JsValue> {
     let peer = RtcPeerConnection::new()?;
+    Ok(WebRTC {
+      peer_connection: peer,
+      stream: None,
+      sdp: None,
+      remote_sdp: None,
+    })
+  }
+
+  pub async fn set_stream(&mut self) -> Result<(), JsValue> {
     let stream = get_media(
       Some("{ device_id: 'default',echo_cancellation: true }"),
       Some("{ device_id: 'default' }"),
     )
     .await?;
-
-    let webrtc = WebRTC {
-      peer_connection: peer,
-      dom: video_dom,
-      stream,
-    };
-    webrtc.set_dom_stream();
-    Ok(webrtc)
+    self.stream = Some(stream);
+    Ok(())
   }
 
-  fn set_dom_stream(&self) {
-    if let Some(stream) = self.dom.src_object() {
+  pub fn set_dom_stream(&self, dom: HtmlMediaElement) {
+    if let Some(stream) = dom.src_object() {
       log!("inside dom", &stream);
       stream
         .get_tracks()
@@ -39,7 +43,6 @@ impl WebRTC {
           stream.remove_track(&media_stream_track);
         });
     }
-    log!("dom", &self.dom, &self.stream);
-    self.dom.set_src_object(Some(&self.stream));
+    dom.set_src_object(self.stream.as_ref());
   }
 }
