@@ -41,9 +41,9 @@ pub struct ChatHistory(pub HashMap<String, Vec<ChatMessage>>);
 
 impl Default for ChatHistory {
   fn default() -> Self {
-    #[cfg(feature = "fake")]
+    #[cfg(feature = "dev")]
     return Faker.fake::<ChatHistory>();
-    #[cfg(not(feature = "fake"))]
+    #[cfg(not(feature = "dev"))]
     return ChatHistory(HashMap::new());
   }
 }

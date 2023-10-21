@@ -5,7 +5,7 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlMediaElement;
 use yew::prelude::*;
 
-use crate::utils::{style, WebRTC};
+use crate::utils::{style, WebRTC, SDP_SERVER};
 
 #[function_component]
 pub fn VideoStream() -> Html {
@@ -34,6 +34,7 @@ pub fn VideoStream() -> Html {
       <div class={class_name}>
         <video ref={video_node_ref} autoplay={true} />
       </div>
+      {SDP_SERVER}
       <button onclick={start_stream}>{{"stream"}}</button>
     </>
   }

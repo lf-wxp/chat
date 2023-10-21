@@ -14,9 +14,9 @@ pub struct User {
 
 impl Default for User {
   fn default() -> Self {
-    #[cfg(feature = "fake")]
+    #[cfg(feature = "dev")]
     return Faker.fake::<User>();
-    #[cfg(not(feature = "fake"))]
+    #[cfg(not(feature = "dev"))]
     return User { uuid: "".to_string(), name: "".to_string() };
   }
 }
@@ -80,9 +80,9 @@ impl Users {
 
 impl Default for Users {
   fn default() -> Self {
-    #[cfg(feature = "fake")]
+    #[cfg(feature = "dev")]
     return Faker.fake::<Users>();
-    #[cfg(not(feature = "fake"))]
+    #[cfg(not(feature = "dev"))]
     return Users(vec![]);
   }
 }
