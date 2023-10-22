@@ -3,7 +3,7 @@ use yew::prelude::*;
 use yew_icons::IconId;
 
 use crate::{
-  components::{NavItem, VolumeSet},
+  components::{NavItem, VolumeSet, Account},
   route::Route,
   utils::style,
 };
@@ -45,8 +45,11 @@ pub fn Side() -> Html {
             <NavItem key={item.route.clone()} route={item.route.clone()} icon={item.icon} />
         }})}
       </div>
-      <div class="side-set">
+      <div class="volume-set">
         <VolumeSet />
+      </div>
+      <div class="user-set">
+        <Account />
       </div>
     </side>
   }
@@ -70,9 +73,13 @@ fn get_class_name() -> String {
           justify-content: center;
           align-items: center;
         }
-        .side-set {
+        .volume-set {
           position: absolute;
-          inset-block-end: 20px; 
+          inset-block-end: 45px; 
+        }
+        .user-set {
+          position: absolute;
+          inset-block-end: 5px; 
         }
     "#
   ))

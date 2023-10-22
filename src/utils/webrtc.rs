@@ -4,6 +4,7 @@ use web_sys::{HtmlMediaElement, MediaStream, MediaStreamTrack, RtcPeerConnection
 
 use super::get_media;
 
+#[derive(Debug, Clone)]
 pub struct WebRTC {
   peer_connection: RtcPeerConnection,
   stream: Option<MediaStream>,

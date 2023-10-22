@@ -1,6 +1,7 @@
 use bounce::use_atom;
 use std::collections::HashMap;
 use yew::prelude::*;
+use yew::use_effect_with;
 
 use crate::{
   store::{Chat, User},
@@ -27,7 +28,7 @@ pub fn use_fake_set() -> () {
     .unwrap()
     .clone();
   conversation_handle.set(Chat((*first_conversation).clone()));
-  use_effect(move || {
+  use_effect_with((), move |_| {
     current_user_handle.set(User {
       uuid: last_message.uuid.clone(),
       name: last_message.name.clone(),

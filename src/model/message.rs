@@ -58,3 +58,4 @@ pub enum MessageAlignment {
   Left,
   Right,
 }
+

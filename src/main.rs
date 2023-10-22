@@ -5,7 +5,7 @@ use yew_router::{BrowserRouter, Switch};
 
 use components::{Background, Chat, FakeSet, Side, NotifyProvider, Service};
 use route::{switch, Route};
-use utils::style;
+use utils::{style, set_client};
 
 mod components;
 mod hook;
@@ -54,6 +54,7 @@ fn get_class_name() -> String {
           inline-size: 40px; 
           padding: var(--padding);
           backdrop-filter: blur(15px);
+          z-index: 1;
         }
         
         .content {
@@ -65,5 +66,6 @@ fn get_class_name() -> String {
 }
 
 fn main() {
+  set_client();
   yew::Renderer::<App>::new().render();
 }
