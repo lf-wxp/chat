@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [features]
 dev = []
+fake = []
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

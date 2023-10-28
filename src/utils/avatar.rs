@@ -1,7 +1,8 @@
 const COLORS_NB: u32 = 9;
 const DEFAULT_SATURATION: u32 = 95;
 const DEFAULT_LIGHTNESS: u32 = 45;
-const MAGIC_NUMBER: i32 = 5;
+const MAGIC_NUMBER: u32 = 5;
+const MODULUS: u32 = 1_000_000_007; // Choose a large prime number as the modulus
 
 #[derive(Debug)]
 pub struct Avatar {
@@ -10,16 +11,18 @@ pub struct Avatar {
 
 impl From<String> for Avatar {
   fn from(value: String) -> Self {
-    Avatar { 
-      image: avatar(value, DEFAULT_SATURATION, DEFAULT_LIGHTNESS, simple_hash)
-     }
+    Avatar {
+      image: avatar(value, DEFAULT_SATURATION, DEFAULT_LIGHTNESS, simple_hash),
+    }
   }
 }
 
 fn simple_hash(str: &str) -> u32 {
-  let num = str.chars().fold(MAGIC_NUMBER, |hash: i32, char| {
-    (hash ^ (u32::from(char) as i32)) * -MAGIC_NUMBER
-  });
+  let num = str.chars().fold(MAGIC_NUMBER, |hash: u32, char| {
+    let char_value = u32::from(char);
+    let new_hash = (hash ^ char_value).wrapping_add(MAGIC_NUMBER);
+    new_hash % MODULUS
+});
   let num = num.to_be_bytes();
   u32::from_be_bytes(num) >> 2
 }

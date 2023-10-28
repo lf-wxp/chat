@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::store::User;
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateRoom {
@@ -111,17 +113,18 @@ pub enum SdpMessage {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct ClientInfo {
-  pub name: String,
-  pub uuid: String,
+pub struct ConnectInfo {
+  pub room_list: Vec<Room>,
+  pub client_list: Vec<User>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum Data {
   RoomList(Vec<Room>),
-  ClientList(Vec<ClientInfo>),
-  ClientInfo(ClientInfo),
+  ClientList(Vec<User>),
+  ClientInfo(User),
+  ConnectInfo(ConnectInfo),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

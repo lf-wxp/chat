@@ -1,10 +1,12 @@
 use bounce::Atom;
 use fake::{uuid::UUIDv1, Dummy, Fake, Faker};
 use pinyin::ToPinyin;
+use serde::{Deserialize, Serialize};
 
 use crate::utils::faker::RandomName;
 
-#[derive(PartialEq, Debug, Dummy, Clone, Atom)]
+#[derive(PartialEq, Debug, Dummy, Clone, Atom, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct User {
   #[dummy(faker = "UUIDv1")]
   pub uuid: String,
@@ -80,9 +82,9 @@ impl Users {
 
 impl Default for Users {
   fn default() -> Self {
-    #[cfg(feature = "dev")]
+    #[cfg(feature = "fake")]
     return Faker.fake::<Users>();
-    #[cfg(not(feature = "dev"))]
+    #[cfg(not(feature = "fake"))]
     return Users(vec![]);
   }
 }

@@ -45,6 +45,7 @@ impl Client {
         {
           if let Some(client) = &client {
             if let Some(onmessage) = &client.borrow().onmessage {
+              log!("onmessage", format!("{:?}", msg));
               onmessage(sdp_response.clone());
             }
             if let Some(Data::ClientInfo(info)) = sdp_response.data {
