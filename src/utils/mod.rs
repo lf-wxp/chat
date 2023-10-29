@@ -12,6 +12,7 @@ pub mod websocket;
 pub mod webrtc;
 pub mod client;
 pub mod config;
+pub mod sdp_sender;
 
 pub use util::*;
 pub use avatar::*;
@@ -27,3 +28,4 @@ pub use websocket::*;
 pub use webrtc::*;
 pub use client::*;
 pub use config::*;
+pub use sdp_sender::*;

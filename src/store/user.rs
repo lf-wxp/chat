@@ -1,4 +1,6 @@
-use bounce::Atom;
+use std::rc::Rc;
+
+use bounce::{Atom, BounceStates, Selector};
 use fake::{uuid::UUIDv1, Dummy, Fake, Faker};
 use pinyin::ToPinyin;
 use serde::{Deserialize, Serialize};
@@ -19,10 +21,18 @@ impl Default for User {
     #[cfg(feature = "dev")]
     return Faker.fake::<User>();
     #[cfg(not(feature = "dev"))]
-    return User { uuid: "".to_string(), name: "".to_string() };
+    return User {
+      uuid: "".to_string(),
+      name: "".to_string(),
+    };
   }
 }
 
+impl User {
+  pub fn update_name(self, name: String) -> Self {
+    Self { name, ..self }
+  }
+}
 
 #[derive(Debug, Clone)]
 pub struct UserGroup {
@@ -36,6 +46,15 @@ pub struct Users(pub Vec<User>);
 impl Dummy<Faker> for Users {
   fn dummy_with_rng<R: rand::Rng + ?Sized>(_: &Faker, _rng: &mut R) -> Self {
     Users((0..10).map(|_| Faker.fake::<User>()).collect::<Vec<User>>())
+  }
+}
+
+impl Selector for Users {
+  fn select(states: &BounceStates) -> Rc<Self> {
+    let user = states.get_atom_value::<User>();
+    let users = states.get_atom_value::<Users>();
+    let users = users.0.clone().into_iter().filter(|x| *x != *user).collect::<Vec<User>>();
+    Rc::from(Users(users))
   }
 }
 

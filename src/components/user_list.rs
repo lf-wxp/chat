@@ -1,19 +1,19 @@
-use bounce::use_atom_value;
-use gloo_console::log;
+use bounce::{use_atom_value, use_selector_value};
 use stylist::{self, style};
 use yew::prelude::*;
 
 use crate::{
   components::{Avatar, Dropdown},
-  model::Option,
-  store::{FilterWord, Users},
-  utils::style,
+  model::{Option, CallType},
+  store::{FilterWord, User, Users},
+  utils::{sdp_sender, style},
 };
 
 #[function_component]
 pub fn UserList() -> Html {
   let class_name = get_class_name();
-  let users = use_atom_value::<Users>();
+  let users = use_selector_value::<Users>();
+  let user = use_atom_value::<User>();
   let filter_word = use_atom_value::<FilterWord>();
 
   let options = vec![
@@ -27,8 +27,11 @@ pub fn UserList() -> Html {
     },
   ];
 
-  let onclick = Callback::from(move |x: String| {
-    log!("the click", x);
+  let onclick = Callback::from(move |(user, call_type): (User, String)| {
+    let call_type = CallType::try_from(call_type);
+    if let Ok(call_type) = call_type {
+      sdp_sender::call(user.uuid, call_type);
+    }
   });
 
   html! {
@@ -41,8 +44,9 @@ pub fn UserList() -> Html {
               </header>
               <div class="user-list">
               { for item.users.iter().map(|x| {
+                let user = x.clone();
                 html! {
-                  <Dropdown options={options.clone()} onclick={onclick.clone()}>
+                  <Dropdown options={options.clone()} onclick={onclick.reform(move |value: String| (user.clone(), value.clone() ))}>
                     <div class="user">
                       <Avatar name={x.name.clone()} />
                       <span class="user-name">{x.name.clone()}</span>

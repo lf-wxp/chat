@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::store::User;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateRoom {
   name: String,
@@ -10,7 +10,7 @@ pub struct CreateRoom {
   passwd: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoveRoom {
   uuid: String,
@@ -32,7 +32,7 @@ pub struct Room {
 	passwd: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ListRoom;
 
 #[derive(Serialize, Deserialize)]
@@ -43,7 +43,7 @@ pub struct ListRoomResponse {
   data: Vec<Room>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum RoomAction {
   Create(CreateRoom),
@@ -52,21 +52,21 @@ pub enum RoomAction {
 }
 
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateName {
   name: String,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ListClient;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct GetInfo;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum ClientAction {
   UpdateName(UpdateName),
@@ -74,7 +74,7 @@ pub enum ClientAction {
   GetInfo(GetInfo),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum Action {
   Room(RoomAction),
@@ -82,29 +82,56 @@ pub enum Action {
 }
 
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Broadcast {
   from: String,
   message: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct Unicast {
-  from: String,
-  pub to: String,
-  message: String,
+pub enum CallType {
+  Video,
+  Audio,
 }
 
-#[derive(Serialize, Deserialize)]
+impl TryFrom<String> for CallType {
+  type Error = ();
+  fn try_from(value: String) -> Result<Self, Self::Error> {
+    if value == "audio" {
+      return Ok(CallType::Audio);
+    }
+    if value == "video" {
+      return Ok(CallType::Video);
+    }
+    Err(())
+  }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Unicast {
+  pub from: String,
+  pub to: String,
+  pub message: CallType,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum Transmit {
   Broadcast(Broadcast),
   Unicast(Unicast),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct  TransmitMessage {
+  from: String,
+  message: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum SdpMessage {
   Action(Action),
@@ -125,6 +152,7 @@ pub enum Data {
   ClientList(Vec<User>),
   ClientInfo(User),
   ConnectInfo(ConnectInfo),
+  Transmit(TransmitMessage),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

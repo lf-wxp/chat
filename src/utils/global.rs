@@ -1,6 +1,6 @@
 use std::{cell::{OnceCell, RefCell}, rc::Rc};
 
-use crate::{model::ChatHistory, utils::Client, store::{User, user}};
+use crate::{model::ChatHistory, utils::Client, store::User};
 
 pub const IMAGE_FILE_SIZE: f64 = 10f64; // mb
 

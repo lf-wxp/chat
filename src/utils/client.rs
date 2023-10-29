@@ -3,7 +3,9 @@ use std::{cell::RefCell, rc::Rc};
 use gloo_console::log;
 
 use crate::{
-  model::{Action, ClientAction, Data, GetInfo, SdpMessage, SdpResponse},
+  model::{
+    Action, CallType, ClientAction, Data, GetInfo, SdpMessage, SdpResponse, Transmit, Unicast,
+  },
   store::User,
   utils::{SocketMessage, WebRTC, Websocket, SDP_SERVER},
 };
@@ -70,5 +72,16 @@ impl Client {
 
   pub fn user(&self) -> User {
     self.user.clone()
+  }
+
+  pub fn call(&self, to: String, call_type: CallType) {
+    let mut ws_client = self.ws.borrow_mut();
+    let action = &SdpMessage::Transmit(Transmit::Unicast(Unicast {
+      from: self.user.uuid.clone(),
+      to,
+      message: call_type,
+    }));
+    let message = serde_json::to_string(action).unwrap().into();
+    ws_client.send(SocketMessage::Str(message)).unwrap();
   }
 }

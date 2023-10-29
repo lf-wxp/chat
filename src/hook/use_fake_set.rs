@@ -23,15 +23,15 @@ pub fn use_fake_set() -> () {
   let last_message = chat_history
     .values()
     .next()
-    .unwrap()
-    .last()
-    .unwrap()
-    .clone();
+    .unwrap_or(&Vec::new())
+    .last().cloned();
   conversation_handle.set(Chat((*first_conversation).clone()));
   use_effect_with((), move |_| {
-    current_user_handle.set(User {
-      uuid: last_message.uuid.clone(),
-      name: last_message.name.clone(),
-    });
+    if let Some(message) = last_message {
+      current_user_handle.set(User {
+        uuid: message.uuid.clone(),
+        name: message.name.clone(),
+      });
+    }
   });
 }
