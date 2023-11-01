@@ -6,7 +6,10 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlMediaElement;
 use yew::prelude::*;
 
-use crate::{utils::{style, WebRTC, SDP_SERVER}, store::User};
+use crate::{
+  store::User,
+  utils::{style, WebRTC, SDP_SERVER},
+};
 
 #[function_component]
 pub fn VideoStream() -> Html {
@@ -24,7 +27,12 @@ pub fn VideoStream() -> Html {
         let webrtc_clone = webrtc_clone.clone();
         spawn_local(async move {
           *webrtc_clone.borrow_mut() = WebRTC::new().ok();
-          let _ = webrtc_clone.borrow_mut().as_mut().unwrap().set_stream().await;
+          let _ = webrtc_clone
+            .borrow_mut()
+            .as_mut()
+            .unwrap()
+            .set_stream()
+            .await;
           webrtc_clone.borrow().as_ref().unwrap().set_dom_stream(dom);
         })
       }

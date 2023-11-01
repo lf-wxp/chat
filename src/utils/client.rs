@@ -4,7 +4,8 @@ use gloo_console::log;
 
 use crate::{
   model::{
-    Action, CallType, ClientAction, Data, GetInfo, SdpMessage, SdpResponse, Transmit, Unicast,
+    Action, CallType, ClientAction, Data, GetInfo, SdpMessage, Transmit, Unicast, WsMessage,
+    WsResponse,
   },
   store::User,
   utils::{SocketMessage, WebRTC, Websocket, SDP_SERVER},
@@ -15,16 +16,17 @@ pub struct Client {
   ws: Rc<RefCell<Websocket>>,
   rtc: Option<WebRTC>,
   this: Option<Rc<RefCell<Self>>>,
-  onmessage: Option<Box<dyn Fn(SdpResponse)>>,
+  onmessage: Option<Box<dyn Fn(WsResponse)>>,
 }
 
 impl Client {
   pub fn new(user: User) -> Rc<RefCell<Self>> {
     let ws = Websocket::new(SDP_SERVER).unwrap();
+    let rtc = WebRTC::new().ok();
     let client = Rc::new(RefCell::new(Client {
       user,
       ws,
-      rtc: None,
+      rtc,
       this: None,
       onmessage: None,
     }));
@@ -43,7 +45,7 @@ impl Client {
       log!("receive message", format!("{:?}", msg));
       if let SocketMessage::Str(msg) = msg {
         if let Ok(sdp_response) =
-          serde_json::from_str::<SdpResponse>(&msg.as_string().expect("error"))
+          serde_json::from_str::<WsResponse>(&msg.as_string().expect("error"))
         {
           if let Some(client) = &client {
             if let Some(onmessage) = &client.borrow().onmessage {
@@ -57,7 +59,7 @@ impl Client {
         }
       }
     }));
-    let action = &SdpMessage::Action(Action::Client(ClientAction::GetInfo(GetInfo)));
+    let action = &WsMessage::Action(Action::Client(ClientAction::GetInfo(GetInfo)));
     let message = serde_json::to_string(action).unwrap().into();
     ws_client.send(SocketMessage::Str(message)).unwrap();
   }
@@ -66,7 +68,7 @@ impl Client {
     self.user.uuid = uuid;
   }
 
-  pub fn set_onmessage(&mut self, onmessage: Box<dyn Fn(SdpResponse)>) {
+  pub fn set_onmessage(&mut self, onmessage: Box<dyn Fn(WsResponse)>) {
     self.onmessage = Some(onmessage);
   }
 
@@ -74,14 +76,18 @@ impl Client {
     self.user.clone()
   }
 
-  pub fn call(&self, to: String, call_type: CallType) {
+  pub async fn call(&mut self, to: String, call_type: CallType) {
     let mut ws_client = self.ws.borrow_mut();
-    let action = &SdpMessage::Transmit(Transmit::Unicast(Unicast {
-      from: self.user.uuid.clone(),
-      to,
-      message: call_type,
-    }));
-    let message = serde_json::to_string(action).unwrap().into();
-    ws_client.send(SocketMessage::Str(message)).unwrap();
+    if let Some(rtc) = &mut self.rtc {
+      if let Some(sdp) = rtc.sdp().await {
+        let action = &WsMessage::Transmit(Transmit::Unicast(Unicast {
+          from: self.user.uuid.clone(),
+          to,
+          message: SdpMessage { call_type, sdp: sdp.to_string() },
+        }));
+        let message = serde_json::to_string(action).unwrap().into();
+        ws_client.send(SocketMessage::Str(message)).unwrap();
+      }
+    }
   }
 }

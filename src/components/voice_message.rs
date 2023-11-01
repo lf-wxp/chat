@@ -3,7 +3,7 @@ use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
 
-use crate::{hook::use_wave_surfer, utils::style, model::MessageBinary};
+use crate::{hook::use_wave_surfer, model::MessageBinary, utils::style};
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
@@ -32,7 +32,7 @@ pub fn VoiceMessage(props: &Props) -> Html {
 
   let message = props.message.clone();
   let duration = duration.clone();
-  use_effect_with((),move |_| {
+  use_effect_with((), move |_| {
     spawn_local(async move {
       let buffer = message.get_buffer().await;
       let _ = load(buffer).await;

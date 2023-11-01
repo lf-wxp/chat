@@ -1,13 +1,14 @@
 use js_sys::ArrayBuffer;
 use stylist::{self, style};
 use wasm_bindgen::JsCast;
+use wasm_bindgen_futures::spawn_local;
 use web_sys::{File, HtmlInputElement};
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
 
 use crate::{
   components::{use_notify, NoticeTag},
-  utils::{get_target, read_file, style, global},
+  utils::{get_target, global, read_file, style},
 };
 
 #[derive(Properties, PartialEq)]
@@ -28,7 +29,7 @@ pub fn ImageInput(props: &Props) -> Html {
         .get()
         .and_then(|input| input.dyn_into::<HtmlInputElement>().ok())
       {
-        wasm_bindgen_futures::spawn_local(async move { input.click() });
+        spawn_local(async move { input.click() });
       }
     })
   };
@@ -53,7 +54,7 @@ pub fn ImageInput(props: &Props) -> Html {
         let change = change.clone();
         let validate = validate.clone();
         if let Some(file) = target.files().and_then(|x| x.get(0)) {
-          wasm_bindgen_futures::spawn_local(async move {
+          spawn_local(async move {
             let valid = validate(&file);
             if !valid {
               return;

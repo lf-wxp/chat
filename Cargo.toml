@@ -9,30 +9,30 @@ fake = []
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-base64 = "0.21.4"
+base64 = "0.21.5"
 bounce = "0.9.0"
 chrono = "0.4.31"
 derivative = "2.2.0"
-fake = {version = "2.8.0", features = ["derive", "uuid", "chrono"]}
-futures = "0.3.28"
-getrandom = {version = "0.2.10", features = ["js"]}
+fake = { version = "2.9.1", features = ["derive", "uuid", "chrono"] }
+futures = "0.3.29"
+getrandom = { version = "0.2.10", features = ["js"] }
 gloo-console = "0.3.0"
 gloo-events = "0.2.0"
 gloo-render = "0.2.0"
 gloo-timers = "0.3.0"
 gloo-utils = "0.2.0"
-indexmap = "2.0.2"
+indexmap = "2.1.0"
 js-sys = "0.3.64"
 nanoid = "0.4.0"
 pinyin = "0.10.0"
 rand = "0.8.5"
-serde = {version = "1.0.189", features = ["derive"]}
-serde_json = "1.0.107"
-stylist = {version = "0.13.0", features = ["yew_integration"]}
+serde = { version = "1.0.190", features = ["derive"] }
+serde_json = "1.0.108"
+stylist = { version = "0.13.0", features = ["yew_integration"] }
 unicode-segmentation = "1.10.1"
 wasm-bindgen = "0.2.87"
 wasm-bindgen-futures = "0.4.37"
-web-sys = {version = "0.3.64", features = [
+web-sys = { version = "0.3.64", features = [
   "Document",
   "Element",
   "Window",
@@ -70,11 +70,11 @@ web-sys = {version = "0.3.64", features = [
   "RtcDataChannel",
   "RtcDataChannelEvent",
   "RtcRtpSender"
-]}
-yew = {version = "0.21.0", features = ["csr"]}
+] }
+yew = { version = "0.21.0", features = ["csr"] }
 yew-hooks = "0.3.0"
 yew-router = "0.18.0"
-yew_icons = {version = "0.8.0", features = [
+yew_icons = { version = "0.8.0", features = [
   "HeroiconsSolidUserGroup",
   "BootstrapCameraVideoFill",
   "LucideSettings",
@@ -93,4 +93,4 @@ yew_icons = {version = "0.8.0", features = [
   "BootstrapPlayFill",
   "BootstrapSunFill",
   "BootstrapMoonStarsFill",
-]}
+] }

@@ -3,6 +3,7 @@ use gloo_console::log;
 use js_sys::JsString;
 use stylist::{self, style};
 use wasm_bindgen::JsCast;
+use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
@@ -11,7 +12,7 @@ use crate::{
   hook::use_chat,
   model::{ChatMessage, Message, MessageBinary},
   store::User,
-  utils::{get_target, style, Websocket, SocketMessage},
+  utils::{get_target, style, SocketMessage, Websocket},
 };
 
 #[function_component]
@@ -27,7 +28,7 @@ pub fn WaveTest() -> Html {
         .get()
         .and_then(|input| input.dyn_into::<HtmlInputElement>().ok())
       {
-        wasm_bindgen_futures::spawn_local(async move { input.click() });
+        spawn_local(async move { input.click() });
       }
     })
   };
@@ -37,7 +38,7 @@ pub fn WaveTest() -> Html {
     let user_name = user_name.clone();
     if let Some(target) = target {
       if let Some(file) = target.files().and_then(|x| x.get(0)) {
-        wasm_bindgen_futures::spawn_local(async move {
+        spawn_local(async move {
           add(ChatMessage::new(
             user_name.name.clone(),
             Message::Audio(MessageBinary::File(file)),
@@ -55,7 +56,9 @@ pub fn WaveTest() -> Html {
     client.set_onmessage(Box::new(|msg: SocketMessage| {
       log!("receive message", format!("{:?}", msg));
     }));
-    client.send(SocketMessage::Str(JsString::from("hello"))).unwrap();
+    client
+      .send(SocketMessage::Str(JsString::from("hello")))
+      .unwrap();
   });
 
   html! {

@@ -1,5 +1,5 @@
 use gloo_console::log;
-use js_sys::{Reflect, Array};
+use js_sys::{Array, Reflect};
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -21,13 +21,14 @@ pub struct WebRTC {
 impl WebRTC {
   pub fn new() -> Result<Self, JsValue> {
     let peer = RtcPeerConnection::new()?;
-    Ok(WebRTC {
+    let rtc = WebRTC {
       peer_connection: peer,
       stream: None,
       sdp: None,
       sdp_obj: None,
       remote_sdp: None,
-    })
+    };
+    Ok(rtc)
   }
 
   pub async fn set_stream(&mut self) -> Result<(), JsValue> {
@@ -37,16 +38,6 @@ impl WebRTC {
     )
     .await?;
     self.stream = Some(stream);
-    Ok(())
-  }
-
-  fn attach_stream(&self) -> Result<(), JsValue> {
-    if let Some(stream) = &self.stream {
-      let tracks = stream.get_tracks();
-      let main_track = tracks.at(0).dyn_into::<MediaStreamTrack>()?;
-      let more_track = tracks.slice(1, tracks.length() - 1);
-      self.peer_connection.add_track(&main_track, stream, &more_track);
-    }
     Ok(())
   }
 
@@ -64,6 +55,25 @@ impl WebRTC {
     dom.set_src_object(self.stream.as_ref());
   }
 
+  pub async fn sdp(&mut self) -> Option<String> {
+    if self.sdp.is_some() {
+      return self.sdp.clone();
+    }
+    self.set_offer().await.ok()
+  }
+
+  fn attach_stream(&self) -> Result<(), JsValue> {
+    if let Some(stream) = &self.stream {
+      let tracks = stream.get_tracks();
+      let main_track = tracks.at(0).dyn_into::<MediaStreamTrack>()?;
+      let more_track = tracks.slice(1, tracks.length() - 1);
+      self
+        .peer_connection
+        .add_track(&main_track, stream, &more_track);
+    }
+    Ok(())
+  }
+
   fn create_answer(sdp: &str) -> RtcSessionDescriptionInit {
     let mut answer_obj = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
     answer_obj.sdp(sdp);
@@ -76,15 +86,15 @@ impl WebRTC {
     offer_obj
   }
 
-  async fn set_offer(&mut self) -> Result<(), JsValue> {
+  async fn set_offer(&mut self) -> Result<String, JsValue> {
     let offer = JsFuture::from(self.peer_connection.create_offer()).await?;
     let offer_sdp = Reflect::get(&offer, &JsValue::from_str("sdp"))?
       .as_string()
       .unwrap();
     let offer_obj = WebRTC::create_offer(&offer_sdp);
     JsFuture::from(self.peer_connection.set_local_description(&offer_obj)).await?;
-    self.sdp = Some(offer_sdp);
-    Ok(())
+    self.sdp = Some(offer_sdp.clone());
+    Ok(offer_sdp)
   }
 
   async fn receive_answer(&mut self, sdp: String) -> Result<(), JsValue> {

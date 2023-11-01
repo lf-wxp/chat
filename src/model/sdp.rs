@@ -111,10 +111,17 @@ impl TryFrom<String> for CallType {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct SdpMessage {
+  pub call_type: CallType,
+  pub sdp: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Unicast {
   pub from: String,
   pub to: String,
-  pub message: CallType,
+  pub message: SdpMessage,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -133,7 +140,7 @@ pub struct  TransmitMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub enum SdpMessage {
+pub enum WsMessage {
   Action(Action),
   Transmit(Transmit),
 }
@@ -157,7 +164,7 @@ pub enum Data {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct SdpResponse {
+pub struct WsResponse {
   pub state: State,
   pub message: String,
   pub data: Option<Data>,

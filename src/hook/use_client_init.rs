@@ -5,7 +5,7 @@ use yew::use_effect_with;
 
 use crate::model::ConnectInfo;
 use crate::{
-  model::{Data, SdpResponse},
+  model::{Data, WsResponse},
   store::{User, Users},
   utils::get_client,
 };
@@ -21,7 +21,7 @@ pub fn use_client_init() {
       let setter_clone = user_setter.clone();
       client
         .borrow_mut()
-        .set_onmessage(Box::new(move |message: SdpResponse| {
+        .set_onmessage(Box::new(move |message: WsResponse| {
           if let Some(message) = message.data {
             match message {
               Data::ClientInfo(info) => {
