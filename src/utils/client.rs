@@ -5,7 +5,7 @@ use gloo_console::log;
 use crate::{
   model::{
     Action, CallType, ClientAction, Data, GetInfo, SdpMessage, Transmit, Unicast, WsMessage,
-    WsResponse,
+    WsResponse, TransmitMessage,
   },
   store::User,
   utils::{SocketMessage, WebRTC, Websocket, SDP_SERVER},
@@ -52,8 +52,11 @@ impl Client {
               log!("onmessage", format!("{:?}", msg));
               onmessage(sdp_response.clone());
             }
-            if let Some(Data::ClientInfo(info)) = sdp_response.data {
+            if let Some(Data::ClientInfo(info)) = sdp_response.data.clone() {
               client.borrow_mut().update_user_uuid(info.uuid);
+            }
+            if let Some(Data::Transmit(message)) = sdp_response.data {
+              client.borrow_mut().set_remote_description(message)
             }
           }
         }
@@ -66,6 +69,12 @@ impl Client {
 
   fn update_user_uuid(&mut self, uuid: String) {
     self.user.uuid = uuid;
+  }
+
+  fn set_remote_description(&mut self, message: TransmitMessage) {
+    if let Some(rtc) = &self.rtc {
+      todo!()
+    }
   }
 
   pub fn set_onmessage(&mut self, onmessage: Box<dyn Fn(WsResponse)>) {

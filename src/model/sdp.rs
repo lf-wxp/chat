@@ -86,7 +86,7 @@ pub enum Action {
 #[serde(rename_all = "camelCase")]
 pub struct Broadcast {
   from: String,
-  message: String,
+  message: SdpMessage,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -135,7 +135,7 @@ pub enum Transmit {
 #[serde(rename_all = "camelCase")]
 pub struct  TransmitMessage {
   from: String,
-  message: String,
+  message: SdpMessage,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

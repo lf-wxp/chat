@@ -97,13 +97,13 @@ impl WebRTC {
     Ok(offer_sdp)
   }
 
-  async fn receive_answer(&mut self, sdp: String) -> Result<(), JsValue> {
+  pub async fn receive_answer(&mut self, sdp: String) -> Result<(), JsValue> {
     let answer_obj = WebRTC::create_answer(&sdp);
     JsFuture::from(self.peer_connection.set_remote_description(&answer_obj)).await?;
     Ok(())
   }
 
-  async fn offer_answer(&self) -> Result<String, JsValue> {
+  pub async fn offer_answer(&self) -> Result<String, JsValue> {
     let answer = JsFuture::from(self.peer_connection.create_answer()).await?;
     let answer_sdp = Reflect::get(&answer, &JsValue::from_str("sdp"))?
       .as_string()
