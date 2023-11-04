@@ -1,52 +1,18 @@
-use std::{cell::RefCell, rc::Rc};
-
-use bounce::use_atom_value;
 use stylist::{self, style};
-use wasm_bindgen_futures::spawn_local;
-use web_sys::HtmlMediaElement;
 use yew::prelude::*;
 
-use crate::{
-  store::User,
-  utils::{style, WebRTC, SDP_SERVER},
-};
+use crate::utils::style;
 
 #[function_component]
 pub fn VideoStream() -> Html {
   let class_name = get_class_name();
-  let video_node_ref = use_node_ref();
-  let user = use_atom_value::<User>();
-  let webrtc: Rc<RefCell<Option<WebRTC>>> = use_mut_ref(Default::default);
-
-  let video_node_clone = video_node_ref.clone();
-  let webrtc_clone = webrtc.clone();
-  let start_stream = {
-    Callback::from(move |_| {
-      let webrtc_clone = webrtc_clone.clone();
-      if let Some(dom) = video_node_clone.cast::<HtmlMediaElement>() {
-        let webrtc_clone = webrtc_clone.clone();
-        spawn_local(async move {
-          *webrtc_clone.borrow_mut() = WebRTC::new().ok();
-          let _ = webrtc_clone
-            .borrow_mut()
-            .as_mut()
-            .unwrap()
-            .set_stream()
-            .await;
-          webrtc_clone.borrow().as_ref().unwrap().set_dom_stream(dom);
-        })
-      }
-    })
-  };
 
   html! {
     <>
       <div class={class_name}>
-        <video ref={video_node_ref} autoplay={true} />
+        <video class="local-stream" autoplay={true} />
+        <video class="remote-stream" autoplay={true} />
       </div>
-      {SDP_SERVER}
-      {user.uuid.clone()}
-      <button onclick={start_stream}>{{"stream"}}</button>
     </>
   }
 }
@@ -58,12 +24,21 @@ fn get_class_name() -> String {
       background: var(--theme-ancillary-color);
       border-radius: var(--radius);
       overflow: hidden;
+      position: relative;
       video {
         border-radius: var(--radius);
-        inline-size: 100%;
-        block-size: 100%;
         aspect-ratio: 3 / 2;
         object-fit: cover;
+      }
+      .local-stream {
+        inline-size: 100%;
+        block-size: 100%;
+      }
+      .remote-stream {
+        position: absolute; 
+        inset-inline-end: 0;
+        inset-block-start: 0;
+        inline-size: 40%;
       }
     "#
   ))

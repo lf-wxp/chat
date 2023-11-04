@@ -1,11 +1,12 @@
 use bounce::{use_atom_value, use_selector_value};
+use sdp_sender::set_dom_stream;
 use stylist::{self, style};
-use yew::prelude::*;
 use wasm_bindgen_futures::spawn_local;
+use yew::prelude::*;
 
 use crate::{
   components::{Avatar, Dropdown},
-  model::{Option, CallType},
+  model::{CallType, Option},
   store::{FilterWord, User, Users},
   utils::{sdp_sender, style},
 };
@@ -29,12 +30,9 @@ pub fn UserList() -> Html {
   ];
 
   let onclick = Callback::from(move |(user, call_type): (User, String)| {
-    let call_type = CallType::try_from(call_type);
-    if let Ok(call_type) = call_type {
-      spawn_local(async {
-        sdp_sender::call(user.uuid, call_type).await;
-      });
-    }
+    spawn_local(async move {
+      sdp_sender::call(user.uuid).await;
+    });
   });
 
   html! {

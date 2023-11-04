@@ -1,7 +1,7 @@
 use stylist::{self, style};
 use yew::prelude::*;
 
-use crate::{components::{UserList, Search}, utils::style};
+use crate::{components::{UserList, Search, VideoStream}, utils::style};
 
 #[function_component]
 pub fn User() -> Html {
@@ -15,6 +15,9 @@ pub fn User() -> Html {
           <UserList />
         </div>
       </div>
+      <div class="user-video">
+        <VideoStream />
+      </div>
     </section>
   }
 }
@@ -23,6 +26,8 @@ pub fn User() -> Html {
 fn get_class_name() -> String {
   style::get_class_name(style!(
     r#"
+    display: flex;
+    
     block-size: 100%;
     inline-size: 100%;
     .user-box {
@@ -32,6 +37,9 @@ fn get_class_name() -> String {
     .user-list-container {
       block-size: calc(100% - 32px);
       overflow: auto;
+    }
+    .user-video {
+
     }
     "#
   ))

@@ -8,7 +8,7 @@ use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
   window, AudioBuffer, AudioContext, Blob, BlobPropertyBag, Document, Event, FileReader,
-  HtmlElement, HtmlTextAreaElement, MediaStream, MediaStreamConstraints, Url, Window,
+  HtmlTextAreaElement, MediaStream, MediaStreamConstraints, Url, Window, HtmlElement,
 };
 use yew::{
   virtual_dom::{ApplyAttributeAs, Attributes, VNode},
@@ -41,12 +41,12 @@ pub fn get_document() -> Document {
     .expect("no global `Document` exists")
 }
 
-pub fn query_selector(selector: &str) -> Option<HtmlElement> {
+pub fn query_selector<T: JsCast>(selector: &str) -> Option<T> {
   get_document()
     .query_selector(selector)
     .ok()
     .and_then(|x| x)
-    .and_then(|x| x.dyn_into::<HtmlElement>().ok())
+    .and_then(|x| x.dyn_into::<T>().ok())
 }
 
 pub fn get_dpr() -> f64 {
@@ -218,7 +218,10 @@ pub async fn get_duration(array_buffer: &ArrayBuffer) -> Result<f64, JsValue> {
   Ok(duration)
 }
 
-pub async fn get_media(audio_constraints: Option<&str>, video_constraints: Option<&str>) -> Result<MediaStream, JsValue> {
+pub async fn get_media(
+  audio_constraints: Option<&str>,
+  video_constraints: Option<&str>,
+) -> Result<MediaStream, JsValue> {
   let mut constraints = MediaStreamConstraints::new();
   if let Some(audio) = audio_constraints {
     constraints.audio(&JsValue::from_str(audio));

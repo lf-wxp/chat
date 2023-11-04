@@ -92,21 +92,8 @@ pub struct Broadcast {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum CallType {
-  Video,
-  Audio,
-}
-
-impl TryFrom<String> for CallType {
-  type Error = ();
-  fn try_from(value: String) -> Result<Self, Self::Error> {
-    if value == "audio" {
-      return Ok(CallType::Audio);
-    }
-    if value == "video" {
-      return Ok(CallType::Video);
-    }
-    Err(())
-  }
+  Offer,
+  Answer,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -134,8 +121,8 @@ pub enum Transmit {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct  TransmitMessage {
-  from: String,
-  message: SdpMessage,
+  pub from: String,
+  pub message: SdpMessage,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

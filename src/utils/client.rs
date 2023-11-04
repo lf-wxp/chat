@@ -1,21 +1,26 @@
 use std::{cell::RefCell, rc::Rc};
 
 use gloo_console::log;
+use wasm_bindgen_futures::spawn_local;
+use web_sys::HtmlMediaElement;
 
 use crate::{
   model::{
-    Action, CallType, ClientAction, Data, GetInfo, SdpMessage, Transmit, Unicast, WsMessage,
-    WsResponse, TransmitMessage,
+    Action, CallType, ClientAction, Data, GetInfo, SdpMessage, Transmit, TransmitMessage, Unicast,
+    WsMessage, WsResponse,
   },
   store::User,
   utils::{SocketMessage, WebRTC, Websocket, SDP_SERVER},
 };
+
+use super::set_dom_stream;
 
 pub struct Client {
   user: User,
   ws: Rc<RefCell<Websocket>>,
   rtc: Option<WebRTC>,
   this: Option<Rc<RefCell<Self>>>,
+  to: Option<String>,
   onmessage: Option<Box<dyn Fn(WsResponse)>>,
 }
 
@@ -28,6 +33,7 @@ impl Client {
       ws,
       rtc,
       this: None,
+      to: None,
       onmessage: None,
     }));
     client.borrow_mut().this = Some(client.clone());
@@ -55,9 +61,24 @@ impl Client {
             if let Some(Data::ClientInfo(info)) = sdp_response.data.clone() {
               client.borrow_mut().update_user_uuid(info.uuid);
             }
-            if let Some(Data::Transmit(message)) = sdp_response.data {
-              client.borrow_mut().set_remote_description(message)
-            }
+          }
+        }
+        if let Ok(transmit_message) =
+          serde_json::from_str::<TransmitMessage>(&msg.as_string().expect("error"))
+        {
+          if let Some(client) = &client {
+            let SdpMessage { call_type, sdp } = transmit_message.message;
+            let client_clone = client.clone();
+            spawn_local(async move {
+              match call_type {
+                CallType::Answer => {
+                  client_clone.borrow_mut().set_remote_description(sdp).await;
+                }
+                CallType::Offer => {
+                  client_clone.borrow_mut().reciprocate(sdp.clone()).await;
+                }
+              }
+            });
           }
         }
       }
@@ -71,9 +92,9 @@ impl Client {
     self.user.uuid = uuid;
   }
 
-  fn set_remote_description(&mut self, message: TransmitMessage) {
-    if let Some(rtc) = &self.rtc {
-      todo!()
+  async fn set_remote_description(&mut self, sdp: String) {
+    if let Some(rtc) = &mut self.rtc {
+      let _ = rtc.receive_answer(sdp).await;
     }
   }
 
@@ -81,21 +102,53 @@ impl Client {
     self.onmessage = Some(onmessage);
   }
 
+  pub fn set_remote_stream(&mut self, dom: HtmlMediaElement) {
+    if let Some(rtc) = &self.rtc {
+      rtc.set_remote_stream_dom(dom);
+    }
+  }
+
   pub fn user(&self) -> User {
     self.user.clone()
   }
 
-  pub async fn call(&mut self, to: String, call_type: CallType) {
+  pub async fn reciprocate(&mut self, sdp: String) {
+    let to = self.to.clone().unwrap_or("".to_owned());
     let mut ws_client = self.ws.borrow_mut();
     if let Some(rtc) = &mut self.rtc {
+      if let Ok(sdp) = rtc.receive_and_emit_offer(sdp).await {
+        let action = &WsMessage::Transmit(Transmit::Unicast(Unicast {
+          from: self.user.uuid.clone(),
+          to,
+          message: SdpMessage {
+            call_type: CallType::Answer,
+            sdp: sdp.to_string(),
+          },
+        }));
+        let message = serde_json::to_string(action).unwrap().into();
+        ws_client.send(SocketMessage::Str(message)).unwrap();
+      }
+    }
+  }
+
+  pub async fn call(&mut self, to: String) {
+    self.to = Some(to.clone());
+    let mut ws_client = self.ws.borrow_mut();
+    if let Some(rtc) = &mut self.rtc {
+      let _ = rtc.set_stream().await;
+      let _ = rtc.attach_stream();
       if let Some(sdp) = rtc.sdp().await {
         let action = &WsMessage::Transmit(Transmit::Unicast(Unicast {
           from: self.user.uuid.clone(),
           to,
-          message: SdpMessage { call_type, sdp: sdp.to_string() },
+          message: SdpMessage {
+            call_type: CallType::Offer,
+            sdp: sdp.to_string(),
+          },
         }));
         let message = serde_json::to_string(action).unwrap().into();
         ws_client.send(SocketMessage::Str(message)).unwrap();
+        set_dom_stream(".local-stream", rtc.stream.as_ref());
       }
     }
   }
