@@ -1,0 +1,21 @@
+[env]
+CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = true
+
+[tasks.serve-yew]
+script = [
+  "cd $CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY/chat && trunk serve --features dev",
+]
+script_runner = "@shell"
+
+[tasks.build-yew]
+script = [
+  "cd $CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY/chat && trunk build",
+]
+script_runner = "@shell"
+
+[tasks.sdp]
+args = ["watch", "-x", "run", "-p", "sdp"]
+command = "cargo"
+
+[tasks.dev]
+run_task = {name = ["sdp", "serve-yew"], parallel = true}

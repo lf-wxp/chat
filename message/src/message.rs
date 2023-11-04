@@ -1,19 +1,18 @@
 use serde::{Deserialize, Serialize};
-
-use crate::store::User;
+use nanoid::nanoid;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateRoom {
-  name: String,
-  desc: Option<String>,
-  passwd: Option<String>,
+  pub name: String,
+  pub desc: Option<String>,
+  pub passwd: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoveRoom {
-  uuid: String,
+  pub uuid: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -22,15 +21,25 @@ pub enum State {
   success,
   error,
 }
-#[derive(Serialize, Deserialize, Clone, Debug)]  
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Room {
   desc: Option<String>,
-	users: Vec<String>,
-	uuid: String,
-	name: String,
-	passwd: Option<String>,
+  users: Vec<String>,
+  uuid: String,
+  name: String,
+  passwd: Option<String>,
 }
+
+impl Room {
+  pub fn new(name: String, desc: Option<String>, passwd: Option<String>) -> Room {
+    Room { desc, users: vec![], uuid: nanoid!(), name, passwd }
+  }
+  pub fn uuid(&self) -> String {
+    self.uuid.clone()
+  }
+}
+
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ListRoom;
@@ -51,11 +60,10 @@ pub enum RoomAction {
   List(ListRoom),
 }
 
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateName {
-  name: String,
+  pub name: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -81,12 +89,11 @@ pub enum Action {
   Client(ClientAction),
 }
 
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Broadcast {
-  from: String,
-  message: SdpMessage,
+  pub from: String,
+  pub message: SdpMessage,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -101,6 +108,12 @@ pub enum CallType {
 pub struct SdpMessage {
   pub call_type: CallType,
   pub sdp: String,
+}
+
+impl SdpMessage {
+  pub fn is_empty(&self) -> bool {
+    self.sdp.is_empty()
+  }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -120,7 +133,7 @@ pub enum Transmit {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct  TransmitMessage {
+pub struct TransmitMessage {
   pub from: String,
   pub message: SdpMessage,
 }
@@ -130,21 +143,22 @@ pub struct  TransmitMessage {
 pub enum WsMessage {
   Action(Action),
   Transmit(Transmit),
+  Connect(Connect),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectInfo {
   pub room_list: Vec<Room>,
-  pub client_list: Vec<User>,
+  pub client_list: Vec<ClientInfo>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum Data {
   RoomList(Vec<Room>),
-  ClientList(Vec<User>),
-  ClientInfo(User),
+  ClientList(Vec<ClientInfo>),
+  ClientInfo(ClientInfo),
   ConnectInfo(ConnectInfo),
   Transmit(TransmitMessage),
 }
@@ -156,3 +170,24 @@ pub struct WsResponse {
   pub message: String,
   pub data: Option<Data>,
 }
+
+impl WsResponse {
+  pub fn new(state: State, message: String, data: Option<Data>) -> WsResponse {
+    WsResponse {
+      state,
+      message,
+      data,
+    }
+  }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ClientInfo {
+  pub name: String,
+  pub uuid: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Connect;

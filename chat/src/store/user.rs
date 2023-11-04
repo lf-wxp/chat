@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use bounce::{Atom, BounceStates, Selector};
 use fake::{uuid::UUIDv1, Dummy, Fake, Faker};
+use message::ClientInfo;
 use pinyin::ToPinyin;
 use serde::{Deserialize, Serialize};
 
@@ -25,6 +26,12 @@ impl Default for User {
       uuid: "".to_string(),
       name: "".to_string(),
     };
+  }
+}
+
+impl From<ClientInfo> for User {
+  fn from(value: ClientInfo) -> Self {
+    User { uuid: value.uuid, name: value.name }
   }
 }
 
@@ -53,7 +60,12 @@ impl Selector for Users {
   fn select(states: &BounceStates) -> Rc<Self> {
     let user = states.get_atom_value::<User>();
     let users = states.get_atom_value::<Users>();
-    let users = users.0.clone().into_iter().filter(|x| *x != *user).collect::<Vec<User>>();
+    let users = users
+      .0
+      .clone()
+      .into_iter()
+      .filter(|x| *x != *user)
+      .collect::<Vec<User>>();
     Rc::from(Users(users))
   }
 }

@@ -1,14 +1,14 @@
 use std::{cell::RefCell, rc::Rc};
 
 use gloo_console::log;
+use message::{
+  Action, CallType, ClientAction, Data, GetInfo, SdpMessage, Transmit, TransmitMessage, Unicast,
+  WsMessage, WsResponse,
+};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlMediaElement;
 
 use crate::{
-  model::{
-    Action, CallType, ClientAction, Data, GetInfo, SdpMessage, Transmit, TransmitMessage, Unicast,
-    WsMessage, WsResponse,
-  },
   store::User,
   utils::{SocketMessage, WebRTC, Websocket, SDP_SERVER},
 };

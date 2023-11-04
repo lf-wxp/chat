@@ -1,11 +1,10 @@
 use bounce::use_atom_setter;
 use gloo_console::log;
+use message::{ConnectInfo, Data, WsResponse};
 use yew::prelude::*;
 use yew::use_effect_with;
 
-use crate::model::ConnectInfo;
 use crate::{
-  model::{Data, WsResponse},
   store::{User, Users},
   utils::get_client,
 };
@@ -25,18 +24,18 @@ pub fn use_client_init() {
           if let Some(message) = message.data {
             match message {
               Data::ClientInfo(info) => {
-                setter_clone(info);
-              },
+                setter_clone(info.into());
+              }
               Data::ClientList(list) => {
-                users_setter(Users(list));
-              },
+                users_setter(Users(list.into_iter().map(|x| x.into()).collect()));
+              }
               Data::RoomList(list) => todo!(),
               Data::Transmit(transmit) => todo!(),
               Data::ConnectInfo(info) => {
                 let ConnectInfo { client_list, .. } = info;
                 log!("user_list", format!("{:?}", client_list));
-                users_setter(Users(client_list));
-              },
+                users_setter(Users(client_list.into_iter().map(|x| x.into()).collect()));
+              }
             }
           }
         }));

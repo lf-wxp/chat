@@ -1,0 +1,99 @@
+[package]
+edition = "2021"
+name = "chat"
+version = "0.1.0"
+
+[features]
+dev = []
+fake = []
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+base64 = "0.21.5"
+bounce = "0.9.0"
+chrono = "0.4.31"
+derivative = "2.2.0"
+fake = {version = "2.9.1", features = ["derive", "uuid", "chrono"]}
+futures = {workspace = true}
+getrandom = {version = "0.2.10", features = ["js"]}
+gloo-console = "0.3.0"
+gloo-events = "0.2.0"
+gloo-render = "0.2.0"
+gloo-timers = "0.3.0"
+gloo-utils = "0.2.0"
+indexmap = "2.1.0"
+js-sys = "0.3.64"
+message = {path = "../message"}
+nanoid = {workspace = true}
+pinyin = "0.10.0"
+rand = "0.8.5"
+serde = {workspace = true, features = ["derive"]}
+serde_json = {workspace = true}
+stylist = {version = "0.13.0", features = ["yew_integration"]}
+unicode-segmentation = "1.10.1"
+wasm-bindgen = "0.2.87"
+wasm-bindgen-futures = "0.4.37"
+web-sys = {version = "0.3.64", features = [
+  "Document",
+  "Element",
+  "Window",
+  "HtmlCanvasElement",
+  "CanvasRenderingContext2d",
+  "DomStringMap",
+  "HtmlTextAreaElement",
+  "Blob",
+  "BlobEvent",
+  "BlobPropertyBag",
+  "Url",
+  "MediaRecorder",
+  "MediaStreamConstraints",
+  "AudioContext",
+  "AudioBuffer",
+  "AnalyserNode",
+  "AudioContextOptions",
+  "MediaStream",
+  "MediaStreamTrack",
+  "MediaDevices",
+  "Navigator",
+  "EventListener",
+  "EventTarget",
+  "BaseAudioContext",
+  "MediaStreamAudioSourceNode",
+  "HtmlAudioElement",
+  "CssStyleDeclaration",
+  "MessageEvent",
+  "RtcPeerConnection",
+  "RtcSignalingState",
+  "RtcSdpType",
+  "RtcSessionDescriptionInit",
+  "RtcPeerConnectionIceEvent",
+  "RtcIceCandidate",
+  "RtcDataChannel",
+  "RtcDataChannelEvent",
+  "RtcRtpSender",
+  "RtcTrackEvent",
+  "RtcDataChannelEvent",
+]}
+yew = {version = "0.21.0", features = ["csr"]}
+yew-hooks = "0.3.0"
+yew-router = "0.18.0"
+yew_icons = {version = "0.8.0", features = [
+  "HeroiconsSolidUserGroup",
+  "BootstrapCameraVideoFill",
+  "LucideSettings",
+  "HeroiconsMiniSolidHome",
+  "FontAwesomeSolidVolumeHigh",
+  "FontAwesomeSolidVolumeXmark",
+  "BootstrapSearch",
+  "FontAwesomeSolidXmark",
+  "BootstrapEmojiSmile",
+  "BootstrapSendFill",
+  "HeroiconsSolidMicrophone",
+  "FontAwesomeRegularImages",
+  "BootstrapCheckCircleFill",
+  "BootstrapInfoCircleFill",
+  "BootstrapPauseFill",
+  "BootstrapPlayFill",
+  "BootstrapSunFill",
+  "BootstrapMoonStarsFill",
+]}

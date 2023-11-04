@@ -1,12 +1,11 @@
 use bounce::{use_atom_value, use_selector_value};
-use sdp_sender::set_dom_stream;
 use stylist::{self, style};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 use crate::{
   components::{Avatar, Dropdown},
-  model::{CallType, Option},
+  model::Option,
   store::{FilterWord, User, Users},
   utils::{sdp_sender, style},
 };
