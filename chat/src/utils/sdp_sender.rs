@@ -12,16 +12,17 @@ pub async fn call(to: String) {
 
 pub fn set_dom_stream(selector: &str, stream: Option<&MediaStream>) {
   if let Some(dom) = query_selector::<HtmlMediaElement>(selector) {
-    if let Some(stream) = dom.src_object() {
-      log!("local dom", &stream);
-      stream
-        .get_tracks()
-        .iter()
-        .filter_map(|track| track.dyn_into::<MediaStreamTrack>().ok())
-        .for_each(|media_stream_track| {
-          stream.remove_track(&media_stream_track);
-        });
-    }
+    // if let Some(stream) = dom.src_object() {
+    //   log!("local dom", &stream);
+    //   stream
+    //     .get_tracks()
+    //     .iter()
+    //     .filter_map(|track| track.dyn_into::<MediaStreamTrack>().ok())
+    //     .for_each(|media_stream_track| {
+    //       stream.remove_track(&media_stream_track);
+    //     });
+    // }
+    log!("add track dom", selector, stream);
     dom.set_src_object(stream);
   }
 }

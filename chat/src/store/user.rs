@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use bounce::{Atom, BounceStates, Selector};
 use fake::{uuid::UUIDv1, Dummy, Fake, Faker};
-use message::ClientInfo;
+use message::Client;
 use pinyin::ToPinyin;
 use serde::{Deserialize, Serialize};
 
@@ -29,8 +29,8 @@ impl Default for User {
   }
 }
 
-impl From<ClientInfo> for User {
-  fn from(value: ClientInfo) -> Self {
+impl From<Client> for User {
+  fn from(value: Client) -> Self {
     User { uuid: value.uuid, name: value.name }
   }
 }

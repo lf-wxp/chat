@@ -4,7 +4,7 @@ use futures::{
   future::{self, Either},
   pin_mut, StreamExt, TryStreamExt,
 };
-use message::{Connect, State, WsMessage, WsResponse};
+use message::{ActionMessage, List, RequestMessage, State};
 use sender_sink::wrappers::UnboundedSenderSink;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::unbounded_channel;
@@ -22,7 +22,7 @@ mod client;
 mod data;
 
 use {
-  action::{connect::ConnectExecute, msg_try_into, Execute},
+  action::{msg_try_into, transmit::TransmitExecute, Execute},
   client::Client,
   data::get_client_map,
 };
@@ -53,7 +53,7 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr) {
     client_map.insert(uuid_key.clone(), client);
   }
 
-  Connect {}.execute();
+  List {}.execute();
 
   let (sink, stream) = ws_stream.split();
 
@@ -62,12 +62,7 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr) {
   let message_tx = transform_tx.clone();
 
   let execute_message = stream.try_for_each(|msg| {
-    println!(
-      "Received a pure message from {}: {}",
-      addr,
-      msg.to_text().unwrap()
-    );
-    let message = match serde_json::from_str::<WsMessage>(msg.to_text().unwrap()) {
+    let message = match serde_json::from_str::<RequestMessage>(msg.to_text().unwrap()) {
       Ok(message) => {
         println!(
           "Received a message from {}: {}",
@@ -76,10 +71,16 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr) {
         );
         message.execute(uuid_key.clone())
       }
-      Err(_) => WsResponse::new(State::error, "construct".to_owned(), None),
+      Err(_) => Some(ActionMessage::to_resp_msg(
+        State::Error,
+        "construct".to_owned(),
+        None,
+      )),
     };
 
-    message_tx.send(msg_try_into(message).unwrap()).unwrap();
+    if let Some(message) = message {
+      message_tx.send(msg_try_into(message).unwrap()).unwrap();
+    }
 
     future::ok(())
   });

@@ -1,5 +1,4 @@
 use std::net::SocketAddr;
-use message::ClientInfo;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_tungstenite::tungstenite::Message;
 use nanoid::nanoid;
@@ -31,10 +30,10 @@ impl Client {
   }
 }
 
-impl From<&Client> for ClientInfo {
+impl From<&Client> for message::Client {
   fn from(client: &Client) -> Self {
     let Client {uuid, name, tx: _ } = client;
-    ClientInfo { name: name.to_string(), uuid: uuid.to_string() }
+    message::Client { name: name.to_string(), uuid: uuid.to_string() }
   }
 }
 

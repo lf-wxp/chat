@@ -1,11 +1,14 @@
+
+use std::{cell::RefCell, rc::Rc};
+
 use gloo_console::log;
-use js_sys::{Array, Reflect};
+use js_sys::Reflect;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
   HtmlMediaElement, MediaStream, MediaStreamTrack, RtcDataChannel, RtcDataChannelEvent,
-  RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType, RtcSessionDescriptionInit,
-  RtcTrackEvent,
+  RtcIceCandidate, RtcIceCandidateInit, RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType,
+  RtcSessionDescriptionInit, RtcTrackEvent,
 };
 
 use crate::utils::set_dom_stream;
@@ -20,6 +23,8 @@ pub struct WebRTC {
   sdp_obj: Option<RtcSessionDescriptionInit>,
   remote_sdp: Option<String>,
   remote_stream: MediaStream,
+  onice: Rc<RefCell<Option<Box<dyn Fn(String)>>>>,
+  // ice_candidates: Rc<RefCell<Vec<RtcIceCandidate>>>,
 }
 
 impl WebRTC {
@@ -35,6 +40,8 @@ impl WebRTC {
       sdp_obj: None,
       remote_sdp: None,
       remote_stream,
+      onice: Rc::new(RefCell::new(None)),
+      // ice_candidates: Rc::new(RefCell::new(vec![])),
     };
     rtc.bind_webrtc_event();
     Ok(rtc)
@@ -45,14 +52,15 @@ impl WebRTC {
     self.bind_ondatachannel();
     self.bind_onicecandidate();
     self.bind_onnegotiationneeded();
+    self.bind_onconnectionstatechange();
   }
 
   fn bind_ontrack(&self) {
     let peer = self.peer_connection.clone();
     let remote_stream = self.remote_stream.clone();
     let ontrack_callback = Closure::<dyn FnMut(_)>::new(move |ev: RtcTrackEvent| {
-      log!("ontrack", ev.track());
       remote_stream.add_track(&ev.track());
+      log!("ontrack", &remote_stream);
       set_dom_stream(".remote-stream", Some(&remote_stream));
     });
     self
@@ -73,12 +81,14 @@ impl WebRTC {
   }
 
   fn bind_onicecandidate(&self) {
-    let peer = self.peer_connection.clone();
+    let onice = self.onice.clone();
     let onicecandidate_callback =
       Closure::<dyn FnMut(_)>::new(move |ev: RtcPeerConnectionIceEvent| {
         if let Some(candidate) = ev.candidate() {
-          log!("onicecandidate", ev.candidate());
-          let _ = peer.add_ice_candidate_with_opt_rtc_ice_candidate(Some(&candidate));
+          log!("onicecandidate", &candidate.candidate());
+          if let Some(onice) = onice.borrow().as_ref() {
+            onice(candidate.candidate());
+          }
         }
       });
     self
@@ -96,6 +106,18 @@ impl WebRTC {
       .peer_connection
       .set_onnegotiationneeded(Some(onnegotiationneeded_callback.as_ref().unchecked_ref()));
     onnegotiationneeded_callback.forget();
+  }
+
+  fn bind_onconnectionstatechange(&self) {
+    let peer = self.peer_connection.clone();
+    let onconnectionstatechange_callback =
+      Closure::<dyn FnMut(_)>::new(move |_: RtcPeerConnection| {
+        log!("onconnectionstatechange", peer.ice_connection_state());
+      });
+    self.peer_connection.set_onconnectionstatechange(Some(
+      onconnectionstatechange_callback.as_ref().unchecked_ref(),
+    ));
+    onconnectionstatechange_callback.forget();
   }
 
   pub async fn set_stream(&mut self) -> Result<(), JsValue> {
@@ -169,6 +191,30 @@ impl WebRTC {
     offer_obj.sdp(sdp);
     offer_obj
   }
+
+  pub fn add_ice_candidate(&self, ice_candidate: String) {
+    let ice = RtcIceCandidate::new(&RtcIceCandidateInit::new(&ice_candidate)).ok();
+    log!("add ice candidate", format!("{:?}", &ice), ice_candidate);
+    self.peer_connection.add_ice_candidate_with_opt_rtc_ice_candidate(ice.as_ref());
+  }
+
+  pub fn set_onice(&self, onice: Box<dyn Fn(String)>) {
+    log!("set ice");
+    *self.onice.borrow_mut() = Some(onice);
+  }
+
+  // fn add_ice_candidates(&self) {
+  //   self.ice_candidates.borrow().iter().for_each(|candidate| {
+  //     let peer = self.peer_connection.clone();
+  //     let candidate = candidate.clone();
+  //     spawn_local(async move {
+  //       let _ = JsFuture::from(
+  //         peer.add_ice_candidate_with_opt_rtc_ice_candidate(Some(&candidate)),
+  //       )
+  //       .await;
+  //     })
+  //   });
+  // }
 
   async fn emit_offer(&mut self) -> Result<String, JsValue> {
     if self.sdp.is_some() {

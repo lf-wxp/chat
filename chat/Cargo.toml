@@ -73,6 +73,8 @@ web-sys = {version = "0.3.64", features = [
   "RtcRtpSender",
   "RtcTrackEvent",
   "RtcDataChannelEvent",
+  "RtcIceConnectionState",
+  "RtcIceCandidateInit"
 ]}
 yew = {version = "0.21.0", features = ["csr"]}
 yew-hooks = "0.3.0"

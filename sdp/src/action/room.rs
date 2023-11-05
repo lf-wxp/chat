@@ -1,9 +1,11 @@
-use message::{CreateRoom, Data, ListRoom, RemoveRoom, Room, RoomAction, State, WsResponse};
+use message::{
+  ActionMessage, CreateRoom, Data, ListRoom, RemoveRoom, ResponseMessage, Room, RoomAction, State,
+};
 
 use crate::data::get_room_map;
 
 impl RoomExecute for CreateRoom {
-  fn execute(&self) -> WsResponse {
+  fn execute(&self) -> ResponseMessage {
     let room = Room::new(
       self.name.to_owned(),
       self.desc.to_owned(),
@@ -12,19 +14,19 @@ impl RoomExecute for CreateRoom {
     match get_room_map() {
       Some(map) => {
         map.insert(room.uuid(), room);
-        WsResponse::new(State::success, "success".to_owned(), None)
+        ActionMessage::to_resp_msg(State::Success, "success".to_owned(), None)
       }
-      None => WsResponse::new(State::error, "create room error".to_owned(), None),
+      None => ActionMessage::to_resp_msg(State::Error, "create room error".to_owned(), None),
     }
   }
 }
 
 impl RoomExecute for RemoveRoom {
-  fn execute(&self) -> WsResponse {
-    let error = WsResponse::new(State::error, "remove room error".to_owned(), None);
+  fn execute(&self) -> ResponseMessage {
+    let error = ActionMessage::to_resp_msg(State::Error, "remove room error".to_owned(), None);
     match get_room_map() {
       Some(map) => map.remove(&self.uuid).map_or(error.clone(), |_| {
-        WsResponse::new(State::success, "success".to_owned(), None)
+        ActionMessage::to_resp_msg(State::Success, "success".to_owned(), None)
       }),
       None => error,
     }
@@ -32,23 +34,23 @@ impl RoomExecute for RemoveRoom {
 }
 
 impl RoomExecute for ListRoom {
-  fn execute(&self) -> WsResponse {
+  fn execute(&self) -> ResponseMessage {
     match get_room_map() {
       Some(map) => {
         let list = map.values().cloned().collect::<Vec<Room>>();
-        WsResponse::new(
-          State::success,
+        ActionMessage::to_resp_msg(
+          State::Success,
           "success".to_owned(),
           Some(Data::RoomList(list)),
         )
       }
-      None => WsResponse::new(State::error, "error list room".to_owned(), None),
+      None => ActionMessage::to_resp_msg(State::Error, "error list room".to_owned(), None),
     }
   }
 }
 
 impl RoomExecute for RoomAction {
-  fn execute(&self) -> WsResponse {
+  fn execute(&self) -> ResponseMessage {
     match self {
       RoomAction::Create(create_room) => create_room.execute(),
       RoomAction::Remove(remove_room) => remove_room.execute(),
@@ -58,5 +60,5 @@ impl RoomExecute for RoomAction {
 }
 
 pub trait RoomExecute {
-  fn execute(&self) -> WsResponse;
+  fn execute(&self) -> ResponseMessage;
 }
