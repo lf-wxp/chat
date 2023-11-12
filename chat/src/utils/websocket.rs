@@ -1,6 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use js_sys::{ArrayBuffer, JsString};
+use message::Channel;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{BinaryType::Arraybuffer, Blob, ErrorEvent, MessageEvent, WebSocket};
 
@@ -137,10 +138,30 @@ impl Websocket {
   }
   fn consume_pending_message(&mut self) {
     if self.is_connected & !self.pending_message.is_empty() {
-      self.pending_message.clone().into_iter().for_each(|message| {
-        let _ = self.send(message);
-      });
+      self
+        .pending_message
+        .clone()
+        .into_iter()
+        .for_each(|message| {
+          let _ = self.send(message);
+        });
       self.pending_message.clear();
     }
+  }
+}
+
+impl Channel for Websocket {
+  fn send(&mut self, message: &str) {
+    let socket_msg = SocketMessage::Str(message.into());
+    let _ = Websocket::send(self, socket_msg);
+  }
+
+  fn onmessage(&mut self, callback: Box<dyn Fn(&str)>) {
+    let onmessage = Box::new(move |message: SocketMessage| {
+      if let SocketMessage::Str(msg) = message {
+        callback(&msg.as_string().unwrap_or("".to_string()));
+      }
+    });
+    self.set_onmessage(onmessage);
   }
 }

@@ -7,7 +7,7 @@ use crate::{
   components::{Avatar, Dropdown},
   model::Option,
   store::{FilterWord, User, Users},
-  utils::{sdp_sender, style},
+  utils::style,
 };
 
 #[function_component]
@@ -30,7 +30,7 @@ pub fn UserList() -> Html {
 
   let onclick = Callback::from(move |(user, call_type): (User, String)| {
     spawn_local(async move {
-      sdp_sender::call(user.uuid).await;
+      // sdp_sender::call(user.uuid).await;
     });
   });
 

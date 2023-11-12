@@ -3,9 +3,9 @@ use message::{
   UpdateName,
 };
 
-use crate::data::get_client_map;
+use crate::{action::ParamResponseExecute, data::get_client_map};
 
-impl ClientExecute for UpdateName {
+impl ParamResponseExecute for UpdateName {
   fn execute(&self, client_id: String) -> ResponseMessage {
     match get_client_map() {
       Some(map) => match map.get_mut(&client_id) {
@@ -20,7 +20,7 @@ impl ClientExecute for UpdateName {
   }
 }
 
-impl ClientExecute for ListClient {
+impl ParamResponseExecute for ListClient {
   fn execute(&self, _client_id: String) -> ResponseMessage {
     match get_client_map() {
       Some(map) => {
@@ -36,7 +36,7 @@ impl ClientExecute for ListClient {
   }
 }
 
-impl ClientExecute for GetInfo {
+impl ParamResponseExecute for GetInfo {
   fn execute(&self, client_id: String) -> ResponseMessage {
     match get_client_map() {
       Some(map) => {
@@ -54,7 +54,7 @@ impl ClientExecute for GetInfo {
   }
 }
 
-impl ClientExecute for ClientAction {
+impl ParamResponseExecute for ClientAction {
   fn execute(&self, client_id: String) -> ResponseMessage {
     match self {
       ClientAction::UpdateName(update_name) => update_name.execute(client_id),
@@ -62,8 +62,4 @@ impl ClientExecute for ClientAction {
       ClientAction::GetInfo(get_info) => get_info.execute(client_id),
     }
   }
-}
-
-pub trait ClientExecute {
-  fn execute(&self, client_id: String) -> ResponseMessage;
 }

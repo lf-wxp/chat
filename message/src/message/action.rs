@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{Client, ClientAction, Room, RoomAction, ResponseMessage};
+use crate::{Client, ClientAction, ListMessage, ResponseMessage, Room, RoomAction};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -22,6 +22,7 @@ pub enum Data {
   RoomList(Vec<Room>),
   ClientList(Vec<Client>),
   Client(Client),
+  ListMessage(ListMessage),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

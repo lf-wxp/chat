@@ -4,7 +4,7 @@ use futures::{
   future::{self, Either},
   pin_mut, StreamExt, TryStreamExt,
 };
-use message::{ActionMessage, List, RequestMessage, State};
+use message::{ActionMessage, ListResponse, RequestMessage, State};
 use sender_sink::wrappers::UnboundedSenderSink;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::unbounded_channel;
@@ -22,7 +22,7 @@ mod client;
 mod data;
 
 use {
-  action::{msg_try_into, transmit::TransmitExecute, Execute},
+  action::{msg_try_into, ParamResponseOptionExecute, VoidExecute},
   client::Client,
   data::get_client_map,
 };
@@ -53,7 +53,7 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr) {
     client_map.insert(uuid_key.clone(), client);
   }
 
-  List {}.execute();
+  ListResponse {}.execute();
 
   let (sink, stream) = ws_stream.split();
 

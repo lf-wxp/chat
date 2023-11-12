@@ -24,3 +24,13 @@ pub enum ResponseMessage {
   Transmit(TransmitMessage),
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ListMessage {
+  pub room_list: Vec<Room>,
+  pub client_list: Vec<Client>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ListResponse;

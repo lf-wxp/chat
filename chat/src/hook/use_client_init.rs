@@ -1,7 +1,6 @@
 use bounce::use_atom_setter;
 use gloo_console::log;
-use message::ListMessage;
-use message::{CastMessage, Data, ResponseMessage};
+use message::{ActionMessage, Data, ListMessage};
 use yew::prelude::*;
 use yew::use_effect_with;
 
@@ -21,31 +20,21 @@ pub fn use_client_init() {
       let setter_clone = user_setter.clone();
       client
         .borrow_mut()
-        .set_onmessage(Box::new(move |message: ResponseMessage| match message {
-          ResponseMessage::Action(action) => {
-            if let Some(message) = action.data {
-              match message {
-                Data::Client(info) => {
-                  setter_clone(info.into());
-                }
-                Data::ClientList(list) => {
-                  users_setter(Users(list.into_iter().map(|x| x.into()).collect()));
-                }
-                Data::RoomList(list) => todo!(),
+        .set_onmessage(Box::new(move |message: ActionMessage| {
+          if let Some(message) = message.data {
+            match message {
+              Data::Client(info) => {
+                setter_clone(info.into());
               }
-            }
-          }
-          ResponseMessage::Transmit(transmit) => {
-            log!("user_list");
-            match transmit.message {
-              CastMessage::Call(call_message) => {}
-              CastMessage::Sdp(call_message) => {}
-              CastMessage::List(list_message) => {
+              Data::ClientList(list) => {
+                users_setter(Users(list.into_iter().map(|x| x.into()).collect()));
+              }
+              Data::RoomList(list) => todo!(),
+              Data::ListMessage(list_message) => {
                 let ListMessage { client_list, .. } = list_message;
                 log!("user_list", format!("{:?}", client_list));
                 users_setter(Users(client_list.into_iter().map(|x| x.into()).collect()));
               }
-              CastMessage::Ice(ice) => {}
             }
           }
         }));

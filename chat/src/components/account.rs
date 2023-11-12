@@ -1,13 +1,8 @@
-use bounce::{use_atom, use_atom_value};
+use bounce::use_atom_value;
 use stylist::{self, style};
-use web_sys::MouseEvent;
-use yew::{prelude::*, Callback};
+use yew::prelude::*;
 
-use crate::{
-  components::Avatar,
-  store::User,
-  utils::style,
-};
+use crate::{components::Avatar, store::User, utils::style};
 
 #[function_component]
 pub fn Account() -> Html {

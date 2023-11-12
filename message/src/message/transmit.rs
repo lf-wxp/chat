@@ -1,17 +1,6 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::{Room, Client, ResponseMessage};
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ListMessage {
-  pub room_list: Vec<Room>,
-  pub client_list: Vec<Client>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct List {}
+use crate::ResponseMessage;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -53,7 +42,6 @@ pub struct CallMessage {
 pub enum CastMessage {
   Sdp(SdpMessage),
   Call(CallMessage),
-  List(ListMessage),
   Ice(String),
 }
 
@@ -77,7 +65,6 @@ pub struct Broadcast {
 pub enum Transmit {
   Broadcast(Broadcast),
   Unicast(Unicast),
-  List(List),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

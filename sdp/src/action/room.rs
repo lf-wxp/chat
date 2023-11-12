@@ -2,9 +2,9 @@ use message::{
   ActionMessage, CreateRoom, Data, ListRoom, RemoveRoom, ResponseMessage, Room, RoomAction, State,
 };
 
-use crate::data::get_room_map;
+use crate::{action::ResponseExecute, data::get_room_map};
 
-impl RoomExecute for CreateRoom {
+impl ResponseExecute for CreateRoom {
   fn execute(&self) -> ResponseMessage {
     let room = Room::new(
       self.name.to_owned(),
@@ -21,7 +21,7 @@ impl RoomExecute for CreateRoom {
   }
 }
 
-impl RoomExecute for RemoveRoom {
+impl ResponseExecute for RemoveRoom {
   fn execute(&self) -> ResponseMessage {
     let error = ActionMessage::to_resp_msg(State::Error, "remove room error".to_owned(), None);
     match get_room_map() {
@@ -33,7 +33,7 @@ impl RoomExecute for RemoveRoom {
   }
 }
 
-impl RoomExecute for ListRoom {
+impl ResponseExecute for ListRoom {
   fn execute(&self) -> ResponseMessage {
     match get_room_map() {
       Some(map) => {
@@ -49,7 +49,7 @@ impl RoomExecute for ListRoom {
   }
 }
 
-impl RoomExecute for RoomAction {
+impl ResponseExecute for RoomAction {
   fn execute(&self) -> ResponseMessage {
     match self {
       RoomAction::Create(create_room) => create_room.execute(),
@@ -57,8 +57,4 @@ impl RoomExecute for RoomAction {
       RoomAction::List(list_room) => list_room.execute(),
     }
   }
-}
-
-pub trait RoomExecute {
-  fn execute(&self) -> ResponseMessage;
 }

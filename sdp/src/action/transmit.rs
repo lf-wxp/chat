@@ -1,11 +1,15 @@
 use message::{
-  Broadcast, CastMessage, Client, List, ListMessage, Room, Transmit, TransmitMessage, Unicast,
+  ActionMessage, Broadcast, Client, Data, ListMessage, ListResponse, Room, State, Transmit,
+  TransmitMessage, Unicast,
 };
 use tokio_tungstenite::tungstenite::Message;
 
-use crate::data::{get_client_map, get_room_map};
+use crate::{
+  action::VoidExecute,
+  data::{get_client_map, get_room_map},
+};
 
-impl TransmitExecute for Broadcast {
+impl VoidExecute for Broadcast {
   fn execute(&self) {
     if let Some(peers) = get_client_map() {
       let broadcast_recipients = peers
@@ -30,7 +34,7 @@ impl TransmitExecute for Broadcast {
   }
 }
 
-impl TransmitExecute for Unicast {
+impl VoidExecute for Unicast {
   fn execute(&self) {
     if let Some(peers) = get_client_map() {
       let target_peer = peers.get(&self.to).unwrap();
@@ -44,7 +48,16 @@ impl TransmitExecute for Unicast {
   }
 }
 
-impl TransmitExecute for List {
+impl VoidExecute for Transmit {
+  fn execute(&self) {
+    match self {
+      Transmit::Broadcast(broadcast) => broadcast.execute(),
+      Transmit::Unicast(unicast) => unicast.execute(),
+    }
+  }
+}
+
+impl VoidExecute for ListResponse {
   fn execute(&self) {
     if let Some(peers) = get_client_map() {
       let broadcast_recipients = peers.iter().map(|(_, ws_sink)| ws_sink);
@@ -64,27 +77,14 @@ impl TransmitExecute for List {
       };
 
       for rec in broadcast_recipients {
-        let message = serde_json::to_string(&TransmitMessage::to_resp_msg(
-          "".to_string(),
-          CastMessage::List(list.clone()),
+        let message = serde_json::to_string(&ActionMessage::to_resp_msg(
+          State::Success,
+          "success".to_owned(),
+          Some(Data::ListMessage(list.clone())),
         ))
         .unwrap();
         rec.tx.send(Message::Text(message)).unwrap();
       }
     }
   }
-}
-
-impl TransmitExecute for Transmit {
-  fn execute(&self) {
-    match self {
-      Transmit::Broadcast(broadcast) => broadcast.execute(),
-      Transmit::Unicast(unicast) => unicast.execute(),
-      Transmit::List(list) => list.execute(),
-    }
-  }
-}
-
-pub trait TransmitExecute {
-  fn execute(&self);
 }
