@@ -11,12 +11,12 @@ pub struct ActionChannel<T: Channel> {
 
 impl<T: Channel> ActionChannel<T> {
   pub fn new(channel: Rc<RefCell<T>>) -> Self {
-    let mut signal_channel = ActionChannel {
+    let mut action_channel = ActionChannel {
       channel,
       receive_message: Rc::new(RefCell::new(None)),
     };
-    signal_channel.bind_event();
-    signal_channel
+    action_channel.bind_event();
+    action_channel
   }
 
   fn bind_event(&mut self) {

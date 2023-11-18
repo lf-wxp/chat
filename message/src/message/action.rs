@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{Client, ClientAction, ListMessage, ResponseMessage, Room, RoomAction};
+use crate::{Client, ClientAction, ResponseMessage, Room, RoomAction};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -14,6 +14,13 @@ pub enum State {
 pub enum Action {
   Room(RoomAction),
   Client(ClientAction),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ListMessage {
+  pub room_list: Vec<Room>,
+  pub client_list: Vec<Client>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

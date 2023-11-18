@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use gloo_console::log;
 use js_sys::Reflect;
-use message::SignalSend;
+use message::Signal;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -13,18 +13,50 @@ use web_sys::{
 pub struct RTCLink {
   peer: RtcPeerConnection,
   data_channel: RtcDataChannel,
-  signal_channel: Rc<RefCell<dyn SignalSend>>,
+  signal_channel: Rc<RefCell<dyn Signal>>,
+  this: Option<Rc<RefCell<Self>>>,
 }
 
 impl RTCLink {
-  pub fn new(signal_channel: Rc<RefCell<dyn SignalSend>>) -> Result<Self, JsValue> {
+  pub fn new(signal_channel: Rc<RefCell<dyn Signal>>) -> Result<Rc<RefCell<Self>>, JsValue> {
     let peer = RtcPeerConnection::new()?;
     let data_channel = peer.create_data_channel("chat");
-    Ok(RTCLink {
+    let link = Rc::new(RefCell::new(RTCLink {
       peer,
       data_channel,
       signal_channel,
-    })
+      this: None,
+    }));
+    link.borrow_mut().this = Some(link.clone());
+    link.borrow_mut().bind_signal_event();
+    link.borrow_mut().bind_webrtc_event();
+    Ok(link)
+  }
+
+  fn bind_signal_event(&self) {
+    if let Some(link) = self.this.clone() {
+      let link_clone = link.clone();
+      self
+        .signal_channel
+        .borrow_mut()
+        .set_receive_answer(Box::new(move |sdp| {
+          link_clone.borrow_mut().receive_answer(sdp);
+        }));
+      let link_clone = link.clone();
+      self
+        .signal_channel
+        .borrow_mut()
+        .set_receive_offer(Box::new(move |sdp| {
+          link_clone.borrow_mut().receive_offer(sdp);
+        }));
+      let link_clone = link.clone();
+      self
+        .signal_channel
+        .borrow_mut()
+        .set_receive_ice(Box::new(move |ice| {
+          link_clone.borrow_mut().receive_ice(ice);
+        }));
+    }
   }
 
   fn create_answer(sdp: &str) -> RtcSessionDescriptionInit {

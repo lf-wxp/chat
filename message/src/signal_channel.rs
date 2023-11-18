@@ -1,8 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-  CastMessage, Channel, RequestMessage, ResponseMessage, SdpMessage, SdpType, SignalSend, Transmit,
-  TransmitMessage, Unicast,
+  CastMessage, Channel, RequestMessage, ResponseMessage, SdpMessage, SdpType, Signal, SignalMessage,
 };
 
 type Callback = Rc<RefCell<Option<Box<dyn Fn(String)>>>>;
@@ -36,11 +35,11 @@ impl<T: Channel> SignalChannel<T> {
   }
 
   fn send_message(&mut self, message: CastMessage) {
-    let action = &RequestMessage::Transmit(Transmit::Unicast(Unicast {
+    let action = &RequestMessage::Signal(SignalMessage {
       from: self.sender.clone(),
       to: self.receiver.clone(),
       message,
-    }));
+    });
     let message = serde_json::to_string(action).unwrap();
     self.channel.borrow_mut().send(&message);
   }
@@ -71,7 +70,7 @@ impl<T: Channel> SignalChannel<T> {
   fn bind_event(&mut self) {
     let (receive_offer, receive_answer, receive_ice) = self.deal_callback();
     let onmessage = Box::new(move |msg: &str| {
-      if let Ok(ResponseMessage::Transmit(TransmitMessage { message, .. })) =
+      if let Ok(ResponseMessage::Signal(SignalMessage { message, .. })) =
         serde_json::from_str::<ResponseMessage>(msg)
       {
         if let CastMessage::Sdp(SdpMessage { sdp, sdp_type }) = message.clone() {
@@ -87,15 +86,9 @@ impl<T: Channel> SignalChannel<T> {
     });
     self.channel.borrow_mut().onmessage(onmessage);
   }
-
-  pub fn set_callback(&self, (offer, answer, ice): TripleCallback) {
-    *self.receive_offer.borrow_mut() = Some(offer);
-    *self.receive_answer.borrow_mut() = Some(answer);
-    *self.receive_answer.borrow_mut() = Some(ice);
-  }
 }
 
-impl<T: Channel> SignalSend for SignalChannel<T> {
+impl<T: Channel> Signal for SignalChannel<T> {
   fn send_offer(&mut self, sdp: String) {
     let message = CastMessage::Sdp(SdpMessage {
       sdp_type: SdpType::Offer,
@@ -113,5 +106,14 @@ impl<T: Channel> SignalSend for SignalChannel<T> {
   fn send_ice(&mut self, ice: String) {
     let message = CastMessage::Ice(ice);
     self.send_message(message);
+  }
+  fn set_receive_offer(&mut self, callback: Box<dyn Fn(String)>) {
+    *self.receive_offer.borrow_mut() = Some(callback);
+  }
+  fn set_receive_answer(&mut self, callback: Box<dyn Fn(String)>) {
+    *self.receive_answer.borrow_mut() = Some(callback);
+  }
+  fn set_receive_ice(&mut self, callback: Box<dyn Fn(String)>) {
+    *self.receive_ice.borrow_mut() = Some(callback);
   }
 }
