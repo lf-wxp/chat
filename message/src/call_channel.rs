@@ -1,6 +1,8 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{Action, CallMessage, CallType, Channel, RequestMessage, ResponseMessage};
+use gloo_console::log;
+
+use crate::{Action, CallMessage, CallType, Channel, RequestMessage};
 
 type Callback = Rc<RefCell<Option<Box<dyn Fn(CallMessage)>>>>;
 
@@ -21,8 +23,9 @@ impl<T: Channel> CallChannel<T> {
 
   fn bind_event(&mut self) {
     let receive_clone = self.response_message.clone();
+    log!("bind event");
     let onmessage = Box::new(move |msg: &str| {
-      if let Ok(ResponseMessage::Call(message)) = serde_json::from_str::<ResponseMessage>(msg) {
+      if let Ok(message) = serde_json::from_str::<CallMessage>(msg) {
         if let Some(callback) = receive_clone.borrow_mut().as_ref() {
           callback(message);
         }

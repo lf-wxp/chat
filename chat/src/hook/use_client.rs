@@ -1,13 +1,17 @@
+use std::rc::Rc;
+use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 use crate::utils::get_client;
 
 #[hook]
-pub fn use_client() -> Box<dyn Fn(String)> {
-  let call = Box::new(|callee: String| {
-    if let Some(client) = get_client() {
-      client.borrow_mut().call(callee);
-    }
+pub fn use_client() -> Rc<dyn Fn(String)> {
+  let call = Rc::new(move |callee: String| {
+    spawn_local( async move {
+      if let Some(client) = get_client() {
+        let _ = client.borrow_mut().call(callee).await;
+      }
+    })
   });
   call
 }

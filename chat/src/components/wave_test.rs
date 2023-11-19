@@ -1,6 +1,4 @@
 use bounce::use_atom_value;
-use gloo_console::log;
-use js_sys::JsString;
 use stylist::{self, style};
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
@@ -12,7 +10,7 @@ use crate::{
   hook::use_chat,
   model::{ChatMessage, Message, MessageBinary},
   store::User,
-  utils::{get_target, style, SocketMessage, Websocket},
+  utils::{get_target, style},
 };
 
 #[function_component]
@@ -46,19 +44,6 @@ pub fn WaveTest() -> Html {
         });
       }
     }
-  });
-  use_effect_with((), move |_| {
-    let ws_client = Websocket::new("ws://127.0.0.1:8888").unwrap();
-    let mut client = ws_client.borrow_mut();
-    client.set_onopen(Box::new(move || {
-      log!("websocket start");
-    }));
-    client.set_onmessage(Box::new(|msg: SocketMessage| {
-      log!("receive message", format!("{:?}", msg));
-    }));
-    client
-      .send(SocketMessage::Str(JsString::from("hello")))
-      .unwrap();
   });
 
   html! {

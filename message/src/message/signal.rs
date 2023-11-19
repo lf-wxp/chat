@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use crate::ResponseMessage;
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum SdpType {

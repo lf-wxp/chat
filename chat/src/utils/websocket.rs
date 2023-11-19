@@ -1,165 +1,91 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::{RefCell}, rc::Rc};
 
-use js_sys::{ArrayBuffer, JsString};
+use futures::{SinkExt, StreamExt};
+use futures_channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use gloo_console::log;
+use gloo_net::websocket::{futures::WebSocket, Message};
+use gloo_utils::errors::JsError;
 use message::Channel;
-use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
-use web_sys::{BinaryType::Arraybuffer, Blob, ErrorEvent, MessageEvent, WebSocket};
+use wasm_bindgen_futures::spawn_local;
 
 pub struct Websocket {
-  ws: WebSocket,
-  onmessage: Option<Box<dyn Fn(SocketMessage)>>,
-  onerror: Option<Box<dyn Fn(ErrorEvent)>>,
-  onopen: Option<Box<dyn Fn()>>,
-  onclose: Option<Box<dyn Fn()>>,
-  this: Option<Rc<RefCell<Self>>>,
-  pending_message: Vec<SocketMessage>,
-  is_connected: bool,
-}
-
-#[derive(Debug, Clone)]
-pub enum SocketMessage {
-  Buffer(ArrayBuffer),
-  Blob(Blob),
-  Str(JsString),
-  None,
+  onmessage: Rc<RefCell<Vec<Box<dyn Fn(Message)>>>>,
+  sender_ws: UnboundedSender<String>,
+  receiver_ws: Rc<RefCell<UnboundedReceiver<String>>>,
+  sender_callback: Rc<RefCell<UnboundedSender<Box<dyn Fn(Message)>>>>,
+  receiver_callback: Rc<RefCell<UnboundedReceiver<Box<dyn Fn(Message)>>>>,
 }
 
 impl Websocket {
-  pub fn new(url: &str) -> Result<Rc<RefCell<Self>>, JsValue> {
-    let ws = WebSocket::new(url)?;
-    ws.set_binary_type(Arraybuffer);
+  pub fn new(url: &str) -> Result<Rc<RefCell<Self>>, JsError> {
+    let (sender_ws, receiver_ws) = mpsc::unbounded();
+    let (sender_callback, receiver_callback) = mpsc::unbounded();
     let client = Rc::new(RefCell::new(Websocket {
-      ws,
-      onmessage: None,
-      onerror: None,
-      onopen: None,
-      onclose: None,
-      this: None,
-      pending_message: vec![],
-      is_connected: false,
+      onmessage: Rc::new(RefCell::new(vec![])),
+      sender_ws,
+      receiver_ws: Rc::new(RefCell::new(receiver_ws)),
+      sender_callback: Rc::new(RefCell::new(sender_callback)),
+      receiver_callback: Rc::new(RefCell::new(receiver_callback)),
     }));
-    client.borrow_mut().this = Some(client.clone());
-    client.borrow().bind_event();
+    client.borrow().setup(url);
     Ok(client)
   }
 
-  pub fn parse_message_event(e: MessageEvent) -> SocketMessage {
-    if let Ok(buffer) = e.data().dyn_into::<ArrayBuffer>() {
-      return SocketMessage::Buffer(buffer);
-    }
-    if let Ok(blob) = e.data().dyn_into::<Blob>() {
-      return SocketMessage::Blob(blob);
-    }
-    if let Ok(txt) = e.data().dyn_into::<JsString>() {
-      return SocketMessage::Str(txt);
-    }
-    SocketMessage::None
-  }
-
-  pub fn bind_event(&self) {
-    if let Some(client) = &self.this {
-      let client_message = client.clone();
-      let onmessage_callback = Closure::<dyn FnMut(_)>::new(move |e: MessageEvent| {
-        if let Some(onmessage) = &client_message.borrow().onmessage {
-          let message = Websocket::parse_message_event(e);
-          onmessage(message);
+  fn setup(&self, url: &str) {
+    let ws = WebSocket::open(url).unwrap();
+    let message_callback = self.onmessage.clone();
+    let (mut write, mut read) = ws.split();
+    spawn_local(async move {
+      while let Some(msg) = read.next().await {
+        log!(format!("1. {:?}", &msg));
+        match msg {
+          Ok(msg) => {
+            message_callback
+              .borrow()
+              .iter()
+              .for_each(|callback| callback(msg.clone()));
+          }
+          Err(_) => todo!(),
         }
-      });
-      self
-        .ws
-        .set_onmessage(Some(onmessage_callback.as_ref().unchecked_ref()));
-      onmessage_callback.forget();
+      }
+      log!("WebSocket Closed")
+    });
 
-      let client_error = client.clone();
-      let onerror_callback = Closure::<dyn FnMut(_)>::new(move |e: ErrorEvent| {
-        client_error.borrow_mut().is_connected = false;
-        if let Some(onerror) = &client_error.borrow().onerror {
-          onerror(e);
-        }
-      });
-      self
-        .ws
-        .set_onerror(Some(onerror_callback.as_ref().unchecked_ref()));
-      onerror_callback.forget();
+    let receiver = self.receiver_ws.clone();
+    spawn_local(async move {
+      while let Some(msg) = receiver.borrow_mut().next().await {
+        let _ = write.send(Message::Text(msg)).await;
+      }
+    });
 
-      let client_open = client.clone();
-      let onopen_callback = Closure::<dyn FnMut(_)>::new(move |_: MessageEvent| {
-        client_open.borrow_mut().is_connected = true;
-        client_open.borrow_mut().consume_pending_message();
-        if let Some(onopen) = &client_open.borrow().onopen {
-          onopen();
-        }
-      });
-      self
-        .ws
-        .set_onopen(Some(onopen_callback.as_ref().unchecked_ref()));
-      onopen_callback.forget();
-
-      let client = client.clone();
-      let onclose_callback = Closure::<dyn FnMut(_)>::new(move |_: MessageEvent| {
-        client.borrow_mut().is_connected = false;
-        if let Some(onclose) = &client.borrow().onclose {
-          onclose();
-        }
-      });
-      self
-        .ws
-        .set_onclose(Some(onclose_callback.as_ref().unchecked_ref()));
-      onclose_callback.forget();
-    }
+    let receiver = self.receiver_callback.clone();
+    let message_callback = self.onmessage.clone();
+    spawn_local(async move {
+      while let Some(callback) = receiver.borrow_mut().next().await {
+        message_callback.borrow_mut().push(callback);
+      }
+    });
   }
 
-  pub fn set_onmessage(&mut self, callback: Box<dyn Fn(SocketMessage)>) {
-    self.onmessage = Some(callback);
+  pub fn set_onmessage(&self, callback: Box<dyn Fn(Message)>) {
+    self.sender_callback.borrow_mut().unbounded_send(callback);
   }
-  pub fn set_onopen(&mut self, callback: Box<dyn Fn()>) {
-    self.onopen = Some(callback);
-  }
-  pub fn set_onerror(&mut self, callback: Box<dyn Fn(ErrorEvent)>) {
-    self.onerror = Some(callback);
-  }
-  pub fn set_onclose(&mut self, callback: Box<dyn Fn()>) {
-    self.onclose = Some(callback);
-  }
-  pub fn get_ws(&self) -> &WebSocket {
-    &self.ws
-  }
-  pub fn send(&mut self, message: SocketMessage) -> Result<(), JsValue> {
-    if !self.is_connected {
-      self.pending_message.push(message);
-      return Ok(());
-    }
-    match message {
-      SocketMessage::Buffer(buffer) => self.ws.send_with_array_buffer(&buffer),
-      SocketMessage::Blob(blob) => self.ws.send_with_blob(&blob),
-      SocketMessage::Str(str) => self.ws.send_with_str(&str.as_string().unwrap()),
-      _ => Ok(()),
-    }
-  }
-  fn consume_pending_message(&mut self) {
-    if self.is_connected & !self.pending_message.is_empty() {
-      self
-        .pending_message
-        .clone()
-        .into_iter()
-        .for_each(|message| {
-          let _ = self.send(message);
-        });
-      self.pending_message.clear();
-    }
+
+  pub fn send_message(&self, message: String) {
+    let _ = self.sender_ws.unbounded_send(message);
   }
 }
 
 impl Channel for Websocket {
-  fn send(&mut self, message: &str) {
-    let socket_msg = SocketMessage::Str(message.into());
-    let _ = Websocket::send(self, socket_msg);
+  fn send(&self, message: &str) {
+    let message = String::from(message);
+    self.send_message(message);
   }
 
   fn onmessage(&mut self, callback: Box<dyn Fn(&str)>) {
-    let onmessage = Box::new(move |message: SocketMessage| {
-      if let SocketMessage::Str(msg) = message {
-        callback(&msg.as_string().unwrap_or("".to_string()));
+    let onmessage = Box::new(move |message: Message| {
+      if let Message::Text(msg) = message {
+        callback(&msg);
       }
     });
     self.set_onmessage(onmessage);

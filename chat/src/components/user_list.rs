@@ -1,13 +1,12 @@
 use bounce::{use_atom_value, use_selector_value};
 use stylist::{self, style};
-use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 use crate::{
   components::{Avatar, Dropdown},
   model::Option,
   store::{FilterWord, User, Users},
-  utils::style,
+  utils::style, hook::use_client,
 };
 
 #[function_component]
@@ -15,6 +14,7 @@ pub fn UserList() -> Html {
   let class_name = get_class_name();
   let users = use_selector_value::<Users>();
   let user = use_atom_value::<User>();
+  let call = use_client();
   let filter_word = use_atom_value::<FilterWord>();
 
   let options = vec![
@@ -27,11 +27,10 @@ pub fn UserList() -> Html {
       label: "视频通话".to_string(),
     },
   ];
-
+  let call_clone = call.clone();
   let onclick = Callback::from(move |(user, call_type): (User, String)| {
-    spawn_local(async move {
-      // sdp_sender::call(user.uuid).await;
-    });
+    let call_clone = call_clone.clone();
+    call_clone(user.uuid);
   });
 
   html! {

@@ -18,6 +18,6 @@ pub trait Signal {
 }
 
 pub trait Channel {
-  fn send(&mut self, _message: &str) {}
+  fn send(&self, _message: &str) {}
   fn onmessage(&mut self, _callback: Box<dyn Fn(&str)>) {}
 }

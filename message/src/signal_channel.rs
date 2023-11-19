@@ -1,5 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
+use gloo_console::log;
+
 use crate::{
   CastMessage, Channel, RequestMessage, ResponseMessage, SdpMessage, SdpType, Signal, SignalMessage,
 };
@@ -73,6 +75,7 @@ impl<T: Channel> SignalChannel<T> {
       if let Ok(ResponseMessage::Signal(SignalMessage { message, .. })) =
         serde_json::from_str::<ResponseMessage>(msg)
       {
+        log!("receive offer");
         if let CastMessage::Sdp(SdpMessage { sdp, sdp_type }) = message.clone() {
           match sdp_type {
             SdpType::Offer => receive_offer(sdp),
@@ -94,6 +97,7 @@ impl<T: Channel> Signal for SignalChannel<T> {
       sdp_type: SdpType::Offer,
       sdp,
     });
+    log!("send offer signal");
     self.send_message(message);
   }
   fn send_answer(&mut self, sdp: String) {

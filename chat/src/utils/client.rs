@@ -40,15 +40,7 @@ impl Client {
   }
 
   fn init(&self) {
-    self.bind_ws_event();
     self.response_call();
-  }
-
-  fn bind_ws_event(&self) {
-    let mut ws_client = self.ws.borrow_mut();
-    ws_client.set_onopen(Box::new(move || {
-      log!("websocket start");
-    }));
   }
 
   pub fn set_onmessage(&mut self, onmessage: Box<dyn Fn(ActionMessage)>) {
@@ -89,19 +81,21 @@ impl Client {
       if let Some(client) = &client {
         let CallMessage { from, .. } = message;
         let link = client.borrow_mut().create_link(from.clone()).unwrap();
-        // client.borrow_mut().call_channel.call(self.user.uuid.clone(), from.clone());
+        log!("receive call");
         client.borrow_mut().links.insert(from.to_string(), link);
       }
     });
     self.call_channel.set_response_message(callback);
   }
 
-  pub fn call(&mut self, callee: String) -> Result<(), JsValue> {
+  pub async fn call(&mut self, callee: String) -> Result<(), JsValue> {
     let link = self.create_link(callee.clone())?;
     self
       .call_channel
       .call(self.user.uuid.clone(), callee.clone());
-    link.borrow().send_offer();
+    log!("send call");
+    let _ = link.borrow().send_offer().await;
+    log!("send offer");
     self.links.insert(callee.to_string(), link);
     Ok(())
   }
