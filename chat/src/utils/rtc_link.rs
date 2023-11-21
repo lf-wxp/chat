@@ -47,7 +47,9 @@ impl RTCLink {
         .signal_channel
         .borrow_mut()
         .set_receive_offer(Box::new(move |sdp| {
+          log!("receive offer");
           link_clone.borrow_mut().receive_offer(sdp);
+          link_clone.borrow_mut().send_answer();
         }));
       let link_clone = link.clone();
       self
@@ -147,6 +149,7 @@ impl RTCLink {
     let offer_obj = RTCLink::create_offer(&offer_sdp);
     JsFuture::from(self.peer.set_local_description(&offer_obj)).await?;
     self.signal_channel.borrow_mut().send_offer(offer_sdp);
+    log!("send offer");
     Ok(())
   }
 

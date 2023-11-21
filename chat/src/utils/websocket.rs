@@ -1,4 +1,4 @@
-use std::{cell::{RefCell}, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use futures::{SinkExt, StreamExt};
 use futures_channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -37,7 +37,6 @@ impl Websocket {
     let (mut write, mut read) = ws.split();
     spawn_local(async move {
       while let Some(msg) = read.next().await {
-        log!(format!("1. {:?}", &msg));
         match msg {
           Ok(msg) => {
             message_callback

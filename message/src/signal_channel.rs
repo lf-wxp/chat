@@ -72,10 +72,10 @@ impl<T: Channel> SignalChannel<T> {
   fn bind_event(&mut self) {
     let (receive_offer, receive_answer, receive_ice) = self.deal_callback();
     let onmessage = Box::new(move |msg: &str| {
+      log!("receive offer", msg);
       if let Ok(ResponseMessage::Signal(SignalMessage { message, .. })) =
         serde_json::from_str::<ResponseMessage>(msg)
       {
-        log!("receive offer");
         if let CastMessage::Sdp(SdpMessage { sdp, sdp_type }) = message.clone() {
           match sdp_type {
             SdpType::Offer => receive_offer(sdp),

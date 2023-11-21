@@ -6,6 +6,7 @@ use message::{
   SignalChannel,
 };
 use wasm_bindgen::JsValue;
+use wasm_bindgen_futures::spawn_local;
 
 use crate::{
   store::User,
@@ -94,9 +95,15 @@ impl Client {
       .call_channel
       .call(self.user.uuid.clone(), callee.clone());
     log!("send call");
-    let _ = link.borrow().send_offer().await;
-    log!("send offer");
+    let link_clone = link.clone();
     self.links.insert(callee.to_string(), link);
+    let on_timeout = move || {
+      spawn_local(async move {
+        link_clone.borrow().send_offer().await.unwrap();
+      });
+    };
+    let time = gloo_timers::callback::Timeout::new(2 * 1000, on_timeout);
+    time.forget();
     Ok(())
   }
 }
