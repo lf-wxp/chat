@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use bounce::{Atom, BounceStates, Selector};
 use fake::{uuid::UUIDv1, Dummy, Fake, Faker};
+use gloo_console::log;
 use message::Client;
 use pinyin::ToPinyin;
 use serde::{Deserialize, Serialize};
@@ -31,7 +32,10 @@ impl Default for User {
 
 impl From<Client> for User {
   fn from(value: Client) -> Self {
-    User { uuid: value.uuid, name: value.name }
+    User {
+      uuid: value.uuid,
+      name: value.name,
+    }
   }
 }
 
@@ -66,6 +70,7 @@ impl Selector for Users {
       .into_iter()
       .filter(|x| *x != *user)
       .collect::<Vec<User>>();
+    log!("user list", format!("{:?}", users.clone()));
     Rc::from(Users(users))
   }
 }
@@ -98,6 +103,7 @@ impl Users {
       .for_each(|x| {
         let User { name, uuid: _ } = x;
         let char = name.chars().next().unwrap_or('#');
+        let char = if char.is_numeric() { '#' } else { char };
         let letter = match char.to_pinyin() {
           Some(letter) => letter.first_letter().to_string(),
           None => char.to_string(),

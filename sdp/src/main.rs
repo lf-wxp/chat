@@ -1,4 +1,4 @@
-use std::{env, io::Error as IoError, net::SocketAddr};
+use std::{env, io::Error as IoError, net::SocketAddr, cell::OnceCell};
 
 use futures::{
   future::{self, Either},
@@ -18,6 +18,19 @@ use tokio_tungstenite::{
 };
 
 use crate::action::BroadcastExecute;
+
+static mut CLIENT_ID: OnceCell<i8> = OnceCell::new();
+
+pub fn get_client_id() -> i8 {
+  unsafe {
+    CLIENT_ID.get_or_init(|| 1);
+    if let Some(id) = CLIENT_ID.get_mut() {
+      *id += 1;
+      return *id;     
+    }
+    0
+  }
+}
 
 mod action;
 mod client;

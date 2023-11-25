@@ -1,20 +1,26 @@
 use std::{cell::RefCell, rc::Rc};
 
 use gloo_console::log;
-use js_sys::Reflect;
+use js_sys::{Array, Reflect, JSON};
 use message::Signal;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
-use wasm_bindgen_futures::JsFuture;
+use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{
-  RtcDataChannel, RtcDataChannelEvent, RtcIceCandidate, RtcIceCandidateInit, RtcPeerConnection,
-  RtcPeerConnectionIceEvent, RtcSdpType, RtcSessionDescriptionInit, RtcTrackEvent,
+  HtmlMediaElement, MediaStream, RtcDataChannel, RtcDataChannelEvent, RtcIceCandidate,
+  RtcIceCandidateInit, RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType,
+  RtcSessionDescriptionInit, RtcTrackEvent,
 };
+
+use crate::{model::IceCandidate, utils::query_selector};
+
+use super::get_user_media;
 
 pub struct RTCLink {
   peer: RtcPeerConnection,
   data_channel: RtcDataChannel,
   signal_channel: Rc<RefCell<dyn Signal>>,
   this: Option<Rc<RefCell<Self>>>,
+  remote_media: Rc<RefCell<MediaStream>>,
 }
 
 impl RTCLink {
@@ -26,6 +32,7 @@ impl RTCLink {
       data_channel,
       signal_channel,
       this: None,
+      remote_media: Rc::new(RefCell::new(MediaStream::new().unwrap())),
     }));
     link.borrow_mut().this = Some(link.clone());
     link.borrow_mut().bind_signal_event();
@@ -40,7 +47,10 @@ impl RTCLink {
         .signal_channel
         .borrow_mut()
         .set_receive_answer(Box::new(move |sdp| {
-          link_clone.borrow_mut().receive_answer(sdp);
+          let link_clone = link_clone.clone();
+          spawn_local(async move {
+            let _ = link_clone.borrow().receive_answer(sdp).await;
+          });
         }));
       let link_clone = link.clone();
       self
@@ -48,15 +58,18 @@ impl RTCLink {
         .borrow_mut()
         .set_receive_offer(Box::new(move |sdp| {
           log!("receive offer");
-          link_clone.borrow_mut().receive_offer(sdp);
-          link_clone.borrow_mut().send_answer();
+          let link_clone = link_clone.clone();
+          spawn_local(async move {
+            let _ = link_clone.borrow().receive_offer(sdp).await;
+            let _ = link_clone.borrow().send_answer().await;
+          });
         }));
       let link_clone = link.clone();
       self
         .signal_channel
         .borrow_mut()
         .set_receive_ice(Box::new(move |ice| {
-          link_clone.borrow_mut().receive_ice(ice);
+          link_clone.borrow().receive_ice(ice);
         }));
     }
   }
@@ -83,8 +96,13 @@ impl RTCLink {
 
   fn bind_ontrack(&self) {
     let peer = self.peer.clone();
+    let media = self.remote_media.clone();
     let ontrack_callback = Closure::<dyn FnMut(_)>::new(move |ev: RtcTrackEvent| {
       log!("ontrack", ev.track());
+      media.borrow_mut().add_track(&ev.track());
+      if let Some(dom) = query_selector::<HtmlMediaElement>(".remote-stream") {
+        dom.set_src_object(Some(media.borrow().as_ref()));
+      }
     });
     self
       .peer
@@ -108,8 +126,12 @@ impl RTCLink {
     let onicecandidate_callback =
       Closure::<dyn FnMut(_)>::new(move |ev: RtcPeerConnectionIceEvent| {
         if let Some(candidate) = ev.candidate() {
-          log!("onicecandidate", &candidate.candidate());
-          channel.borrow_mut().send_ice(candidate.candidate().clone());
+          let json_candidate = JSON::stringify(&candidate.to_json())
+            .unwrap()
+            .as_string()
+            .unwrap();
+          log!("onicecandidate", &json_candidate);
+          channel.borrow_mut().send_ice(json_candidate);
         }
       });
     self
@@ -156,6 +178,7 @@ impl RTCLink {
   pub async fn receive_offer(&self, sdp: String) -> Result<(), JsValue> {
     let offer_obj = RTCLink::create_offer(&sdp);
     JsFuture::from(self.peer.set_remote_description(&offer_obj)).await?;
+    log!("receive offer inner");
     Ok(())
   }
 
@@ -167,21 +190,70 @@ impl RTCLink {
     let answer_obj = RTCLink::create_answer(&answer_sdp);
     JsFuture::from(self.peer.set_local_description(&answer_obj)).await?;
     self.signal_channel.borrow_mut().send_answer(answer_sdp);
+    log!("send answer");
     Ok(())
   }
 
   pub async fn receive_answer(&self, sdp: String) -> Result<(), JsValue> {
     let answer_obj = RTCLink::create_answer(&sdp);
     JsFuture::from(self.peer.set_remote_description(&answer_obj)).await?;
+    log!("receive answer");
     Ok(())
   }
 
-  pub async fn receive_ice(&self, ice_candidate: String) -> Result<(), JsValue> {
-    let ice = RtcIceCandidate::new(&RtcIceCandidateInit::new(&ice_candidate)).ok();
-    log!("add ice candidate", format!("{:?}", &ice), ice_candidate);
+  pub fn receive_ice(&self, ice_candidate_json: String) -> Result<(), JsValue> {
+    let ice_candidate = serde_json::from_str::<IceCandidate>(&ice_candidate_json).unwrap();
+    let ice = RtcIceCandidate::try_from(ice_candidate.clone()).ok();
+    log!(
+      "add ice candidate",
+      format!("{:?}----{:?}", &ice, &ice_candidate),
+      ice_candidate_json
+    );
     let _ = self
       .peer
       .add_ice_candidate_with_opt_rtc_ice_candidate(ice.as_ref());
+    Ok(())
+  }
+
+  pub fn set_tracks(&self, stream: MediaStream) {
+    let audio_tracks = stream.get_audio_tracks();
+    for i in 0..audio_tracks.length() {
+      let track = audio_tracks
+        .get(i)
+        .dyn_into::<web_sys::MediaStreamTrack>()
+        .unwrap();
+      let more_streams = Array::new();
+      log!("set tracks audio");
+      self.peer.add_track(&track, &stream, &more_streams);
+    }
+
+    let video_tracks = stream.get_video_tracks();
+    for i in 0..video_tracks.length() {
+      let track = video_tracks
+        .get(i)
+        .dyn_into::<web_sys::MediaStreamTrack>()
+        .unwrap();
+      log!("set tracks video");
+      let more_streams = Array::new();
+      self.peer.add_track(&track, &stream, &more_streams);
+    }
+  }
+
+  pub async fn set_local_user_media(&self, dom: Option<HtmlMediaElement>) -> Result<(), JsValue> {
+    let stream = get_user_media(
+      // Some("{ device_id: 'default',echo_cancellation: true }"),
+      None,
+      Some("true"),
+    )
+    .await
+    .ok();
+    if let Some(dom) = dom {
+      log!("stream", &dom);
+      dom.set_src_object(stream.as_ref());
+    }
+    if let Some(stream) = stream {
+      self.set_tracks(stream);
+    }
     Ok(())
   }
 }

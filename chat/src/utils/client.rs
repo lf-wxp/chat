@@ -7,10 +7,11 @@ use message::{
 };
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
+use web_sys::HtmlMediaElement;
 
 use crate::{
   store::User,
-  utils::{RTCLink, Websocket, SDP_SERVER},
+  utils::{RTCLink, Websocket, SDP_SERVER, query_selector},
 };
 
 pub struct Client {
@@ -82,7 +83,12 @@ impl Client {
       if let Some(client) = &client {
         let CallMessage { from, .. } = message;
         let link = client.borrow_mut().create_link(from.clone()).unwrap();
+        let link_clone = link.clone();
         log!("receive call");
+        spawn_local(async move {
+          let dom = query_selector::<HtmlMediaElement>(".local-stream");
+          link_clone.borrow().set_local_user_media(dom).await.unwrap();
+        });
         client.borrow_mut().links.insert(from.to_string(), link);
       }
     });
@@ -99,6 +105,8 @@ impl Client {
     self.links.insert(callee.to_string(), link);
     let on_timeout = move || {
       spawn_local(async move {
+        let dom = query_selector::<HtmlMediaElement>(".local-stream");
+        link_clone.borrow().set_local_user_media(dom).await.unwrap();
         link_clone.borrow().send_offer().await.unwrap();
       });
     };

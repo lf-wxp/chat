@@ -9,7 +9,7 @@ use web_sys::{
 
 use crate::{
   model::VisualizeColor,
-  utils::{get_media, Timer},
+  utils::{get_user_media, Timer},
 };
 
 #[derive(Clone)]
@@ -56,7 +56,7 @@ impl WaveRecorder {
   }
 
   pub async fn start(&mut self) -> Result<(), JsValue> {
-    let stream = get_media(
+    let stream = get_user_media(
       Some("{ device_id: 'default',echo_cancellation: true }"),
       None,
     )

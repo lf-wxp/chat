@@ -218,7 +218,7 @@ pub async fn get_duration(array_buffer: &ArrayBuffer) -> Result<f64, JsValue> {
   Ok(duration)
 }
 
-pub async fn get_media(
+pub async fn get_user_media(
   audio_constraints: Option<&str>,
   video_constraints: Option<&str>,
 ) -> Result<MediaStream, JsValue> {

@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use gloo_console::log;
 
 use crate::{
-  CastMessage, Channel, RequestMessage, ResponseMessage, SdpMessage, SdpType, Signal, SignalMessage,
+  CastMessage, Channel, RequestMessage, SdpMessage, SdpType, Signal, SignalMessage,
 };
 
 type Callback = Rc<RefCell<Option<Box<dyn Fn(String)>>>>;
@@ -72,9 +72,8 @@ impl<T: Channel> SignalChannel<T> {
   fn bind_event(&mut self) {
     let (receive_offer, receive_answer, receive_ice) = self.deal_callback();
     let onmessage = Box::new(move |msg: &str| {
-      log!("receive offer", msg);
-      if let Ok(ResponseMessage::Signal(SignalMessage { message, .. })) =
-        serde_json::from_str::<ResponseMessage>(msg)
+      if let Ok(SignalMessage { message, .. }) =
+        serde_json::from_str::<SignalMessage>(msg)
       {
         if let CastMessage::Sdp(SdpMessage { sdp, sdp_type }) = message.clone() {
           match sdp_type {

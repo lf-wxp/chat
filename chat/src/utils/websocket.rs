@@ -1,39 +1,39 @@
 use std::{cell::RefCell, rc::Rc};
 
 use futures::{SinkExt, StreamExt};
-use futures_channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use futures_channel::mpsc::{self, UnboundedSender};
 use gloo_console::log;
 use gloo_net::websocket::{futures::WebSocket, Message};
 use gloo_utils::errors::JsError;
 use message::Channel;
 use wasm_bindgen_futures::spawn_local;
 
+type MessageFn = Box<dyn Fn(Message)>;
+
 pub struct Websocket {
-  onmessage: Rc<RefCell<Vec<Box<dyn Fn(Message)>>>>,
-  sender_ws: UnboundedSender<String>,
-  receiver_ws: Rc<RefCell<UnboundedReceiver<String>>>,
-  sender_callback: Rc<RefCell<UnboundedSender<Box<dyn Fn(Message)>>>>,
-  receiver_callback: Rc<RefCell<UnboundedReceiver<Box<dyn Fn(Message)>>>>,
+  onmessage: Rc<RefCell<Vec<MessageFn>>>,
+  sender_ws: Option<UnboundedSender<String>>,
+  sender_callback: Option<UnboundedSender<MessageFn>>,
 }
 
 impl Websocket {
   pub fn new(url: &str) -> Result<Rc<RefCell<Self>>, JsError> {
-    let (sender_ws, receiver_ws) = mpsc::unbounded();
-    let (sender_callback, receiver_callback) = mpsc::unbounded();
     let client = Rc::new(RefCell::new(Websocket {
       onmessage: Rc::new(RefCell::new(vec![])),
-      sender_ws,
-      receiver_ws: Rc::new(RefCell::new(receiver_ws)),
-      sender_callback: Rc::new(RefCell::new(sender_callback)),
-      receiver_callback: Rc::new(RefCell::new(receiver_callback)),
+      sender_ws: None,
+      sender_callback: None,
     }));
-    client.borrow().setup(url);
+    client.borrow_mut().setup(url);
     Ok(client)
   }
 
-  fn setup(&self, url: &str) {
+  fn setup(&mut self, url: &str) {
     let ws = WebSocket::open(url).unwrap();
     let message_callback = self.onmessage.clone();
+    let (sender_ws, mut receiver_ws) = mpsc::unbounded();
+    let (sender_callback, mut receiver_callback) = mpsc::unbounded();
+    self.sender_ws = Some(sender_ws);
+    self.sender_callback = Some(sender_callback);
     let (mut write, mut read) = ws.split();
     spawn_local(async move {
       while let Some(msg) = read.next().await {
@@ -50,28 +50,30 @@ impl Websocket {
       log!("WebSocket Closed")
     });
 
-    let receiver = self.receiver_ws.clone();
     spawn_local(async move {
-      while let Some(msg) = receiver.borrow_mut().next().await {
+      while let Some(msg) = receiver_ws.next().await {
         let _ = write.send(Message::Text(msg)).await;
       }
     });
 
-    let receiver = self.receiver_callback.clone();
     let message_callback = self.onmessage.clone();
     spawn_local(async move {
-      while let Some(callback) = receiver.borrow_mut().next().await {
+      while let Some(callback) = receiver_callback.next().await {
         message_callback.borrow_mut().push(callback);
       }
     });
   }
 
   pub fn set_onmessage(&self, callback: Box<dyn Fn(Message)>) {
-    self.sender_callback.borrow_mut().unbounded_send(callback);
+    if let Some(sender) = &self.sender_callback {
+      let _ = sender.unbounded_send(callback);
+    }
   }
 
   pub fn send_message(&self, message: String) {
-    let _ = self.sender_ws.unbounded_send(message);
+    if let Some(sender) = &self.sender_ws {
+      let _ = sender.unbounded_send(message);
+    }
   }
 }
 
