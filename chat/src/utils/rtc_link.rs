@@ -7,8 +7,8 @@ use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{
   HtmlMediaElement, MediaStream, RtcDataChannel, RtcDataChannelEvent, RtcIceCandidate,
-  RtcIceCandidateInit, RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType,
-  RtcSessionDescriptionInit, RtcTrackEvent,
+  RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType,
+  RtcSessionDescriptionInit, RtcTrackEvent, RtcIceConnectionState,
 };
 
 use crate::{model::IceCandidate, utils::query_selector};
@@ -111,7 +111,6 @@ impl RTCLink {
   }
 
   fn bind_ondatachannel(&self) {
-    let peer = self.peer.clone();
     let ondatachanel_callback = Closure::<dyn FnMut(_)>::new(move |ev: RtcDataChannelEvent| {
       log!("ondatachanel", ev);
     });
@@ -161,6 +160,10 @@ impl RTCLink {
       onconnectionstatechange_callback.as_ref().unchecked_ref(),
     ));
     onconnectionstatechange_callback.forget();
+  }
+  
+  pub fn state(&self) -> RtcIceConnectionState {
+    self.peer.ice_connection_state()
   }
 
   pub async fn send_offer(&self) -> Result<(), JsValue> {

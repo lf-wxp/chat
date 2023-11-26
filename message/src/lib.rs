@@ -1,12 +1,16 @@
 pub mod action_channel;
-pub mod call_channel;
+pub mod connect_channel;
 pub mod message;
 pub mod signal_channel;
+pub mod media_channel;
+pub mod channel;
 
 pub use action_channel::*;
-pub use call_channel::*;
+pub use connect_channel::*;
 pub use message::*;
 pub use signal_channel::*;
+pub use media_channel::*;
+pub use channel::*;
 
 pub trait Signal {
   fn send_offer(&mut self, _sdp: String);
@@ -15,9 +19,4 @@ pub trait Signal {
   fn set_receive_offer(&mut self, callback: Box<dyn Fn(String)>);
   fn set_receive_answer(&mut self, callback: Box<dyn Fn(String)>);
   fn set_receive_ice(&mut self, callback: Box<dyn Fn(String)>);
-}
-
-pub trait Channel {
-  fn send(&self, _message: &str) {}
-  fn onmessage(&mut self, _callback: Box<dyn Fn(&str)>) {}
 }

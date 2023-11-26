@@ -1,16 +1,16 @@
 mod action;
 mod client;
 mod room;
-// mod transmit;
-mod call;
+mod media;
 mod signal;
+mod connect;
 
 pub use action::*;
 pub use client::*;
 pub use room::*;
-// pub use transmit::*;
-pub use call::*;
+pub use media::*;
 pub use signal::*;
+pub use connect::*;
 
 use serde::{Deserialize, Serialize};
 
@@ -18,7 +18,8 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub enum RequestMessage {
   Action(Action),
-  Call(CallMessage),
+  Connect(ConnectMessage),
+  Media(MediaMessage),
   Signal(SignalMessage),
 }
 
@@ -26,7 +27,8 @@ pub enum RequestMessage {
 #[serde(rename_all = "camelCase")]
 pub enum ResponseMessage {
   Action(ActionMessage),
-  Call(CallMessage),
+  Connect(ConnectMessage),
+  Media(MediaMessage),
   Signal(SignalMessage),
 }
 

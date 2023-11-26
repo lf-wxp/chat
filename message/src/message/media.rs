@@ -2,17 +2,17 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub enum CallType {
+pub enum MediaType {
   Video,
   Audio,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct CallMessage {
+pub struct MediaMessage {
   pub from: String,
   pub to: String,
-  pub call_type: CallType,
+  pub media_type: MediaType,
   pub expired: Option<String>,
   pub confirm: Option<bool>,
 }

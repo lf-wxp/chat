@@ -1,8 +1,9 @@
-pub mod call;
+pub mod connect;
 pub mod client;
 pub mod list;
 pub mod room;
 pub mod signal;
+pub mod media;
 
 use message::{Action, RequestMessage, ResponseMessage};
 use tokio_tungstenite::tungstenite::{self, Message};
@@ -73,10 +74,14 @@ impl ParamResponseOptionExecute for RequestMessage {
   fn execute(&self, client_id: String) -> Option<ResponseMessage> {
     match self {
       RequestMessage::Action(action) => Some(action.execute(client_id)),
-      RequestMessage::Call(call) => {
-        call.execute();
+      RequestMessage::Media(media) => {
+        media.execute();
         None
-      }
+      },
+      RequestMessage::Connect(connect) => {
+        connect.execute();
+        None
+      },
       RequestMessage::Signal(signal) => {
         signal.execute();
         None
