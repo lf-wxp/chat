@@ -89,11 +89,11 @@ impl Client {
         let ConnectMessage { from, .. } = message;
         let link = client.borrow_mut().create_link(from.clone()).unwrap();
         log!("receive call");
-        let link_clone = link.clone();
-        spawn_local(async move {
-          let dom = query_selector::<HtmlMediaElement>(".local-stream");
-          link_clone.borrow().set_local_user_media(dom).await.unwrap();
-        });
+        // let link_clone = link.clone();
+        // spawn_local(async move {
+        //   let dom = query_selector::<HtmlMediaElement>(".local-stream");
+        //   link_clone.borrow().set_local_user_media(dom).await.unwrap();
+        // });
         client.borrow_mut().links.insert(from.to_string(), link);
       }
     });
@@ -138,16 +138,9 @@ impl Client {
     });
     self.links.insert(to.to_string(), link.clone());
     let link_clone = link.clone();
-    let client = self.this.clone().unwrap();
-    let on_timeout = move || {
-      spawn_local(async move {
-        let dom = query_selector::<HtmlMediaElement>(".local-stream");
-        link_clone.borrow().set_local_user_media(dom).await.unwrap();
-        link_clone.borrow().send_offer().await.unwrap();
-      });
-    };
-    let time = gloo_timers::callback::Timeout::new(2 * 1000, on_timeout);
-    time.forget();
+    let dom = query_selector::<HtmlMediaElement>(".local-stream");
+    // link_clone.borrow().set_local_user_media(dom).await.unwrap();
+    link_clone.borrow().send_offer().await.unwrap();
     Ok(())
   }
 }
