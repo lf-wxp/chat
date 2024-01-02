@@ -16,6 +16,8 @@ use web_sys::{
   RtcSessionDescriptionInit, RtcTrackEvent, MessageEvent,
 };
 
+use crate::bind_event;
+
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 
 pub struct WebRTC {
@@ -62,62 +64,43 @@ impl WebRTC {
   }
 
   fn bind_ontrack(&self) -> Result<(), JsValue> {
-    let track_callback = {
-      let sender = self.message_sender.clone();
-      Closure::<dyn FnMut(_)>::new(move |ev: RtcTrackEvent| {
-        log!("ontrack", ev.track());
-        let _ = sender.unbounded_send(ChannelMessage::TrackEvent(ev));
-      })
-    };
-    self
-      .peer
-      .add_event_listener_with_callback("track", track_callback.as_ref().unchecked_ref())
+    bind_event!(
+      self.peer,
+      "track",
+      self.message_sender,
+      ChannelMessage::TrackEvent,
+      RtcTrackEvent
+    )
   }
 
   fn bind_ondatachannel(&self) -> Result<(), JsValue> {
-    let datachannel_callback = {
-      let sender = self.message_sender.clone();
-      Closure::<dyn FnMut(_)>::new(move |ev: RtcDataChannelEvent| {
-        log!("ondatachanel", &ev);
-        let _ = sender.unbounded_send(ChannelMessage::DataChannelEvent(ev));
-      })
-    };
-    self
-      .peer
-      .add_event_listener_with_callback(
-        "datachannel",
-        datachannel_callback.as_ref().unchecked_ref(),
-      )
+    bind_event!(
+      self.peer,
+      "datachannel",
+      self.message_sender,
+      ChannelMessage::DataChannelEvent,
+      RtcDataChannelEvent
+    )
   }
 
   fn bind_onicecandidate(&self) -> Result<(), JsValue>{
-    let icecandidate_callback = {
-      let sender = self.message_sender.clone();
-      Closure::<dyn FnMut(_)>::new(move |ev: RtcPeerConnectionIceEvent| {
-        let _ = sender.unbounded_send(ChannelMessage::IceEvent(ev));
-      })
-    };
-    self
-      .peer
-      .add_event_listener_with_callback(
-        "icecandidate",
-        icecandidate_callback.as_ref().unchecked_ref(),
-      )
+    bind_event!(
+      self.peer,
+      "icecandidate",
+      self.message_sender,
+      ChannelMessage::IceEvent,
+      RtcPeerConnectionIceEvent
+    )
   }
 
   fn bind_ondatachannel_message(&self) -> Result<(), JsValue>{
-    let message_callback = {
-      let sender = self.message_sender.clone();
-      Closure::<dyn FnMut(_)>::new(move |ev: MessageEvent| {
-        let _ = sender.unbounded_send(ChannelMessage::DataChannelMessage(ev));
-      })
-    };
-    self
-      .data_channel
-      .add_event_listener_with_callback(
-        "message",
-        message_callback.as_ref().unchecked_ref(),
-      )
+    bind_event!(
+      self.data_channel,
+      "message",
+      self.message_sender,
+      ChannelMessage::DataChannelMessage,
+      MessageEvent
+    )
   }
 
   pub fn state(&self) -> RtcIceConnectionState {
