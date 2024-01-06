@@ -56,7 +56,6 @@ impl WebRTC {
   }
 
   fn setup(&self) -> Result<(), JsValue> {
-    // to-do use macro to simplify event binding code
     self.bind_ontrack()?;
     self.bind_ondatachannel()?;
     self.bind_onicecandidate()?;

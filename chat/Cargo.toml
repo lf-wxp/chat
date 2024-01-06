@@ -9,6 +9,7 @@ fake = []
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+async-broadcast = {workspace = true}
 base64 = "0.21.5"
 bounce = "0.9.0"
 chrono = "0.4.31"
@@ -17,7 +18,7 @@ fake = {version = "2.9.2", features = ["derive", "uuid", "chrono"]}
 futures = {workspace = true}
 futures-channel = "0.3.30"
 getrandom = {version = "0.2.11", features = ["js"]}
-gloo-console = "0.3.0"
+gloo-console = {workspace = true}
 gloo-events = "0.2.0"
 gloo-net = "0.4.0"
 gloo-render = "0.2.0"
@@ -76,7 +77,7 @@ web-sys = {version = "0.3.66", features = [
   "RtcTrackEvent",
   "RtcDataChannelEvent",
   "RtcIceConnectionState",
-  "RtcIceCandidateInit"
+  "RtcIceCandidateInit",
 ]}
 yew = {version = "0.21.0", features = ["csr"]}
 yew-hooks = "0.3.0"

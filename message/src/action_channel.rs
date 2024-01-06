@@ -19,8 +19,6 @@ impl<T: Channel> ActionChannel<T> {
   }
 
   pub fn set_response_message(&self, callback: Box<dyn Fn(ActionMessage)>) {
-
-
     let onmessage = Box::new(move |msg: ResponseMessage| {
       if let ResponseMessage::Action(message) = msg {
         callback(message);

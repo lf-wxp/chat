@@ -1,16 +1,35 @@
-pub mod action_channel;
-pub mod connect_channel;
 pub mod message;
-pub mod signal_channel;
-pub mod media_channel;
+#[macro_use]
 pub mod channel;
 
-pub use action_channel::*;
-pub use connect_channel::*;
+// pub use action_channel::*;
+// pub use connect_channel::*;
 pub use message::*;
-pub use signal_channel::*;
-pub use media_channel::*;
-pub use channel::*;
+// pub use signal_channel::*;
+// pub use media_channel::*;
+
+channel!(
+  ActionChannel,
+  Action,
+  RequestMessage::Action,
+  ActionMessage,
+  ResponseMessage::Action
+);
+
+channel!(
+  ConnectChannel,
+  ConnectMessage,
+  RequestMessage::Connect,
+  ConnectMessage,
+  ResponseMessage::Connect
+);
+channel!(
+  MediaChannel,
+  MediaMessage,
+  RequestMessage::Media,
+  MediaMessage,
+  ResponseMessage::Media
+);
 
 pub trait Signal {
   fn send_offer(&mut self, _sdp: String);

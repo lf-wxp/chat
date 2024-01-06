@@ -26,7 +26,7 @@ pub struct Client {
 
 impl Client {
   pub fn new(user: User) -> Rc<RefCell<Self>> {
-    let ws = Websocket::new(SDP_SERVER).unwrap();
+    let ws = Websocket::new(SDP_SERVER);
     let ws_action = ws.clone();
     let ws_connect = ws.clone();
     let ws_media = ws.clone();

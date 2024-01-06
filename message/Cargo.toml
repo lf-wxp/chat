@@ -9,4 +9,6 @@ edition = "2021"
 serde = {workspace = true, features = ["derive"]}
 serde_json = {workspace = true}
 nanoid = {workspace = true}
-gloo-console = "0.3.0"
+futures = {workspace = true}
+gloo-console = {workspace = true}
+async-broadcast = {workspace = true}

@@ -3,7 +3,9 @@ members = ["sdp", "chat", "message"]
 resolver = "2"
 
 [workspace.dependencies]
-serde = {version = "1.0.193", features = ["derive"]}
-serde_json = "1.0.109"
+serde = {version = "1.0.195", features = ["derive"]}
+serde_json = "1.0.111"
 nanoid = "0.4.0"
 futures = "0.3.30"
+gloo-console = "0.3.0"
+async-broadcast = "0.6.0"
