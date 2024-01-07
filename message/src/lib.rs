@@ -2,6 +2,7 @@ pub mod message;
 #[macro_use]
 pub mod channel;
 
+use gloo_console::log;
 // pub use action_channel::*;
 // pub use connect_channel::*;
 pub use message::*;
@@ -23,12 +24,21 @@ channel!(
   ConnectMessage,
   ResponseMessage::Connect
 );
+
 channel!(
   MediaChannel,
   MediaMessage,
   RequestMessage::Media,
   MediaMessage,
   ResponseMessage::Media
+);
+
+channel!(
+  SignalChannel,
+  SignalMessage,
+  RequestMessage::Signal,
+  SignalMessage,
+  ResponseMessage::Signal
 );
 
 pub trait Signal {

@@ -1,10 +1,8 @@
+use async_broadcast::{broadcast, Receiver, Sender};
 use futures::{SinkExt, StreamExt};
 use gloo_console::log;
 use gloo_net::websocket::{futures::WebSocket, Message};
 use wasm_bindgen_futures::spawn_local;
-use async_broadcast::{broadcast, Receiver, Sender};
-
-type MessageFn = Box<dyn Fn(Message)>;
 
 pub struct Websocket {
   write_sender: Sender<Message>,
@@ -35,7 +33,7 @@ impl Websocket {
       while let Some(msg) = read.next().await {
         match msg {
           Ok(msg) => {
-            sender.send(msg);
+            sender.broadcast(msg);
           }
           Err(_) => todo!(),
         }
@@ -45,17 +43,24 @@ impl Websocket {
 
     let receiver = self.write_receiver.clone();
     spawn_local(async move {
-      while let Ok(msg) = receiver.next().await {
+      while let Some(msg) = receiver.next().await {
         let _ = write.send(msg).await;
       }
     });
   }
 
   pub fn send(&self, message: String) {
-    self.write_sender.send(Message::Text(message));
+    self.write_sender.broadcast(Message::Text(message));
   }
 
-  pub fn get_receiver(&self) -> Receiver<Message> {
-    self.read_receiver
+  pub fn get_channel(&self) -> (Sender<Message>, Receiver<Message>) {
+    (self.write_sender, self.read_receiver)
+  }
+
+  pub fn get_channel_fn(&self) -> (Box<dyn Fn(String)>, Receiver<Message>) {
+    (
+      Box::new(|message: String| { self.write_sender.broadcast(Message::Text(message)); }),
+      self.read_receiver,
+    )
   }
 }

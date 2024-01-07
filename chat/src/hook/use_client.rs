@@ -9,7 +9,7 @@ pub fn use_client() -> Rc<dyn Fn(String)> {
   let call = Rc::new(move |callee: String| {
     spawn_local( async move {
       if let Some(client) = get_client() {
-        let _ = client.borrow_mut().connect(callee).await;
+        let _ = client.borrow_mut().request_connect(callee).await;
       }
     })
   });

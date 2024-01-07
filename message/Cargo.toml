@@ -12,3 +12,4 @@ nanoid = {workspace = true}
 futures = {workspace = true}
 gloo-console = {workspace = true}
 async-broadcast = {workspace = true}
+gloo-net = {workspace = true}

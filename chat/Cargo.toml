@@ -20,7 +20,7 @@ futures-channel = "0.3.30"
 getrandom = {version = "0.2.11", features = ["js"]}
 gloo-console = {workspace = true}
 gloo-events = "0.2.0"
-gloo-net = "0.4.0"
+gloo-net = {workspace = true}
 gloo-render = "0.2.0"
 gloo-timers = "0.3.0"
 gloo-utils = "0.2.0"

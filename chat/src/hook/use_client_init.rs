@@ -1,6 +1,9 @@
 use bounce::use_atom_setter;
+use futures::StreamExt;
 use gloo_console::log;
-use message::{ActionMessage, Data, ListMessage};
+use message::{ActionMessage, ResponseMessage};
+use message::{Data, ListMessage};
+use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew::use_effect_with;
 
@@ -18,12 +21,17 @@ pub fn use_client_init() {
     if let Some(client) = get_client() {
       user_setter(client.borrow_mut().user());
       let setter_clone = user_setter.clone();
-      client
-        .borrow_mut()
-        .set_onmessage(Box::new(move |message: ActionMessage| {
-          if let Some(message) = message.data {
+      let client_clone = client.clone();
+      spawn_local(async move {
+        while let Some(msg) = client_clone.borrow_mut().receiver.next().await {
+          if let Ok(ResponseMessage::Action(ActionMessage {
+            data: Some(message),
+            ..
+          })) = serde_json::from_str::<ResponseMessage>(&msg)
+          {
             match message {
               Data::Client(info) => {
+                client_clone.borrow_mut().user.uuid = info.uuid.clone();
                 setter_clone(info.into());
               }
               Data::ClientList(list) => {
@@ -37,7 +45,9 @@ pub fn use_client_init() {
               }
             }
           }
-        }));
+        }
+      });
+      client.borrow_mut().get_init_info();
     }
   })
 }
