@@ -10,14 +10,14 @@ fake = []
 
 [dependencies]
 async-broadcast = {workspace = true}
-base64 = "0.21.5"
+base64 = "0.21.7"
 bounce = "0.9.0"
 chrono = "0.4.31"
 derivative = "2.2.0"
 fake = {version = "2.9.2", features = ["derive", "uuid", "chrono"]}
 futures = {workspace = true}
 futures-channel = "0.3.30"
-getrandom = {version = "0.2.11", features = ["js"]}
+getrandom = {version = "0.2.12", features = ["js"]}
 gloo-console = {workspace = true}
 gloo-events = "0.2.0"
 gloo-net = {workspace = true}
@@ -25,7 +25,7 @@ gloo-render = "0.2.0"
 gloo-timers = "0.3.0"
 gloo-utils = "0.2.0"
 indexmap = "2.1.0"
-js-sys = "0.3.66"
+js-sys = "0.3.67"
 message = {path = "../message"}
 nanoid = {workspace = true}
 pinyin = "0.10.0"
@@ -34,9 +34,9 @@ serde = {workspace = true, features = ["derive"]}
 serde_json = {workspace = true}
 stylist = {version = "0.13.0", features = ["yew_integration"]}
 unicode-segmentation = "1.10.1"
-wasm-bindgen = "0.2.89"
-wasm-bindgen-futures = "0.4.39"
-web-sys = {version = "0.3.66", features = [
+wasm-bindgen = "0.2.90"
+wasm-bindgen-futures = "0.4.40"
+web-sys = {version = "0.3.67", features = [
   "Document",
   "Element",
   "Window",

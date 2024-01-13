@@ -17,9 +17,10 @@ use crate::{
   utils::{Link, SDP_SERVER},
 };
 
+use super::query_selector;
+
 pub struct Client {
   pub user: User,
-  ws: WebSocket,
   this: Option<Rc<RefCell<Self>>>,
   links: Rc<RefCell<HashMap<String, Link>>>,
   sender: Sender<String>,
@@ -28,34 +29,34 @@ pub struct Client {
 
 impl Client {
   pub fn new(user: User) -> Rc<RefCell<Self>> {
-    let ws = WebSocket::open(SDP_SERVER).unwrap();
     let (sender, receiver) = broadcast(10);
     let client = Rc::new(RefCell::new(Client {
       user,
-      ws,
       links: Rc::new(RefCell::new(HashMap::new())),
       sender,
       receiver,
       this: None,
     }));
     client.borrow_mut().this = Some(client.clone());
+    client.borrow_mut().setup();
     client
   }
 
   fn setup(&self) {
-    let links = self.links.clone();
+    let ws = WebSocket::open(SDP_SERVER).unwrap();
+    let (mut write, mut read) = ws.split();
+    let client = self.this.clone().unwrap().clone();
     let sender = self.sender.clone();
-    let (mut write, mut read) = self.ws.split();
     spawn_local(async move {
       while let Some(msg) = read.next().await {
         match msg {
           Ok(msg) => {
             if let Message::Text(msg) = msg {
+              client.borrow_mut().parse_action(&msg);
+              client.borrow_mut().parse_signal(&msg);
+              client.borrow_mut().parse_media(&msg);
+              client.borrow_mut().parse_connect(&msg);
               sender.broadcast(msg);
-              self.parse_action(msg);
-              self.parse_signal(msg);
-              self.parse_media(msg);
-              self.parse_connect(msg);
             }
           }
           Err(_) => todo!(),
@@ -63,21 +64,22 @@ impl Client {
       }
       log!("WebSocket Closed")
     });
+    let mut receiver = self.receiver.clone();
     spawn_local(async move {
-      while let Some(msg) = self.receiver.next().await {
+      while let Some(msg) = receiver.next().await {
         write.send(Message::Text(msg));
       }
     });
   }
 
-  fn parse_action(&self, message: String) {}
-  fn parse_connect(&self, message: String) {
+  fn parse_action(&self, _message: &str) {}
+  fn parse_connect(&self, message: &str) {
     let links = self.links.clone();
     match serde_json::from_str::<ResponseMessage>(&message) {
       Ok(msg) => {
         if let ResponseMessage::Connect(message) = msg {
-          let ConnectMessage { from, .. } = message;
-          let link = Link::new(from).unwrap();
+          let ConnectMessage { from, .. } = &message;
+          let link = Link::new(from.to_string()).unwrap();
           log!("receive call");
           links.borrow_mut().insert(from.to_string(), link);
         }
@@ -86,17 +88,17 @@ impl Client {
     }
   }
 
-  fn parse_signal(&self, message: String) {
-    let links = self.links.clone();
+  fn parse_signal(&self, message: &str) {
+    let _links = self.links.clone();
     match serde_json::from_str::<ResponseMessage>(&message) {
-      Ok(msg) => if let ResponseMessage::Signal(message) = msg {},
+      Ok(msg) => if let ResponseMessage::Signal(_message) = msg {},
       Err(_) => todo!(),
     }
   }
-  fn parse_media(&self, message: String) {
-    let links = self.links.clone();
+  fn parse_media(&self, message: &str) {
+    let _links = self.links.clone();
     match serde_json::from_str::<ResponseMessage>(&message) {
-      Ok(msg) => if let ResponseMessage::Media(message) = msg {},
+      Ok(msg) => if let ResponseMessage::Media(_message) = msg {},
       Err(_) => todo!(),
     }
   }
@@ -133,7 +135,9 @@ impl Client {
     });
     let message = serde_json::to_string(&message).unwrap();
     self.sender.broadcast(message);
-
+    let dom = query_selector(".local-stream");
+    log!("local stream", dom.clone());
+    link.set_local_user_media(dom);
     self.links.borrow_mut().insert(to.to_string(), link);
 
     let message = RequestMessage::Signal(SignalMessage {

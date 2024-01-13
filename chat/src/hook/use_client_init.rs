@@ -37,7 +37,7 @@ pub fn use_client_init() {
               Data::ClientList(list) => {
                 users_setter(Users(list.into_iter().map(|x| x.into()).collect()));
               }
-              Data::RoomList(list) => todo!(),
+              Data::RoomList(_list) => todo!(),
               Data::ListMessage(list_message) => {
                 let ListMessage { client_list, .. } = list_message;
                 log!("user_list", format!("{:?}", client_list));

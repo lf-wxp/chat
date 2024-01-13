@@ -13,7 +13,7 @@ use crate::{
 pub fn UserList() -> Html {
   let class_name = get_class_name();
   let users = use_selector_value::<Users>();
-  let user = use_atom_value::<User>();
+  let _user = use_atom_value::<User>();
   let call = use_client();
   let filter_word = use_atom_value::<FilterWord>();
 
@@ -28,7 +28,7 @@ pub fn UserList() -> Html {
     },
   ];
   let call_clone = call.clone();
-  let onclick = Callback::from(move |(user, call_type): (User, String)| {
+  let onclick = Callback::from(move |(user, _call_type): (User, String)| {
     let call_clone = call_clone.clone();
     call_clone(user.uuid);
   });

@@ -51,13 +51,13 @@ impl Link {
   }
 
   fn onicecandidate(&self, ev: RtcPeerConnectionIceEvent) -> Option<String> {
-    ev.candidate().and_then(|candidate| {
+    ev.candidate().map(|candidate| {
       let json_candidate = JSON::stringify(&candidate.to_json())
         .unwrap()
         .as_string()
         .unwrap();
       log!("onicecandidate", &json_candidate);
-      Some(json_candidate)
+      json_candidate
     })
   }
 

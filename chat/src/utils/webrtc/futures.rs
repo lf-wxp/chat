@@ -5,15 +5,14 @@ use std::{
   task::{Context, Poll, Waker},
 };
 
-use futures::{channel::mpsc, ready, Sink, SinkExt, Stream, StreamExt};
+use futures::{channel::mpsc, ready, Sink, Stream, StreamExt};
 use futures_channel::mpsc::TrySendError;
-use gloo_console::log;
+
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
-use wasm_bindgen_futures::{spawn_local, JsFuture};
+
 use web_sys::{
-  HtmlMediaElement, MediaStream, RtcDataChannel, RtcDataChannelEvent, RtcIceCandidate,
-  RtcIceConnectionState, RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType,
-  RtcSessionDescriptionInit, RtcTrackEvent, MessageEvent,
+  RtcDataChannel, RtcDataChannelEvent,
+  RtcIceConnectionState, RtcPeerConnection, RtcPeerConnectionIceEvent, RtcTrackEvent, MessageEvent,
 };
 
 use crate::bind_event;

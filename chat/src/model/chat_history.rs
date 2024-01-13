@@ -1,5 +1,5 @@
 use chrono::prelude::*;
-use fake::{faker::chrono::zh_cn::DateTime, uuid::UUIDv1, Dummy, Fake, Faker};
+use fake::{faker::chrono::zh_cn::DateTime, uuid::UUIDv1, Dummy, Faker, Fake};
 use nanoid::nanoid;
 use std::collections::HashMap;
 

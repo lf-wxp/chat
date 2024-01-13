@@ -8,7 +8,7 @@ use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
   window, AudioBuffer, AudioContext, Blob, BlobPropertyBag, Document, Event, FileReader,
-  HtmlTextAreaElement, MediaStream, MediaStreamConstraints, Url, Window, HtmlElement,
+  HtmlTextAreaElement, MediaStream, MediaStreamConstraints, Url, Window,
 };
 use yew::{
   virtual_dom::{ApplyAttributeAs, Attributes, VNode},
