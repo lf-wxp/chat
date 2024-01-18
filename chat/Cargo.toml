@@ -9,7 +9,6 @@ fake = []
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-broadcast = {workspace = true}
 base64 = "0.21.7"
 bounce = "0.9.0"
 chrono = "0.4.31"
@@ -29,6 +28,7 @@ js-sys = "0.3.67"
 message = {path = "../message"}
 nanoid = {workspace = true}
 pinyin = "0.10.0"
+postage = {version = "0.5.0", features = ["futures-traits"]}
 rand = "0.8.5"
 serde = {workspace = true, features = ["derive"]}
 serde_json = {workspace = true}

@@ -1,13 +1,15 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use async_broadcast::{broadcast, Receiver, Sender};
 use futures::{SinkExt, StreamExt};
 use gloo_console::log;
 use gloo_net::websocket::{futures::WebSocket, Message};
 use message::{
-  Action, CastMessage, ClientAction, ConnectMessage,
-  GetInfo, MediaMessage, MediaType, RequestMessage, ResponseMessage,
-  SdpMessage, SdpType, SignalMessage,
+  Action, CastMessage, ClientAction, ConnectMessage, GetInfo, MediaMessage, MediaType,
+  RequestMessage, ResponseMessage, SdpMessage, SdpType, SignalMessage,
+};
+use postage::{
+  broadcast::{self, Receiver, Sender},
+  sink::Sink,
 };
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
@@ -29,7 +31,7 @@ pub struct Client {
 
 impl Client {
   pub fn new(user: User) -> Rc<RefCell<Self>> {
-    let (sender, receiver) = broadcast(10);
+    let (sender, receiver) = broadcast::channel(10);
     let client = Rc::new(RefCell::new(Client {
       user,
       links: Rc::new(RefCell::new(HashMap::new())),
@@ -46,7 +48,7 @@ impl Client {
     let ws = WebSocket::open(SDP_SERVER).unwrap();
     let (mut write, mut read) = ws.split();
     let client = self.this.clone().unwrap().clone();
-    let sender = self.sender.clone();
+    let mut sender = self.sender.clone();
     spawn_local(async move {
       while let Some(msg) = read.next().await {
         match msg {
@@ -56,7 +58,7 @@ impl Client {
               client.borrow_mut().parse_signal(&msg);
               client.borrow_mut().parse_media(&msg);
               client.borrow_mut().parse_connect(&msg);
-              sender.broadcast(msg);
+              let _ = sender.blocking_send(msg);
             }
           }
           Err(_) => todo!(),
@@ -67,7 +69,7 @@ impl Client {
     let mut receiver = self.receiver.clone();
     spawn_local(async move {
       while let Some(msg) = receiver.next().await {
-        write.send(Message::Text(msg));
+        let _ = write.send(Message::Text(msg));
       }
     });
   }
@@ -103,10 +105,10 @@ impl Client {
     }
   }
 
-  pub fn get_init_info(&self) {
+  pub fn get_init_info(&mut self) {
     let message = RequestMessage::Action(Action::Client(ClientAction::GetInfo(GetInfo)));
     let message = serde_json::to_string(&message).unwrap();
-    self.sender.broadcast(message);
+    let _ = self.sender.blocking_send(message);
   }
 
   pub fn user(&self) -> User {
@@ -122,7 +124,7 @@ impl Client {
       confirm: None,
     });
     let message = serde_json::to_string(&message).unwrap();
-    self.sender.broadcast(message);
+    self.sender.blocking_send(message);
   }
 
   pub async fn request_connect(&mut self, to: String) -> Result<(), JsValue> {
@@ -134,10 +136,10 @@ impl Client {
       to: to.clone(),
     });
     let message = serde_json::to_string(&message).unwrap();
-    self.sender.broadcast(message);
+    let _ = self.sender.send(message).await;
     let dom = query_selector(".local-stream");
     log!("local stream", dom.clone());
-    link.set_local_user_media(dom);
+    let _ = link.set_local_user_media(dom).await;
     self.links.borrow_mut().insert(to.to_string(), link);
 
     let message = RequestMessage::Signal(SignalMessage {
@@ -149,7 +151,7 @@ impl Client {
       }),
     });
     let message = serde_json::to_string(&message).unwrap();
-    self.sender.broadcast(message);
+    let _ = self.sender.send(message).await;
     Ok(())
   }
 }
