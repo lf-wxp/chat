@@ -1,7 +1,7 @@
+use nanoid::nanoid;
 use std::net::SocketAddr;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_tungstenite::tungstenite::Message;
-use nanoid::nanoid;
 
 use crate::get_client_id;
 
@@ -17,7 +17,7 @@ pub struct Client {
 impl Client {
   pub fn new(addr: SocketAddr, name: Option<String>, tx: Tx) -> Client {
     let name = name.unwrap_or(nanoid!());
-    let id =get_client_id().to_string(); 
+    let id = get_client_id().to_string();
     Client {
       // uuid: format!("{}-{}", addr, name),
       uuid: id.clone(),
@@ -36,11 +36,10 @@ impl Client {
 
 impl From<&Client> for message::Client {
   fn from(client: &Client) -> Self {
-    let Client {uuid, name, tx: _ } = client;
-    message::Client { name: name.to_string(), uuid: uuid.to_string() }
+    let Client { uuid, name, tx: _ } = client;
+    message::Client {
+      name: name.to_string(),
+      uuid: uuid.to_string(),
+    }
   }
 }
-
-
-
-

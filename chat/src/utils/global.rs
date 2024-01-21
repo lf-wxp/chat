@@ -6,7 +6,7 @@ pub const IMAGE_FILE_SIZE: f64 = 10f64; // mb
 
 static mut CHAT_HISTORY: OnceCell<ChatHistory> = OnceCell::new();
 
-static mut CLIENT: OnceCell<Rc<RefCell<Client>>> = OnceCell::new();
+static mut CLIENT: OnceCell<Client> = OnceCell::new();
 
 pub fn get_chat_history() -> Option<&'static mut ChatHistory> {
   unsafe {
@@ -21,7 +21,7 @@ pub fn set_client() {
   }
 }
 
-pub fn get_client() -> Option<&'static mut Rc<RefCell<Client>>> {
+pub fn get_client() -> Option<&'static mut Client> {
   unsafe {
     CLIENT.get_or_init(|| Client::new(User::default()));
     CLIENT.get_mut()

@@ -19,11 +19,13 @@ pub fn use_client_init() {
 
   use_effect_with((), move |_| {
     if let Some(client) = get_client() {
-      user_setter(client.borrow_mut().user());
+      user_setter(client.user());
       let setter_clone = user_setter.clone();
-      let client_clone = client.clone();
+      let mut receiver = client.receiver();
+      let client_clone = client;
       spawn_local(async move {
-        while let Some(msg) = client_clone.borrow_mut().receiver.next().await {
+        while let Some(msg) = receiver.next().await {
+          log!("read_receiver msg", format!("{:}", &msg));
           if let Ok(ResponseMessage::Action(ActionMessage {
             data: Some(message),
             ..
@@ -31,7 +33,7 @@ pub fn use_client_init() {
           {
             match message {
               Data::Client(info) => {
-                client_clone.borrow_mut().user.uuid = info.uuid.clone();
+                client_clone.user.uuid = info.uuid.clone();
                 setter_clone(info.into());
               }
               Data::ClientList(list) => {
@@ -47,7 +49,9 @@ pub fn use_client_init() {
           }
         }
       });
-      client.borrow_mut().get_init_info();
+    }
+    if let Some(client) = get_client() {
+      client.get_init_info();
     }
   })
 }
