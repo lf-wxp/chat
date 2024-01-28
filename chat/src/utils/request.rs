@@ -1,10 +1,10 @@
 use std::{
-  pin::Pin,
-  task::{Context, Poll},
+  pin::Pin, task::{Context, Poll}, time::Duration
 };
 
 use futures::{ready, Future, StreamExt};
 use gloo_console::log;
+use gloo_timers::future::sleep;
 use message::{
   MessageType, RequestMessage, RequestMessageData, ResponseMessage, ResponseMessageData,
 };
@@ -13,6 +13,7 @@ use postage::{
   broadcast::{Receiver, Sender},
   sink::Sink,
 };
+use wasm_bindgen_futures::spawn_local;
 
 pub struct Request {
   sender: Sender<String>,
@@ -33,7 +34,11 @@ impl Request {
       message_type: MessageType::Request,
     })
     .unwrap();
-    let _ = self.sender.blocking_send(message);
+    let mut sender = self.sender.clone();
+    spawn_local(async move {
+      sleep(Duration::from_secs(3)).await;
+      let _ = sender.blocking_send(message);
+    });
     RequestFuture::new(session_id, receiver)
   }
 }

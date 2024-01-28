@@ -11,7 +11,7 @@ fake = []
 [dependencies]
 base64 = "0.21.7"
 bounce = "0.9.0"
-chrono = "0.4.31"
+chrono = "0.4.33"
 derivative = "2.2.0"
 fake = {version = "2.9.2", features = ["derive", "uuid", "chrono"]}
 futures = {workspace = true}

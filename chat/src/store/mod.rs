@@ -6,6 +6,7 @@ pub mod filter_word;
 pub mod chat;
 pub mod refresh;
 pub mod history_message;
+pub mod client;
 
 pub use theme::*;
 pub use user::*;
@@ -14,3 +15,4 @@ pub use filter_word::*;
 pub use chat::*;
 pub use refresh::*;
 pub use history_message::*;
+pub use client::*;

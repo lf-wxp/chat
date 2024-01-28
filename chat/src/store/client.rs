@@ -1,5 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
+use bounce::Atom;
 use futures::{SinkExt, StreamExt};
 use gloo_console::log;
 use gloo_net::websocket::{futures::WebSocket, Message};
@@ -62,6 +63,8 @@ async fn parse_media(sender: &mut Sender<String>, message: &str) {
     Err(_) => todo!(),
   }
 }
+
+#[derive(Atom, Clone)]
 pub struct Client {
   pub user: User,
   links: Rc<RefCell<HashMap<String, Link>>>,
@@ -69,6 +72,18 @@ pub struct Client {
   read_receiver: Receiver<String>,
   write_sender: Sender<String>,
   write_receiver: Receiver<String>,
+}
+
+impl PartialEq for Client {
+  fn eq(&self, other: &Self) -> bool {
+    self.user == other.user
+  }
+}
+
+impl Default for Client {
+  fn default() -> Self {
+    Client::new(User::default())
+  }
 }
 
 impl Client {
