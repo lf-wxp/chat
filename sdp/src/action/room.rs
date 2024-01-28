@@ -1,11 +1,11 @@
 use message::{
-  ActionMessage, CreateRoom, Data, ListRoom, RemoveRoom, ResponseMessage, Room, RoomAction, State,
+  ActionMessage, CreateRoom, ListRoom, RemoveRoom, ResponseMessage, Room, RoomAction, State,
 };
 
 use crate::{action::ResponseExecute, data::get_room_map};
 
 impl ResponseExecute for CreateRoom {
-  fn execute(&self) -> ResponseMessage {
+  fn execute(&self, session_id: String) -> ResponseMessage {
     let room = Room::new(
       self.name.to_owned(),
       self.desc.to_owned(),
@@ -14,19 +14,19 @@ impl ResponseExecute for CreateRoom {
     match get_room_map() {
       Some(map) => {
         map.insert(room.uuid(), room);
-        ActionMessage::to_resp_msg(State::Success, "success".to_owned(), None)
+        ActionMessage::to_resp_msg(session_id, ActionMessage::Success)
       }
-      None => ActionMessage::to_resp_msg(State::Error, "create room error".to_owned(), None),
+      None => ActionMessage::to_resp_msg(session_id, ActionMessage::Error),
     }
   }
 }
 
 impl ResponseExecute for RemoveRoom {
-  fn execute(&self) -> ResponseMessage {
-    let error = ActionMessage::to_resp_msg(State::Error, "remove room error".to_owned(), None);
+  fn execute(&self, session_id: String) -> ResponseMessage {
+    let error = ActionMessage::to_resp_msg(session_id.clone(), ActionMessage::Error);
     match get_room_map() {
       Some(map) => map.remove(&self.uuid).map_or(error.clone(), |_| {
-        ActionMessage::to_resp_msg(State::Success, "success".to_owned(), None)
+        ActionMessage::to_resp_msg(session_id, ActionMessage::Success)
       }),
       None => error,
     }
@@ -34,27 +34,23 @@ impl ResponseExecute for RemoveRoom {
 }
 
 impl ResponseExecute for ListRoom {
-  fn execute(&self) -> ResponseMessage {
+  fn execute(&self, session_id: String) -> ResponseMessage {
     match get_room_map() {
       Some(map) => {
         let list = map.values().cloned().collect::<Vec<Room>>();
-        ActionMessage::to_resp_msg(
-          State::Success,
-          "success".to_owned(),
-          Some(Data::RoomList(list)),
-        )
+        ActionMessage::to_resp_msg(session_id, ActionMessage::RoomList(list))
       }
-      None => ActionMessage::to_resp_msg(State::Error, "error list room".to_owned(), None),
+      None => ActionMessage::to_resp_msg(session_id, ActionMessage::Error),
     }
   }
 }
 
 impl ResponseExecute for RoomAction {
-  fn execute(&self) -> ResponseMessage {
+  fn execute(&self, session_id: String) -> ResponseMessage {
     match self {
-      RoomAction::Create(create_room) => create_room.execute(),
-      RoomAction::Remove(remove_room) => remove_room.execute(),
-      RoomAction::List(list_room) => list_room.execute(),
+      RoomAction::Create(create_room) => create_room.execute(session_id),
+      RoomAction::Remove(remove_room) => remove_room.execute(session_id),
+      RoomAction::List(list_room) => list_room.execute(session_id),
     }
   }
 }

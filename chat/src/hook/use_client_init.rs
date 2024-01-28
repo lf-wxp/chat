@@ -1,8 +1,8 @@
 use bounce::use_atom_setter;
 use futures::StreamExt;
 use gloo_console::log;
-use message::{ActionMessage, ResponseMessage};
-use message::{Data, ListMessage};
+use message::ListMessage;
+use message::{ActionMessage, ResponseMessage, ResponseMessageData};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew::use_effect_with;
@@ -26,25 +26,26 @@ pub fn use_client_init() {
       spawn_local(async move {
         while let Some(msg) = receiver.next().await {
           log!("read_receiver msg", format!("{:}", &msg));
-          if let Ok(ResponseMessage::Action(ActionMessage {
-            data: Some(message),
+          if let Ok(ResponseMessage {
+            message: ResponseMessageData::Action(message),
             ..
-          })) = serde_json::from_str::<ResponseMessage>(&msg)
+          }) = serde_json::from_str::<ResponseMessage>(&msg)
           {
             match message {
-              Data::Client(info) => {
+              ActionMessage::Client(info) => {
                 client_clone.user.uuid = info.uuid.clone();
                 setter_clone(info.into());
               }
-              Data::ClientList(list) => {
+              ActionMessage::ClientList(list) => {
                 users_setter(Users(list.into_iter().map(|x| x.into()).collect()));
               }
-              Data::RoomList(_list) => todo!(),
-              Data::ListMessage(list_message) => {
+              ActionMessage::RoomList(_list) => todo!(),
+              ActionMessage::ListMessage(list_message) => {
                 let ListMessage { client_list, .. } = list_message;
                 log!("user_list", format!("{:?}", client_list));
                 users_setter(Users(client_list.into_iter().map(|x| x.into()).collect()));
               }
+              _ => todo!(),
             }
           }
         }

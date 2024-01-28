@@ -1,4 +1,4 @@
-use message::{MediaMessage, ResponseMessage};
+use message::{MediaMessage, MessageType, ResponseMessage, ResponseMessageData};
 
 use super::{UnicastExecute, UnicastMessage};
 
@@ -7,7 +7,12 @@ impl UnicastMessage for MediaMessage {
   fn get_to(&self) -> String {
     self.to.clone()
   }
-  fn get_message(&self) -> String {
-    serde_json::to_string(&ResponseMessage::Media(self.clone())).unwrap()
+  fn get_message(&self, session_id: String, message_type: MessageType) -> String {
+    serde_json::to_string(&ResponseMessage {
+      session_id,
+      message: ResponseMessageData::Media(self.clone()),
+      message_type,
+    })
+    .unwrap()
   }
 }

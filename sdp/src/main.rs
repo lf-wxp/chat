@@ -68,7 +68,7 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr) {
     client_map.insert(uuid_key.clone(), client);
   }
 
-  ListResponse {}.execute();
+  ListResponse {}.execute("".to_string());
 
   let (sink, stream) = ws_stream.split();
 
@@ -84,13 +84,9 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr) {
           addr,
           msg.to_text().unwrap()
         );
-        message.execute(uuid_key.clone())
+        message.execute(uuid_key.clone(), None)
       }
-      Err(_) => Some(ActionMessage::to_resp_msg(
-        State::Error,
-        "construct".to_owned(),
-        None,
-      )),
+      Err(_) => None,
     };
 
     if let Some(message) = message {

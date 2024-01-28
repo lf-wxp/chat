@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{Client, ClientAction, ResponseMessage, Room, RoomAction};
+use crate::{Client, ClientAction, MessageType, ResponseMessage, ResponseMessageData, Room, RoomAction};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -25,30 +25,20 @@ pub struct ListMessage {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub enum Data {
+pub enum ActionMessage {
   RoomList(Vec<Room>),
   ClientList(Vec<Client>),
   Client(Client),
   ListMessage(ListMessage),
+  Error,
+  Success,
 }
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ActionMessage {
-  pub state: State,
-  pub message: String,
-  pub data: Option<Data>,
-}
-
 impl ActionMessage {
-  pub fn new(state: State, message: String, data: Option<Data>) -> ActionMessage {
-    ActionMessage {
-      state,
-      message,
-      data,
+  pub fn to_resp_msg(session_id: String, message: ActionMessage) -> ResponseMessage {
+    ResponseMessage {
+      session_id,
+      message: ResponseMessageData::Action(message),
+      message_type: MessageType::Response,
     }
-  }
-  pub fn to_resp_msg(state: State, message: String, data: Option<Data>) -> ResponseMessage {
-    ResponseMessage::Action(ActionMessage::new(state, message, data))
   }
 }
