@@ -10,18 +10,18 @@ use web_sys::{
 
 use crate::{model::IceCandidate, utils::{query_selector, get_user_media}};
 
-pub struct Link {
+pub struct RTCLink {
   peer_id: String,
   peer: RtcPeerConnection,
   data_channel: RtcDataChannel,
   remote_media: MediaStream,
 }
 
-impl Link {
+impl RTCLink {
   pub fn new(peer_id: String) -> Result<Self, JsValue> {
     let peer = RtcPeerConnection::new()?;
     let data_channel = peer.create_data_channel("chat");
-    let link = Link {
+    let link = RTCLink {
       peer_id,
       peer,
       data_channel,
@@ -70,14 +70,14 @@ impl Link {
     let offer_sdp = Reflect::get(&offer, &JsValue::from_str("sdp"))?
       .as_string()
       .unwrap();
-    let offer_obj = Link::create_offer(&offer_sdp);
+    let offer_obj = RTCLink::create_offer(&offer_sdp);
     JsFuture::from(self.peer.set_local_description(&offer_obj)).await?;
     log!("send offer");
     Ok(offer_sdp)
   }
 
   pub async fn receive_offer(&self, sdp: String) -> Result<(), JsValue> {
-    let offer_obj = Link::create_offer(&sdp);
+    let offer_obj = RTCLink::create_offer(&sdp);
     JsFuture::from(self.peer.set_remote_description(&offer_obj)).await?;
     log!("receive offer inner");
     Ok(())
@@ -88,14 +88,14 @@ impl Link {
     let answer_sdp = Reflect::get(&answer, &JsValue::from_str("sdp"))?
       .as_string()
       .unwrap();
-    let answer_obj = Link::create_answer(&answer_sdp);
+    let answer_obj = RTCLink::create_answer(&answer_sdp);
     JsFuture::from(self.peer.set_local_description(&answer_obj)).await?;
     log!("send answer");
     Ok(answer_sdp)
   }
 
   pub async fn receive_answer(&self, sdp: String) -> Result<(), JsValue> {
-    let answer_obj = Link::create_answer(&sdp);
+    let answer_obj = RTCLink::create_answer(&sdp);
     JsFuture::from(self.peer.set_remote_description(&answer_obj)).await?;
     log!("receive answer");
     Ok(())

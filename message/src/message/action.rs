@@ -11,9 +11,14 @@ pub enum State {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct ListAction;
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub enum Action {
   Room(RoomAction),
   Client(ClientAction),
+  List(ListAction),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

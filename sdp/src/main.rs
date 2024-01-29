@@ -4,7 +4,7 @@ use futures::{
   future::{self, Either},
   pin_mut, StreamExt, TryStreamExt,
 };
-use message::{ActionMessage, GetInfo, ListResponse, RequestMessage, State};
+use message::RequestMessage;
 use sender_sink::wrappers::UnboundedSenderSink;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::unbounded_channel;
@@ -16,8 +16,6 @@ use tokio_tungstenite::{
     protocol::Message,
   },
 };
-
-use crate::action::{BroadcastExecute, ParamResponseExecute};
 
 static mut CLIENT_ID: OnceCell<i8> = OnceCell::new();
 
@@ -67,8 +65,6 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr) {
   if let Some(client_map) = get_client_map() {
     client_map.insert(uuid_key.clone(), client);
   }
-
-  ListResponse {}.execute("".to_string());
 
   let (sink, stream) = ws_stream.split();
 

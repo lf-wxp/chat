@@ -12,6 +12,7 @@ pub mod wave_recorder;
 pub mod wave_surfer;
 pub mod webrtc;
 pub mod request;
+pub mod link;
 
 pub use client::*;
 pub use config::*;
@@ -24,3 +25,4 @@ pub use wave_recorder::*;
 pub use wave_surfer::*;
 pub use webrtc::*;
 pub use request::*;
+pub use link::*;

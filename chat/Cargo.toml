@@ -13,30 +13,30 @@ base64 = "0.21.7"
 bounce = "0.9.0"
 chrono = "0.4.33"
 derivative = "2.2.0"
-fake = {version = "2.9.2", features = ["derive", "uuid", "chrono"]}
+fake = { version = "2.9.2", features = ["derive", "uuid", "chrono"] }
 futures = {workspace = true}
 futures-channel = "0.3.30"
-getrandom = {version = "0.2.12", features = ["js"]}
+getrandom = { version = "0.2.12", features = ["js"] }
 gloo-console = {workspace = true}
 gloo-events = "0.2.0"
 gloo-net = {workspace = true}
 gloo-render = "0.2.0"
 gloo-timers = "0.3.0"
 gloo-utils = "0.2.0"
-indexmap = "2.1.0"
+indexmap = "2.2.1"
 js-sys = "0.3.67"
 message = {path = "../message"}
 nanoid = {workspace = true}
 pinyin = "0.10.0"
-postage = {version = "0.5.0", features = ["futures-traits"]}
+postage = { version = "0.5.0", features = ["futures-traits"] }
 rand = "0.8.5"
 serde = {workspace = true, features = ["derive"]}
 serde_json = {workspace = true}
-stylist = {version = "0.13.0", features = ["yew_integration"]}
+stylist = { version = "0.13.0", features = ["yew_integration"] }
 unicode-segmentation = "1.10.1"
 wasm-bindgen = "0.2.90"
 wasm-bindgen-futures = "0.4.40"
-web-sys = {version = "0.3.67", features = [
+web-sys = { version = "0.3.67", features = [
   "Document",
   "Element",
   "Window",
@@ -78,11 +78,11 @@ web-sys = {version = "0.3.67", features = [
   "RtcDataChannelEvent",
   "RtcIceConnectionState",
   "RtcIceCandidateInit",
-]}
-yew = {version = "0.21.0", features = ["csr"]}
+] }
+yew = { version = "0.21.0", features = ["csr"] }
 yew-hooks = "0.3.0"
 yew-router = "0.18.0"
-yew_icons = {version = "0.8.0", features = [
+yew_icons = { version = "0.8.0", features = [
   "HeroiconsSolidUserGroup",
   "BootstrapCameraVideoFill",
   "LucideSettings",
@@ -101,4 +101,4 @@ yew_icons = {version = "0.8.0", features = [
   "BootstrapPlayFill",
   "BootstrapSunFill",
   "BootstrapMoonStarsFill",
-]}
+] }

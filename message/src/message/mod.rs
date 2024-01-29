@@ -54,8 +54,3 @@ pub enum ResponseMessageData {
   Media(MediaMessage),
   Signal(SignalMessage),
 }
-
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ListResponse;

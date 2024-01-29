@@ -19,7 +19,7 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::{
   store::User,
-  utils::{query_selector, Link, Request, RequestFuture, SDP_SERVER},
+  utils::{query_selector, RTCLink, Request, RequestFuture, SDP_SERVER},
 };
 
 async fn parse_media(sender: &mut Sender<String>, message: &str) {
@@ -64,7 +64,7 @@ async fn parse_media(sender: &mut Sender<String>, message: &str) {
 }
 pub struct Client {
   pub user: User,
-  links: Rc<RefCell<HashMap<String, Link>>>,
+  links: Rc<RefCell<HashMap<String, RTCLink>>>,
   read_sender: Sender<String>,
   read_receiver: Receiver<String>,
   write_sender: Sender<String>,
@@ -127,7 +127,7 @@ impl Client {
       }) => {
         if let ResponseMessageData::Connect(message) = message {
           let ConnectMessage { from, .. } = &message;
-          let link = Link::new(from.to_string()).unwrap();
+          let link = RTCLink::new(from.to_string()).unwrap();
           log!("receive call");
           links.borrow_mut().insert(from.to_string(), link);
         }
@@ -213,7 +213,7 @@ impl Client {
   }
 
   pub async fn request_connect(&mut self, to: String) -> Result<(), JsValue> {
-    let link = Link::new(to.clone()).unwrap();
+    let link = RTCLink::new(to.clone()).unwrap();
     let offer = &link.get_send_offer().await?;
 
     let message = RequestMessageData::Connect(ConnectMessage {

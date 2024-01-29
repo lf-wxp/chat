@@ -5,7 +5,7 @@ pub mod media;
 pub mod room;
 pub mod signal;
 
-use message::{Action, MessageType, RequestMessage, RequestMessageData, ResponseMessage};
+use message::{Action, ListAction, MessageType, RequestMessage, RequestMessageData, ResponseMessage};
 use tokio_tungstenite::tungstenite::{self, Message};
 
 use crate::data::get_client_map;
@@ -66,6 +66,7 @@ impl ParamResponseExecute for Action {
     match self {
       Action::Room(room_action) => room_action.execute(session_id),
       Action::Client(client_action) => client_action.execute(client_id, session_id),
+      Action::List(list_action) => list_action.execute(session_id),
     }
   }
 }

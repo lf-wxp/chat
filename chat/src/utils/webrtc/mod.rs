@@ -1,7 +1,7 @@
 mod futures;
-mod link;
+mod rtc_link;
 
 #[macro_use]
 mod event;
 
-pub use link::*;
+pub use rtc_link::*;
