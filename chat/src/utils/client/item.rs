@@ -10,9 +10,8 @@ use message::{
   SignalMessage,
 };
 use nanoid::nanoid;
-use postage::{
-  broadcast::{self, Receiver, Sender},
-  sink::Sink,
+use async_broadcast::{
+  broadcast,Receiver, Sender,
 };
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
@@ -55,7 +54,7 @@ async fn parse_media(sender: &mut Sender<String>, message: &str) {
           })
           .unwrap();
           sleep(Duration::from_secs(3)).await;
-          let _ = sender.blocking_send(message);
+          let _ = sender.broadcast_direct(message).await;
         }
       }
     }
@@ -73,8 +72,8 @@ pub struct Client {
 
 impl Client {
   pub fn new(user: User) -> Self {
-    let (read_sender, read_receiver) = broadcast::channel(10);
-    let (write_sender, write_receiver) = broadcast::channel(10);
+    let (read_sender, read_receiver) = broadcast(10);
+    let (write_sender, write_receiver) = broadcast(10);
     let client = Client {
       user,
       links: Rc::new(RefCell::new(HashMap::new())),
@@ -98,7 +97,7 @@ impl Client {
           Ok(msg) => {
             if let Message::Text(msg) = msg {
               log!("broadcast msg receive", &msg);
-              let _ = sender.blocking_send(msg.clone());
+              let _ = sender.broadcast_direct(msg.clone()).await;
               parse_media(&mut write_sender, &msg).await;
             }
           }
@@ -147,7 +146,7 @@ impl Client {
       Err(_) => todo!(),
     }
   }
-  fn parse_media(&mut self, message: &str) {
+  async fn parse_media(&mut self, message: &str) {
     let _links = self.links.clone();
     match serde_json::from_str::<ResponseMessage>(message) {
       Ok(ResponseMessage {
@@ -171,14 +170,14 @@ impl Client {
             confirm: None,
           });
           let message = serde_json::to_string(&message).unwrap();
-          let _ = self.write_sender.blocking_send(message);
+          let _ = self.write_sender.broadcast_direct(message).await;
         }
       }
       Err(_) => todo!(),
     }
   }
 
-  pub fn get_init_info(&mut self) {
+  pub async fn get_init_info(&mut self) {
     let message = RequestMessageData::Action(Action::Client(ClientAction::GetInfo(GetInfo)));
     let message = serde_json::to_string(&RequestMessage {
       session_id: nanoid!(),
@@ -186,7 +185,7 @@ impl Client {
       message_type: MessageType::Request,
     })
     .unwrap();
-    let _ = self.write_sender.blocking_send(message);
+    let _ = self.write_sender.broadcast_direct(message).await;
   }
 
   pub fn user(&self) -> User {
@@ -221,7 +220,7 @@ impl Client {
       to: to.clone(),
     });
     let message = serde_json::to_string(&message).unwrap();
-    let _ = self.write_sender.send(message).await;
+    let _ = self.write_sender.broadcast(message).await;
     let dom = query_selector(".local-stream");
     log!("local stream", dom.clone());
     let _ = link.set_local_user_media(dom).await;
@@ -236,7 +235,7 @@ impl Client {
       }),
     });
     let message = serde_json::to_string(&message).unwrap();
-    let _ = self.write_sender.send(message).await;
+    let _ = self.write_sender.broadcast(message).await;
     Ok(())
   }
 }

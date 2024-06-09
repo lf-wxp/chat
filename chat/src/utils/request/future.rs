@@ -6,7 +6,7 @@ use std::{
 use futures::{ready, Future, StreamExt};
 use gloo_console::log;
 use message::{ResponseMessage, ResponseMessageData};
-use postage::broadcast::Receiver;
+use async_broadcast::Receiver;
 
 pub struct RequestFuture {
   session_id: String,

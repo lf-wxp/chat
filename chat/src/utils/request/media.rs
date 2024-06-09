@@ -1,10 +1,8 @@
+use async_broadcast::{Receiver, Sender};
 use gloo_console::log;
 use message::{MessageType, RequestMessage, RequestMessageData};
 use nanoid::nanoid;
-use postage::{
-  broadcast::{Receiver, Sender},
-  sink::Sink,
-};
+use wasm_bindgen_futures::spawn_local;
 
 use super::RequestFuture;
 
@@ -28,8 +26,10 @@ impl Request {
       message_type: MessageType::Request,
     })
     .unwrap();
-    let mut sender = self.sender.clone();
-    let _ = sender.blocking_send(message);
+    let sender = self.sender.clone();
+    spawn_local(async move {
+      let _ = sender.broadcast_direct(message).await;
+    });
     RequestFuture::new(session_id, receiver)
   }
 }

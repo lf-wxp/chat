@@ -20,9 +20,7 @@ pub fn use_client_init() {
 
   use_effect_with((), move |_| {
     if let Some(link) = get_link() {
-      // user_setter(client.user());
       let setter_clone = user_setter.clone();
-
       let receiver = link.receiver();
       let sender = link.sender();
       spawn_local(async move {
@@ -30,7 +28,7 @@ pub fn use_client_init() {
         let mut request = Request::new(sender, receiver);
         log!("list await start");
         let msg = request.request(message).await;
-        log!("list await ", format!("{:?}", &msg));
+        log!("list await end", format!("{:?}", &msg));
         if let ResponseMessageData::Action(ActionMessage::ListMessage(list_message)) = msg {
           let ListMessage { client_list, .. } = list_message;
           log!("user_list", format!("{:?}", client_list));
