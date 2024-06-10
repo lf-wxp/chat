@@ -23,6 +23,7 @@ pub mod theme_switch;
 pub mod service;
 pub mod video_stream;
 pub mod account;
+pub mod dialog;
 
 pub use text::*;
 pub use background::*;
@@ -49,3 +50,4 @@ pub use theme_switch::*;
 pub use service::*;
 pub use video_stream::*;
 pub use account::*;
+pub use dialog::*;

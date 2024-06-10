@@ -3,7 +3,7 @@ use stylist::{self, style};
 use yew::prelude::*;
 use yew_router::{BrowserRouter, Switch};
 
-use components::{Background, Chat, FakeSet, Side, NotifyProvider, Service};
+use components::{Background, Chat, DialogProvider, FakeSet, NotifyProvider, Service, Side};
 use route::{switch, Route};
 use utils::style;
 
@@ -23,18 +23,20 @@ fn App() -> Html {
     <BrowserRouter>
       <BounceRoot>
         <NotifyProvider>
-          <Service />
-          <FakeSet />
-          <section class={class_name}>
-            <Background />
-            <div class={"side"}>
-              <Side />
-            </div>
-            <div class="content">
-              <Switch<Route> render={switch}/>
-            </div>
-            <Chat />
-          </section>
+          <DialogProvider>
+            <Service />
+            <FakeSet />
+            <section class={class_name}>
+              <Background />
+              <div class={"side"}>
+                <Side />
+              </div>
+              <div class="content">
+                <Switch<Route> render={switch}/>
+              </div>
+              <Chat />
+            </section>
+          </DialogProvider>
         </NotifyProvider>
       </BounceRoot>
     </BrowserRouter>
@@ -66,6 +68,5 @@ fn get_class_name() -> String {
 }
 
 fn main() {
-  // set_client();
   yew::Renderer::<App>::new().render();
 }
