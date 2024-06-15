@@ -60,21 +60,13 @@ impl Reducible for NoticeList {
         Rc::new(NoticeList(notices))
       }
       NoticeAction::Remove(id) => {
-        let idx = self
-          .0
-          .iter()
-          .position(|x| x.id == id)
-          .unwrap_or(usize::MAX);
+        let idx = self.0.iter().position(|x| x.id == id).unwrap_or(usize::MAX);
         let mut notices = self.0.clone();
         notices.remove(idx);
         Rc::new(NoticeList(notices))
       }
       NoticeAction::PreRemove(id) => {
-        let idx = self
-          .0
-          .iter()
-          .position(|x| x.id == id)
-          .unwrap_or(usize::MAX);
+        let idx = self.0.iter().position(|x| x.id == id).unwrap_or(usize::MAX);
         let mut notices = self.0.clone();
         if let Some(notice) = notices.get_mut(idx) {
           notice.state = NoticeState::Perish;

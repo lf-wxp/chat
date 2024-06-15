@@ -24,6 +24,7 @@ pub mod service;
 pub mod video_stream;
 pub mod account;
 pub mod dialog;
+pub mod register;
 
 pub use text::*;
 pub use background::*;
@@ -51,3 +52,4 @@ pub use service::*;
 pub use video_stream::*;
 pub use account::*;
 pub use dialog::*;
+pub use register::*;

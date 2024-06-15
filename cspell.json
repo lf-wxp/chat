@@ -29,6 +29,7 @@
         "onmousedown",
         "onmouseup",
         "onnegotiationneeded",
+        "onpreclose",
         "onresize",
         "onsend",
         "ontrack",

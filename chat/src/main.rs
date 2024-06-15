@@ -3,7 +3,7 @@ use stylist::{self, style};
 use yew::prelude::*;
 use yew_router::{BrowserRouter, Switch};
 
-use components::{Background, Chat, DialogProvider, FakeSet, NotifyProvider, Service, Side};
+use components::{Background, Chat, DialogProvider, FakeSet, NotifyProvider, Service, Side, Register};
 use route::{switch, Route};
 use utils::style;
 
@@ -26,6 +26,7 @@ fn App() -> Html {
           <DialogProvider>
             <Service />
             <FakeSet />
+            <Register />
             <section class={class_name}>
               <Background />
               <div class={"side"}>

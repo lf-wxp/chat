@@ -8,6 +8,8 @@ pub enum DialogAction {
   Append(Dialog),
   Remove(String),
   PreRemove(String),
+  Visible(bool),
+  ClassVisible(bool),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -37,45 +39,51 @@ impl Dialog {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct DialogList(pub Vec<Dialog>);
+pub struct DialogContext {
+  pub list: Vec<Dialog>,
+  pub visible: bool,
+  pub class_visible: bool,
+}
 
-impl Reducible for DialogList {
+impl Reducible for DialogContext {
   type Action = DialogAction;
 
   fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
     match action {
       DialogAction::Append(dialog) => {
-        let mut dialogs = self.0.clone();
-        dialogs.push(dialog);
-        Rc::new(DialogList(dialogs))
+        let mut list = self.list.clone();
+        list.push(dialog);
+        Rc::new(DialogContext { list, ..(*self) })
       }
       DialogAction::Remove(id) => {
-        let idx = self
-          .0
-          .iter()
-          .position(|x| x.id == id)
-          .unwrap_or(usize::MAX);
-        let mut dialogs = self.0.clone();
-        dialogs.remove(idx);
-        Rc::new(DialogList(dialogs))
+        if let Some(idx) = self.list.iter().position(|x| x.id == id) {
+          let mut list = self.list.clone();
+          list.remove(idx);
+          return Rc::new(DialogContext { list, ..(*self) });
+        }
+        self
       }
       DialogAction::PreRemove(id) => {
-        let idx = self
-          .0
-          .iter()
-          .position(|x| x.id == id)
-          .unwrap_or(usize::MAX);
-        let mut dialogs = self.0.clone();
-        if let Some(dialog) = dialogs.get_mut(idx) {
-          dialog.state = DialogState::Perish;
+        if let Some(idx) = self.list.iter().position(|x| x.id == id) {
+          let mut list = self.list.clone();
+          if let Some(dialog) = list.get_mut(idx) {
+            dialog.state = DialogState::Perish;
+          }
+          return Rc::new(DialogContext { list, ..(*self) });
         }
-        Rc::new(DialogList(dialogs))
+        self
       }
+      DialogAction::Visible(visible) => Rc::new(DialogContext {
+        visible,
+        ..(*self).clone()
+      }),
+      DialogAction::ClassVisible(visible) => Rc::new(DialogContext {
+        class_visible: visible,
+        ..(*self).clone()
+      }),
     }
   }
 }
-
-pub type DialogContext = UseReducerHandle<DialogList>;
 
 #[derive(Properties, Debug, PartialEq)]
 pub struct DialogProviderProps {
@@ -85,12 +93,12 @@ pub struct DialogProviderProps {
 
 #[function_component]
 pub fn DialogProvider(props: &DialogProviderProps) -> Html {
-  let dialog = use_reducer(DialogList::default);
+  let dialog = use_reducer(DialogContext::default);
 
   html! {
-    <ContextProvider<DialogContext> context={dialog}>
+    <ContextProvider<UseReducerHandle<DialogContext>> context={dialog}>
       {props.children.clone()}
       <DialogComponent />
-    </ContextProvider<DialogContext>>
+    </ContextProvider<UseReducerHandle<DialogContext>>>
   }
 }
