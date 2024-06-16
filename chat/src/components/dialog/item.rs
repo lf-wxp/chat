@@ -113,7 +113,7 @@ fn get_class_name() -> String {
         .icon {
           margin-inline-start: 5px;
           transition: all 0.2s ease;
-          cursor: point;
+          cursor: pointer;
         }
         .icon:hover {
           background: rgba(var(--theme-color-rgb), 1);

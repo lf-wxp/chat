@@ -13,6 +13,7 @@ pub mod wave_surfer;
 pub mod webrtc;
 pub mod request;
 pub mod link;
+pub mod i18n;
 
 pub use client::*;
 pub use config::*;
@@ -26,3 +27,4 @@ pub use wave_surfer::*;
 pub use webrtc::*;
 pub use request::*;
 pub use link::*;
+pub use i18n::*;

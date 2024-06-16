@@ -25,6 +25,8 @@ pub mod video_stream;
 pub mod account;
 pub mod dialog;
 pub mod register;
+pub mod button;
+pub mod input;
 
 pub use text::*;
 pub use background::*;
@@ -53,3 +55,5 @@ pub use video_stream::*;
 pub use account::*;
 pub use dialog::*;
 pub use register::*;
+pub use button::*;
+pub use input::*;

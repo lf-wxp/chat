@@ -1,11 +1,14 @@
 use bounce::BounceRoot;
 use stylist::{self, style};
 use yew::prelude::*;
+use yew_i18n::I18nProvider;
 use yew_router::{BrowserRouter, Switch};
 
-use components::{Background, Chat, DialogProvider, FakeSet, NotifyProvider, Service, Side, Register};
+use components::{
+  Background, Chat, DialogProvider, FakeSet, NotifyProvider, Register, Service, Side,
+};
 use route::{switch, Route};
-use utils::style;
+use utils::{style, TRANSLATIONS};
 
 mod components;
 mod hook;
@@ -18,27 +21,30 @@ mod utils;
 #[function_component]
 fn App() -> Html {
   let class_name = get_class_name();
+  let supported_languages = vec!["en", "zh"];
 
   html! {
     <BrowserRouter>
       <BounceRoot>
-        <NotifyProvider>
-          <DialogProvider>
-            <Service />
-            <FakeSet />
-            <Register />
-            <section class={class_name}>
-              <Background />
-              <div class={"side"}>
-                <Side />
-              </div>
-              <div class="content">
-                <Switch<Route> render={switch}/>
-              </div>
-              <Chat />
-            </section>
-          </DialogProvider>
-        </NotifyProvider>
+        <I18nProvider supported_languages={supported_languages} translations={TRANSLATIONS.clone()} >
+          <NotifyProvider>
+            <DialogProvider>
+              <Service />
+              <FakeSet />
+              <Register />
+              <section class={class_name}>
+                <Background />
+                <div class={"side"}>
+                  <Side />
+                </div>
+                <div class="content">
+                  <Switch<Route> render={switch}/>
+                </div>
+                <Chat />
+              </section>
+            </DialogProvider>
+          </NotifyProvider>
+        </I18nProvider>
       </BounceRoot>
     </BrowserRouter>
   }

@@ -1,3 +1,5 @@
+use std::fmt::{self, Display, Formatter};
+
 use serde::{Deserialize, Serialize};
 
 pub mod chat_history;
@@ -42,5 +44,24 @@ impl TryFrom<IceCandidate> for RtcIceCandidate {
       .sdp_mid(value.sdp_mid.as_deref())
       .sdp_m_line_index(value.sdp_m_line_index);
     RtcIceCandidate::new(ice_candidate_init)
+  }
+}
+
+#[derive(PartialEq, Default)]
+pub enum Size {
+  Small,
+  #[default]
+  Media,
+  Large,
+}
+
+impl Display for Size {
+  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    let t = match self {
+      Size::Small => "small",
+      Size::Media => "media",
+      Size::Large => "large",
+    };
+    write!(f, "{}", t)
   }
 }

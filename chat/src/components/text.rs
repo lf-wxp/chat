@@ -5,7 +5,7 @@ use yew::{prelude::*, Callback};
 
 use crate::{
   store::{Theme, Volume},
-  utils::style, components::{use_notify, NoticeTag, use_dialog},
+  utils::style, components::{use_notify, NoticeTag, use_dialog, Button},
 };
 
 #[function_component]
@@ -30,8 +30,8 @@ pub fn Text() -> Html {
     <>
       <h1 class={class_name}>{"theme is "}{&theme}</h1>
       <h1>{format!("volume is {:?}", volume_value)}</h1>
-      <button {onclick}>{ "click hello"}</button>
-      <button onclick={ondialog}>{ "click dialog"}</button>
+      <Button {onclick}>{ "click hello"}</Button>
+      <Button onclick={ondialog}>{ "click dialog"}</Button>
     </>
   }
 }

@@ -7,6 +7,7 @@ pub mod use_wave_surfer;
 pub mod use_theme;
 pub mod use_client_init;
 pub mod use_client;
+pub mod use_i18n;
 
 pub use use_movement::*;
 pub use use_click_exclusive::*;
@@ -17,3 +18,4 @@ pub use use_wave_surfer::*;
 pub use use_theme::*;
 pub use use_client_init::*;
 pub use use_client::*;
+pub use use_i18n::*;
