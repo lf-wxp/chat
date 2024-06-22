@@ -11,6 +11,7 @@ lazy_static! {
           "input your name": "Input your name",
           "confirm": "confirm",
           "cancel": "cancel",
+          "user name exist": "user name exist",
       }),
     );
     translations.insert(
@@ -19,6 +20,7 @@ lazy_static! {
           "input your name": "请的输入名称",
           "confirm": "确认",
           "cancel": "取消",
+          "user name exist": "用户名称已存在",
       }),
     );
     translations

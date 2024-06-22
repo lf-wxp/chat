@@ -1,17 +1,15 @@
 use bounce::use_atom_setter;
-use futures::StreamExt;
 use gloo_console::log;
 use message::{
-  Action, ActionMessage, ClientAction, GetInfo, RequestMessageData, ResponseMessage,
-  ResponseMessageData,
+  Action, ActionMessage, ClientAction, GetInfo, RequestMessageData, ResponseMessageData,
 };
 use message::{ListAction, ListMessage};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew::use_effect_with;
 
-use crate::utils::{get_link, Request};
 use crate::store::{User, Users};
+use crate::utils::{get_link, Request};
 
 #[hook]
 pub fn use_client_init() {

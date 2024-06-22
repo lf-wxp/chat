@@ -26,7 +26,7 @@ pub fn get_client() -> Option<&'static mut Client> {
 
 pub fn get_link() -> Option<&'static mut Link> {
   unsafe {
-    LINK.get_or_init(|| Link::new());
+    LINK.get_or_init(Link::new);
     LINK.get_mut()
   }
 }

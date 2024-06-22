@@ -1,24 +1,19 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
-use futures::{SinkExt, StreamExt};
+use async_broadcast::Sender;
 use gloo_console::log;
-use gloo_net::websocket::{futures::WebSocket, Message};
 use gloo_timers::future::sleep;
 use message::{
   Action, CastMessage, ClientAction, ConnectMessage, GetInfo, MediaMessage, MediaType, MessageType,
   RequestMessage, RequestMessageData, ResponseMessage, ResponseMessageData, SdpMessage, SdpType,
-  SignalMessage,
+  SignalMessage, UpdateName,
 };
 use nanoid::nanoid;
-use async_broadcast::{
-  broadcast,Receiver, Sender,
-};
 use wasm_bindgen::JsValue;
-use wasm_bindgen_futures::spawn_local;
 
 use crate::{
   store::User,
-  utils::{query_selector, RTCLink, Request, RequestFuture, SDP_SERVER},
+  utils::{get_link, query_selector, Link, RTCLink, Request, RequestFuture},
 };
 
 async fn parse_media(sender: &mut Sender<String>, message: &str) {
@@ -64,55 +59,18 @@ async fn parse_media(sender: &mut Sender<String>, message: &str) {
 pub struct Client {
   pub user: User,
   links: Rc<RefCell<HashMap<String, RTCLink>>>,
-  read_sender: Sender<String>,
-  read_receiver: Receiver<String>,
-  write_sender: Sender<String>,
-  write_receiver: Receiver<String>,
+  link: &'static mut Link,
 }
 
 impl Client {
   pub fn new(user: User) -> Self {
-    let (read_sender, read_receiver) = broadcast(10);
-    let (write_sender, write_receiver) = broadcast(10);
-    let client = Client {
+    let link = get_link().unwrap();
+
+    Client {
       user,
       links: Rc::new(RefCell::new(HashMap::new())),
-      read_sender,
-      read_receiver,
-      write_sender,
-      write_receiver,
-    };
-    client.setup();
-    client
-  }
-
-  fn setup(&self) {
-    let ws = WebSocket::open(SDP_SERVER).unwrap();
-    let (mut write, mut read) = ws.split();
-    let mut sender = self.read_sender.clone();
-    let mut write_sender = self.write_sender.clone();
-    spawn_local(async move {
-      while let Some(msg) = read.next().await {
-        match msg {
-          Ok(msg) => {
-            if let Message::Text(msg) = msg {
-              log!("broadcast msg receive", &msg);
-              let _ = sender.broadcast_direct(msg.clone()).await;
-              parse_media(&mut write_sender, &msg).await;
-            }
-          }
-          Err(_) => todo!(),
-        }
-      }
-      log!("WebSocket Closed")
-    });
-    let mut receiver = self.write_receiver.clone();
-    spawn_local(async move {
-      while let Some(msg) = receiver.next().await {
-        log!("broadcast msg", &msg);
-        let _ = write.send(Message::Text(msg)).await;
-      }
-    });
+      link,
+    }
   }
 
   fn parse_action(&self, _message: &str) {}
@@ -147,7 +105,6 @@ impl Client {
     }
   }
   async fn parse_media(&mut self, message: &str) {
-    let _links = self.links.clone();
     match serde_json::from_str::<ResponseMessage>(message) {
       Ok(ResponseMessage {
         session_id,
@@ -170,7 +127,7 @@ impl Client {
             confirm: None,
           });
           let message = serde_json::to_string(&message).unwrap();
-          let _ = self.write_sender.broadcast_direct(message).await;
+          let _ = self.link.sender().broadcast_direct(message).await;
         }
       }
       Err(_) => todo!(),
@@ -185,15 +142,20 @@ impl Client {
       message_type: MessageType::Request,
     })
     .unwrap();
-    let _ = self.write_sender.broadcast_direct(message).await;
+    let _ = self.link.sender().broadcast_direct(message).await;
   }
 
   pub fn user(&self) -> User {
     self.user.clone()
   }
 
-  pub fn receiver(&self) -> Receiver<String> {
-    self.read_receiver.clone()
+  pub fn update_name(&mut self, name: String) -> RequestFuture {
+    let message =
+      RequestMessageData::Action(Action::Client(ClientAction::UpdateName(UpdateName {
+        name,
+      })));
+    let mut request = Request::new(self.link.sender(), self.link.receiver());
+    request.request(message)
   }
 
   pub fn request_media(&mut self, to: String, media_type: MediaType) -> RequestFuture {
@@ -204,10 +166,7 @@ impl Client {
       expired: None,
       confirm: None,
     });
-    // let sender = self.write_sender.clone();
-    let sender = self.read_sender.clone();
-    let receiver = self.read_receiver.clone();
-    let mut request = Request::new(sender, receiver);
+    let mut request = Request::new(self.link.sender(), self.link.receiver());
     request.request(message)
   }
 
@@ -220,7 +179,7 @@ impl Client {
       to: to.clone(),
     });
     let message = serde_json::to_string(&message).unwrap();
-    let _ = self.write_sender.broadcast(message).await;
+    let _ = self.link.sender().broadcast(message).await;
     let dom = query_selector(".local-stream");
     log!("local stream", dom.clone());
     let _ = link.set_local_user_media(dom).await;
@@ -235,7 +194,7 @@ impl Client {
       }),
     });
     let message = serde_json::to_string(&message).unwrap();
-    let _ = self.write_sender.broadcast(message).await;
+    let _ = self.link.sender().broadcast(message).await;
     Ok(())
   }
 }

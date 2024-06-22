@@ -4,9 +4,10 @@ use yew::prelude::*;
 
 use crate::{
   components::{Avatar, Dropdown},
+  hook::use_client,
   model::Option,
   store::{FilterWord, User, Users},
-  utils::style, hook::use_client,
+  utils::style,
 };
 
 #[function_component]

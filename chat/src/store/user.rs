@@ -115,6 +115,9 @@ impl Users {
       });
     group
   }
+  pub fn is_exist(&self, name: &str) -> bool {
+    self.0.iter().any(|user| user.name == name)
+  }
 }
 
 impl Default for Users {
