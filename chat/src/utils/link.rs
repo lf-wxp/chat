@@ -1,19 +1,15 @@
+use async_broadcast::{broadcast, Receiver, Sender};
 use futures::{SinkExt, StreamExt};
 use gloo_console::log;
 use gloo_net::websocket::{futures::WebSocket, Message};
-use message::{MessageType, RequestMessage, ResponseMessage, ResponseMessageData};
-use async_broadcast::{
-  broadcast, Sender,Receiver
-};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::utils::SDP_SERVER;
 
+#[derive(Debug)]
 pub struct Link {
-  read_sender: Sender<String>,
-  read_receiver: Receiver<String>,
-  write_sender: Sender<String>,
-  write_receiver: Receiver<String>,
+  receiver: Receiver<String>,
+  sender: Sender<String>,
 }
 
 impl Link {
@@ -40,24 +36,22 @@ impl Link {
     let mut receiver = write_receiver.clone();
     log!("link init");
     spawn_local(async move {
-      while let Some(msg) = receiver.next().await {
+      while let Ok(msg) = receiver.recv().await {
         log!("broadcast msg", &msg);
         let _ = write.send(Message::Text(msg)).await;
       }
     });
     Link {
-      read_sender,
-      read_receiver,
-      write_sender,
-      write_receiver,
+      receiver: read_receiver,
+      sender: write_sender,
     }
   }
 
   pub fn receiver(&self) -> Receiver<String> {
-    self.read_receiver.clone()
+    self.receiver.clone()
   }
 
   pub fn sender(&self) -> Sender<String> {
-    self.write_sender.clone()
+    self.sender.clone()
   }
 }

@@ -10,6 +10,7 @@ use web_sys::{
 
 use crate::{model::IceCandidate, utils::{query_selector, get_user_media}};
 
+#[derive(Debug)]
 pub struct RTCLink {
   peer_id: String,
   peer: RtcPeerConnection,

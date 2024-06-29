@@ -25,7 +25,9 @@ pub fn use_client_init() {
         let message = RequestMessageData::Action(Action::List(ListAction));
         let mut request = Request::new(sender, receiver);
         log!("list await start");
-        let msg = request.request(message).await;
+        let futures = request.feature();
+        request.request(message);
+        let msg =  futures.await;
         log!("list await end", format!("{:?}", &msg));
         if let ResponseMessageData::Action(ActionMessage::ListMessage(list_message)) = msg {
           let ListMessage { client_list, .. } = list_message;
@@ -40,7 +42,9 @@ pub fn use_client_init() {
         let message = RequestMessageData::Action(Action::Client(ClientAction::GetInfo(GetInfo)));
         let mut request = Request::new(sender, receiver);
         log!("info await start");
-        let msg = request.request(message).await;
+        let futures = request.feature();
+        request.request(message);
+        let msg =  futures.await;
         log!("info await ", format!("{:?}", &msg));
         if let ResponseMessageData::Action(ActionMessage::Client(info)) = msg {
           setter_clone(info.into());

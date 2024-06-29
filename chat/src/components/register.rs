@@ -52,6 +52,7 @@ pub fn Register() -> Html {
     let name = (*value).to_string();
     if let Some(client) = get_client() {
       spawn_local(async move {
+        log!("update name");
         client.update_name(name).await;
       })
     }

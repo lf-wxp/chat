@@ -13,7 +13,7 @@ use wasm_bindgen::JsValue;
 
 use crate::{
   store::User,
-  utils::{get_link, query_selector, Link, RTCLink, Request, RequestFuture},
+  utils::{future::RequestFuture, get_link, query_selector, Link, RTCLink, Request},
 };
 
 async fn parse_media(sender: &mut Sender<String>, message: &str) {
@@ -56,6 +56,8 @@ async fn parse_media(sender: &mut Sender<String>, message: &str) {
     Err(_) => todo!(),
   }
 }
+
+#[derive(Debug)]
 pub struct Client {
   pub user: User,
   links: Rc<RefCell<HashMap<String, RTCLink>>>,
@@ -155,7 +157,10 @@ impl Client {
         name,
       })));
     let mut request = Request::new(self.link.sender(), self.link.receiver());
-    request.request(message)
+    let futures = request.feature();
+    log!("update name", format!("{:?}", &message));
+    request.request(message);
+    futures
   }
 
   pub fn request_media(&mut self, to: String, media_type: MediaType) -> RequestFuture {
@@ -167,7 +172,9 @@ impl Client {
       confirm: None,
     });
     let mut request = Request::new(self.link.sender(), self.link.receiver());
-    request.request(message)
+    let futures = request.feature();
+    request.request(message);
+    futures
   }
 
   pub async fn request_connect(&mut self, to: String) -> Result<(), JsValue> {
