@@ -35,7 +35,7 @@ pub enum ActionMessage {
   ClientList(Vec<Client>),
   Client(Client),
   ListMessage(ListMessage),
-  Error,
+  Error(Option<String>),
   Success,
 }
 impl ActionMessage {

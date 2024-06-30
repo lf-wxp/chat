@@ -17,9 +17,9 @@ pub struct Request {
 }
 
 impl Request {
-  pub fn new(sender: Sender<String>, receiver: Receiver<String>) -> Self {
+  pub fn new(sender: Sender<String>,receiver: Receiver<String>) -> Self {
     let session_id = nanoid!();
-    Request { receiver, sender, session_id }
+    Request { sender, session_id, receiver }
   }
 
   pub fn feature(&mut self) -> RequestFuture {
@@ -27,25 +27,17 @@ impl Request {
     RequestFuture::new(self.session_id.clone(), receiver)
   }
   pub fn request(&mut self, message: RequestMessageData) {
-    let session_id = nanoid!();
-    log!("session_id", session_id.clone());
     let message = serde_json::to_string(&RequestMessage {
       message,
-      session_id: session_id.clone(),
+      session_id: self.session_id.clone(),
       message_type: MessageType::Request,
     })
     .unwrap();
     let sender = self.sender.clone();
     spawn_local(async move {
       log!("send message before", message.clone());
-      match sender.broadcast_direct(message).await {
-        Ok(_) => {
-          log!("send message after");
-        },
-        Err(_) =>  {
-          log!("send message after error");
-        }
-      }
+      let _ = sender.broadcast_direct(message).await;
+      log!("send message after");
     });
   }
 }

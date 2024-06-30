@@ -1,9 +1,10 @@
-use bounce::{use_atom_value, use_selector_value};
+use bounce::{use_atom, use_selector_value};
 use gloo_console::log;
 use stylist::{self, style};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew_hooks::use_effect_once;
+use message::{ActionMessage, ResponseMessageData::Action};
 
 use crate::{
   components::{use_notify, Button, DialogPortal, Input, NoticeTag},
@@ -16,18 +17,11 @@ use crate::{
 pub fn Register() -> Html {
   let class_name = get_class_name();
   let users = use_selector_value::<Users>();
-  let current_user = use_atom_value::<User>();
+  let user = use_atom::<User>();
   let notify = use_notify();
-  let value = use_state(|| "");
+  let value = use_state(|| "".to_string());
   let visible = use_state(|| false);
   let i18n = use_i18n();
-  let get_name = |name: String| {
-    if name == current_user.name {
-      None
-    } else {
-      Some(name)
-    }
-  };
   let visible_clone = visible.clone();
   use_effect_once(move || {
     visible_clone.set(true);
@@ -43,25 +37,42 @@ pub fn Register() -> Html {
   let confirm_text = i18n.t("confirm");
   let cancel_text = i18n.t("cancel");
 
-  let confirm = Callback::from(move |_| {
-    let is_exist = users.is_exist(*value);
+  let visible_clone = visible.clone();
+  let value_clone = value.clone();
+  let confirm = use_callback(value.clone(), move |_, value| {
+    let is_exist = users.is_exist(value);
     if is_exist {
       notify(i18n.t("user name exist"), NoticeTag::Warning, None);
       return;
     }
     let name = (*value).to_string();
+    let user = user.clone();
+    let visible_clone = visible_clone.clone();
+    let value_clone = value_clone.clone();
     if let Some(client) = get_client() {
       spawn_local(async move {
-        log!("update name");
-        client.update_name(name).await;
+        if let Action(ActionMessage::Success) = client.update_name(name.clone()).await {
+          user.set(User {
+            name,
+            uuid: user.uuid.clone(),
+          });
+          value_clone.set("".to_string());
+          visible_clone.set(false);
+          log!("update user name");
+        }
       })
     }
+  });
+
+  let value_clone = value.clone();
+  let onchange = Callback::from(move |val: String| {
+    value_clone.set(val);
   });
 
   html! {
     <DialogPortal  visible={*visible} onclose={onclose} {header}>
       <div class={class_name}>
-        <Input />
+        <Input value={(*value).clone()} {onchange} />
         <div class="button">
           <Button>
           { cancel_text}

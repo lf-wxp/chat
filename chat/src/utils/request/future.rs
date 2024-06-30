@@ -3,10 +3,10 @@ use std::{
   task::{Context, Poll},
 };
 
-use futures::{ready, Future, StreamExt};
+use async_broadcast::Receiver;
+use futures::{ready, Future, StreamExt };
 use gloo_console::log;
 use message::{ResponseMessage, ResponseMessageData};
-use async_broadcast::Receiver;
 
 pub struct RequestFuture {
   session_id: String,
@@ -30,20 +30,29 @@ impl Future for RequestFuture {
     log!("poll before", &this.session_id);
     let msg = ready!(this.receiver.poll_next_unpin(cx));
     if let Some(msg) = msg {
+      log!("poll  after ", format!("{:?}", &msg));
       match serde_json::from_str::<ResponseMessage>(&msg) {
         Ok(ResponseMessage {
           message,
           session_id,
           ..
         }) => {
-          log!("poll xxx", &session_id, &this.session_id, format!("{:?}", &msg));
+          log!(
+            "poll xxx",
+            &session_id,
+            &this.session_id,
+            format!("{:?}", &msg)
+          );
           if session_id == this.session_id {
             log!("poll  after ", format!("{:?}", &message));
             return Poll::Ready(message);
           }
           return Poll::Pending;
         }
-        Err(_) => return Poll::Pending,
+        Err(err) => {
+          log!("poll error", format!("{:?}", err));
+          return Poll::Pending;
+        },
       }
     }
     Poll::Pending

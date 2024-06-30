@@ -19,8 +19,8 @@ pub fn use_client_init() {
   use_effect_with((), move |_| {
     if let Some(link) = get_link() {
       let setter_clone = user_setter.clone();
-      let receiver = link.receiver();
       let sender = link.sender();
+      let receiver = link.receiver();
       spawn_local(async move {
         let message = RequestMessageData::Action(Action::List(ListAction));
         let mut request = Request::new(sender, receiver);
@@ -36,8 +36,8 @@ pub fn use_client_init() {
         }
       });
 
-      let receiver = link.receiver();
       let sender = link.sender();
+      let receiver = link.receiver();
       spawn_local(async move {
         let message = RequestMessageData::Action(Action::Client(ClientAction::GetInfo(GetInfo)));
         let mut request = Request::new(sender, receiver);

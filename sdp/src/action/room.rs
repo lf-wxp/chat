@@ -16,14 +16,14 @@ impl ResponseExecute for CreateRoom {
         map.insert(room.uuid(), room);
         ActionMessage::to_resp_msg(session_id, ActionMessage::Success)
       }
-      None => ActionMessage::to_resp_msg(session_id, ActionMessage::Error),
+      None => ActionMessage::to_resp_msg(session_id, ActionMessage::Error(None)),
     }
   }
 }
 
 impl ResponseExecute for RemoveRoom {
   fn execute(&self, session_id: String) -> ResponseMessage {
-    let error = ActionMessage::to_resp_msg(session_id.clone(), ActionMessage::Error);
+    let error = ActionMessage::to_resp_msg(session_id.clone(), ActionMessage::Error(None));
     match get_room_map() {
       Some(map) => map.remove(&self.uuid).map_or(error.clone(), |_| {
         ActionMessage::to_resp_msg(session_id, ActionMessage::Success)
@@ -40,7 +40,7 @@ impl ResponseExecute for ListRoom {
         let list = map.values().cloned().collect::<Vec<Room>>();
         ActionMessage::to_resp_msg(session_id, ActionMessage::RoomList(list))
       }
-      None => ActionMessage::to_resp_msg(session_id, ActionMessage::Error),
+      None => ActionMessage::to_resp_msg(session_id, ActionMessage::Error(None)),
     }
   }
 }

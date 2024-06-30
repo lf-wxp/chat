@@ -158,7 +158,6 @@ impl Client {
       })));
     let mut request = Request::new(self.link.sender(), self.link.receiver());
     let futures = request.feature();
-    log!("update name", format!("{:?}", &message));
     request.request(message);
     futures
   }

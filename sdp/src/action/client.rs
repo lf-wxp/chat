@@ -3,24 +3,28 @@ use message::{
 };
 
 use crate::{
-  action::ParamResponseExecute,
-  action::{BroadcastExecute, BroadcastMessage},
-  data::get_client_map,
+  action::{BroadcastExecute, BroadcastMessage, ParamResponseExecute},
+  data::{get_client_list, get_client_map},
   msg_try_into,
 };
 
 impl ParamResponseExecute for UpdateName {
   fn execute(&self, client_id: String, session_id: String) -> ResponseMessage {
     let id = session_id.clone();
+    let client_list = get_client_list();
+    let is_name_exist = client_list.iter().any(|item| item.name == self.name);
+    if is_name_exist {
+      return ActionMessage::to_resp_msg(session_id, ActionMessage::Error(Some("name exists".to_string())));
+    }
     let message = match get_client_map() {
       Some(map) => match map.get_mut(&client_id) {
         Some(client) => {
           client.update_name(self.name.clone());
           ActionMessage::to_resp_msg(session_id, ActionMessage::Success)
         }
-        None => ActionMessage::to_resp_msg(session_id, ActionMessage::Error),
+        None => ActionMessage::to_resp_msg(session_id, ActionMessage::Error(None)),
       },
-      None => ActionMessage::to_resp_msg(session_id, ActionMessage::Error),
+      None => ActionMessage::to_resp_msg(session_id, ActionMessage::Error(None)),
     };
     BroadcastExecute::execute(&ListClient {}, id);
     message
@@ -34,7 +38,7 @@ impl ParamResponseExecute for ListClient {
         let list = map.values().map(Client::from).collect::<Vec<Client>>();
         ActionMessage::to_resp_msg(session_id, ActionMessage::ClientList(list))
       }
-      None => ActionMessage::to_resp_msg(session_id, ActionMessage::Error),
+      None => ActionMessage::to_resp_msg(session_id, ActionMessage::Error(None)),
     }
   }
 }
@@ -46,7 +50,7 @@ impl BroadcastMessage for ListClient {
         let list = map.values().map(Client::from).collect::<Vec<Client>>();
         ActionMessage::to_resp_msg(session_id, ActionMessage::ClientList(list))
       }
-      None => ActionMessage::to_resp_msg(session_id, ActionMessage::Error),
+      None => ActionMessage::to_resp_msg(session_id, ActionMessage::Error(None)),
     };
     msg_try_into(message).unwrap().to_string()
   }
@@ -62,9 +66,9 @@ impl ParamResponseExecute for GetInfo {
             ActionMessage::Client(Client::from(client)),
           );
         }
-        ActionMessage::to_resp_msg(session_id, ActionMessage::Error)
+        ActionMessage::to_resp_msg(session_id, ActionMessage::Error(None))
       }
-      None => ActionMessage::to_resp_msg(session_id, ActionMessage::Error),
+      None => ActionMessage::to_resp_msg(session_id, ActionMessage::Error(None)),
     }
   }
 }
