@@ -4,11 +4,10 @@ use async_broadcast::Sender;
 use gloo_console::log;
 use gloo_timers::future::sleep;
 use message::{
-  Action, CastMessage, ClientAction, ConnectMessage, GetInfo, MediaMessage, MediaType, MessageType,
-  RequestMessage, RequestMessageData, ResponseMessage, ResponseMessageData, SdpMessage, SdpType,
-  SignalMessage, UpdateName,
+  self, Action, ActionMessage, CastMessage, ClientAction, ConnectMessage, GetInfo, ListAction,
+  ListMessage, MediaMessage, MediaType, MessageType, RequestMessageData, ResponseMessage,
+  ResponseMessageData, SdpMessage, SdpType, SignalMessage, UpdateName,
 };
-use nanoid::nanoid;
 use wasm_bindgen::JsValue;
 
 use crate::{
@@ -136,15 +135,30 @@ impl Client {
     }
   }
 
-  pub async fn get_init_info(&mut self) {
+  pub async fn get_init_info(&mut self) -> Option<message::Client> {
     let message = RequestMessageData::Action(Action::Client(ClientAction::GetInfo(GetInfo)));
-    let message = serde_json::to_string(&RequestMessage {
-      session_id: nanoid!(),
-      message,
-      message_type: MessageType::Request,
-    })
-    .unwrap();
-    let _ = self.link.sender().broadcast_direct(message).await;
+    let mut request = Request::new(self.link.sender(), self.link.receiver());
+    let futures = request.feature();
+    request.request(message);
+    let msg = futures.await;
+    log!("info await ", format!("{:?}", &msg));
+    if let ResponseMessageData::Action(ActionMessage::Client(info)) = msg {
+      return Some(info);
+    }
+    None
+  }
+
+  pub async fn get_user_list(&mut self) -> Option<ListMessage> {
+    let message = RequestMessageData::Action(Action::List(ListAction));
+    let mut request = Request::new(self.link.sender(), self.link.receiver());
+    let futures = request.feature();
+    request.request(message);
+    let msg = futures.await;
+    log!("list await end", format!("{:?}", &msg));
+    if let ResponseMessageData::Action(ActionMessage::ListMessage(list_message)) = msg {
+      return Some(list_message);
+    }
+    None
   }
 
   pub fn user(&self) -> User {
