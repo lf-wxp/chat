@@ -14,7 +14,10 @@ impl ParamResponseExecute for UpdateName {
     let client_list = get_client_list();
     let is_name_exist = client_list.iter().any(|item| item.name == self.name);
     if is_name_exist {
-      return ActionMessage::to_resp_msg(session_id, ActionMessage::Error(Some("name exists".to_string())));
+      return ActionMessage::to_resp_msg(
+        session_id,
+        ActionMessage::Error(Some("name exists".to_string())),
+      );
     }
     let message = match get_client_map() {
       Some(map) => match map.get_mut(&client_id) {

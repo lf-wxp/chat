@@ -1,13 +1,14 @@
 use bounce::{use_atom_value, use_selector_value};
+use gloo_console::log;
+use message::{MediaType, ResponseMessageData::Media};
 use stylist::{self, style};
 use yew::prelude::*;
 
 use crate::{
   components::{Avatar, Dropdown},
-  hook::use_client,
   model::Option,
   store::{FilterWord, User, Users},
-  utils::style,
+  utils::{get_client_execute, style},
 };
 
 #[function_component]
@@ -15,7 +16,6 @@ pub fn UserList() -> Html {
   let class_name = get_class_name();
   let users = use_selector_value::<Users>();
   let _user = use_atom_value::<User>();
-  let call = use_client();
   let filter_word = use_atom_value::<FilterWord>();
 
   let options = vec![
@@ -28,10 +28,16 @@ pub fn UserList() -> Html {
       label: "视频通话".to_string(),
     },
   ];
-  let call_clone = call.clone();
   let onclick = Callback::from(move |(user, _call_type): (User, String)| {
-    let call_clone = call_clone.clone();
-    call_clone(user.uuid);
+    get_client_execute(Box::new(|client| {
+      Box::pin(async move {
+        if let Media(message) =
+          client.request_media(user.uuid, MediaType::Video).await
+        {
+          log!("send media message", format!("{:?}", message));
+        }
+      })
+    }));
   });
 
   html! {

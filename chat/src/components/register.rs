@@ -1,16 +1,16 @@
 use bounce::{use_atom, use_selector_value};
 use gloo_console::log;
+use message::{ActionMessage, ResponseMessageData::Action};
 use stylist::{self, style};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew_hooks::use_effect_once;
-use message::{ActionMessage, ResponseMessageData::Action};
 
 use crate::{
   components::{use_notify, Button, DialogPortal, Input, NoticeTag},
   hook::use_i18n,
   store::{User, Users},
-  utils::{get_client, style},
+  utils::{get_client, get_client_execute, style},
 };
 
 #[function_component]
@@ -49,8 +49,8 @@ pub fn Register() -> Html {
     let user = user.clone();
     let visible_clone = visible_clone.clone();
     let value_clone = value_clone.clone();
-    if let Some(client) = get_client() {
-      spawn_local(async move {
+    get_client_execute(Box::new(|client| {
+      Box::pin(async move {
         if let Action(ActionMessage::Success) = client.update_name(name.clone()).await {
           user.set(User {
             name,
@@ -61,7 +61,7 @@ pub fn Register() -> Html {
           log!("update user name");
         }
       })
-    }
+    }));
   });
 
   let value_clone = value.clone();
