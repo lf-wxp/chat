@@ -28,8 +28,8 @@ fn get_class_name() -> String {
         background: var(--theme-color);
         border-radius: var(--radius);
         display: inline-block;
-        block-size: 40px;
-        inline-size: 40px;
+        block-size: var(--avatar-size, 40px);
+        inline-size: var(--avatar-size, 40px);
         border: 1px solid rgba(255, 255, 255, 0.1);
     "#
     )

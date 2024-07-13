@@ -5,7 +5,8 @@ use yew_i18n::I18nProvider;
 use yew_router::{BrowserRouter, Switch};
 
 use components::{
-  Background, Chat, DialogProvider, FakeSet, NotifyProvider, Register, Service, Side,
+  Background, Chat, DialogProvider, FakeSet, MediaRequestProvider, NotifyProvider, Register,
+  Service, Side,
 };
 use route::{switch, Route};
 use utils::{style, TRANSLATIONS};
@@ -27,23 +28,25 @@ fn App() -> Html {
     <BrowserRouter>
       <BounceRoot>
         <I18nProvider supported_languages={supported_languages} translations={TRANSLATIONS.clone()} >
-          <NotifyProvider>
-            <DialogProvider>
-              <Service />
-              <FakeSet />
-              <Register />
-              <section class={class_name}>
-                <Background />
-                <div class={"side"}>
-                  <Side />
-                </div>
-                <div class="content">
-                  <Switch<Route> render={switch}/>
-                </div>
-                <Chat />
-              </section>
-            </DialogProvider>
-          </NotifyProvider>
+          <MediaRequestProvider>
+            <NotifyProvider>
+              <DialogProvider>
+                <Service />
+                <FakeSet />
+                <Register />
+                <section class={class_name}>
+                  <Background />
+                  <div class={"side"}>
+                    <Side />
+                  </div>
+                  <div class="content">
+                    <Switch<Route> render={switch}/>
+                  </div>
+                  <Chat />
+                </section>
+              </DialogProvider>
+            </NotifyProvider>
+          </MediaRequestProvider>
         </I18nProvider>
       </BounceRoot>
     </BrowserRouter>

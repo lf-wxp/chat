@@ -35,8 +35,9 @@ async fn parse_media(sender: &mut Sender<String>, message: &str) {
         );
         if let MessageType::Request = message_type {
           let message = ResponseMessageData::Media(MediaMessage {
-            from: to,
+            from: to.clone(),
             to: from,
+            from_name: to,
             media_type,
             expired: None,
             confirm: None,
@@ -122,6 +123,7 @@ impl Client {
           log!("receive media message", format!("{:?}", message.clone()));
           let message = RequestMessageData::Media(MediaMessage {
             from: self.user.uuid.clone(),
+            from_name: self.user.name.clone(),
             to: from,
             media_type,
             expired: None,
@@ -165,6 +167,10 @@ impl Client {
     self.user.clone()
   }
 
+  pub fn set_name(&mut self, name: String) {
+    self.user.name = name;
+  }
+
   pub fn update_name(&mut self, name: String) -> RequestFuture {
     let message =
       RequestMessageData::Action(Action::Client(ClientAction::UpdateName(UpdateName {
@@ -177,8 +183,10 @@ impl Client {
   }
 
   pub fn request_media(&mut self, to: String, media_type: MediaType) -> RequestFuture {
+    log!("user", format!("{:?}", self.user));
     let message = RequestMessageData::Media(MediaMessage {
       from: self.user.uuid.clone(),
+      from_name: self.user.name.clone(),
       to: to.clone(),
       media_type,
       expired: None,

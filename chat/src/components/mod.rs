@@ -27,6 +27,7 @@ pub mod dialog;
 pub mod register;
 pub mod button;
 pub mod input;
+pub mod media_request;
 
 pub use text::*;
 pub use background::*;
@@ -57,3 +58,4 @@ pub use dialog::*;
 pub use register::*;
 pub use button::*;
 pub use input::*;
+pub use media_request::*;

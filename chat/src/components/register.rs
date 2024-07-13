@@ -52,6 +52,7 @@ pub fn Register() -> Html {
     get_client_execute(Box::new(|client| {
       Box::pin(async move {
         if let Action(ActionMessage::Success) = client.update_name(name.clone()).await {
+          client.set_name(name.clone());
           user.set(User {
             name,
             uuid: user.uuid.clone(),

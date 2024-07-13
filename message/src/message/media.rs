@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum MediaType {
   #[default]
@@ -12,6 +12,7 @@ pub enum MediaType {
 #[serde(rename_all = "camelCase")]
 pub struct MediaMessage {
   pub from: String,
+  pub from_name: String,
   pub to: String,
   pub media_type: MediaType,
   pub expired: Option<String>,
