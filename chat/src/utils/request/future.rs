@@ -4,7 +4,7 @@ use std::{
 };
 
 use async_broadcast::Receiver;
-use futures::{ready, Future, StreamExt };
+use futures::{ready, Future, StreamExt};
 use gloo_console::log;
 use message::{ResponseMessage, ResponseMessageData};
 
@@ -52,7 +52,7 @@ impl Future for RequestFuture {
         Err(err) => {
           log!("poll error", format!("{:?}", err));
           return Poll::Pending;
-        },
+        }
       }
     }
     Poll::Pending

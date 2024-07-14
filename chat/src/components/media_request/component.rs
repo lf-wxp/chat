@@ -4,7 +4,9 @@ use yew_icons::{Icon, IconId};
 
 use super::MediaRequestContext;
 use crate::{
-  components::{use_media_remove, Avatar, MediaMessage, MediaState},
+  components::{
+    use_media_confirm, use_media_reject, use_media_remove, Avatar, MediaMessage, MediaState,
+  },
   utils::style,
 };
 
@@ -13,6 +15,8 @@ pub fn MediaRequest() -> Html {
   let class_name = get_class_name();
   let message_list = use_context::<MediaRequestContext>().map_or(vec![], |x| x.0.clone());
   let media_remove = use_media_remove();
+  let media_reject = use_media_reject();
+  let media_confirm = use_media_confirm();
 
   let class_fn = |item: MediaMessage| {
     let mut extra = "";
@@ -28,11 +32,25 @@ pub fn MediaRequest() -> Html {
     }
   });
 
+  pub enum Request {
+    EmitGlobalEvent,
+  }
+
+  let reject = Callback::from(move |message: MediaMessage| {
+    media_reject(message.id);
+  });
+
+  let confirm = Callback::from(move |message: MediaMessage| {
+    media_confirm(message.id);
+  });
+
   html! {
     if message_list.iter().len() > 0 {
       <div class={class_name} >
         { for message_list.iter().map(|item|{
           let message = item.clone();
+          let message_reject = item.clone();
+          let message_confirm = item.clone();
           html!{
             <div
               key={item.id.clone()}
@@ -44,14 +62,18 @@ pub fn MediaRequest() -> Html {
                 <span class="name">{ item.from_name.clone()}</span>
               </div>
               <div class="action">
-                <span class="confirm icon">
+                <span class="confirm icon"
+                  onclick={confirm.reform(move |_| message_confirm.clone())}
+                >
                   <Icon
                     icon_id={IconId::LucidePhoneCall}
                     width="16px"
                     height="16px"
                   />
                 </span>
-                <span class="reject icon">
+                <span class="reject icon"
+                  onclick={reject.reform(move |_| message_reject.clone())}
+                >
                   <Icon
                     icon_id={IconId::LucidePhoneOff}
                     width="16px"

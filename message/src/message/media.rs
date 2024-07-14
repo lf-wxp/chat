@@ -15,6 +15,5 @@ pub struct MediaMessage {
   pub from_name: String,
   pub to: String,
   pub media_type: MediaType,
-  pub expired: Option<String>,
   pub confirm: Option<bool>,
 }

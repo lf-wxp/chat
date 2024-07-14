@@ -31,7 +31,7 @@ pub fn UserList() -> Html {
   let onclick = Callback::from(move |(user, _call_type): (User, String)| {
     get_client_execute(Box::new(|client| {
       Box::pin(async move {
-        if let Media(message) =
+        if let Ok(Media(message)) =
           client.request_media(user.uuid, MediaType::Video).await
         {
           log!("send media message", format!("{:?}", message));

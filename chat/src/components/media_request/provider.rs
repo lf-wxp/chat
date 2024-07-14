@@ -25,7 +25,6 @@ pub struct MediaMessage {
   pub from_name: String,
   pub to: String,
   pub media_type: MediaType,
-  pub expired: Option<String>,
   pub confirm: Option<bool>,
   pub state: MediaState,
 }
@@ -37,7 +36,6 @@ impl From<message::MediaMessage> for MediaMessage {
       from_name,
       to,
       media_type,
-      expired,
       confirm,
     } = value;
     let id = nanoid!();
@@ -48,7 +46,6 @@ impl From<message::MediaMessage> for MediaMessage {
       to,
       from_name,
       media_type,
-      expired,
       confirm,
     }
   }

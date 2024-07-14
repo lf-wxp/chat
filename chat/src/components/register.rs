@@ -2,7 +2,6 @@ use bounce::{use_atom, use_selector_value};
 use gloo_console::log;
 use message::{ActionMessage, ResponseMessageData::Action};
 use stylist::{self, style};
-use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew_hooks::use_effect_once;
 
@@ -10,7 +9,7 @@ use crate::{
   components::{use_notify, Button, DialogPortal, Input, NoticeTag},
   hook::use_i18n,
   store::{User, Users},
-  utils::{get_client, get_client_execute, style},
+  utils::{get_client_execute, style},
 };
 
 #[function_component]
@@ -51,7 +50,7 @@ pub fn Register() -> Html {
     let value_clone = value_clone.clone();
     get_client_execute(Box::new(|client| {
       Box::pin(async move {
-        if let Action(ActionMessage::Success) = client.update_name(name.clone()).await {
+        if let Ok(Action(ActionMessage::Success)) = client.update_name(name.clone()).await {
           client.set_name(name.clone());
           user.set(User {
             name,
