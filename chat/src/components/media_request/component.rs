@@ -5,7 +5,8 @@ use yew_icons::{Icon, IconId};
 use super::MediaRequestContext;
 use crate::{
   components::{
-    use_media_confirm, use_media_reject, use_media_remove, Avatar, MediaMessage, MediaState,
+    use_media_confirm, use_media_reject, use_media_remove, Avatar, CallbackType, MediaMessage,
+    MediaState,
   },
   utils::style,
 };
@@ -13,7 +14,9 @@ use crate::{
 #[function_component]
 pub fn MediaRequest() -> Html {
   let class_name = get_class_name();
-  let message_list = use_context::<MediaRequestContext>().map_or(vec![], |x| x.0.clone());
+  let message_ctx = use_context::<MediaRequestContext>();
+  let (message_list, callback_vec) =
+    message_ctx.map_or((vec![], vec![]), |x| (x.list.clone(), x.callback.clone()));
   let media_remove = use_media_remove();
   let media_reject = use_media_reject();
   let media_confirm = use_media_confirm();
@@ -32,16 +35,19 @@ pub fn MediaRequest() -> Html {
     }
   });
 
-  pub enum Request {
-    EmitGlobalEvent,
-  }
-
+  let callback_vec_clone = callback_vec.clone();
   let reject = Callback::from(move |message: MediaMessage| {
-    media_reject(message.id);
+    media_reject(message.id.clone());
+    callback_vec_clone
+      .iter()
+      .for_each(|f| f(message.clone(), CallbackType::Reject));
   });
 
   let confirm = Callback::from(move |message: MediaMessage| {
-    media_confirm(message.id);
+    media_confirm(message.id.clone());
+    callback_vec
+      .iter()
+      .for_each(|f| f(message.clone(), CallbackType::Confirm));
   });
 
   html! {

@@ -5,11 +5,16 @@ use yew::prelude::*;
 
 use super::MediaRequest;
 
+pub enum CallbackType {
+  Confirm,
+  Reject,    
+}
 pub enum MediaAction {
   Append(MediaMessage),
   Reject(String),
   Remove(String),
   Confirm(String),
+  Callback(fn(MediaMessage, CallbackType)),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -51,38 +56,66 @@ impl From<message::MediaMessage> for MediaMessage {
   }
 }
 
-#[derive(PartialEq, Default, Clone, Eq)]
-pub struct MediaRequestList(pub Vec<MediaMessage>);
+#[derive(Default, Clone, PartialEq)]
+pub struct MediaRequestProps {
+  pub list: Vec<MediaMessage>,
+  pub callback: Vec<fn(MediaMessage, CallbackType)>,
+}
 
-impl Reducible for MediaRequestList {
+impl Reducible for MediaRequestProps {
   type Action = MediaAction;
 
   fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
     match action {
       MediaAction::Append(notice) => {
-        let mut message = self.0.clone();
+        let mut message = self.list.clone();
         message.push(notice);
-        Rc::new(MediaRequestList(message))
+        Rc::new(MediaRequestProps {
+          list: message,
+          ..(*self).clone()
+        })
       }
       MediaAction::Remove(id) => {
-        let idx = self.0.iter().position(|x| x.id == id).unwrap_or(usize::MAX);
-        let mut message = self.0.clone();
+        let idx = self
+          .list
+          .iter()
+          .position(|x| x.id == id)
+          .unwrap_or(usize::MAX);
+        let mut message = self.list.clone();
         message.remove(idx);
-        Rc::new(MediaRequestList(message))
+        Rc::new(MediaRequestProps {
+          list: message,
+          ..(*self).clone()
+        })
       }
       MediaAction::Confirm(id) | MediaAction::Reject(id) => {
-        let idx = self.0.iter().position(|x| x.id == id).unwrap_or(usize::MAX);
-        let mut message = self.0.clone();
+        let idx = self
+          .list
+          .iter()
+          .position(|x| x.id == id)
+          .unwrap_or(usize::MAX);
+        let mut message = self.list.clone();
         if let Some(notice) = message.get_mut(idx) {
           notice.state = MediaState::Perish;
         }
-        Rc::new(MediaRequestList(message))
+        Rc::new(MediaRequestProps {
+          list: message,
+          ..(*self).clone()
+        })
+      }
+      MediaAction::Callback(function) => {
+        let mut callback = self.callback.clone();
+        callback.push(function);
+        Rc::new(MediaRequestProps {
+          callback,
+          ..(*self).clone()
+        })
       }
     }
   }
 }
 
-pub type MediaRequestContext = UseReducerHandle<MediaRequestList>;
+pub type MediaRequestContext = UseReducerHandle<MediaRequestProps>;
 
 #[derive(Properties, Debug, PartialEq)]
 pub struct MediaRequestProviderProps {
@@ -92,7 +125,7 @@ pub struct MediaRequestProviderProps {
 
 #[function_component]
 pub fn MediaRequestProvider(props: &MediaRequestProviderProps) -> Html {
-  let notice = use_reducer(MediaRequestList::default);
+  let notice = use_reducer(MediaRequestProps::default);
 
   html! {
     <ContextProvider<MediaRequestContext> context={notice}>

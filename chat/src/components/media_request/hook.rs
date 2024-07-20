@@ -1,14 +1,15 @@
 use std::rc::Rc;
 use yew::prelude::*;
+use yew_hooks::use_effect_once;
 
-use super::{MediaAction, MediaMessage, MediaRequestContext};
+use super::{CallbackType, MediaAction, MediaMessage, MediaRequestContext};
 
 #[hook]
 pub fn use_media_request() -> Rc<dyn Fn(message::MediaMessage)> {
-  let message_list = use_context::<MediaRequestContext>();
+  let message_ctx = use_context::<MediaRequestContext>();
 
   Rc::new(move |message: message::MediaMessage| {
-    if let Some(item) = &message_list {
+    if let Some(item) = &message_ctx {
       let append_item = MediaMessage::from(message);
       let item_clone = item.clone();
       let id = append_item.id.clone();
@@ -24,9 +25,9 @@ pub fn use_media_request() -> Rc<dyn Fn(message::MediaMessage)> {
 
 #[hook]
 pub fn use_media_remove() -> Rc<dyn Fn(String)> {
-  let message_list = use_context::<MediaRequestContext>();
+  let message_ctx = use_context::<MediaRequestContext>();
   Rc::new(move |id: String| {
-    if let Some(item) = &message_list {
+    if let Some(item) = &message_ctx {
       item.dispatch(MediaAction::Remove(id))
     }
   })
@@ -34,9 +35,9 @@ pub fn use_media_remove() -> Rc<dyn Fn(String)> {
 
 #[hook]
 pub fn use_media_reject() -> Rc<dyn Fn(String)> {
-  let message_list = use_context::<MediaRequestContext>();
+  let message_ctx = use_context::<MediaRequestContext>();
   Rc::new(move |id: String| {
-    if let Some(item) = &message_list {
+    if let Some(item) = &message_ctx {
       item.dispatch(MediaAction::Reject(id))
     }
   })
@@ -44,10 +45,21 @@ pub fn use_media_reject() -> Rc<dyn Fn(String)> {
 
 #[hook]
 pub fn use_media_confirm() -> Rc<dyn Fn(String)> {
-  let message_list = use_context::<MediaRequestContext>();
+  let message_ctx = use_context::<MediaRequestContext>();
   Rc::new(move |id: String| {
-    if let Some(item) = &message_list {
+    if let Some(item) = &message_ctx {
       item.dispatch(MediaAction::Confirm(id))
     }
   })
+}
+
+#[hook]
+pub fn use_register_callback(callback: fn(MediaMessage, CallbackType)) {
+  let message_ctx = use_context::<MediaRequestContext>();
+  use_effect_once(move || {
+    if let Some(item) = &message_ctx {
+      item.dispatch(MediaAction::Callback(callback));
+    }
+    || {}
+  });
 }

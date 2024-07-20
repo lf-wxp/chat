@@ -1,11 +1,22 @@
+use gloo_console::log;
 use stylist::{self, style};
 use yew::prelude::*;
 
-use crate::utils::style;
+use crate::{
+  components::{use_register_callback, CallbackType},
+  utils::style,
+};
 
 #[function_component]
 pub fn VideoStream() -> Html {
   let class_name = get_class_name();
+  use_register_callback(|message, callback_type| {
+    log!("media replay message", format!("{:?}", message));
+    match callback_type {
+      CallbackType::Confirm => todo!(),
+      CallbackType::Reject => todo!(),
+    };
+  });
 
   html! {
     <>
