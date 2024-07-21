@@ -32,7 +32,16 @@ impl Default for User {
 
 impl From<Client> for User {
   fn from(value: Client) -> Self {
-    User {
+    Self {
+      uuid: value.uuid,
+      name: value.name,
+    }
+  }
+}
+
+impl From<User> for Client {
+  fn from(value: User) -> Self {
+    Self {
       uuid: value.uuid,
       name: value.name,
     }

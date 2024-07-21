@@ -5,7 +5,7 @@ pub mod media;
 pub mod room;
 pub mod signal;
 
-use message::{Action, ListAction, MessageType, RequestMessage, RequestMessageData, ResponseMessage};
+use message::{Action, MessageType, RequestMessage, RequestMessageData, ResponseMessage};
 use tokio_tungstenite::tungstenite::{self, Message};
 
 use crate::data::get_client_map;

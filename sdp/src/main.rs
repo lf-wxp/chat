@@ -46,7 +46,7 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr) {
   println!("WebSocket connection established: {}", addr);
 
   let (tx, rx) = unbounded_channel();
-  let client = Client::new(addr, None, tx);
+  let client = Client::new( None, tx);
   let uuid_key = client.uuid();
 
   if let Some(client_map) = get_client_map() {

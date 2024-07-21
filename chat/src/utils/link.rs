@@ -17,8 +17,8 @@ impl Link {
   pub fn new() -> Self {
     let ws = WebSocket::open(SDP_SERVER).unwrap();
     let (mut write, mut read) = ws.split();
-    let (write_sender, write_receiver) = broadcast(10);
-    let (read_sender, read_receiver) = broadcast(10);
+    let (write_sender, write_receiver) = broadcast(20);
+    let (read_sender, read_receiver) = broadcast(20);
     let sender_clone = read_sender.clone();
     spawn_local(async move {
       while let Some(msg) = read.next().await {

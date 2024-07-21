@@ -4,10 +4,9 @@ use async_broadcast::Sender;
 use futures::Future;
 use gloo_console::log;
 use gloo_timers::future::sleep;
+use nanoid::nanoid;
 use message::{
-  self, Action, ActionMessage, CastMessage, ClientAction, ConnectMessage, GetInfo, ListAction,
-  ListMessage, MediaMessage, MediaType, MessageType, RequestMessageData, ResponseMessage,
-  ResponseMessageData, SdpMessage, SdpType, SignalMessage, UpdateName,
+  self, Action, ActionMessage, CastMessage, ClientAction, ConnectMessage, GetInfo, ListAction, ListMessage, MediaMessage, MediaType, MessageType, RequestMessage, RequestMessageData, ResponseMessage, ResponseMessageData, SdpMessage, SdpType, SignalMessage, UpdateName
 };
 use wasm_bindgen::JsValue;
 
@@ -108,8 +107,15 @@ impl Client {
   }
 
   async fn send(&self, message: RequestMessageData) {
-    let message = serde_json::to_string(&message).unwrap();
+    let session_id = nanoid!();
+    let message = serde_json::to_string(&RequestMessage {
+      message,
+      session_id,
+      message_type: MessageType::Request,
+    }).unwrap();
+    log!("send message 123", &message);
     let _ = self.link.sender().broadcast_direct(message).await;
+    log!("after message 123");
   }
 
   async fn parse_media(&mut self, message: &str) {
@@ -146,8 +152,8 @@ impl Client {
     let request = Request::new(self.link.sender(), self.link.receiver());
     let futures = request.feature();
     request.request(message);
-    // log!("info await ", format!("{:?}", &msg));
     if let Ok(ResponseMessageData::Action(ActionMessage::Client(info))) = futures.await {
+      self.set_user(info.clone());
       return Some(info);
     }
     None
@@ -158,8 +164,6 @@ impl Client {
     let request = Request::new(self.link.sender(), self.link.receiver());
     let futures = request.feature();
     request.request(message);
-    // let msg = futures.await;
-    // log!("list await end", format!("{:?}", &msg));
     if let Ok(ResponseMessageData::Action(ActionMessage::ListMessage(list_message))) = futures.await
     {
       return Some(list_message);
@@ -174,6 +178,10 @@ impl Client {
   pub fn set_name(&mut self, name: String) {
     self.user.name = name;
   }
+  pub fn set_user(&mut self, client: message::Client) {
+    self.user = client.into();
+  }
+
 
   pub fn update_name(
     &mut self,
@@ -208,16 +216,23 @@ impl Client {
     futures
   }
 
-  pub async fn replay_request_media(&mut self, to: String, media_type: MediaType, confirm: bool) {
-    log!("user", format!("{:?}", self.user));
+  async fn replay_request_media(&mut self, message: MediaMessage, confirm: bool) {
+    let MediaMessage { media_type, from ,..} = message;
     let message = RequestMessageData::Media(MediaMessage {
       from: self.user.uuid.clone(),
       from_name: self.user.name.clone(),
-      to: to.clone(),
+      to: from,
       media_type,
       confirm: Some(confirm),
     });
     self.send(message).await;
+  }
+
+  pub async fn reject_request_media(&mut self, message: MediaMessage) {
+    self.replay_request_media(message, false).await;
+  }
+  pub async fn confirm_request_media(&mut self, message: MediaMessage) {
+    self.replay_request_media(message, true).await;
   }
 
   pub async fn request_connect(&mut self, to: String) -> Result<(), JsValue> {

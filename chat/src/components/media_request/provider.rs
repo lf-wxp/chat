@@ -5,9 +5,10 @@ use yew::prelude::*;
 
 use super::MediaRequest;
 
+#[derive(Debug, Clone)]
 pub enum CallbackType {
   Confirm,
-  Reject,    
+  Reject,
 }
 pub enum MediaAction {
   Append(MediaMessage),
@@ -34,6 +35,26 @@ pub struct MediaMessage {
   pub state: MediaState,
 }
 
+impl From<MediaMessage> for message::MediaMessage {
+  fn from(value: MediaMessage) -> Self {
+    let MediaMessage {
+      from,
+      from_name,
+      to,
+      media_type,
+      confirm,
+      ..
+    } = value;
+    Self {
+      from,
+      from_name,
+      to,
+      media_type,
+      confirm,
+    }
+  }
+}
+
 impl From<message::MediaMessage> for MediaMessage {
   fn from(value: message::MediaMessage) -> Self {
     let message::MediaMessage {
@@ -55,7 +76,6 @@ impl From<message::MediaMessage> for MediaMessage {
     }
   }
 }
-
 #[derive(Default, Clone, PartialEq)]
 pub struct MediaRequestProps {
   pub list: Vec<MediaMessage>,

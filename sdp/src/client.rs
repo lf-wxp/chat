@@ -1,11 +1,10 @@
 use nanoid::nanoid;
-use std::net::SocketAddr;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_tungstenite::tungstenite::Message;
 
 type Tx = UnboundedSender<Message>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Client {
   uuid: String,
   name: String,
@@ -13,10 +12,11 @@ pub struct Client {
 }
 
 impl Client {
-  pub fn new(addr: SocketAddr, name: Option<String>, tx: Tx) -> Client {
+  pub fn new(name: Option<String>, tx: Tx) -> Client {
     let name = name.unwrap_or(nanoid!());
+    let uuid = nanoid!();
     Client {
-      uuid: format!("{}-{}", addr, name),
+      uuid,
       name,
       tx,
     }

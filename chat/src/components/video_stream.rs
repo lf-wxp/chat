@@ -1,26 +1,43 @@
+use bounce::use_atom_value;
 use gloo_console::log;
 use stylist::{self, style};
 use yew::prelude::*;
 
 use crate::{
   components::{use_register_callback, CallbackType},
-  utils::style,
+  store::User,
+  utils::{get_client_execute, style},
 };
 
 #[function_component]
 pub fn VideoStream() -> Html {
   let class_name = get_class_name();
+  let user = use_atom_value::<User>();
   use_register_callback(|message, callback_type| {
-    log!("media replay message", format!("{:?}", message));
     match callback_type {
-      CallbackType::Confirm => todo!(),
-      CallbackType::Reject => todo!(),
+      CallbackType::Confirm => {
+        get_client_execute(Box::new(|client| {
+          Box::pin(async move {
+            log!("media replay message", format!("{:?}", message));
+            client.confirm_request_media(message.into()).await;
+          })
+        }));
+      }
+      CallbackType::Reject => {
+        get_client_execute(Box::new(|client| {
+          Box::pin(async move {
+            client.reject_request_media(message.into()).await;
+          })
+        }));
+      }
     };
   });
 
   html! {
     <>
       <div class={class_name}>
+        {{ user.uuid.clone() }}
+        {{ user.name.clone() }}
         <video class="local-stream" autoplay={true} />
         <video class="remote-stream" autoplay={true} />
       </div>
