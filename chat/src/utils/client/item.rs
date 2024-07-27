@@ -4,10 +4,12 @@ use async_broadcast::Sender;
 use futures::Future;
 use gloo_console::log;
 use gloo_timers::future::sleep;
-use nanoid::nanoid;
 use message::{
-  self, Action, ActionMessage, CastMessage, ClientAction, ConnectMessage, GetInfo, ListAction, ListMessage, MediaMessage, MediaType, MessageType, RequestMessage, RequestMessageData, ResponseMessage, ResponseMessageData, SdpMessage, SdpType, SignalMessage, UpdateName
+  self, Action, ActionMessage, CastMessage, ClientAction, ConnectMessage, GetInfo, ListAction,
+  ListMessage, MediaMessage, MediaType, MessageType, RequestMessage, RequestMessageData,
+  ResponseMessage, ResponseMessageData, SdpMessage, SdpType, SignalMessage, UpdateName,
 };
+use nanoid::nanoid;
 use wasm_bindgen::JsValue;
 
 use crate::{
@@ -106,13 +108,14 @@ impl Client {
     }
   }
 
-  async fn send(&self, message: RequestMessageData) {
+  async fn send(&self, message: RequestMessageData, message_type: MessageType) {
     let session_id = nanoid!();
     let message = serde_json::to_string(&RequestMessage {
       message,
       session_id,
-      message_type: MessageType::Request,
-    }).unwrap();
+      message_type,
+    })
+    .unwrap();
     log!("send message 123", &message);
     let _ = self.link.sender().broadcast_direct(message).await;
     log!("after message 123");
@@ -140,7 +143,7 @@ impl Client {
             media_type,
             confirm: None,
           });
-          self.send(message).await;
+          self.send(message, MessageType::Request).await;
         }
       }
       Err(_) => todo!(),
@@ -182,7 +185,6 @@ impl Client {
     self.user = client.into();
   }
 
-
   pub fn update_name(
     &mut self,
     name: String,
@@ -217,7 +219,9 @@ impl Client {
   }
 
   async fn replay_request_media(&mut self, message: MediaMessage, confirm: bool) {
-    let MediaMessage { media_type, from ,..} = message;
+    let MediaMessage {
+      media_type, from, ..
+    } = message;
     let message = RequestMessageData::Media(MediaMessage {
       from: self.user.uuid.clone(),
       from_name: self.user.name.clone(),
@@ -225,7 +229,7 @@ impl Client {
       media_type,
       confirm: Some(confirm),
     });
-    self.send(message).await;
+    self.send(message, MessageType::Response).await;
   }
 
   pub async fn reject_request_media(&mut self, message: MediaMessage) {
