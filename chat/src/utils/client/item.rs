@@ -7,9 +7,10 @@ use gloo_timers::future::sleep;
 use message::{
   self, Action, ActionMessage, CastMessage, ClientAction, ConnectMessage, GetInfo, ListAction,
   ListMessage, MediaMessage, MediaType, MessageType, RequestMessage, RequestMessageData,
-  ResponseMessage, ResponseMessageData, SdpMessage, SdpType, SignalMessage, UpdateName,
+  ResponseMessage, ResponseMessageData, ResponseMessageData::Media, SdpMessage, SdpType,
+  SignalMessage, UpdateName,
 };
-use nanoid::nanoid;
+
 use wasm_bindgen::JsValue;
 
 use crate::{
@@ -108,8 +109,7 @@ impl Client {
     }
   }
 
-  async fn send(&self, message: RequestMessageData, message_type: MessageType) {
-    let session_id = nanoid!();
+  async fn send(&self, message: RequestMessageData, message_type: MessageType, session_id: String) {
     let message = serde_json::to_string(&RequestMessage {
       message,
       session_id,
@@ -143,7 +143,7 @@ impl Client {
             media_type,
             confirm: None,
           });
-          self.send(message, MessageType::Request).await;
+          self.send(message, MessageType::Request, session_id).await;
         }
       }
       Err(_) => todo!(),
@@ -199,12 +199,7 @@ impl Client {
     futures
   }
 
-  pub fn request_media(
-    &mut self,
-    to: String,
-    media_type: MediaType,
-  ) -> impl Future<Output = Result<ResponseMessageData, ()>> {
-    log!("user", format!("{:?}", self.user));
+  pub async fn request_media(&mut self, to: String, media_type: MediaType) {
     let message = RequestMessageData::Media(MediaMessage {
       from: self.user.uuid.clone(),
       from_name: self.user.name.clone(),
@@ -215,10 +210,34 @@ impl Client {
     let request = Request::new(self.link.sender(), self.link.receiver());
     let futures = request.feature();
     request.request(message);
-    futures
+    match futures.await {
+      Ok(message) => {
+        if let Media(MediaMessage {
+          media_type,
+          from_name,
+          from,
+          confirm,
+          ..
+        }) = message
+        {
+          if confirm.is_some_and(|x| x) {
+            self.request_connect(from.clone()).await;
+            log!("confirm", from_name, from, format!("{:?}", media_type));
+          }
+        }
+      }
+      Err(_) => {
+        log!("time out");
+      }
+    };
   }
 
-  async fn replay_request_media(&mut self, message: MediaMessage, confirm: bool) {
+  async fn replay_request_media(
+    &mut self,
+    message: MediaMessage,
+    confirm: bool,
+    session_id: String,
+  ) {
     let MediaMessage {
       media_type, from, ..
     } = message;
@@ -229,14 +248,14 @@ impl Client {
       media_type,
       confirm: Some(confirm),
     });
-    self.send(message, MessageType::Response).await;
+    self.send(message, MessageType::Response, session_id).await;
   }
 
-  pub async fn reject_request_media(&mut self, message: MediaMessage) {
-    self.replay_request_media(message, false).await;
+  pub async fn reject_request_media(&mut self, message: MediaMessage, session_id: String) {
+    self.replay_request_media(message, false, session_id).await;
   }
-  pub async fn confirm_request_media(&mut self, message: MediaMessage) {
-    self.replay_request_media(message, true).await;
+  pub async fn confirm_request_media(&mut self, message: MediaMessage, session_id: String) {
+    self.replay_request_media(message, true, session_id).await;
   }
 
   pub async fn request_connect(&mut self, to: String) -> Result<(), JsValue> {
@@ -248,7 +267,7 @@ impl Client {
       to: to.clone(),
     });
     let message = serde_json::to_string(&message).unwrap();
-    let _ = self.link.sender().broadcast(message).await;
+    let _ = self.link.sender().broadcast_direct(message).await;
     let dom = query_selector(".local-stream");
     log!("local stream", dom.clone());
     let _ = link.set_local_user_media(dom).await;
@@ -263,7 +282,7 @@ impl Client {
       }),
     });
     let message = serde_json::to_string(&message).unwrap();
-    let _ = self.link.sender().broadcast(message).await;
+    let _ = self.link.sender().broadcast_direct(message).await;
     Ok(())
   }
 }

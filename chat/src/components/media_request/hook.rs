@@ -5,12 +5,13 @@ use yew_hooks::use_effect_once;
 use super::{CallbackType, MediaAction, MediaMessage, MediaRequestContext};
 
 #[hook]
-pub fn use_media_request() -> Rc<dyn Fn(message::MediaMessage)> {
+pub fn use_media_request() -> Rc<dyn Fn(message::MediaMessage, String)> {
   let message_ctx = use_context::<MediaRequestContext>();
 
-  Rc::new(move |message: message::MediaMessage| {
+  Rc::new(move |message: message::MediaMessage, session_id: String| {
     if let Some(item) = &message_ctx {
-      let append_item = MediaMessage::from(message);
+      let mut append_item = MediaMessage::from(message);
+      append_item.id = session_id;
       let item_clone = item.clone();
       let id = append_item.id.clone();
       let on_timeout = move || {

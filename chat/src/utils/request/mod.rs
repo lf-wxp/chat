@@ -31,12 +31,17 @@ impl Request {
 
   pub fn feature(&self) -> impl Future<Output = Result<ResponseMessageData, ()>> {
     let receiver = self.receiver.clone();
-    let timeout_future = TimeoutFuture::new(30 * 1000);
+    let receiver_clone = receiver.clone();
     let session_id = self.session_id.clone();
+    let request_future = RequestFuture::new(session_id, receiver);
+    let timeout_future = TimeoutFuture::new(30 * 1000);
     async move {
       select! {
-        data = RequestFuture::new(session_id, receiver).fuse() => Ok(data),
-        _ = timeout_future.fuse() => Err(()),
+        data = request_future.fuse() => Ok(data),
+        _ = timeout_future.fuse() => { 
+          receiver_clone.close();
+          Err(())
+        },
       }
     }
   }
@@ -49,9 +54,7 @@ impl Request {
     .unwrap();
     let sender = self.sender.clone();
     spawn_local(async move {
-      log!("send message before", message.clone());
       let _ = sender.broadcast_direct(message).await;
-      log!("send message after");
     });
   }
 }

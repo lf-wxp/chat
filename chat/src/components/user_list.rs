@@ -1,6 +1,5 @@
 use bounce::{use_atom_value, use_selector_value};
-use gloo_console::log;
-use message::{MediaType, ResponseMessageData::Media};
+use message::MediaType;
 use stylist::{self, style};
 use yew::prelude::*;
 
@@ -31,11 +30,7 @@ pub fn UserList() -> Html {
   let onclick = Callback::from(move |(user, _call_type): (User, String)| {
     get_client_execute(Box::new(|client| {
       Box::pin(async move {
-        if let Ok(Media(message)) =
-          client.request_media(user.uuid, MediaType::Video).await
-        {
-          log!("send media message", format!("{:?}", message));
-        }
+        client.request_media(user.uuid, MediaType::Video).await;
       })
     }));
   });
