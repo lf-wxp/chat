@@ -4,12 +4,9 @@ use std::{
   rc::Rc,
   task::{Context, Poll, Waker},
 };
-
 use futures::{channel::mpsc, ready, Sink, Stream, StreamExt};
 use futures_channel::mpsc::TrySendError;
-
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
-
 use web_sys::{
   RtcDataChannel, RtcDataChannelEvent,
   RtcIceConnectionState, RtcPeerConnection, RtcPeerConnectionIceEvent, RtcTrackEvent, MessageEvent,

@@ -1,63 +1,20 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
-
 use async_broadcast::Sender;
 use futures::Future;
 use gloo_console::log;
-use gloo_timers::future::sleep;
 use message::{
   self, Action, ActionMessage, CastMessage, ClientAction, ConnectMessage, GetInfo, ListAction,
   ListMessage, MediaMessage, MediaType, MessageType, RequestMessage, RequestMessageData,
   ResponseMessage, ResponseMessageData, ResponseMessageData::Media, SdpMessage, SdpType,
   SignalMessage, UpdateName,
 };
-
-use wasm_bindgen::JsValue;
+use nanoid::nanoid;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use wasm_bindgen_futures::spawn_local;
 
 use crate::{
   store::User,
   utils::{get_link, query_selector, Link, RTCLink, Request},
 };
-
-async fn parse_media(sender: &mut Sender<String>, message: &str) {
-  match serde_json::from_str::<ResponseMessage>(message) {
-    Ok(ResponseMessage {
-      session_id,
-      message,
-      message_type,
-    }) => {
-      if let ResponseMessageData::Media(message) = message {
-        let MediaMessage {
-          from,
-          to,
-          media_type,
-          ..
-        } = message.clone();
-        log!(
-          "receive media message",
-          format!("{}-{}--{:?}", from, to, message_type)
-        );
-        if let MessageType::Request = message_type {
-          let message = ResponseMessageData::Media(MediaMessage {
-            from: to.clone(),
-            to: from,
-            from_name: to,
-            media_type,
-            confirm: None,
-          });
-          let message = serde_json::to_string(&ResponseMessage {
-            session_id,
-            message,
-            message_type: MessageType::Response,
-          })
-          .unwrap();
-          sleep(Duration::from_secs(3)).await;
-          let _ = sender.broadcast_direct(message).await;
-        }
-      }
-    }
-    Err(_) => todo!(),
-  }
-}
 
 #[derive(Debug)]
 pub struct Client {
@@ -70,84 +27,69 @@ impl Client {
   pub fn new(user: User) -> Self {
     let link = get_link().unwrap();
 
-    Client {
+    let client = Client {
       user,
       links: Rc::new(RefCell::new(HashMap::new())),
       link,
-    }
+    };
+    client.watch_message();
+    client
   }
 
-  fn parse_action(&self, _message: &str) {}
-  fn parse_connect(&self, message: &str) {
+  fn watch_message(&self) {
+    let mut receiver = self.link.receiver.clone();
     let links = self.links.clone();
-    match serde_json::from_str::<ResponseMessage>(&message) {
-      Ok(ResponseMessage {
-        message,
-        session_id,
-        ..
-      }) => {
-        if let ResponseMessageData::Connect(message) = message {
-          let ConnectMessage { from, .. } = &message;
-          let link = RTCLink::new(from.to_string()).unwrap();
-          log!("receive call");
-          links.borrow_mut().insert(from.to_string(), link);
+    let sender = self.link.sender();
+    let uuid = self.user.uuid.clone();
+    spawn_local(async move {
+      while let Ok(msg) = receiver.recv().await {
+        if let Ok(origin_message) = serde_json::from_str::<ResponseMessage>(&msg) {
+          let ResponseMessage {
+            message,
+            message_type,
+            session_id,
+          } = &origin_message;
+          if let ResponseMessageData::Signal(message) = message {
+            let SignalMessage { from, .. } = message;
+            let links = links.borrow();
+            let link = links.get(from).unwrap();
+            link.parse_signal(origin_message, &sender).await;
+            continue;
+          }
+
+          if *message_type == MessageType::Response {
+            continue;
+          }
+          if let ResponseMessageData::Connect(message) = message {
+            let ConnectMessage { from, .. } = &message;
+            let link = RTCLink::new(from.to_string()).unwrap();
+            links.borrow_mut().insert(from.to_string(), link);
+            Client::replay_request_connect(&sender, uuid.clone(), from.clone(), session_id.clone())
+              .await;
+          }
         }
       }
-      Err(_) => todo!(),
-    }
-  }
-
-  fn parse_signal(&self, message: &str) {
-    let _links = self.links.clone();
-    match serde_json::from_str::<ResponseMessage>(&message) {
-      Ok(ResponseMessage {
-        session_id,
-        message,
-        ..
-      }) => if let ResponseMessageData::Signal(_message) = message {},
-      Err(_) => todo!(),
-    }
+    })
   }
 
   async fn send(&self, message: RequestMessageData, message_type: MessageType, session_id: String) {
+    let sender = self.link.sender();
+    Client::send_static(&sender, message, message_type, session_id).await;
+  }
+
+  async fn send_static(
+    sender: &Sender<String>,
+    message: RequestMessageData,
+    message_type: MessageType,
+    session_id: String,
+  ) {
     let message = serde_json::to_string(&RequestMessage {
       message,
       session_id,
       message_type,
     })
     .unwrap();
-    log!("send message 123", &message);
-    let _ = self.link.sender().broadcast_direct(message).await;
-    log!("after message 123");
-  }
-
-  async fn parse_media(&mut self, message: &str) {
-    match serde_json::from_str::<ResponseMessage>(message) {
-      Ok(ResponseMessage {
-        session_id,
-        message,
-        ..
-      }) => {
-        if let ResponseMessageData::Media(message) = message {
-          let MediaMessage {
-            from,
-            to,
-            media_type,
-            ..
-          } = message.clone();
-          log!("receive media message", format!("{:?}", message.clone()));
-          let message = RequestMessageData::Media(MediaMessage {
-            from: self.user.uuid.clone(),
-            from_name: self.user.name.clone(),
-            to: from,
-            media_type,
-            confirm: None,
-          });
-          self.send(message, MessageType::Request, session_id).await;
-        }
-      }
-      Err(_) => todo!(),
-    }
+    let _ = sender.broadcast_direct(message).await;
   }
 
   pub async fn get_init_info(&mut self) -> Option<message::Client> {
@@ -258,31 +200,45 @@ impl Client {
     self.replay_request_media(message, true, session_id).await;
   }
 
-  pub async fn request_connect(&mut self, to: String) -> Result<(), JsValue> {
-    let link = RTCLink::new(to.clone()).unwrap();
-    let offer = &link.get_send_offer().await?;
+  pub async fn replay_request_connect(
+    sender: &Sender<String>,
+    from: String,
+    to: String,
+    session_id: String,
+  ) {
+    let message = RequestMessageData::Connect(ConnectMessage { from, to });
+    Client::send_static(sender, message, MessageType::Response, session_id).await;
+  }
 
+  pub async fn request_connect(&mut self, to: String) {
+    let link = RTCLink::new(to.clone()).unwrap();
+    let offer = &link.get_send_offer().await.unwrap();
+    let session_id = nanoid!();
     let message = RequestMessageData::Connect(ConnectMessage {
       from: self.user.uuid.clone(),
       to: to.clone(),
     });
-    let message = serde_json::to_string(&message).unwrap();
-    let _ = self.link.sender().broadcast_direct(message).await;
-    let dom = query_selector(".local-stream");
-    log!("local stream", dom.clone());
-    let _ = link.set_local_user_media(dom).await;
-    self.links.borrow_mut().insert(to.to_string(), link);
+    let request = Request::new(self.link.sender(), self.link.receiver());
+    let futures = request.feature();
+    request.request(message);
+    match futures.await {
+      Ok(_) => {
+        let dom = query_selector(".local-stream");
+        log!("local stream", dom.clone());
+        let _ = link.set_local_user_media(dom).await;
+        self.links.borrow_mut().insert(to.to_string(), link);
 
-    let message = RequestMessageData::Signal(SignalMessage {
-      from: self.user.uuid.clone(),
-      to: to.clone(),
-      message: CastMessage::Sdp(SdpMessage {
-        sdp_type: SdpType::Offer,
-        sdp: offer.clone(),
-      }),
-    });
-    let message = serde_json::to_string(&message).unwrap();
-    let _ = self.link.sender().broadcast_direct(message).await;
-    Ok(())
+        let message = RequestMessageData::Signal(SignalMessage {
+          from: self.user.uuid.clone(),
+          to: to.clone(),
+          message: CastMessage::Sdp(SdpMessage {
+            sdp_type: SdpType::Offer,
+            sdp: offer.clone(),
+          }),
+        });
+        let _ = self.send(message, MessageType::Request, session_id).await;
+      }
+      Err(_) => todo!(),
+    }
   }
 }

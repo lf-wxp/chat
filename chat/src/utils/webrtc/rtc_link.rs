@@ -1,14 +1,22 @@
+use async_broadcast::Sender;
 use gloo_console::log;
 use js_sys::{Array, Reflect, JSON};
+use message::{
+  CastMessage, MessageType, RequestMessage, RequestMessageData, ResponseMessage,
+  ResponseMessageData, SdpMessage, SdpType, SignalMessage,
+};
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-  HtmlMediaElement, MediaStream, RtcDataChannel, RtcIceCandidate,
-  RtcIceConnectionState, RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType,
-  RtcSessionDescriptionInit, RtcTrackEvent,
+  HtmlMediaElement, MediaStream, RtcDataChannel, RtcIceCandidate, RtcIceConnectionState,
+  RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType, RtcSessionDescriptionInit,
+  RtcTrackEvent,
 };
 
-use crate::{model::IceCandidate, utils::{query_selector, get_user_media}};
+use crate::{
+  model::IceCandidate,
+  utils::{get_user_media, query_selector},
+};
 
 #[derive(Debug)]
 pub struct RTCLink {
@@ -29,6 +37,52 @@ impl RTCLink {
       remote_media: MediaStream::new()?,
     };
     Ok(link)
+  }
+  async fn send(sender: &Sender<String>, message: SignalMessage, session_id: String) {
+    let message = serde_json::to_string(&RequestMessage {
+      message: RequestMessageData::Signal(message),
+      session_id,
+      message_type: MessageType::Request,
+    })
+    .unwrap();
+    let _ = sender.broadcast_direct(message).await;
+  }
+
+  pub async fn parse_signal(&self, message: ResponseMessage, sender: &Sender<String>) {
+    let ResponseMessage {
+      session_id,
+      message,
+      message_type,
+    } = message;
+    if let ResponseMessageData::Signal(message) = message {
+      let SignalMessage { from, to, message } = message;
+      match message {
+        message::CastMessage::Sdp(message) => {
+          let SdpMessage { sdp_type, sdp } = message;
+          match sdp_type {
+            message::SdpType::Offer => {
+              let _ = self.receive_offer(sdp).await;
+              let answer = self.get_send_answer().await.unwrap();
+              let message = SignalMessage {
+                from: to,
+                to: from,
+                message: CastMessage::Sdp(SdpMessage {
+                  sdp_type: SdpType::Answer,
+                  sdp: answer,
+                }),
+              };
+              RTCLink::send(sender, message, session_id).await;
+            }
+            message::SdpType::Answer => {
+              let _ = self.receive_answer(sdp).await;
+            }
+          }
+        }
+        message::CastMessage::Ice(message) => {
+          let _ = self.receive_ice(message);
+        }
+      }
+    }
   }
 
   fn create_answer(sdp: &str) -> RtcSessionDescriptionInit {

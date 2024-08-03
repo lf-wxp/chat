@@ -9,7 +9,7 @@ use crate::utils::SDP_SERVER;
 #[derive(Debug)]
 pub struct Link {
   sender: Sender<String>,
-  receiver: Receiver<String>,
+  pub receiver: Receiver<String>,
   read_sender: Sender<String>,
 }
 
