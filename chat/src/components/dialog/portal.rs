@@ -1,4 +1,3 @@
-use gloo_console::log;
 use nanoid::nanoid;
 use yew::prelude::*;
 
@@ -38,7 +37,6 @@ pub fn DialogPortal(props: &Props) -> Html {
       dialog_context.dispatch(DialogAction::Visible(true));
       return;
     }
-    log!("watch", *visible);
     dialog_context.dispatch(DialogAction::ClassVisible(false));
   });
 

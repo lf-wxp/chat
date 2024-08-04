@@ -1,11 +1,9 @@
+use bounce::use_atom_value;
+use futures::Future;
+use js_sys::ArrayBuffer;
 use std::cell::RefCell;
 use std::pin::Pin;
 use std::rc::Rc;
-
-use bounce::use_atom_value;
-use futures::Future;
-use gloo_console::log;
-use js_sys::ArrayBuffer;
 use wasm_bindgen::JsValue;
 use web_sys::Element;
 use yew::prelude::*;
@@ -80,10 +78,9 @@ pub fn use_wave_surfer() -> ReturnTuple {
   {
     let wave = wave.clone();
     let theme = theme.clone();
-    use_effect_with(theme,move |theme| {
+    use_effect_with(theme, move |theme| {
       let ThemeColor { font_color, .. } = theme.get_color();
       if let Some(wave) = wave.borrow_mut().as_mut() {
-        log!("theme change");
         let _ = wave.set_color(VisualizeColor {
           background: "transparent".to_string(),
           rect_color: font_color,
@@ -93,7 +90,7 @@ pub fn use_wave_surfer() -> ReturnTuple {
     });
   }
 
-  use_effect_with(wrap,move |_| {
+  use_effect_with(wrap, move |_| {
     let ThemeColor { font_color, .. } = theme.get_color();
     if let Some(wrap) = wrap_node_ref.clone().cast::<Element>() {
       *wave.borrow_mut() = WaveSurfer::new(

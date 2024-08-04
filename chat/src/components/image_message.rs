@@ -1,4 +1,3 @@
-use gloo_console::log;
 use stylist::{self, style};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
@@ -22,7 +21,6 @@ pub fn ImageMessage(props: &Props) -> Html {
     let src_clone = src_clone.clone();
     spawn_local(async move {
       let url = message.get_url().await;
-      log!("url", &url);
       src_clone.set(url);
     });
   });

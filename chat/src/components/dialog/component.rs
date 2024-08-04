@@ -1,4 +1,3 @@
-use gloo_console::log;
 use stylist::{self, style};
 use yew::prelude::*;
 
@@ -20,7 +19,6 @@ pub fn DialogComponent() -> Html {
   let class_content = use_state(|| class_content_fn(false));
   let dialog_context_clone = dialog_context.clone();
   let container_hide = Callback::from(move |_: AnimationEvent| {
-    log!("class visible", dialog_context_clone.class_visible);
     if !dialog_context_clone.class_visible {
       dialog_context_clone.dispatch(DialogAction::Visible(false));
     }
@@ -29,7 +27,6 @@ pub fn DialogComponent() -> Html {
   let class_content_clone = class_content.clone();
   let dialog_context_clone = dialog_context.clone();
   use_effect_with(dialog_context_clone.class_visible, move |visible| {
-    log!("watch set class", *visible);
     class_content_clone.set(class_content_fn(*visible));
   });
 
@@ -37,7 +34,6 @@ pub fn DialogComponent() -> Html {
   use_effect_with(dialog_context_clone.list.clone(), move |list| {
     let len = list.iter().len();
     let val = len != 0;
-    log!("watch set class len", val);
     if val {
       dialog_context_clone.dispatch(DialogAction::Visible(true));
     }

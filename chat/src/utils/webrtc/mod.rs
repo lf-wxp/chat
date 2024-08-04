@@ -1,4 +1,4 @@
-mod futures;
+mod rtc;
 mod rtc_link;
 
 #[macro_use]

@@ -2,12 +2,10 @@ use async_broadcast::Sender;
 use futures::Future;
 use gloo_console::log;
 use message::{
-  self, Action, ActionMessage, CastMessage, ClientAction, ConnectMessage, GetInfo, ListAction,
-  ListMessage, MediaMessage, MediaType, MessageType, RequestMessage, RequestMessageData,
-  ResponseMessage, ResponseMessageData, ResponseMessageData::Media, SdpMessage, SdpType,
-  SignalMessage, UpdateName,
+  self, Action, ActionMessage, ClientAction, ConnectMessage, GetInfo, ListAction, ListMessage,
+  MediaMessage, MediaType, MessageType, RequestMessage, RequestMessageData, ResponseMessage,
+  ResponseMessageData, ResponseMessageData::Media, SignalMessage, UpdateName,
 };
-use nanoid::nanoid;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use wasm_bindgen_futures::spawn_local;
 
@@ -18,7 +16,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Client {
-  pub user: User,
+  pub user: Rc<RefCell<User>>,
   links: Rc<RefCell<HashMap<String, RTCLink>>>,
   link: &'static mut Link,
 }
@@ -26,13 +24,12 @@ pub struct Client {
 impl Client {
   pub fn new(user: User) -> Self {
     let link = get_link().unwrap();
-
     let client = Client {
-      user,
+      user: Rc::new(RefCell::new(user)),
       links: Rc::new(RefCell::new(HashMap::new())),
       link,
     };
-    client.watch_message();
+    client.watch_message(); 
     client
   }
 
@@ -40,7 +37,7 @@ impl Client {
     let mut receiver = self.link.receiver.clone();
     let links = self.links.clone();
     let sender = self.link.sender();
-    let uuid = self.user.uuid.clone();
+    let user = self.user.clone();
     spawn_local(async move {
       while let Ok(msg) = receiver.recv().await {
         if let Ok(origin_message) = serde_json::from_str::<ResponseMessage>(&msg) {
@@ -52,17 +49,21 @@ impl Client {
           if let ResponseMessageData::Signal(message) = message {
             let SignalMessage { from, .. } = message;
             let links = links.borrow();
-            let link = links.get(from).unwrap();
-            link.parse_signal(origin_message, &sender).await;
+            let link = links.get(from);
+            if link.is_some() {
+              link.unwrap().parse_signal(origin_message).await;
+            }
             continue;
           }
 
           if *message_type == MessageType::Response {
             continue;
           }
+          let sender_clone = sender.clone();
+          let uuid = &user.borrow().uuid;
           if let ResponseMessageData::Connect(message) = message {
             let ConnectMessage { from, .. } = &message;
-            let link = RTCLink::new(from.to_string()).unwrap();
+            let link = RTCLink::new(uuid.clone(), from.to_string(), sender_clone).unwrap();
             links.borrow_mut().insert(from.to_string(), link);
             Client::replay_request_connect(&sender, uuid.clone(), from.clone(), session_id.clone())
               .await;
@@ -117,14 +118,19 @@ impl Client {
   }
 
   pub fn user(&self) -> User {
-    self.user.clone()
+    self.user.borrow().clone()
   }
 
   pub fn set_name(&mut self, name: String) {
-    self.user.name = name;
+    let uuid = self.user.borrow().uuid.clone();
+    let user = User {
+      uuid,
+      name,
+    };
+    *self.user.borrow_mut() = user;
   }
   pub fn set_user(&mut self, client: message::Client) {
-    self.user = client.into();
+    *self.user.borrow_mut() = client.into();
   }
 
   pub fn update_name(
@@ -140,11 +146,17 @@ impl Client {
     request.request(message);
     futures
   }
+  
+  fn extract_user(&self) -> (String, String) {
+    let user  = self.user.borrow().clone();
+    (user.uuid, user.name)
+  }
 
   pub async fn request_media(&mut self, to: String, media_type: MediaType) {
+    let (uuid, name) = self.extract_user();
     let message = RequestMessageData::Media(MediaMessage {
-      from: self.user.uuid.clone(),
-      from_name: self.user.name.clone(),
+      from: uuid,
+      from_name: name,
       to: to.clone(),
       media_type,
       confirm: None,
@@ -154,17 +166,9 @@ impl Client {
     request.request(message);
     match futures.await {
       Ok(message) => {
-        if let Media(MediaMessage {
-          media_type,
-          from_name,
-          from,
-          confirm,
-          ..
-        }) = message
-        {
+        if let Media(MediaMessage { from, confirm, .. }) = message {
           if confirm.is_some_and(|x| x) {
             self.request_connect(from.clone()).await;
-            log!("confirm", from_name, from, format!("{:?}", media_type));
           }
         }
       }
@@ -183,9 +187,10 @@ impl Client {
     let MediaMessage {
       media_type, from, ..
     } = message;
+    let (uuid, name) = self.extract_user();
     let message = RequestMessageData::Media(MediaMessage {
-      from: self.user.uuid.clone(),
-      from_name: self.user.name.clone(),
+      from: uuid,
+      from_name: name,
       to: from,
       media_type,
       confirm: Some(confirm),
@@ -211,11 +216,14 @@ impl Client {
   }
 
   pub async fn request_connect(&mut self, to: String) {
-    let link = RTCLink::new(to.clone()).unwrap();
-    let offer = &link.get_send_offer().await.unwrap();
-    let session_id = nanoid!();
+    let (uuid, ..) = self.extract_user();
+    let id = uuid.clone();
+    let remote_id = to.clone();
+    log!("request", to.clone(), id.clone());
+    let sender = self.link.sender();
+    let link = RTCLink::new(id, remote_id, sender).unwrap();
     let message = RequestMessageData::Connect(ConnectMessage {
-      from: self.user.uuid.clone(),
+      from: uuid,
       to: to.clone(),
     });
     let request = Request::new(self.link.sender(), self.link.receiver());
@@ -224,19 +232,19 @@ impl Client {
     match futures.await {
       Ok(_) => {
         let dom = query_selector(".local-stream");
-        log!("local stream", dom.clone());
         let _ = link.set_local_user_media(dom).await;
+        let _ = link.send_offer().await;
         self.links.borrow_mut().insert(to.to_string(), link);
-
-        let message = RequestMessageData::Signal(SignalMessage {
-          from: self.user.uuid.clone(),
-          to: to.clone(),
-          message: CastMessage::Sdp(SdpMessage {
-            sdp_type: SdpType::Offer,
-            sdp: offer.clone(),
-          }),
-        });
-        let _ = self.send(message, MessageType::Request, session_id).await;
+        // let offer = &link.get_send_offer().await.unwrap();
+        // let message = RequestMessageData::Signal(SignalMessage {
+        //   from: self.user.uuid.clone(),
+        //   to: to.clone(),
+        //   message: CastMessage::Sdp(SdpMessage {
+        //     sdp_type: SdpType::Offer,
+        //     sdp: offer.clone(),
+        //   }),
+        // });
+        // let _ = self.send(message, MessageType::Request, session_id).await;
       }
       Err(_) => todo!(),
     }

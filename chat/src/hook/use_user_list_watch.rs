@@ -1,6 +1,5 @@
 use bounce::use_atom_setter;
-use gloo_console::log;
-use message::{ActionMessage, ListMessage, ResponseMessage, ResponseMessageData};
+use message::{ActionMessage, ResponseMessage, ResponseMessageData};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew::use_effect_with;

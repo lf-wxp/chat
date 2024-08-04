@@ -35,6 +35,7 @@ pub fn VideoStream() -> Html {
   html! {
     <>
       <div class={class_name}>
+        {user.uuid.clone()}
         <video class="local-stream" autoplay={true} />
         <video class="remote-stream" autoplay={true} />
       </div>

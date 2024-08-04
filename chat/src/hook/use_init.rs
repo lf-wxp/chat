@@ -1,5 +1,4 @@
 use bounce::use_atom_setter;
-use gloo_console::log;
 use message::ListMessage;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
@@ -20,7 +19,6 @@ pub fn use_init() {
         }
         if let Some(list_message) = client.get_user_list().await {
           let ListMessage { client_list, .. } = list_message;
-          log!("user_list", format!("{:?}", client_list));
           users_setter(Users(client_list.into_iter().map(|x| x.into()).collect()));
         }
       });

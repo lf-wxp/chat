@@ -1,11 +1,9 @@
-use std::rc::Rc;
-
 use bounce::{Atom, BounceStates, Selector};
 use fake::{uuid::UUIDv1, Dummy, Fake, Faker};
-use gloo_console::log;
 use message::Client;
 use pinyin::ToPinyin;
 use serde::{Deserialize, Serialize};
+use std::rc::Rc;
 
 use crate::utils::faker::RandomName;
 
@@ -79,7 +77,6 @@ impl Selector for Users {
       .into_iter()
       .filter(|x| *x != *user)
       .collect::<Vec<User>>();
-    log!("user list", format!("{:?}", users.clone()));
     Rc::from(Users(users))
   }
 }

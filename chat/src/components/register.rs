@@ -1,5 +1,4 @@
 use bounce::{use_atom, use_selector_value};
-use gloo_console::log;
 use message::{ActionMessage, ResponseMessageData::Action};
 use stylist::{self, style};
 use yew::prelude::*;
@@ -24,7 +23,6 @@ pub fn Register() -> Html {
   let visible_clone = visible.clone();
   use_effect_once(move || {
     visible_clone.set(true);
-    log!("set visible true");
     || {}
   });
 
@@ -58,7 +56,6 @@ pub fn Register() -> Html {
           });
           value_clone.set("".to_string());
           visible_clone.set(false);
-          log!("update user name");
         }
       })
     }));

@@ -1,4 +1,3 @@
-use gloo_console::log;
 use message::MessageType;
 use message::{ResponseMessage, ResponseMessageData};
 use wasm_bindgen_futures::spawn_local;
@@ -15,7 +14,6 @@ pub fn use_media_request_watch() {
       let mut receiver = link.receiver();
       spawn_local(async move {
         while let Ok(msg) = receiver.recv().await {
-          log!("get media message", &msg);
           if let Ok(ResponseMessage {
             message: ResponseMessageData::Media(message),
             message_type,

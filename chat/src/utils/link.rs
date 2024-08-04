@@ -1,6 +1,5 @@
 use async_broadcast::{broadcast, Receiver, Sender};
 use futures::{SinkExt, StreamExt};
-use gloo_console::log;
 use gloo_net::websocket::{futures::WebSocket, Message};
 use wasm_bindgen_futures::spawn_local;
 
@@ -25,22 +24,17 @@ impl Link {
         match msg {
           Ok(msg) => {
             if let Message::Text(msg) = msg {
-              log!("broadcast msg receive from sdp", &msg);
               let _ = sender_clone.broadcast_direct(msg.clone()).await;
-              log!("broadcast msg receive send", &msg);
             }
           }
           Err(_) => todo!(),
         }
       }
-      log!("WebSocket Closed")
     });
     let mut receiver_clone = write_receiver.clone();
     spawn_local(async move {
       while let Ok(msg) = receiver_clone.recv().await {
-        log!("client before", &msg);
         let _ = write.send(Message::Text(msg)).await;
-        log!("client after");
       }
     });
     Link {
