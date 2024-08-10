@@ -6,11 +6,13 @@ use message::{
   ResponseMessageData, SdpMessage, SdpType, SignalMessage,
 };
 use nanoid::nanoid;
+use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{HtmlMediaElement, MediaStream, RtcTrackEvent};
+use web_sys::{HtmlMediaElement, MediaStream, RtcIceConnectionState, RtcPeerConnection};
+use yew::Event;
 
-use crate::utils::{get_user_media, query_selector};
+use crate::utils::{get_target, get_user_media, query_selector};
 
 use super::rtc::{ChannelMessage, WebRTC};
 
@@ -18,20 +20,23 @@ use super::rtc::{ChannelMessage, WebRTC};
 pub struct RTCLink {
   id: String,
   remote_id: String,
-  remote_media: MediaStream,
+  remote_media: Rc<RefCell<MediaStream>>,
   sender: Sender<String>,
+  ready: Rc<RefCell<bool>>,
   rtc: WebRTC,
 }
 
 impl RTCLink {
   pub fn new(id: String, remote_id: String, sender: Sender<String>) -> Result<Self, JsValue> {
     let rtc = WebRTC::new()?;
+    let remote_media = MediaStream::new()?;
     let link = RTCLink {
       id,
       remote_id,
       rtc,
       sender,
-      remote_media: MediaStream::new()?,
+      ready: Rc::new(RefCell::new(false)),
+      remote_media: Rc::new(RefCell::new(remote_media)),
     };
     link.watch_rtc_event();
     Ok(link)
@@ -42,12 +47,19 @@ impl RTCLink {
     let sender = self.sender.clone();
     let from = self.id.clone();
     let to = self.remote_id.clone();
+    let remote_media = self.remote_media.clone();
+    let ready = self.ready.clone();
     log!("watch ", from.clone(), to.clone());
     spawn_local(async move {
       while let Ok(msg) = receiver.recv().await {
         match msg {
           ChannelMessage::ErrorEvent => {}
-          ChannelMessage::TrackEvent(ev) => {}
+          ChannelMessage::TrackEvent(ev) => {
+            remote_media.borrow_mut().add_track(&ev.track());
+            if let Some(dom) = query_selector::<HtmlMediaElement>(".remote-stream") {
+              dom.set_src_object(Some(&remote_media.borrow()));
+            }
+          }
           ChannelMessage::DataChannelEvent(ev) => {}
           ChannelMessage::IceEvent(ev) => {
             let ice = ev.candidate().map(|candidate| {
@@ -64,6 +76,13 @@ impl RTCLink {
           ChannelMessage::DataChannelCloseEvent => {}
           ChannelMessage::DataChannelErrorEvent => {}
           ChannelMessage::DataChannelMessage(ev) => {}
+          ChannelMessage::IceConnectionStateChange(ev) => {
+            let target = get_target::<Event, RtcPeerConnection>(ev);
+            if target.is_some() {
+              *ready.borrow_mut() =
+                target.unwrap().ice_connection_state() == RtcIceConnectionState::Connected;
+            }
+          }
         }
       }
     })
@@ -132,14 +151,6 @@ impl RTCLink {
           let _ = self.rtc.receive_ice(message);
         }
       }
-    }
-  }
-
-  fn ontrack(&self, ev: RtcTrackEvent) {
-    log!("ontrack", ev.track());
-    self.remote_media.add_track(&ev.track());
-    if let Some(dom) = query_selector::<HtmlMediaElement>(".remote-stream") {
-      dom.set_src_object(Some(self.remote_media.as_ref()));
     }
   }
 

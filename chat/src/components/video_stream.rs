@@ -1,17 +1,14 @@
-use bounce::use_atom_value;
 use stylist::{self, style};
 use yew::prelude::*;
 
 use crate::{
   components::{use_register_callback, CallbackType},
-  store::User,
   utils::{get_client_execute, style},
 };
 
 #[function_component]
 pub fn VideoStream() -> Html {
   let class_name = get_class_name();
-  let user = use_atom_value::<User>();
   use_register_callback(|message, callback_type| {
     let id = message.id.clone();
     match callback_type {
@@ -35,7 +32,6 @@ pub fn VideoStream() -> Html {
   html! {
     <>
       <div class={class_name}>
-        {user.uuid.clone()}
         <video class="local-stream" autoplay={true} />
         <video class="remote-stream" autoplay={true} />
       </div>

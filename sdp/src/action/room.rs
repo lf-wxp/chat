@@ -1,6 +1,4 @@
-use message::{
-  ActionMessage, CreateRoom, ListRoom, RemoveRoom, ResponseMessage, Room, RoomAction, State,
-};
+use message::{ActionMessage, CreateRoom, ListRoom, RemoveRoom, ResponseMessage, Room, RoomAction};
 
 use crate::{action::ResponseExecute, data::get_room_map};
 

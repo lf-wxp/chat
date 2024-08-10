@@ -14,7 +14,6 @@ use crate::{
 pub fn UserList() -> Html {
   let class_name = get_class_name();
   let users = use_selector_value::<Users>();
-  let _user = use_atom_value::<User>();
   let filter_word = use_atom_value::<FilterWord>();
 
   let options = vec![

@@ -29,7 +29,7 @@ impl Client {
       links: Rc::new(RefCell::new(HashMap::new())),
       link,
     };
-    client.watch_message(); 
+    client.watch_message();
     client
   }
 
@@ -64,6 +64,8 @@ impl Client {
           if let ResponseMessageData::Connect(message) = message {
             let ConnectMessage { from, .. } = &message;
             let link = RTCLink::new(uuid.clone(), from.to_string(), sender_clone).unwrap();
+            let dom = query_selector(".local-stream");
+            let _ = link.set_local_user_media(dom).await;
             links.borrow_mut().insert(from.to_string(), link);
             Client::replay_request_connect(&sender, uuid.clone(), from.clone(), session_id.clone())
               .await;
@@ -123,10 +125,7 @@ impl Client {
 
   pub fn set_name(&mut self, name: String) {
     let uuid = self.user.borrow().uuid.clone();
-    let user = User {
-      uuid,
-      name,
-    };
+    let user = User { uuid, name };
     *self.user.borrow_mut() = user;
   }
   pub fn set_user(&mut self, client: message::Client) {
@@ -146,9 +145,9 @@ impl Client {
     request.request(message);
     futures
   }
-  
+
   fn extract_user(&self) -> (String, String) {
-    let user  = self.user.borrow().clone();
+    let user = self.user.borrow().clone();
     (user.uuid, user.name)
   }
 
@@ -235,16 +234,6 @@ impl Client {
         let _ = link.set_local_user_media(dom).await;
         let _ = link.send_offer().await;
         self.links.borrow_mut().insert(to.to_string(), link);
-        // let offer = &link.get_send_offer().await.unwrap();
-        // let message = RequestMessageData::Signal(SignalMessage {
-        //   from: self.user.uuid.clone(),
-        //   to: to.clone(),
-        //   message: CastMessage::Sdp(SdpMessage {
-        //     sdp_type: SdpType::Offer,
-        //     sdp: offer.clone(),
-        //   }),
-        // });
-        // let _ = self.send(message, MessageType::Request, session_id).await;
       }
       Err(_) => todo!(),
     }

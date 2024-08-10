@@ -59,6 +59,8 @@ fn get_class_name() -> String {
         block-size: 100%;
         display: flex;
         flex-flow: column nowrap;
+        background: rgba(var(--theme-ancillary-color-rgb), 0.3);
+        padding: 10px;
 
         .history-message {
           flex: 1;  

@@ -7,6 +7,7 @@ use web_sys::{
   RtcIceConnectionState, RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType,
   RtcSessionDescriptionInit, RtcTrackEvent,
 };
+use yew::Event;
 
 use crate::{bind_event, model::IceCandidate};
 
@@ -26,6 +27,7 @@ pub enum ChannelMessage {
   TrackEvent(RtcTrackEvent),
   DataChannelEvent(RtcDataChannelEvent),
   IceEvent(RtcPeerConnectionIceEvent),
+  IceConnectionStateChange(Event),
   DataChannelCloseEvent,
   DataChannelErrorEvent,
   DataChannelMessage(MessageEvent),
@@ -50,6 +52,7 @@ impl WebRTC {
     self.bind_ontrack();
     self.bind_ondatachannel();
     self.bind_onicecandidate();
+    self.bind_oniceconnectionstatechange();
     self.bind_ondatachannel_message();
   }
 
@@ -80,6 +83,16 @@ impl WebRTC {
       self.message_sender,
       ChannelMessage::IceEvent,
       RtcPeerConnectionIceEvent
+    )
+  }
+
+  fn bind_oniceconnectionstatechange(&self) {
+    bind_event!(
+      self.peer,
+      "iceconnectionstatechange",
+      self.message_sender,
+      ChannelMessage::IceConnectionStateChange,
+      Event
     )
   }
 
