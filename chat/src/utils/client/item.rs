@@ -2,9 +2,9 @@ use async_broadcast::Sender;
 use futures::Future;
 use gloo_console::log;
 use message::{
-  self, Action, ActionMessage, ClientAction, ConnectMessage, GetInfo, ListAction, ListMessage,
-  MediaMessage, MediaType, MessageType, RequestMessage, RequestMessageData, ResponseMessage,
-  ResponseMessageData, ResponseMessageData::Media, SignalMessage, UpdateName,
+  self, Action, ActionMessage, ClientAction, ConnectMessage, ConnectState, GetInfo, ListAction,
+  ListMessage, MediaMessage, MediaType, MessageType, RequestMessage, RequestMessageData,
+  ResponseMessage, ResponseMessageData, ResponseMessageData::Media, SignalMessage, UpdateName,
 };
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use wasm_bindgen_futures::spawn_local;
@@ -37,9 +37,11 @@ impl Client {
     let mut receiver = self.link.receiver.clone();
     let links = self.links.clone();
     let sender = self.link.sender();
+    let receiver_clone = self.link.receiver.clone();
     let user = self.user.clone();
     spawn_local(async move {
       while let Ok(msg) = receiver.recv().await {
+        // log!("receiver message", &msg);
         if let Ok(origin_message) = serde_json::from_str::<ResponseMessage>(&msg) {
           let ResponseMessage {
             message,
@@ -60,10 +62,12 @@ impl Client {
             continue;
           }
           let sender_clone = sender.clone();
+          let receiver_clone = receiver_clone.clone();
           let uuid = &user.borrow().uuid;
           if let ResponseMessageData::Connect(message) = message {
             let ConnectMessage { from, .. } = &message;
-            let link = RTCLink::new(uuid.clone(), from.to_string(), sender_clone).unwrap();
+            let link =
+              RTCLink::new(uuid.clone(), from.to_string(), sender_clone, receiver_clone).unwrap();
             let dom = query_selector(".local-stream");
             let _ = link.set_local_user_media(dom).await;
             links.borrow_mut().insert(from.to_string(), link);
@@ -210,7 +214,11 @@ impl Client {
     to: String,
     session_id: String,
   ) {
-    let message = RequestMessageData::Connect(ConnectMessage { from, to });
+    let message = RequestMessageData::Connect(ConnectMessage {
+      from,
+      to,
+      state: ConnectState::CONNECTING,
+    });
     Client::send_static(sender, message, MessageType::Response, session_id).await;
   }
 
@@ -220,10 +228,12 @@ impl Client {
     let remote_id = to.clone();
     log!("request", to.clone(), id.clone());
     let sender = self.link.sender();
-    let link = RTCLink::new(id, remote_id, sender).unwrap();
+    let receiver = self.link.receiver();
+    let link = RTCLink::new(id, remote_id, sender, receiver).unwrap();
     let message = RequestMessageData::Connect(ConnectMessage {
       from: uuid,
       to: to.clone(),
+      state: ConnectState::CONNECTING,
     });
     let request = Request::new(self.link.sender(), self.link.receiver());
     let futures = request.feature();
@@ -232,10 +242,13 @@ impl Client {
       Ok(_) => {
         let dom = query_selector(".local-stream");
         let _ = link.set_local_user_media(dom).await;
-        let _ = link.send_offer().await;
+        // let _ = link.send_offer().await;
+        let _ = link.connect().await;
         self.links.borrow_mut().insert(to.to_string(), link);
       }
-      Err(_) => todo!(),
+      Err(err) => {
+        log!("error", format!("{:?}", err));
+      },
     }
   }
 }

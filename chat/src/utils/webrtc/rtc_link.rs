@@ -1,9 +1,9 @@
-use async_broadcast::Sender;
+use async_broadcast::{Receiver, Sender};
 use gloo_console::log;
 use js_sys::JSON;
 use message::{
-  CastMessage, MessageType, RequestMessage, RequestMessageData, ResponseMessage,
-  ResponseMessageData, SdpMessage, SdpType, SignalMessage,
+  CastMessage, ConnectMessage, ConnectState, MessageType, RequestMessage, RequestMessageData,
+  ResponseMessage, ResponseMessageData, SdpMessage, SdpType, SignalMessage,
 };
 use nanoid::nanoid;
 use std::{cell::RefCell, rc::Rc};
@@ -14,7 +14,10 @@ use yew::Event;
 
 use crate::utils::{get_target, get_user_media, query_selector};
 
-use super::rtc::{ChannelMessage, WebRTC};
+use super::{
+  rtc::{ChannelMessage, WebRTC},
+  ConnectFuture,
+};
 
 #[derive(Debug)]
 pub struct RTCLink {
@@ -22,12 +25,18 @@ pub struct RTCLink {
   remote_id: String,
   remote_media: Rc<RefCell<MediaStream>>,
   sender: Sender<String>,
+  receiver: Receiver<String>,
   ready: Rc<RefCell<bool>>,
   rtc: WebRTC,
 }
 
 impl RTCLink {
-  pub fn new(id: String, remote_id: String, sender: Sender<String>) -> Result<Self, JsValue> {
+  pub fn new(
+    id: String,
+    remote_id: String,
+    sender: Sender<String>,
+    receiver: Receiver<String>,
+  ) -> Result<Self, JsValue> {
     let rtc = WebRTC::new()?;
     let remote_media = MediaStream::new()?;
     let link = RTCLink {
@@ -35,6 +44,7 @@ impl RTCLink {
       remote_id,
       rtc,
       sender,
+      receiver,
       ready: Rc::new(RefCell::new(false)),
       remote_media: Rc::new(RefCell::new(remote_media)),
     };
@@ -70,7 +80,8 @@ impl RTCLink {
             });
             if ice.is_some() {
               let message = CastMessage::Ice(ice.unwrap());
-              RTCLink::send_static(&sender, from.clone(), to.clone(), message, nanoid!()).await;
+              RTCLink::send_signal_static(&sender, from.clone(), to.clone(), message, nanoid!())
+                .await;
             }
           }
           ChannelMessage::DataChannelCloseEvent => {}
@@ -79,8 +90,19 @@ impl RTCLink {
           ChannelMessage::IceConnectionStateChange(ev) => {
             let target = get_target::<Event, RtcPeerConnection>(ev);
             if target.is_some() {
-              *ready.borrow_mut() =
+              let is_connected =
                 target.unwrap().ice_connection_state() == RtcIceConnectionState::Connected;
+              *ready.borrow_mut() = is_connected;
+              if is_connected {
+                RTCLink::send_connect_static(
+                  &sender,
+                  from.clone(),
+                  to.clone(),
+                  ConnectState::CONNECTED,
+                  nanoid!(),
+                )
+                .await;
+              }
             }
           }
         }
@@ -88,7 +110,7 @@ impl RTCLink {
     })
   }
 
-  async fn send_static(
+  async fn send_signal_static(
     sender: &Sender<String>,
     from: String,
     to: String,
@@ -103,11 +125,36 @@ impl RTCLink {
     .unwrap();
     let _ = sender.broadcast_direct(message).await;
   }
-  async fn send(&self, message: CastMessage, session_id: String) {
+
+  async fn send_connect_static(
+    sender: &Sender<String>,
+    from: String,
+    to: String,
+    state: ConnectState,
+    session_id: String,
+  ) {
+    let message = serde_json::to_string(&RequestMessage {
+      message: RequestMessageData::Connect(ConnectMessage { from, to, state }),
+      session_id,
+      message_type: MessageType::Request,
+    })
+    .unwrap();
+    let _ = sender.broadcast_direct(message).await;
+  }
+
+  async fn send_signal(&self, message: CastMessage, session_id: String) {
     let sender = self.sender.clone();
     let from = self.id.clone();
     let to = self.remote_id.clone();
-    RTCLink::send_static(&sender, from, to, message, session_id).await;
+    RTCLink::send_signal_static(&sender, from, to, message, session_id).await;
+  }
+
+  pub async fn connect(&self) {
+    let receiver = self.receiver.clone();
+    let future = ConnectFuture::new(self.remote_id.clone(), receiver);
+    let _ = self.send_offer().await;
+    let a = future.await;
+    log!("connected");
   }
 
   pub async fn send_offer(&self) -> Result<(), JsValue> {
@@ -116,7 +163,7 @@ impl RTCLink {
       sdp_type: SdpType::Offer,
       sdp: offer,
     });
-    self.send(message, nanoid!()).await;
+    self.send_signal(message, nanoid!()).await;
     Ok(())
   }
 
@@ -140,7 +187,7 @@ impl RTCLink {
                 sdp_type: SdpType::Answer,
                 sdp: answer,
               });
-              self.send(message, session_id).await;
+              self.send_signal(message, session_id).await;
             }
             message::SdpType::Answer => {
               let _ = self.rtc.receive_answer(sdp).await;
