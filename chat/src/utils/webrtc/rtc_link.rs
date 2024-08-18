@@ -1,4 +1,4 @@
-use async_broadcast::{Receiver, Sender};
+use async_broadcast::Sender;
 use gloo_console::log;
 use js_sys::JSON;
 use message::{
@@ -12,7 +12,7 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::{HtmlMediaElement, MediaStream, RtcIceConnectionState, RtcPeerConnection};
 use yew::Event;
 
-use crate::utils::{get_target, get_user_media, query_selector};
+use crate::utils::{get_link, get_target, get_user_media, query_selector, Link};
 
 use super::{
   rtc::{ChannelMessage, WebRTC},
@@ -24,29 +24,23 @@ pub struct RTCLink {
   id: String,
   remote_id: String,
   remote_media: Rc<RefCell<MediaStream>>,
-  sender: Sender<String>,
-  receiver: Receiver<String>,
   ready: Rc<RefCell<bool>>,
+  link: &'static mut Link,
   rtc: WebRTC,
 }
 
 impl RTCLink {
-  pub fn new(
-    id: String,
-    remote_id: String,
-    sender: Sender<String>,
-    receiver: Receiver<String>,
-  ) -> Result<Self, JsValue> {
+  pub fn new(id: String, remote_id: String) -> Result<Self, JsValue> {
     let rtc = WebRTC::new()?;
+    let link = get_link().unwrap();
     let remote_media = MediaStream::new()?;
     let link = RTCLink {
       id,
       remote_id,
       rtc,
-      sender,
-      receiver,
       ready: Rc::new(RefCell::new(false)),
       remote_media: Rc::new(RefCell::new(remote_media)),
+      link,
     };
     link.watch_rtc_event();
     Ok(link)
@@ -54,7 +48,7 @@ impl RTCLink {
 
   fn watch_rtc_event(&self) {
     let mut receiver = self.rtc.message_receiver.clone();
-    let sender = self.sender.clone();
+    let sender = self.link.sender();
     let from = self.id.clone();
     let to = self.remote_id.clone();
     let remote_media = self.remote_media.clone();
@@ -143,16 +137,17 @@ impl RTCLink {
   }
 
   async fn send_signal(&self, message: CastMessage, session_id: String) {
-    let sender = self.sender.clone();
+    let sender = self.link.sender();
     let from = self.id.clone();
     let to = self.remote_id.clone();
     RTCLink::send_signal_static(&sender, from, to, message, session_id).await;
   }
 
   pub async fn connect(&self) {
-    let receiver = self.receiver.clone();
+    let receiver = self.link.receiver();
     let future = ConnectFuture::new(self.remote_id.clone(), receiver);
     let _ = self.send_offer().await;
+    log!("connected sender offer()");
     let a = future.await;
     log!("connected");
   }

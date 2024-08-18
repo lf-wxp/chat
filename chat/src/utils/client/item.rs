@@ -34,14 +34,13 @@ impl Client {
   }
 
   fn watch_message(&self) {
-    let mut receiver = self.link.receiver.clone();
+    let mut receiver = self.link.receiver();
     let links = self.links.clone();
     let sender = self.link.sender();
-    let receiver_clone = self.link.receiver.clone();
     let user = self.user.clone();
     spawn_local(async move {
       while let Ok(msg) = receiver.recv().await {
-        // log!("receiver message", &msg);
+        log!("receiver message connect", &msg);
         if let Ok(origin_message) = serde_json::from_str::<ResponseMessage>(&msg) {
           let ResponseMessage {
             message,
@@ -61,13 +60,10 @@ impl Client {
           if *message_type == MessageType::Response {
             continue;
           }
-          let sender_clone = sender.clone();
-          let receiver_clone = receiver_clone.clone();
           let uuid = &user.borrow().uuid;
           if let ResponseMessageData::Connect(message) = message {
             let ConnectMessage { from, .. } = &message;
-            let link =
-              RTCLink::new(uuid.clone(), from.to_string(), sender_clone, receiver_clone).unwrap();
+            let link = RTCLink::new(uuid.clone(), from.to_string()).unwrap();
             let dom = query_selector(".local-stream");
             let _ = link.set_local_user_media(dom).await;
             links.borrow_mut().insert(from.to_string(), link);
@@ -227,9 +223,7 @@ impl Client {
     let id = uuid.clone();
     let remote_id = to.clone();
     log!("request", to.clone(), id.clone());
-    let sender = self.link.sender();
-    let receiver = self.link.receiver();
-    let link = RTCLink::new(id, remote_id, sender, receiver).unwrap();
+    let link = RTCLink::new(id, remote_id).unwrap();
     let message = RequestMessageData::Connect(ConnectMessage {
       from: uuid,
       to: to.clone(),
@@ -240,15 +234,17 @@ impl Client {
     request.request(message);
     match futures.await {
       Ok(_) => {
-        let dom = query_selector(".local-stream");
-        let _ = link.set_local_user_media(dom).await;
+        // let dom = query_selector(".local-stream");
+        // let _ = link.set_local_user_media(dom).await;
         // let _ = link.send_offer().await;
+        log!("connect before");
         let _ = link.connect().await;
+        log!("connect after");
         self.links.borrow_mut().insert(to.to_string(), link);
       }
       Err(err) => {
         log!("error", format!("{:?}", err));
-      },
+      }
     }
   }
 }

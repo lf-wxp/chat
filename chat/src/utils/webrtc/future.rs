@@ -27,28 +27,25 @@ impl Future for ConnectFuture {
   fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
     let this = self.get_mut();
     let msg = ready!(this.receiver.poll_next_unpin(cx));
-    log!("connect future", format!("{:?}", &msg,), this.remote_id.clone());
+    log!(
+      "connect future",
+      format!("{:?}", &msg,),
+      this.remote_id.clone()
+    );
     if let Some(msg) = msg {
-      match serde_json::from_str::<ResponseMessage>(&msg) {
-        Ok(ResponseMessage { message, .. }) => {
-          if let ResponseMessageData::Connect(ConnectMessage { state, from, .. }) = message {
-            if from != this.remote_id {
-              return Poll::Pending;
-            }
-            match state {
-              ConnectState::CONNECTED => {
-                return Poll::Ready(());
-              }
-              _ => {
-                return Poll::Pending;
-              }
-            }
+      if let Ok(ResponseMessage {
+        message: ResponseMessageData::Connect(ConnectMessage { state, from, .. }),
+        ..
+      }) = serde_json::from_str::<ResponseMessage>(&msg)
+      {
+        if from == this.remote_id {
+          if let ConnectState::CONNECTED = state {
+            return Poll::Ready(());
           }
-          return Poll::Pending;
         }
-        Err(_) => return Poll::Pending,
       }
     }
+    cx.waker().wake_by_ref();
     Poll::Pending
   }
 }

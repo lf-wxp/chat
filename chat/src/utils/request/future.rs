@@ -27,22 +27,17 @@ impl Future for RequestFuture {
     let this = self.get_mut();
     let msg = ready!(this.receiver.poll_next_unpin(cx));
     if let Some(msg) = msg {
-      match serde_json::from_str::<ResponseMessage>(&msg) {
-        Ok(ResponseMessage {
+      if let Ok(ResponseMessage {
           message,
           session_id,
           ..
-        }) => {
-          if session_id == this.session_id {
-            return Poll::Ready(message);
-          }
-          return Poll::Pending;
-        }
-        Err(err) => {
-          return Poll::Pending;
+        }) = serde_json::from_str::<ResponseMessage>(&msg) {
+        if session_id == this.session_id {
+          return Poll::Ready(message);
         }
       }
     }
+    cx.waker().wake_by_ref();
     Poll::Pending
   }
 }
