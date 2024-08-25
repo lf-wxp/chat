@@ -1,5 +1,6 @@
 use async_broadcast::{broadcast, Receiver, Sender};
 use futures::{SinkExt, StreamExt};
+use gloo_console::log;
 use gloo_net::websocket::{futures::WebSocket, Message};
 use wasm_bindgen_futures::spawn_local;
 
@@ -27,7 +28,9 @@ impl Link {
               let _ = sender_clone.broadcast_direct(msg.clone()).await;
             }
           }
-          Err(_) => todo!(),
+          Err(msg) => {
+            log!("error is ", format!("{:?}", msg));
+          },
         }
       }
     });

@@ -4,7 +4,6 @@ pub use future::*;
 
 use async_broadcast::{Receiver, Sender};
 use futures::{select, Future, FutureExt};
-use gloo_console::log;
 use gloo_timers::future::TimeoutFuture;
 use message::{MessageType, RequestMessage, RequestMessageData, ResponseMessageData};
 use nanoid::nanoid;
@@ -12,6 +11,11 @@ use wasm_bindgen_futures::spawn_local;
 
 use RequestFuture;
 
+#[derive(Debug, Clone)]
+pub enum RequestError {
+  Timeout,
+  Error,
+}
 #[derive(Debug, Clone)]
 pub struct Request {
   sender: Sender<String>,
@@ -29,7 +33,7 @@ impl Request {
     }
   }
 
-  pub fn feature(&self) -> impl Future<Output = Result<ResponseMessageData, ()>> {
+  pub fn feature(&self) -> impl Future<Output = Result<ResponseMessageData, RequestError>> {
     let receiver = self.receiver.clone();
     let receiver_clone = receiver.clone();
     let session_id = self.session_id.clone();
@@ -37,24 +41,32 @@ impl Request {
     let timeout_future = TimeoutFuture::new(30 * 1000);
     async move {
       select! {
-        data = request_future.fuse() => Ok(data),
-        _ = timeout_future.fuse() => { 
+        data = request_future.fuse() => {
+          // receiver_clone.close();
+          Ok(data)
+        },
+        _ = timeout_future.fuse() => {
           receiver_clone.close();
-          Err(())
+          Err(RequestError::Timeout)
         },
       }
     }
   }
-  pub fn request(&self, message: RequestMessageData) {
+  pub fn request(
+    &self,
+    message: RequestMessageData,
+  ) -> impl Future<Output = Result<ResponseMessageData, RequestError>> {
     let message = serde_json::to_string(&RequestMessage {
       message,
       session_id: self.session_id.clone(),
       message_type: MessageType::Request,
     })
     .unwrap();
+    let feature = self.feature();
     let sender = self.sender.clone();
     spawn_local(async move {
       let _ = sender.broadcast_direct(message).await;
     });
+    feature
   }
 }

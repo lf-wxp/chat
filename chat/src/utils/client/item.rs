@@ -6,12 +6,13 @@ use message::{
   ListMessage, MediaMessage, MediaType, MessageType, RequestMessage, RequestMessageData,
   ResponseMessage, ResponseMessageData, ResponseMessageData::Media, SignalMessage, UpdateName,
 };
+
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
   store::User,
-  utils::{get_link, query_selector, Link, RTCLink, Request},
+  utils::{get_link, get_window, query_selector, Link, RTCLink, Request, RequestError},
 };
 
 #[derive(Debug)]
@@ -40,7 +41,6 @@ impl Client {
     let user = self.user.clone();
     spawn_local(async move {
       while let Ok(msg) = receiver.recv().await {
-        log!("receiver message connect", &msg);
         if let Ok(origin_message) = serde_json::from_str::<ResponseMessage>(&msg) {
           let ResponseMessage {
             message,
@@ -61,14 +61,21 @@ impl Client {
             continue;
           }
           let uuid = &user.borrow().uuid;
-          if let ResponseMessageData::Connect(message) = message {
-            let ConnectMessage { from, .. } = &message;
+          if let ResponseMessageData::Connect(ConnectMessage { from, state, .. }) = message {
+            log!("connect", format!("{:?}", *message));
+            if ConnectState::New != *state {
+              return;
+            }
             let link = RTCLink::new(uuid.clone(), from.to_string()).unwrap();
             let dom = query_selector(".local-stream");
             let _ = link.set_local_user_media(dom).await;
             links.borrow_mut().insert(from.to_string(), link);
             Client::replay_request_connect(&sender, uuid.clone(), from.clone(), session_id.clone())
               .await;
+            log!(
+              "request connect before",
+              get_window().performance().unwrap().now()
+            );
           }
         }
       }
@@ -98,9 +105,9 @@ impl Client {
   pub async fn get_init_info(&mut self) -> Option<message::Client> {
     let message = RequestMessageData::Action(Action::Client(ClientAction::GetInfo(GetInfo)));
     let request = Request::new(self.link.sender(), self.link.receiver());
-    let futures = request.feature();
-    request.request(message);
-    if let Ok(ResponseMessageData::Action(ActionMessage::Client(info))) = futures.await {
+    if let Ok(ResponseMessageData::Action(ActionMessage::Client(info))) =
+      request.request(message).await
+    {
       self.set_user(info.clone());
       return Some(info);
     }
@@ -110,9 +117,8 @@ impl Client {
   pub async fn get_user_list(&mut self) -> Option<ListMessage> {
     let message = RequestMessageData::Action(Action::List(ListAction));
     let request = Request::new(self.link.sender(), self.link.receiver());
-    let futures = request.feature();
-    request.request(message);
-    if let Ok(ResponseMessageData::Action(ActionMessage::ListMessage(list_message))) = futures.await
+    if let Ok(ResponseMessageData::Action(ActionMessage::ListMessage(list_message))) =
+      request.request(message).await
     {
       return Some(list_message);
     }
@@ -135,15 +141,13 @@ impl Client {
   pub fn update_name(
     &mut self,
     name: String,
-  ) -> impl Future<Output = Result<ResponseMessageData, ()>> {
+  ) -> impl Future<Output = Result<ResponseMessageData, RequestError>> {
     let message =
       RequestMessageData::Action(Action::Client(ClientAction::UpdateName(UpdateName {
         name,
       })));
     let request = Request::new(self.link.sender(), self.link.receiver());
-    let futures = request.feature();
-    request.request(message);
-    futures
+    request.request(message)
   }
 
   fn extract_user(&self) -> (String, String) {
@@ -161,9 +165,7 @@ impl Client {
       confirm: None,
     });
     let request = Request::new(self.link.sender(), self.link.receiver());
-    let futures = request.feature();
-    request.request(message);
-    match futures.await {
+    match request.request(message).await {
       Ok(message) => {
         if let Media(MediaMessage { from, confirm, .. }) = message {
           if confirm.is_some_and(|x| x) {
@@ -213,7 +215,7 @@ impl Client {
     let message = RequestMessageData::Connect(ConnectMessage {
       from,
       to,
-      state: ConnectState::CONNECTING,
+      state: ConnectState::Checking,
     });
     Client::send_static(sender, message, MessageType::Response, session_id).await;
   }
@@ -222,25 +224,30 @@ impl Client {
     let (uuid, ..) = self.extract_user();
     let id = uuid.clone();
     let remote_id = to.clone();
-    log!("request", to.clone(), id.clone());
     let link = RTCLink::new(id, remote_id).unwrap();
     let message = RequestMessageData::Connect(ConnectMessage {
       from: uuid,
       to: to.clone(),
-      state: ConnectState::CONNECTING,
+      state: ConnectState::New,
     });
     let request = Request::new(self.link.sender(), self.link.receiver());
-    let futures = request.feature();
-    request.request(message);
-    match futures.await {
+    match request.request(message).await {
       Ok(_) => {
-        // let dom = query_selector(".local-stream");
-        // let _ = link.set_local_user_media(dom).await;
-        // let _ = link.send_offer().await;
-        log!("connect before");
-        let _ = link.connect().await;
-        log!("connect after");
+        log!(
+          "request connect after",
+          get_window().performance().unwrap().now()
+        );
         self.links.borrow_mut().insert(to.to_string(), link);
+        let links = self.links.borrow();
+        let link = links.get(&(to.clone()));
+        let dom = query_selector(".local-stream");
+        if let Some(link) = link {
+          let _ = link.set_local_user_media(dom).await;
+          if (link.connect().await).is_ok() {
+            let _ = link.set_remote_media().await;
+            log!("connected");
+          }
+        }
       }
       Err(err) => {
         log!("error", format!("{:?}", err));

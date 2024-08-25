@@ -1,4 +1,5 @@
 use async_broadcast::{broadcast, Receiver, Sender};
+use gloo_console::log;
 use js_sys::{Array, Reflect};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
@@ -31,6 +32,7 @@ pub enum ChannelMessage {
   DataChannelCloseEvent,
   DataChannelErrorEvent,
   DataChannelMessage(MessageEvent),
+  Negotiationneeded(Event),
 }
 
 impl WebRTC {
@@ -53,6 +55,7 @@ impl WebRTC {
     self.bind_ondatachannel();
     self.bind_onicecandidate();
     self.bind_oniceconnectionstatechange();
+    self.bind_onnegotiationneeded();
     self.bind_ondatachannel_message();
   }
 
@@ -106,19 +109,29 @@ impl WebRTC {
     )
   }
 
+  fn bind_onnegotiationneeded(&self) {
+    bind_event!(
+      self.peer,
+      "negotiationneeded",
+      self.message_sender,
+      ChannelMessage::Negotiationneeded,
+      Event
+    )
+  }
+
   pub fn state(&self) -> RtcIceConnectionState {
     self.peer.ice_connection_state()
   }
 
   fn create_answer(sdp: &str) -> RtcSessionDescriptionInit {
-    let mut answer_obj = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
-    answer_obj.sdp(sdp);
+    let answer_obj = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
+    answer_obj.set_sdp(sdp);
     answer_obj
   }
 
   fn create_offer(sdp: &str) -> RtcSessionDescriptionInit {
-    let mut offer_obj = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
-    offer_obj.sdp(sdp);
+    let offer_obj = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
+    offer_obj.set_sdp(sdp);
     offer_obj
   }
 
@@ -165,6 +178,7 @@ impl WebRTC {
         .dyn_into::<web_sys::MediaStreamTrack>()
         .unwrap();
       let more_streams = Array::new();
+      log!("set media video");
       self.peer.add_track(&track, &stream, &more_streams);
     }
   }

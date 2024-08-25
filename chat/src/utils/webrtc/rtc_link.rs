@@ -12,11 +12,11 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::{HtmlMediaElement, MediaStream, RtcIceConnectionState, RtcPeerConnection};
 use yew::Event;
 
-use crate::utils::{get_link, get_target, get_user_media, query_selector, Link};
+use crate::utils::{get_link, get_target, get_user_media, query_selector, to_connect_state, Link};
 
 use super::{
   rtc::{ChannelMessage, WebRTC},
-  ConnectFuture,
+  Connect, ConnectError,
 };
 
 #[derive(Debug)]
@@ -53,12 +53,12 @@ impl RTCLink {
     let to = self.remote_id.clone();
     let remote_media = self.remote_media.clone();
     let ready = self.ready.clone();
-    log!("watch ", from.clone(), to.clone());
     spawn_local(async move {
       while let Ok(msg) = receiver.recv().await {
         match msg {
           ChannelMessage::ErrorEvent => {}
           ChannelMessage::TrackEvent(ev) => {
+            log!("track event");
             remote_media.borrow_mut().add_track(&ev.track());
             if let Some(dom) = query_selector::<HtmlMediaElement>(".remote-stream") {
               dom.set_src_object(Some(&remote_media.borrow()));
@@ -83,22 +83,24 @@ impl RTCLink {
           ChannelMessage::DataChannelMessage(ev) => {}
           ChannelMessage::IceConnectionStateChange(ev) => {
             let target = get_target::<Event, RtcPeerConnection>(ev);
+            let state = target.as_ref().unwrap().ice_connection_state();
+            log!("ice change", format!("{:?}", &state));
             if target.is_some() {
-              let is_connected =
-                target.unwrap().ice_connection_state() == RtcIceConnectionState::Connected;
+              let is_connected = state == RtcIceConnectionState::Connected;
               *ready.borrow_mut() = is_connected;
-              if is_connected {
-                RTCLink::send_connect_static(
-                  &sender,
-                  from.clone(),
-                  to.clone(),
-                  ConnectState::CONNECTED,
-                  nanoid!(),
-                )
-                .await;
-              }
+              RTCLink::send_connect_static(
+                &sender,
+                from.clone(),
+                to.clone(),
+                to_connect_state(state),
+                nanoid!(),
+              )
+              .await;
             }
           }
+          ChannelMessage::Negotiationneeded(ev) => {
+            log!("track negotiation");
+          },
         }
       }
     })
@@ -143,13 +145,11 @@ impl RTCLink {
     RTCLink::send_signal_static(&sender, from, to, message, session_id).await;
   }
 
-  pub async fn connect(&self) {
+  pub async fn connect(&self) -> Result<(), ConnectError> {
     let receiver = self.link.receiver();
-    let future = ConnectFuture::new(self.remote_id.clone(), receiver);
-    let _ = self.send_offer().await;
-    log!("connected sender offer()");
-    let a = future.await;
-    log!("connected");
+    let send_future = self.send_offer();
+    let connect = Connect::new(self.remote_id.clone(), receiver);
+    connect.connect(send_future).await
   }
 
   pub async fn send_offer(&self) -> Result<(), JsValue> {
@@ -158,7 +158,17 @@ impl RTCLink {
       sdp_type: SdpType::Offer,
       sdp: offer,
     });
-    self.send_signal(message, nanoid!()).await;
+    self.send_signal(message.clone(), nanoid!()).await;
+    Ok(())
+  }
+
+  pub async fn send_answer(&self, session_id: String) -> Result<(), JsValue> {
+    let answer = self.rtc.get_send_answer().await.unwrap();
+    let message = CastMessage::Sdp(SdpMessage {
+      sdp_type: SdpType::Answer,
+      sdp: answer,
+    });
+    self.send_signal(message.clone(), session_id).await;
     Ok(())
   }
 
@@ -177,12 +187,7 @@ impl RTCLink {
           match sdp_type {
             message::SdpType::Offer => {
               let _ = self.rtc.receive_offer(sdp).await;
-              let answer = self.rtc.get_send_answer().await.unwrap();
-              let message = CastMessage::Sdp(SdpMessage {
-                sdp_type: SdpType::Answer,
-                sdp: answer,
-              });
-              self.send_signal(message, session_id).await;
+              let _ = self.send_answer(session_id).await;
             }
             message::SdpType::Answer => {
               let _ = self.rtc.receive_answer(sdp).await;
@@ -207,6 +212,17 @@ impl RTCLink {
     if let Some(dom) = dom {
       dom.set_src_object(stream.as_ref());
     }
+    Ok(())
+  }
+
+  pub async fn set_remote_media(&self) -> Result<(), JsValue> {
+    let stream = get_user_media(
+      // Some("{ device_id: 'default',echo_cancellation: true }"),
+      None,
+      Some("true"),
+    )
+    .await
+    .ok();
     if let Some(stream) = stream {
       self.rtc.set_tracks(stream);
     }

@@ -1,13 +1,16 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ConnectState {
-  CONNECTING,
-  CONNECTED,
-  CLOSED,
+  New,
+  Checking,
+  Connected,
+  Completed,
+  Failed,
+  Disconnected,
+  Closed,
 }
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectMessage {
