@@ -68,7 +68,7 @@ impl Client {
             }
             let link = RTCLink::new(uuid.clone(), from.to_string()).unwrap();
             let dom = query_selector(".local-stream");
-            let _ = link.set_local_user_media(dom).await;
+            let _ = link.set_media(dom).await;
             links.borrow_mut().insert(from.to_string(), link);
             Client::replay_request_connect(&sender, uuid.clone(), from.clone(), session_id.clone())
               .await;
@@ -242,9 +242,8 @@ impl Client {
         let link = links.get(&(to.clone()));
         let dom = query_selector(".local-stream");
         if let Some(link) = link {
-          let _ = link.set_local_user_media(dom).await;
+          let _ = link.set_media(dom).await;
           if (link.connect().await).is_ok() {
-            let _ = link.set_remote_media().await;
             log!("connected");
           }
         }

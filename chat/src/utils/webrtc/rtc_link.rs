@@ -201,7 +201,7 @@ impl RTCLink {
     }
   }
 
-  pub async fn set_local_user_media(&self, dom: Option<HtmlMediaElement>) -> Result<(), JsValue> {
+  pub async fn set_media(&self, dom: Option<HtmlMediaElement>) -> Result<(), JsValue> {
     let stream = get_user_media(
       // Some("{ device_id: 'default',echo_cancellation: true }"),
       None,
@@ -212,20 +212,10 @@ impl RTCLink {
     if let Some(dom) = dom {
       dom.set_src_object(stream.as_ref());
     }
-    Ok(())
-  }
-
-  pub async fn set_remote_media(&self) -> Result<(), JsValue> {
-    let stream = get_user_media(
-      // Some("{ device_id: 'default',echo_cancellation: true }"),
-      None,
-      Some("true"),
-    )
-    .await
-    .ok();
     if let Some(stream) = stream {
       self.rtc.set_tracks(stream);
     }
     Ok(())
   }
+
 }
