@@ -222,12 +222,12 @@ pub async fn get_user_media(
   audio_constraints: Option<&str>,
   video_constraints: Option<&str>,
 ) -> Result<MediaStream, JsValue> {
-  let mut constraints = MediaStreamConstraints::new();
+  let constraints = MediaStreamConstraints::new();
   if let Some(audio) = audio_constraints {
-    constraints.audio(&JsValue::from_str(audio));
+    constraints.set_audio(&JsValue::from_str(audio));
   }
   if let Some(video) = video_constraints {
-    constraints.video(&JsValue::from_str(video));
+    constraints.set_video(&JsValue::from_str(video));
   }
   let window = get_window();
   let promise = window

@@ -2,8 +2,8 @@ use async_broadcast::Sender;
 use gloo_console::log;
 use js_sys::JSON;
 use message::{
-  CastMessage, ConnectMessage, ConnectState, MessageType, RequestMessage, RequestMessageData,
-  ResponseMessage, ResponseMessageData, SdpMessage, SdpType, SignalMessage,
+  CastMessage, ConnectMessage, ConnectState, MediaType, MessageType, RequestMessage,
+  RequestMessageData, ResponseMessage, ResponseMessageData, SdpMessage, SdpType, SignalMessage,
 };
 use nanoid::nanoid;
 use std::{cell::RefCell, rc::Rc};
@@ -93,6 +93,7 @@ impl RTCLink {
                 from.clone(),
                 to.clone(),
                 to_connect_state(state),
+                None,
                 nanoid!(),
               )
               .await;
@@ -100,7 +101,7 @@ impl RTCLink {
           }
           ChannelMessage::Negotiationneeded(ev) => {
             log!("track negotiation");
-          },
+          }
         }
       }
     })
@@ -127,10 +128,16 @@ impl RTCLink {
     from: String,
     to: String,
     state: ConnectState,
+    media_type: Option<MediaType>,
     session_id: String,
   ) {
     let message = serde_json::to_string(&RequestMessage {
-      message: RequestMessageData::Connect(ConnectMessage { from, to, state }),
+      message: RequestMessageData::Connect(ConnectMessage {
+        from,
+        to,
+        state,
+        media_type,
+      }),
       session_id,
       message_type: MessageType::Request,
     })
@@ -201,21 +208,25 @@ impl RTCLink {
     }
   }
 
-  pub async fn set_media(&self, dom: Option<HtmlMediaElement>) -> Result<(), JsValue> {
-    let stream = get_user_media(
-      // Some("{ device_id: 'default',echo_cancellation: true }"),
-      None,
-      Some("true"),
-    )
-    .await
-    .ok();
-    if let Some(dom) = dom {
-      dom.set_src_object(stream.as_ref());
-    }
-    if let Some(stream) = stream {
-      self.rtc.set_tracks(stream);
+  pub async fn set_media(
+    &self,
+    dom: Option<HtmlMediaElement>,
+    media_type: &Option<MediaType>,
+  ) -> Result<(), JsValue> {
+    if let Some(media_type) = media_type {
+      let stream = match media_type {
+        MediaType::Video => get_user_media(Some("true"), Some("true")),
+        MediaType::Audio => get_user_media(Some("true"), None),
+      }
+      .await
+      .ok();
+      if let Some(dom) = dom {
+        dom.set_src_object(stream.as_ref());
+      }
+      if let Some(stream) = stream {
+        self.rtc.set_tracks(stream);
+      }
     }
     Ok(())
   }
-
 }

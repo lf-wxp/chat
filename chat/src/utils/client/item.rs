@@ -60,18 +60,21 @@ impl Client {
           if *message_type == MessageType::Response {
             continue;
           }
-          let uuid = &user.borrow().uuid;
-          if let ResponseMessageData::Connect(ConnectMessage { from, state, .. }) = message {
+          let uuid = user.borrow().uuid.clone();
+          if let ResponseMessageData::Connect(ConnectMessage {
+            from,
+            state,
+            media_type,
+            ..
+          }) = message
+          {
             log!("connect", format!("{:?}", *message));
             if ConnectState::New != *state {
               return;
             }
-            let link = RTCLink::new(uuid.clone(), from.to_string()).unwrap();
-            let dom = query_selector(".local-stream");
-            let _ = link.set_media(dom).await;
-            links.borrow_mut().insert(from.to_string(), link);
-            Client::replay_request_connect(&sender, uuid.clone(), from.clone(), session_id.clone())
-              .await;
+            Client::set_link_static(links.clone(), &uuid, from);
+            Client::set_link_media_static(links.clone(), from, media_type).await;
+            Client::replay_request_connect(&sender, uuid, from.clone(), session_id.clone()).await;
             log!(
               "request connect before",
               get_window().performance().unwrap().now()
@@ -155,13 +158,33 @@ impl Client {
     (user.uuid, user.name)
   }
 
+  fn set_link(&self, remote_id: &str) {
+    let (uuid, ..) = self.extract_user();
+    let links = self.links.clone();
+    Client::set_link_static(links, &uuid, remote_id);
+  }
+  async fn set_link_media(&self, remote_id: &str, media_type: &Option<MediaType>) {
+    let links = self.links.clone();
+    Client::set_link_media_static(links, remote_id, media_type).await;
+  }
+
+  async fn link_connect(&self, remote_id: &str) {
+    let links = self.links.borrow();
+    let link = links.get(remote_id);
+    if let Some(link) = link {
+      if (link.connect().await).is_ok() {
+        log!("connected");
+      }
+    }
+  }
+
   pub async fn request_media(&mut self, to: String, media_type: MediaType) {
     let (uuid, name) = self.extract_user();
     let message = RequestMessageData::Media(MediaMessage {
       from: uuid,
       from_name: name,
       to: to.clone(),
-      media_type,
+      media_type: media_type.clone(),
       confirm: None,
     });
     let request = Request::new(self.link.sender(), self.link.receiver());
@@ -169,7 +192,17 @@ impl Client {
       Ok(message) => {
         if let Media(MediaMessage { from, confirm, .. }) = message {
           if confirm.is_some_and(|x| x) {
-            self.request_connect(from.clone()).await;
+            match self
+              .request_connect(from.clone(), Some(media_type.clone()))
+              .await
+            {
+              Ok(_) => {
+                self.set_link(&to);
+                self.set_link_media(&to, &Some(media_type)).await;
+                self.link_connect(&to).await;
+              }
+              Err(_) => todo!(),
+            }
           }
         }
       }
@@ -203,7 +236,9 @@ impl Client {
     self.replay_request_media(message, false, session_id).await;
   }
   pub async fn confirm_request_media(&mut self, message: MediaMessage, session_id: String) {
-    self.replay_request_media(message, true, session_id).await;
+    self
+      .replay_request_media(message.clone(), true, session_id)
+      .await;
   }
 
   pub async fn replay_request_connect(
@@ -216,41 +251,45 @@ impl Client {
       from,
       to,
       state: ConnectState::Checking,
+      media_type: None,
     });
     Client::send_static(sender, message, MessageType::Response, session_id).await;
   }
 
-  pub async fn request_connect(&mut self, to: String) {
+  pub fn set_link_static(links: Rc<RefCell<HashMap<String, RTCLink>>>, id: &str, remote_id: &str) {
+    if links.borrow().get(remote_id).is_none() {
+      let link = RTCLink::new(id.to_string(), remote_id.to_string()).unwrap();
+      links.borrow_mut().insert(remote_id.to_string(), link);
+    }
+  }
+
+  pub async fn set_link_media_static(
+    links: Rc<RefCell<HashMap<String, RTCLink>>>,
+    remote_id: &str,
+    media_type: &Option<MediaType>,
+  ) {
+    let links = links.borrow();
+    let link = links.get(remote_id);
+    let dom = query_selector(".local-stream");
+    if let Some(link) = link {
+      let _ = link.set_media(dom, media_type).await;
+      log!("set link media");
+    }
+  }
+
+  pub async fn request_connect(
+    &mut self,
+    to: String,
+    media_type: Option<MediaType>,
+  ) -> Result<ResponseMessageData, RequestError> {
     let (uuid, ..) = self.extract_user();
-    let id = uuid.clone();
-    let remote_id = to.clone();
-    let link = RTCLink::new(id, remote_id).unwrap();
     let message = RequestMessageData::Connect(ConnectMessage {
       from: uuid,
       to: to.clone(),
       state: ConnectState::New,
+      media_type,
     });
     let request = Request::new(self.link.sender(), self.link.receiver());
-    match request.request(message).await {
-      Ok(_) => {
-        log!(
-          "request connect after",
-          get_window().performance().unwrap().now()
-        );
-        self.links.borrow_mut().insert(to.to_string(), link);
-        let links = self.links.borrow();
-        let link = links.get(&(to.clone()));
-        let dom = query_selector(".local-stream");
-        if let Some(link) = link {
-          let _ = link.set_media(dom).await;
-          if (link.connect().await).is_ok() {
-            log!("connected");
-          }
-        }
-      }
-      Err(err) => {
-        log!("error", format!("{:?}", err));
-      }
-    }
+    request.request(message).await
   }
 }
