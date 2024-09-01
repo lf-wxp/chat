@@ -1,4 +1,7 @@
+use std::time::Duration;
+
 use bounce::{use_atom_value, use_selector_value};
+use gloo_timers::future::sleep;
 use message::MediaType;
 use stylist::{self, style};
 use yew::prelude::*;
@@ -29,7 +32,10 @@ pub fn UserList() -> Html {
   let onclick = Callback::from(move |(user, _call_type): (User, String)| {
     get_client_execute(Box::new(|client| {
       Box::pin(async move {
-        client.request_media(user.uuid, MediaType::Video).await;
+        // client.request_media(user.uuid, MediaType::Video).await;
+        client.request_link(user.uuid.clone()).await;
+        sleep(Duration::from_secs(2)).await;
+        client.send_rtc_message(user.uuid, "hello world".to_string()).await;
       })
     }));
   });

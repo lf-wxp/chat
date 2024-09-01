@@ -7,9 +7,11 @@ use message::{
 };
 use nanoid::nanoid;
 use std::{cell::RefCell, rc::Rc};
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{HtmlMediaElement, MediaStream, RtcIceConnectionState, RtcPeerConnection};
+use web_sys::{
+  HtmlMediaElement, MediaStream, MessageEvent, RtcIceConnectionState, RtcPeerConnection,
+};
 use yew::Event;
 
 use crate::utils::{get_link, get_target, get_user_media, query_selector, to_connect_state, Link};
@@ -20,6 +22,11 @@ use super::{
 };
 
 #[derive(Debug)]
+pub enum RtcType {
+  Caller,
+  Callee,
+}
+#[derive(Debug)]
 pub struct RTCLink {
   id: String,
   remote_id: String,
@@ -27,10 +34,11 @@ pub struct RTCLink {
   ready: Rc<RefCell<bool>>,
   link: &'static mut Link,
   rtc: WebRTC,
+  rtc_type: RtcType,
 }
 
 impl RTCLink {
-  pub fn new(id: String, remote_id: String) -> Result<Self, JsValue> {
+  pub fn new(id: String, remote_id: String, rtc_type: RtcType) -> Result<Self, JsValue> {
     let rtc = WebRTC::new()?;
     let link = get_link().unwrap();
     let remote_media = MediaStream::new()?;
@@ -41,6 +49,7 @@ impl RTCLink {
       ready: Rc::new(RefCell::new(false)),
       remote_media: Rc::new(RefCell::new(remote_media)),
       link,
+      rtc_type,
     };
     link.watch_rtc_event();
     Ok(link)
@@ -64,7 +73,18 @@ impl RTCLink {
               dom.set_src_object(Some(&remote_media.borrow()));
             }
           }
-          ChannelMessage::DataChannelEvent(ev) => {}
+          ChannelMessage::DataChannelEvent(ev) => {
+            log!("data channel data");
+            let channel = ev.channel();
+            let message_callback = Closure::wrap(Box::new(move |ev: MessageEvent| {
+              log!("receiver message", ev);
+            }) as Box<dyn FnMut(_)>);
+            let _ = channel.add_event_listener_with_callback(
+              "message",
+              message_callback.as_ref().unchecked_ref(),
+            );
+            message_callback.forget(); // 防止闭包在事件监听器结束时被销毁
+          }
           ChannelMessage::IceEvent(ev) => {
             let ice = ev.candidate().map(|candidate| {
               JSON::stringify(&candidate.to_json())
@@ -80,7 +100,9 @@ impl RTCLink {
           }
           ChannelMessage::DataChannelCloseEvent => {}
           ChannelMessage::DataChannelErrorEvent => {}
-          ChannelMessage::DataChannelMessage(ev) => {}
+          ChannelMessage::DataChannelMessage(ev) => {
+            log!("receive channel message", ev);
+          }
           ChannelMessage::IceConnectionStateChange(ev) => {
             let target = get_target::<Event, RtcPeerConnection>(ev);
             let state = target.as_ref().unwrap().ice_connection_state();
@@ -101,6 +123,9 @@ impl RTCLink {
           }
           ChannelMessage::Negotiationneeded(ev) => {
             log!("track negotiation");
+          }
+          ChannelMessage::DataChannelOpenEvent(ev) => {
+            log!("data change open");
           }
         }
       }
@@ -150,6 +175,10 @@ impl RTCLink {
     let from = self.id.clone();
     let to = self.remote_id.clone();
     RTCLink::send_signal_static(&sender, from, to, message, session_id).await;
+  }
+
+  pub fn is_ready(&self) -> bool {
+    *self.ready.clone().borrow()
   }
 
   pub async fn connect(&self) -> Result<(), ConnectError> {
@@ -228,5 +257,10 @@ impl RTCLink {
       }
     }
     Ok(())
+  }
+
+  pub fn send_message(&self, message: String) {
+    let data = self.rtc.send_message(message);
+    log!("send_message result", format!("{:?}", data));
   }
 }

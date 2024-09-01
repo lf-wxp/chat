@@ -14,6 +14,7 @@ use crate::{bind_event, model::IceCandidate};
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 
+
 #[derive(Debug)]
 pub struct WebRTC {
   peer: RtcPeerConnection,
@@ -31,6 +32,7 @@ pub enum ChannelMessage {
   IceConnectionStateChange(Event),
   DataChannelCloseEvent,
   DataChannelErrorEvent,
+  DataChannelOpenEvent(Event),
   DataChannelMessage(MessageEvent),
   Negotiationneeded(Event),
 }
@@ -57,6 +59,7 @@ impl WebRTC {
     self.bind_oniceconnectionstatechange();
     self.bind_onnegotiationneeded();
     self.bind_ondatachannel_message();
+    self.bind_ondatachannel_open();
   }
 
   fn bind_ontrack(&self) {
@@ -106,6 +109,16 @@ impl WebRTC {
       self.message_sender,
       ChannelMessage::DataChannelMessage,
       MessageEvent
+    )
+  }
+
+  fn bind_ondatachannel_open(&self) {
+    bind_event!(
+      self.data_channel,
+      "open",
+      self.message_sender,
+      ChannelMessage::DataChannelOpenEvent,
+      Event
     )
   }
 
@@ -197,4 +210,10 @@ impl WebRTC {
       .add_ice_candidate_with_opt_rtc_ice_candidate(ice.as_ref());
     Ok(())
   }
+
+  pub fn send_message(&self, message: String) -> Result<(), JsValue> {
+    log!("send message", &message);
+    self.data_channel.send_with_str(&message)
+  }
+
 }
