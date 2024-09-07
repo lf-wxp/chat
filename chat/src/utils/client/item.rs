@@ -72,8 +72,10 @@ impl Client {
             if ConnectState::New != *state {
               return;
             }
-            Client::set_link_static(links.clone(), &uuid, from, RtcType::Callee);
-            Client::set_link_media_static(links.clone(), from, media_type).await;
+            if !Client::has_link(links.clone(), from) {
+              Client::set_link_static(links.clone(), &uuid, from, RtcType::Callee);
+              Client::set_link_media_static(links.clone(), from, media_type).await;
+            }
             Client::replay_request_connect(&sender, uuid, from.clone(), session_id.clone()).await;
             log!(
               "request connect before",
@@ -179,25 +181,39 @@ impl Client {
   }
 
   pub fn is_link_ready(&self, to: &str) -> bool {
-    let links = self.links.borrow();
-    let link = links.get(to);
-    if let Some(link) = link {
-      if link.is_ready() {
-        return true;
-      }
-    }
-    false
+    self.links.borrow().get(to).map_or(false, |x| x.is_ready())
   }
-  
+
+  pub fn is_datachannel_ready(&self, to: &str) -> bool {
+    self
+      .links
+      .borrow()
+      .get(to)
+      .map_or(false, |x| x.is_datachannel_ready())
+  }
+
   pub async fn request_link(&mut self, remote_id: String) {
-    if self.is_link_ready(&remote_id)  { return };
+    if self.is_link_ready(&remote_id) {
+      return;
+    };
     if (self.request_connect(&remote_id, None).await).is_ok() {
+      log!("connect");
       self.set_link(&remote_id, RtcType::Caller);
       self.link_connect(&remote_id).await;
     };
   }
 
-  pub async fn send_rtc_message(&mut self, remote_id: String, message: String ) {
+  pub fn request_datachannel(&mut self, remote_id: String) {
+    if self.is_datachannel_ready(&remote_id) {
+      return;
+    }
+    if let Some(link) = self.links.borrow_mut().get_mut(&remote_id) {
+      log!("create datachannel");
+      link.create_datachannel();
+    }
+  }
+
+  pub async fn send_rtc_message(&mut self, remote_id: String, message: String) {
     let links = self.links.borrow();
     let link = links.get(&remote_id);
     if let Some(link) = link {
@@ -282,7 +298,19 @@ impl Client {
     Client::send_static(sender, message, MessageType::Response, session_id).await;
   }
 
-  pub fn set_link_static(links: Rc<RefCell<HashMap<String, RTCLink>>>, id: &str, remote_id: &str, rtc_type: RtcType) {
+  pub fn has_link(
+    links: Rc<RefCell<HashMap<String, RTCLink>>>,
+    remote_id: &str,
+  ) -> bool {
+    links.borrow().get(remote_id).is_some()
+  }
+
+  pub fn set_link_static(
+    links: Rc<RefCell<HashMap<String, RTCLink>>>,
+    id: &str,
+    remote_id: &str,
+    rtc_type: RtcType,
+  ) {
     if links.borrow().get(remote_id).is_none() {
       let link = RTCLink::new(id.to_string(), remote_id.to_string(), rtc_type).unwrap();
       links.borrow_mut().insert(remote_id.to_string(), link);

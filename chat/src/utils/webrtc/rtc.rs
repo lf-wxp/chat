@@ -1,6 +1,7 @@
 use async_broadcast::{broadcast, Receiver, Sender};
 use gloo_console::log;
 use js_sys::{Array, Reflect};
+use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -14,11 +15,10 @@ use crate::{bind_event, model::IceCandidate};
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 
-
 #[derive(Debug)]
 pub struct WebRTC {
   peer: RtcPeerConnection,
-  data_channel: RtcDataChannel,
+  data_channel: Rc<RefCell<Option<RtcDataChannel>>>,
   pub message_receiver: Receiver<ChannelMessage>,
   pub message_sender: Sender<ChannelMessage>,
 }
@@ -27,11 +27,11 @@ pub struct WebRTC {
 pub enum ChannelMessage {
   ErrorEvent,
   TrackEvent(RtcTrackEvent),
-  DataChannelEvent(RtcDataChannelEvent),
   IceEvent(RtcPeerConnectionIceEvent),
   IceConnectionStateChange(Event),
   DataChannelCloseEvent,
   DataChannelErrorEvent,
+  DataChannelEvent(RtcDataChannelEvent),
   DataChannelOpenEvent(Event),
   DataChannelMessage(MessageEvent),
   Negotiationneeded(Event),
@@ -41,10 +41,9 @@ impl WebRTC {
   pub fn new() -> Result<Self, JsValue> {
     let (sender, receiver) = broadcast(20);
     let peer = RtcPeerConnection::new()?;
-    let data_channel = peer.create_data_channel("chat");
     let rtc = Self {
       peer,
-      data_channel,
+      data_channel: Rc::new(RefCell::new(None)),
       message_receiver: receiver,
       message_sender: sender,
     };
@@ -58,8 +57,7 @@ impl WebRTC {
     self.bind_onicecandidate();
     self.bind_oniceconnectionstatechange();
     self.bind_onnegotiationneeded();
-    self.bind_ondatachannel_message();
-    self.bind_ondatachannel_open();
+    self.bind_datachannel_message();
   }
 
   fn bind_ontrack(&self) {
@@ -103,23 +101,27 @@ impl WebRTC {
   }
 
   fn bind_ondatachannel_message(&self) {
-    bind_event!(
-      self.data_channel,
-      "message",
-      self.message_sender,
-      ChannelMessage::DataChannelMessage,
-      MessageEvent
-    )
+    if let Some(channel) = self.data_channel.borrow().as_ref() {
+      bind_event!(
+        channel,
+        "message",
+        self.message_sender,
+        ChannelMessage::DataChannelMessage,
+        MessageEvent
+      )
+    }
   }
 
   fn bind_ondatachannel_open(&self) {
-    bind_event!(
-      self.data_channel,
-      "open",
-      self.message_sender,
-      ChannelMessage::DataChannelOpenEvent,
-      Event
-    )
+    if let Some(channel) = self.data_channel.borrow().as_ref() {
+      bind_event!(
+        channel,
+        "open",
+        self.message_sender,
+        ChannelMessage::DataChannelOpenEvent,
+        Event
+      )
+    }
   }
 
   fn bind_onnegotiationneeded(&self) {
@@ -130,6 +132,31 @@ impl WebRTC {
       ChannelMessage::Negotiationneeded,
       Event
     )
+  }
+
+  fn bind_datachannel_message(&self) {
+    let datachannel = self.data_channel.clone();
+    let message_sender = self.message_sender.clone();
+    let message_callback = {
+      Closure::<dyn FnMut(RtcDataChannelEvent)>::new(move |ev: RtcDataChannelEvent| {
+        let mut datachannel = datachannel.borrow_mut();
+        let channel = ev.channel();
+        if datachannel.is_none() {
+          *datachannel = Some(channel.clone());
+          bind_event!(
+            channel,
+            "message",
+            message_sender,
+            ChannelMessage::DataChannelMessage,
+            MessageEvent
+          )
+        }
+      })
+    };
+    let _ = self
+      .peer
+      .add_event_listener_with_callback("datachannel", message_callback.as_ref().unchecked_ref());
+    message_callback.forget(); // 防止闭包在事件监听器结束时被销毁
   }
 
   pub fn state(&self) -> RtcIceConnectionState {
@@ -213,7 +240,16 @@ impl WebRTC {
 
   pub fn send_message(&self, message: String) -> Result<(), JsValue> {
     log!("send message", &message);
-    self.data_channel.send_with_str(&message)
+    if let Some(channel) = self.data_channel.borrow().as_ref() {
+      let _ = channel.send_with_str(&message);
+    }
+    Ok(())
   }
 
+  pub fn create_datachannel(&mut self) {
+    let data_channel = self.peer.create_data_channel("chat");
+    *self.data_channel.borrow_mut() = Some(data_channel);
+    self.bind_ondatachannel_message();
+    self.bind_ondatachannel_open();
+  }
 }
