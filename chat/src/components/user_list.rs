@@ -33,9 +33,9 @@ pub fn UserList() -> Html {
     get_client_execute(Box::new(|client| {
       Box::pin(async move {
         // client.request_media(user.uuid, MediaType::Video).await;
-        client.request_link(user.uuid.clone()).await;
+        client.request_datachannel(user.uuid.clone()).await;
         sleep(Duration::from_secs(2)).await;
-        client.send_rtc_message(user.uuid, "hello world".to_string()).await;
+        client.send_message(user.uuid, "hello world".to_string()).await;
       })
     }));
   });

@@ -141,16 +141,14 @@ impl WebRTC {
       Closure::<dyn FnMut(RtcDataChannelEvent)>::new(move |ev: RtcDataChannelEvent| {
         let mut datachannel = datachannel.borrow_mut();
         let channel = ev.channel();
-        if datachannel.is_none() {
-          *datachannel = Some(channel.clone());
-          bind_event!(
-            channel,
-            "message",
-            message_sender,
-            ChannelMessage::DataChannelMessage,
-            MessageEvent
-          )
-        }
+        *datachannel = Some(channel.clone());
+        bind_event!(
+          channel,
+          "message",
+          message_sender,
+          ChannelMessage::DataChannelMessage,
+          MessageEvent
+        )
       })
     };
     let _ = self

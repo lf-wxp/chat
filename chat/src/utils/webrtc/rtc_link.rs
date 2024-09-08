@@ -1,4 +1,4 @@
-use async_broadcast::Sender;
+use async_broadcast::{Receiver, Sender};
 use gloo_console::log;
 use js_sys::JSON;
 use message::{
@@ -19,20 +19,29 @@ use super::{
   Connect, ConnectError,
 };
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RtcType {
   Caller,
   Callee,
 }
+
+#[derive(Debug, Clone)]
+pub struct BaseInfo {
+  id: String,
+  remote_id: String,
+  rtc: Rc<RefCell<WebRTC>>,
+  rtc_type: RtcType,
+}
+
 #[derive(Debug)]
 pub struct RTCLink {
   id: String,
   remote_id: String,
   remote_media: Rc<RefCell<MediaStream>>,
   ready: Rc<RefCell<bool>>,
-  datachannel: Rc<RefCell<bool>>,
+  datachannel_ready: Rc<RefCell<bool>>,
   link: &'static mut Link,
-  rtc: WebRTC,
+  rtc: Rc<RefCell<WebRTC>>,
   rtc_type: RtcType,
 }
 
@@ -44,9 +53,9 @@ impl RTCLink {
     let mut link = RTCLink {
       id,
       remote_id,
-      rtc,
+      rtc: Rc::new(RefCell::new(rtc)),
       ready: Rc::new(RefCell::new(false)),
-      datachannel: Rc::new(RefCell::new(false)),
+      datachannel_ready: Rc::new(RefCell::new(false)),
       remote_media: Rc::new(RefCell::new(remote_media)),
       link,
       rtc_type,
@@ -58,16 +67,32 @@ impl RTCLink {
     Ok(link)
   }
 
+  fn get_base_info(&self) -> BaseInfo {
+    let RTCLink {
+      id,
+      remote_id,
+      rtc,
+      rtc_type,
+      ..
+    } = self;
+    BaseInfo {
+      id: id.to_string(),
+      remote_id: remote_id.to_string(),
+      rtc: rtc.clone(),
+      rtc_type: (*rtc_type).clone(),
+    }
+  }
+
   fn watch_rtc_event(&self) {
-    let mut receiver = self.rtc.message_receiver.clone();
+    let mut receiver_rtc = self.rtc.borrow().message_receiver.clone();
     let sender = self.link.sender();
-    let from = self.id.clone();
-    let to = self.remote_id.clone();
+    let receiver = self.link.receiver();
     let remote_media = self.remote_media.clone();
     let ready = self.ready.clone();
-    let datachannel = self.datachannel.clone();
+    let datachannel_ready = self.datachannel_ready.clone();
+    let base_info = self.get_base_info();
     spawn_local(async move {
-      while let Ok(msg) = receiver.recv().await {
+      while let Ok(msg) = receiver_rtc.recv().await {
         match msg {
           ChannelMessage::ErrorEvent => {}
           ChannelMessage::TrackEvent(ev) => {
@@ -89,8 +114,7 @@ impl RTCLink {
             });
             if ice.is_some() {
               let message = CastMessage::Ice(ice.unwrap());
-              RTCLink::send_signal_static(&sender, from.clone(), to.clone(), message, nanoid!())
-                .await;
+              RTCLink::send_signal(&sender, base_info.clone(), message, nanoid!()).await;
             }
           }
           ChannelMessage::DataChannelCloseEvent => {}
@@ -105,58 +129,39 @@ impl RTCLink {
             if target.is_some() {
               let is_connected = state == RtcIceConnectionState::Connected;
               *ready.borrow_mut() = is_connected;
-              RTCLink::send_connect_static(
+              RTCLink::transmit_ice_state_message(
                 &sender,
-                from.clone(),
-                to.clone(),
+                base_info.clone(),
                 to_connect_state(state),
                 None,
-                nanoid!(),
               )
               .await;
             }
           }
           ChannelMessage::Negotiationneeded(ev) => {
             log!("track negotiation");
+            let _ = RTCLink::negotiation(&sender, receiver.clone(), base_info.clone()).await;
           }
           ChannelMessage::DataChannelOpenEvent(ev) => {
-            *datachannel.borrow_mut() = true;
+            *datachannel_ready.borrow_mut() = true;
           }
         }
       }
     })
   }
 
-  async fn send_signal_static(
+  async fn send_signal(
     sender: &Sender<String>,
-    from: String,
-    to: String,
+    base_info: BaseInfo,
     message: CastMessage,
     session_id: String,
   ) {
+    let BaseInfo { id, remote_id, .. } = base_info;
     let message = serde_json::to_string(&RequestMessage {
-      message: RequestMessageData::Signal(SignalMessage { from, to, message }),
-      session_id,
-      message_type: MessageType::Request,
-    })
-    .unwrap();
-    let _ = sender.broadcast_direct(message).await;
-  }
-
-  async fn send_connect_static(
-    sender: &Sender<String>,
-    from: String,
-    to: String,
-    state: ConnectState,
-    media_type: Option<MediaType>,
-    session_id: String,
-  ) {
-    let message = serde_json::to_string(&RequestMessage {
-      message: RequestMessageData::Connect(ConnectMessage {
-        from,
-        to,
-        state,
-        media_type,
+      message: RequestMessageData::Signal(SignalMessage {
+        from: id,
+        to: remote_id,
+        message,
       }),
       session_id,
       message_type: MessageType::Request,
@@ -165,11 +170,25 @@ impl RTCLink {
     let _ = sender.broadcast_direct(message).await;
   }
 
-  async fn send_signal(&self, message: CastMessage, session_id: String) {
-    let sender = self.link.sender();
-    let from = self.id.clone();
-    let to = self.remote_id.clone();
-    RTCLink::send_signal_static(&sender, from, to, message, session_id).await;
+  async fn transmit_ice_state_message(
+    sender: &Sender<String>,
+    base_info: BaseInfo,
+    state: ConnectState,
+    media_type: Option<MediaType>,
+  ) {
+    let BaseInfo { id, remote_id, .. } = base_info;
+    let message = serde_json::to_string(&RequestMessage {
+      message: RequestMessageData::Connect(ConnectMessage {
+        from: id,
+        to: remote_id,
+        state,
+        media_type,
+      }),
+      session_id: nanoid!(),
+      message_type: MessageType::Request,
+    })
+    .unwrap();
+    let _ = sender.broadcast_direct(message).await;
   }
 
   pub fn is_ready(&self) -> bool {
@@ -177,33 +196,46 @@ impl RTCLink {
   }
 
   pub fn is_datachannel_ready(&self) -> bool {
-    *self.datachannel.clone().borrow()
+    *self.datachannel_ready.clone().borrow()
   }
 
-  pub async fn connect(&self) -> Result<(), ConnectError> {
-    let receiver = self.link.receiver();
-    let send_future = self.send_offer();
-    let connect = Connect::new(self.remote_id.clone(), receiver);
+  pub async fn negotiation(
+    sender: &Sender<String>,
+    receiver: Receiver<String>,
+    base_info: BaseInfo,
+  ) -> Result<(), ConnectError> {
+    if base_info.rtc_type == RtcType::Callee {
+      return Ok(());
+    }
+    let remote_id = base_info.remote_id.clone();
+    let send_future = RTCLink::send_offer(sender, base_info);
+    let connect = Connect::new(remote_id, receiver);
     connect.connect(send_future).await
   }
 
-  pub async fn send_offer(&self) -> Result<(), JsValue> {
-    let offer = self.rtc.get_send_offer().await?;
+  pub async fn send_offer(sender: &Sender<String>, base_info: BaseInfo) -> Result<(), JsValue> {
+    let rtc = base_info.rtc.clone();
+    let offer = rtc.borrow().get_send_offer().await?;
     let message = CastMessage::Sdp(SdpMessage {
       sdp_type: SdpType::Offer,
       sdp: offer,
     });
-    self.send_signal(message.clone(), nanoid!()).await;
+    RTCLink::send_signal(sender, base_info, message, nanoid!()).await;
     Ok(())
   }
 
-  pub async fn send_answer(&self, session_id: String) -> Result<(), JsValue> {
-    let answer = self.rtc.get_send_answer().await.unwrap();
+  pub async fn send_answer(
+    sender: &Sender<String>,
+    base_info: BaseInfo,
+    session_id: String,
+  ) -> Result<(), JsValue> {
+    let rtc = base_info.rtc.clone();
+    let answer = rtc.borrow().get_send_answer().await.unwrap();
     let message = CastMessage::Sdp(SdpMessage {
       sdp_type: SdpType::Answer,
       sdp: answer,
     });
-    self.send_signal(message.clone(), session_id).await;
+    RTCLink::send_signal(sender, base_info, message, session_id).await;
     Ok(())
   }
 
@@ -214,6 +246,8 @@ impl RTCLink {
       ..
     } = message;
 
+    let base_info = self.get_base_info();
+    let sender = self.link.sender();
     if let ResponseMessageData::Signal(message) = message {
       let SignalMessage { message, .. } = message;
       match message {
@@ -221,16 +255,16 @@ impl RTCLink {
           let SdpMessage { sdp_type, sdp } = message;
           match sdp_type {
             message::SdpType::Offer => {
-              let _ = self.rtc.receive_offer(sdp).await;
-              let _ = self.send_answer(session_id).await;
+              let _ = self.rtc.borrow().receive_offer(sdp).await;
+              let _ = RTCLink::send_answer(&sender, base_info, session_id).await;
             }
             message::SdpType::Answer => {
-              let _ = self.rtc.receive_answer(sdp).await;
+              let _ = self.rtc.borrow().receive_answer(sdp).await;
             }
           }
         }
         message::CastMessage::Ice(message) => {
-          let _ = self.rtc.receive_ice(message);
+          let _ = self.rtc.borrow().receive_ice(message);
         }
       }
     }
@@ -252,18 +286,18 @@ impl RTCLink {
         dom.set_src_object(stream.as_ref());
       }
       if let Some(stream) = stream {
-        self.rtc.set_tracks(stream);
+        self.rtc.borrow().set_tracks(stream);
       }
     }
     Ok(())
   }
 
   pub fn send_message(&self, message: String) {
-    let data = self.rtc.send_message(message);
+    let data = self.rtc.borrow().send_message(message);
     log!("send_message result", format!("{:?}", data));
   }
 
   pub fn create_datachannel(&mut self) {
-    self.rtc.create_datachannel();
+    self.rtc.borrow_mut().create_datachannel();
   }
 }
