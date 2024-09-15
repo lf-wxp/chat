@@ -6,12 +6,12 @@ use message::{
   ListMessage, MediaMessage, MediaType, MessageType, RequestMessage, RequestMessageData,
   ResponseMessage, ResponseMessageData, ResponseMessageData::Media, SignalMessage, UpdateName,
 };
-
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
   store::User,
+  utils::webrtc::ChannelMessage,
   utils::{get_link, get_window, query_selector, Link, RTCLink, Request, RequestError, RtcType},
 };
 
@@ -164,7 +164,7 @@ impl Client {
       .map_or(false, |x| x.is_datachannel_ready())
   }
 
-  pub async fn send_message(&mut self, remote_id: String, message: String) {
+  pub fn send_message(&mut self, remote_id: String, message: ChannelMessage) {
     let links = self.links.borrow();
     let link = links.get(&remote_id);
     if let Some(link) = link {

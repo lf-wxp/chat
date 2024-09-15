@@ -106,9 +106,9 @@ fn get_class_name() -> String {
         block-size: 0;
         inline-size: 0;
         transform: translateX(50%);
-        border-left: var(--triangle-size) solid transparent;
-        border-right: var(--triangle-size) solid transparent;
-        border-top: var(--triangle-size) solid rgba(var(--theme-color-rgb), 0.7);
+        border-inline-start: var(--triangle-size) solid transparent;
+        border-inline-end: var(--triangle-size) solid transparent;
+        border-block-start: var(--triangle-size) solid rgba(var(--theme-color-rgb), 0.7);
       }
     "#
   ))

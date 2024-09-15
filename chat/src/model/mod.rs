@@ -9,6 +9,7 @@ pub use chat_history::*;
 pub use message::*;
 use wasm_bindgen::JsValue;
 use web_sys::{RtcIceCandidate, RtcIceCandidateInit};
+use yew_icons::IconId;
 
 pub type Error = Box<dyn std::error::Error>;
 pub type UResult<T> = std::result::Result<T, Error>;
@@ -16,6 +17,7 @@ pub type UResult<T> = std::result::Result<T, Error>;
 pub struct Option<T = String> {
   pub label: String,
   pub value: T,
+  pub icon: std::option::Option<IconId>
 }
 
 #[derive(Clone)]

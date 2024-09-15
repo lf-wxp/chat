@@ -124,7 +124,7 @@ fn get_class_name() -> String {
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #50b66d;
+        background: var(--icon-button-background);
         color: white; 
         inline-size: var(--send-size);
         block-size: var(--send-size);
@@ -134,7 +134,7 @@ fn get_class_name() -> String {
         transition: all 0.2s ease;
       } 
       .send-btn:hover {
-        background: #4cad68;
+        background: var(--icon-button-background-hover);
       }
          
     "#

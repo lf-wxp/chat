@@ -1,6 +1,6 @@
 use async_broadcast::{broadcast, Receiver, Sender};
 use gloo_console::log;
-use js_sys::{Array, Reflect};
+use js_sys::{Array, ArrayBuffer, Reflect};
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
@@ -16,15 +16,21 @@ use crate::{bind_event, model::IceCandidate};
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 
 #[derive(Debug)]
+pub enum ChannelMessage<'a> {
+  String(&'a str),
+  ArrayBuffer(ArrayBuffer),
+}
+
+#[derive(Debug)]
 pub struct WebRTC {
   peer: RtcPeerConnection,
   data_channel: Rc<RefCell<Option<RtcDataChannel>>>,
-  pub message_receiver: Receiver<ChannelMessage>,
-  pub message_sender: Sender<ChannelMessage>,
+  pub message_receiver: Receiver<TransmitMessage>,
+  pub message_sender: Sender<TransmitMessage>,
 }
 
 #[derive(Debug, Clone)]
-pub enum ChannelMessage {
+pub enum TransmitMessage {
   ErrorEvent,
   TrackEvent(RtcTrackEvent),
   IceEvent(RtcPeerConnectionIceEvent),
@@ -65,7 +71,7 @@ impl WebRTC {
       self.peer,
       "track",
       self.message_sender,
-      ChannelMessage::TrackEvent,
+      TransmitMessage::TrackEvent,
       RtcTrackEvent
     )
   }
@@ -75,7 +81,7 @@ impl WebRTC {
       self.peer,
       "datachannel",
       self.message_sender,
-      ChannelMessage::DataChannelEvent,
+      TransmitMessage::DataChannelEvent,
       RtcDataChannelEvent
     )
   }
@@ -85,7 +91,7 @@ impl WebRTC {
       self.peer,
       "icecandidate",
       self.message_sender,
-      ChannelMessage::IceEvent,
+      TransmitMessage::IceEvent,
       RtcPeerConnectionIceEvent
     )
   }
@@ -95,7 +101,7 @@ impl WebRTC {
       self.peer,
       "iceconnectionstatechange",
       self.message_sender,
-      ChannelMessage::IceConnectionStateChange,
+      TransmitMessage::IceConnectionStateChange,
       Event
     )
   }
@@ -106,7 +112,7 @@ impl WebRTC {
         channel,
         "message",
         self.message_sender,
-        ChannelMessage::DataChannelMessage,
+        TransmitMessage::DataChannelMessage,
         MessageEvent
       )
     }
@@ -118,7 +124,7 @@ impl WebRTC {
         channel,
         "open",
         self.message_sender,
-        ChannelMessage::DataChannelOpenEvent,
+        TransmitMessage::DataChannelOpenEvent,
         Event
       )
     }
@@ -129,7 +135,7 @@ impl WebRTC {
       self.peer,
       "negotiationneeded",
       self.message_sender,
-      ChannelMessage::Negotiationneeded,
+      TransmitMessage::Negotiationneeded,
       Event
     )
   }
@@ -146,7 +152,7 @@ impl WebRTC {
           channel,
           "message",
           message_sender,
-          ChannelMessage::DataChannelMessage,
+          TransmitMessage::DataChannelMessage,
           MessageEvent
         )
       })
@@ -236,10 +242,16 @@ impl WebRTC {
     Ok(())
   }
 
-  pub fn send_message(&self, message: String) -> Result<(), JsValue> {
-    log!("send message", &message);
+  pub fn send_message(&self, message: ChannelMessage) -> Result<(), JsValue> {
     if let Some(channel) = self.data_channel.borrow().as_ref() {
-      let _ = channel.send_with_str(&message);
+      match message {
+        ChannelMessage::String(message) => {
+          let _ = channel.send_with_str(&message);
+        }
+        ChannelMessage::ArrayBuffer(message) => {
+          let _ = channel.send_with_array_buffer(&message);
+        }
+      }
     }
     Ok(())
   }

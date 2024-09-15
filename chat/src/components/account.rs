@@ -61,9 +61,9 @@ fn get_class_name() -> String {
         margin: auto;
         block-size: 0;
         inline-size: 0;
-        border-bottom: 5px solid transparent;
-        border-top: 5px solid transparent;
-        border-right: 5px solid var(--theme-color);
+        border-block-end: 5px solid transparent;
+        border-block-start: 5px solid transparent;
+        border-inline-end: 5px solid var(--theme-color);
       }
     "#
   ))

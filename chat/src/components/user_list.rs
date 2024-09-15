@@ -2,15 +2,15 @@ use std::time::Duration;
 
 use bounce::{use_atom_value, use_selector_value};
 use gloo_timers::future::sleep;
-use message::MediaType;
 use stylist::{self, style};
 use yew::prelude::*;
+use yew_icons::{Icon, IconId};
 
 use crate::{
-  components::{Avatar, Dropdown},
+  components::Avatar,
   model::Option,
   store::{FilterWord, User, Users},
-  utils::{get_client_execute, style},
+  utils::{get_client_execute, style, ChannelMessage},
 };
 
 #[function_component]
@@ -19,14 +19,16 @@ pub fn UserList() -> Html {
   let users = use_selector_value::<Users>();
   let filter_word = use_atom_value::<FilterWord>();
 
-  let options = vec![
+  let options = [
     Option {
       value: "voice".to_string(),
       label: "语音通话".to_string(),
+      icon: Some(IconId::BootstrapTelephoneForwardFill),
     },
     Option {
       value: "video".to_string(),
       label: "视频通话".to_string(),
+      icon: Some(IconId::BootstrapCameraVideoFill),
     },
   ];
   let onclick = Callback::from(move |(user, _call_type): (User, String)| {
@@ -35,7 +37,7 @@ pub fn UserList() -> Html {
         // client.request_media(user.uuid, MediaType::Video).await;
         client.request_datachannel(user.uuid.clone()).await;
         sleep(Duration::from_secs(2)).await;
-        client.send_message(user.uuid, "hello world".to_string()).await;
+        client.send_message(user.uuid, ChannelMessage::String("hello world"));
       })
     }));
   });
@@ -50,14 +52,31 @@ pub fn UserList() -> Html {
               </header>
               <div class="user-list">
               { for item.users.iter().map(|x| {
-                let user = x.clone();
                 html! {
-                  <Dropdown options={options.clone()} onclick={onclick.reform(move |value: String| (user.clone(), value.clone() ))}>
+                  <div class="user-item">
                     <div class="user">
                       <Avatar name={x.name.clone()} />
                       <span class="user-name">{x.name.clone()}</span>
                     </div>
-                  </Dropdown>
+                    <ul class="action">
+                    { for options.iter().map(|y| {
+                      let value = y.value.clone();
+                      let user = x.clone();
+                      html! {
+                        <li class="icon">
+                          if let Some(icon) = y.icon {
+                            <Icon
+                              onclick={onclick.reform(move |_| (user.clone(), value.clone()))}
+                              icon_id={icon}
+                              width="16px"
+                              height="16px"
+                            />
+                          }
+                        </li>
+                      }
+                    })}
+                    </ul>
+                  </div>
                 }
               })}
             </div>
@@ -87,26 +106,66 @@ fn get_class_name() -> String {
         margin-inline-start: 5px;
         color: var(--font-color);
       }
-      .user {
+      .user-list {
+        inline-size: 100%;
+      }
+      .user-item {
+        inline-size: 100%;
         display: flex;
         align-items: center;
         margin-block: 20px;
-        block-size: 50px;
-        padding-block: 5px;
-        padding-inline: 5px;
         transition: background 0.2s ease;
         cursor: pointer;
         border-radius: var(--radius);
       }
-      .user:hover {
+      .user-item:hover {
         background: rgba(var(--theme-color-rgb), 0.5);
+      }
+      .user-item:hover .action { 
+        transform: translate(0);
+        inline-size: calc(var(--avatar-size, 40px) * 2);
+      }
+      .user-item:hover .user {
+        inline-size: calc(100% - var(--avatar-size, 40px) * 2);
+      }
+      .user {
+        display: flex;
+        align-items: center;
+        inline-size: 100%;
       }
       .user-name {
         color: var(--font-color);
         font-size: 14px;
         block-size: 100%;
-        flex: 1 1 auto;
+        flex: 0 0 auto;
         line-height: 40px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        inline-size: calc(100% - var(--avatar-size, 40px) - 10px);
+      }
+      .action {
+        display: flex;
+        align-items: center;
+        transform: translate(calc(var(--avatar-size, 40px) * 2));
+        transition: all 0.2s ease;
+        inline-size: 0;
+      }
+      .icon {
+        block-size: var(--avatar-size, 40px);
+        inline-size: var(--avatar-size, 40px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--icon-button-background-hover);
+        color: white;
+        transition: all 0.2s ease;
+      }
+      .icon:last-of-type {
+        border-inline-start: 1px solid rgba(var(--theme-color-rgb), 0.5);
+      }
+      .icon:hover {
+        background: var(--icon-button-background-hover);
       }
     "#
   ))

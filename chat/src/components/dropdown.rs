@@ -63,9 +63,9 @@ fn get_class_name() -> String {
         inset-block-end: -5px;
         block-size: 0;
         inline-size: 0;
-        border-left: 5px solid transparent;
-        border-right: 5px solid transparent;
-        border-top: 5px solid rgba(var(--theme-color-rgb), 0.5);
+        border-inline-start: 5px solid transparent;
+        border-inline-end: 5px solid transparent;
+        border-block-start: 5px solid rgba(var(--theme-color-rgb), 0.5);
       }
 
       :hover .dropdown-content {

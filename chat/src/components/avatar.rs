@@ -31,6 +31,7 @@ fn get_class_name() -> String {
         block-size: var(--avatar-size, 40px);
         inline-size: var(--avatar-size, 40px);
         border: 1px solid rgba(255, 255, 255, 0.1);
+        flex: 0 0 auto;
     "#
     )
   )

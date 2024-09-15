@@ -15,7 +15,7 @@ use yew::Event;
 use crate::utils::{get_link, get_target, get_user_media, query_selector, to_connect_state, Link};
 
 use super::{
-  rtc::{ChannelMessage, WebRTC},
+  rtc::{ChannelMessage, TransmitMessage, WebRTC},
   Connect, ConnectError,
 };
 
@@ -94,18 +94,18 @@ impl RTCLink {
     spawn_local(async move {
       while let Ok(msg) = receiver_rtc.recv().await {
         match msg {
-          ChannelMessage::ErrorEvent => {}
-          ChannelMessage::TrackEvent(ev) => {
+          TransmitMessage::ErrorEvent => {}
+          TransmitMessage::TrackEvent(ev) => {
             log!("track event");
             remote_media.borrow_mut().add_track(&ev.track());
             if let Some(dom) = query_selector::<HtmlMediaElement>(".remote-stream") {
               dom.set_src_object(Some(&remote_media.borrow()));
             }
           }
-          ChannelMessage::DataChannelEvent(ev) => {
+          TransmitMessage::DataChannelEvent(ev) => {
             log!("data channel data");
           }
-          ChannelMessage::IceEvent(ev) => {
+          TransmitMessage::IceEvent(ev) => {
             let ice = ev.candidate().map(|candidate| {
               JSON::stringify(&candidate.to_json())
                 .unwrap()
@@ -117,12 +117,12 @@ impl RTCLink {
               RTCLink::send_signal(&sender, base_info.clone(), message, nanoid!()).await;
             }
           }
-          ChannelMessage::DataChannelCloseEvent => {}
-          ChannelMessage::DataChannelErrorEvent => {}
-          ChannelMessage::DataChannelMessage(ev) => {
+          TransmitMessage::DataChannelCloseEvent => {}
+          TransmitMessage::DataChannelErrorEvent => {}
+          TransmitMessage::DataChannelMessage(ev) => {
             log!("receive channel message", ev);
           }
-          ChannelMessage::IceConnectionStateChange(ev) => {
+          TransmitMessage::IceConnectionStateChange(ev) => {
             let target = get_target::<Event, RtcPeerConnection>(ev);
             let state = target.as_ref().unwrap().ice_connection_state();
             log!("ice change", format!("{:?}", &state));
@@ -138,11 +138,11 @@ impl RTCLink {
               .await;
             }
           }
-          ChannelMessage::Negotiationneeded(ev) => {
+          TransmitMessage::Negotiationneeded(ev) => {
             log!("track negotiation");
             let _ = RTCLink::negotiation(&sender, receiver.clone(), base_info.clone()).await;
           }
-          ChannelMessage::DataChannelOpenEvent(ev) => {
+          TransmitMessage::DataChannelOpenEvent(ev) => {
             *datachannel_ready.borrow_mut() = true;
           }
         }
@@ -292,7 +292,7 @@ impl RTCLink {
     Ok(())
   }
 
-  pub fn send_message(&self, message: String) {
+  pub fn send_message(&self, message: ChannelMessage) {
     let data = self.rtc.borrow().send_message(message);
     log!("send_message result", format!("{:?}", data));
   }

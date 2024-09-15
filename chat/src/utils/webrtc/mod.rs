@@ -7,6 +7,7 @@ mod event;
 
 pub use future::*;
 pub use rtc_link::*;
+pub use rtc::*;
 
 use message::ConnectState;
 use web_sys::RtcIceConnectionState;

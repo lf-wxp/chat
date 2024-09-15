@@ -33,6 +33,7 @@ fn get_class_name() -> String {
     .user-box {
       inline-size: 300px;
       block-size: 100%;
+      flex: 0 0 auto;
     }
     .user-list-container {
       block-size: calc(100% - 32px);

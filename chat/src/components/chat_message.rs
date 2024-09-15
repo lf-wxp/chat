@@ -108,8 +108,8 @@ fn get_class_name() -> String {
           align-items: flex-start;
         }
         &.current {
-          --theme-ancillary-color: #50b66d;
-          --time-dot-bg: #50b66d;
+          --theme-ancillary-color: var(--icon-button-background);
+          --time-dot-bg: var(--icon-button-background);
           margin-inline-start: 45px; 
         }
         &.current .message, &.current time {
