@@ -37,7 +37,8 @@ fn get_class_name() -> String {
     }
     .user-list-container {
       block-size: calc(100% - 32px);
-      overflow: auto;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
     .user-video {
 

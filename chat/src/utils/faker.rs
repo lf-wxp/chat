@@ -1,10 +1,14 @@
 use fake::{
   faker::{lorem::raw::Sentence, name::raw::FirstName},
   locales::{EN, ZH_CN},
-  Dummy, Fake,
+  Dummy, Fake, Faker,
 };
+use nanoid::nanoid;
 
-use crate::model::{Message, MessageState};
+use crate::{
+  model::{Message, MessageState},
+  store::{Chat, ChatGroup, ChatGroups, ChatSingle, CurrentChat, User},
+};
 
 pub struct RandomName;
 impl Dummy<RandomName> for String {
@@ -29,5 +33,32 @@ pub struct FakeMessageState;
 impl Dummy<FakeMessageState> for MessageState {
   fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &FakeMessageState, _rng: &mut R) -> Self {
     MessageState::Success
+  }
+}
+
+pub struct FakeCurrentChat;
+impl Dummy<FakeCurrentChat> for CurrentChat {
+  fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &FakeCurrentChat, _rng: &mut R) -> Self {
+    CurrentChat(Some(Chat::Single(ChatSingle {
+      id: nanoid!(),
+      user: Faker.fake::<User>(),
+    })))
+  }
+}
+
+pub struct FakeUsers;
+impl Dummy<FakeUsers> for Vec<User> {
+  fn dummy_with_rng<R: rand::Rng + ?Sized>(_: &FakeUsers, _rng: &mut R) -> Self {
+    (0..4).map(|_| Faker.fake::<User>()).collect::<Vec<User>>()
+  }
+}
+
+pub struct FakeUser;
+impl Dummy<FakeUser> for User {
+  fn dummy_with_rng<R: rand::Rng + ?Sized>(_: &FakeUser, _rng: &mut R) -> Self {
+    User {
+      uuid: nanoid!(),
+      name: FirstName(EN).fake(),
+    }
   }
 }

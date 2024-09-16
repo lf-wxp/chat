@@ -1,31 +1,45 @@
 use bounce::use_atom;
+use bounce::use_atom_setter;
+use nanoid::nanoid;
 use std::collections::HashMap;
 use yew::prelude::*;
 use yew::use_effect_with;
 
 use crate::{
-  store::{Chat, User},
+  store::{Chat, ChatSingle, CurrentChat, User},
   utils::get_chat_history,
 };
 
 #[hook]
 pub fn use_fake_set() -> () {
   let chat_history = get_chat_history();
-  let binding = HashMap::new();
-  let chat_history = match chat_history {
-    Some(chat_history) => &chat_history.0,
-    None => &binding,
-  };
-  let conversation_handle = use_atom::<Chat>();
+  let conversation_handle = use_atom_setter::<CurrentChat>();
   let current_user_handle = use_atom::<User>();
-  let binding = "".to_owned();
-  let first_conversation = chat_history.keys().next().unwrap_or(&binding);
+  let chat_history = chat_history.map_or(HashMap::new(), |x| x.0.clone());
   let last_message = chat_history
+    .clone()
     .values()
     .next()
     .unwrap_or(&Vec::new())
-    .last().cloned();
-  conversation_handle.set(Chat((*first_conversation).clone()));
+    .last()
+    .cloned();
+  let first_key = chat_history
+    .keys()
+    .next()
+    .map_or("".to_string(), |v| v.to_string())
+    .clone();
+  use_effect_with((), move |_| {
+    conversation_handle(CurrentChat(
+      Some(Chat::Single(ChatSingle {
+        id: first_key.to_string(),
+        user: User {
+          uuid: nanoid!(),
+          name: "".to_string(),
+        },
+      }))
+      .clone(),
+    ));
+  });
   use_effect_with((), move |_| {
     if let Some(message) = last_message {
       current_user_handle.set(User {

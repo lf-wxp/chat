@@ -1,17 +1,34 @@
 use bounce::Atom;
-use std::fmt::{self, Display};
+use fake::{uuid::UUIDv1, Dummy};
 
-#[derive(Atom, PartialEq, Clone)]
-pub struct Chat(pub String);
+use crate::utils::faker::FakeUser;
+use super::{ChatGroup, User};
 
-impl Default for Chat {
-  fn default() -> Self {
-    Chat("".to_string())
-  }
+#[derive(PartialEq, Clone, Default, Dummy)]
+pub struct ChatSingle {
+  #[dummy(faker = "UUIDv1")]
+  pub id: String,
+  #[dummy(faker = "FakeUser")]
+  pub user: User,
 }
 
-impl Display for Chat {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", self.0)
+#[derive(PartialEq, Clone)]
+pub enum Chat {
+  Single(ChatSingle),
+  Group(ChatGroup),
+}
+
+#[derive(Atom, PartialEq, Clone, Default)]
+pub struct CurrentChat(pub Option<Chat>);
+
+impl CurrentChat {
+  pub fn id(&self) -> &str {
+    if let Some(chat) = &self.0 {
+      return match chat {
+        Chat::Single(chat_single) => &chat_single.id,
+        Chat::Group(chat_group) => &chat_group.id,
+      };
+    }
+    ""
   }
 }

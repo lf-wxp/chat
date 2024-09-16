@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use crate::{
   model::ChatMessage,
-  store::{Chat, Refresh},
+  store::{CurrentChat, Refresh},
   utils::get_history,
 };
 
@@ -12,9 +12,10 @@ pub struct HistoryMessage(pub Vec<ChatMessage>);
 
 impl Selector for HistoryMessage {
   fn select(states: &BounceStates) -> Rc<Self> {
-    let chat = states.get_atom_value::<Chat>();
+    let current_chat = states.get_atom_value::<CurrentChat>();
     states.get_atom_value::<Refresh>();
-    let message = get_history(&chat.0).map_or(vec![], |x| x.to_vec());
+    let id = current_chat.id();
+    let message = get_history(id).map_or(vec![], |x| x.to_vec());
     Rc::from(HistoryMessage(message))
   }
 }
