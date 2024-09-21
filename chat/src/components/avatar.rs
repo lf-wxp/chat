@@ -1,7 +1,7 @@
 use stylist::{self, style};
 use yew::prelude::*;
 
-use crate::utils::{style, avatar};
+use crate::utils::{avatar, style};
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
@@ -11,8 +11,8 @@ pub struct Props {
 #[function_component]
 pub fn Avatar(props: &Props) -> Html {
   let class_name = get_class_name();
-  let avatar = avatar::Avatar::from(props.name.to_string());
-  let avatar_html = Html::from_html_unchecked(avatar.image.into());
+  let avatar_html =
+    Html::from_html_unchecked(avatar::Avatar::from(props.name.to_string()).image.into());
   html! {
     <avatar class={class_name} name={props.name.clone()}>
       {{ avatar_html }}
@@ -22,9 +22,8 @@ pub fn Avatar(props: &Props) -> Html {
 
 #[allow(non_upper_case_globals)]
 fn get_class_name() -> String {
-  style::get_class_name(
-    style!(
-      r#"
+  style::get_class_name(style!(
+    r#"
         background: var(--theme-color);
         border-radius: var(--radius);
         display: inline-block;
@@ -33,6 +32,5 @@ fn get_class_name() -> String {
         border: 1px solid rgba(255, 255, 255, 0.1);
         flex: 0 0 auto;
     "#
-    )
-  )
+  ))
 }

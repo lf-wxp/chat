@@ -3,38 +3,44 @@ use stylist::{self, style};
 use yew::prelude::*;
 
 use crate::{
-  components::AvatarMultitude,
-  store::{ChatGroup, ChatGroups},
+  components::{Avatar, AvatarMultitude},
+  store::{Chat, Chats},
   utils::{get_client_execute, style},
 };
 
 #[function_component]
-pub fn ChatGroupsList() -> Html {
+pub fn ChatList() -> Html {
   let class_name = get_class_name();
-  let groups = use_atom_value::<ChatGroups>();
-  let onclick = Callback::from(move |item: ChatGroup| {
-    get_client_execute(Box::new(|client| {
-      Box::pin(async move {
-      })
-    }));
+  let chats = use_atom_value::<Chats>();
+  let onclick = Callback::from(move |item: Chat| {
+    get_client_execute(Box::new(|client| Box::pin(async move {})));
   });
 
   html! {
     <section class={class_name}>
-      { for groups.0.iter().map(|item| {
+      { for chats.0.iter().map(|item| {
         let item_clone = item.clone();
+        let name = match item {
+          Chat::Single(chat_single) => chat_single.user.name.clone(),
+          Chat::Group(chat_group) => chat_group.name.clone(),
+        };
         html!{
           <div class="chat-list">
             <div class="chat-item">
               <div class="chat"
                 onclick={onclick.reform(move |_| item_clone.clone())}
               >
-                <AvatarMultitude name={item.name.clone()} />
-                <span class="chat-name">{item.name.clone()}</span>
+                if let Chat::Group(item) = item {
+                  <AvatarMultitude names={item.users.clone().iter().map(|x| x.name.clone()).collect::<Vec<String>>()} />
+                }
+                if let Chat::Single(item) = item {
+                  <Avatar name={item.user.name.clone()} />
+                }
+                <span class="chat-name">{name.clone()}</span>
               </div>
             </div>
         </div>
-        } 
+        }
       })}
     </section>
   }

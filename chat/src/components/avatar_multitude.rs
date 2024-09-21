@@ -1,30 +1,28 @@
 use stylist::{self, style};
 use yew::prelude::*;
 
-use crate::utils::{style, avatar};
+use crate::{components::Avatar, utils::style};
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
-  pub name: AttrValue,
+  pub names: Vec<String>,
 }
 
 #[function_component]
 pub fn AvatarMultitude(props: &Props) -> Html {
   let class_name = get_class_name();
-  let avatar = avatar::Avatar::from(props.name.to_string());
-  let avatar_html = Html::from_html_unchecked(avatar.image.into());
   html! {
-    <avatar class={class_name} name={props.name.clone()}>
-      {{ avatar_html }}
-    </avatar>
+    <section class={class_name}>
+      { for props.names.clone().into_iter().map(|name| html! {
+        <Avatar name={name} />
+      })}
+    </section>
   }
 }
-
 #[allow(non_upper_case_globals)]
 fn get_class_name() -> String {
-  style::get_class_name(
-    style!(
-      r#"
+  style::get_class_name(style!(
+    r#"
         background: var(--theme-color);
         border-radius: var(--radius);
         display: inline-block;
@@ -33,6 +31,5 @@ fn get_class_name() -> String {
         border: 1px solid rgba(255, 255, 255, 0.1);
         flex: 0 0 auto;
     "#
-    )
-  )
+  ))
 }

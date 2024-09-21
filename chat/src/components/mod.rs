@@ -28,7 +28,7 @@ pub mod register;
 pub mod button;
 pub mod input;
 pub mod media_request;
-pub mod chat_groups_list;
+pub mod chat_list;
 pub mod avatar_multitude;
 
 pub use text::*;
@@ -61,5 +61,5 @@ pub use register::*;
 pub use button::*;
 pub use input::*;
 pub use media_request::*;
-pub use chat_groups_list::*;
+pub use chat_list::*;
 pub use avatar_multitude::*;
