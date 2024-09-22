@@ -28,6 +28,10 @@ pub fn Side() -> Html {
       route: Route::User,
     },
     Nav {
+      icon: IconId::HeroiconsSolidChatBubbleLeft,
+      route: Route::Chat,
+    },
+    Nav {
       icon: IconId::BootstrapCameraVideoFill,
       route: Route::Video,
     },

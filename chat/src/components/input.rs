@@ -15,6 +15,8 @@ pub struct Props {
   #[prop_or_default]
   pub onclick: Callback<()>,
   #[prop_or_default]
+  pub onenter: Callback<()>,
+  #[prop_or_default]
   pub size: Size,
   #[prop_or_default]
   pub value: String,
@@ -27,6 +29,7 @@ pub fn Input(props: &Props) -> Html {
   let class_name = get_class_name();
   let onchange = props.onchange.clone();
   let onclick_clone = props.onclick.clone();
+  let onenter = props.onenter.clone();
 
   let oninput = Callback::from(move |e: InputEvent| {
     if let Some(target) = get_target::<InputEvent, HtmlInputElement>(e) {
@@ -34,13 +37,18 @@ pub fn Input(props: &Props) -> Html {
     }
   });
   let onclick = Callback::from(move |_e: MouseEvent| {
-      onclick_clone.emit(());
+    onclick_clone.emit(());
+  });
+  let onkeydown = Callback::from(move |e: KeyboardEvent| {
+    if e.key() == "Enter" {
+      onenter.emit(());
+    }
   });
   let class = format!("{class_name} {}", props.size);
 
   html! {
     <section {class}>
-      <input type="text" {oninput} value={props.value.clone()} />
+      <input type="text" {oninput} value={props.value.clone()} {onkeydown} />
       if props.icon.is_some() {
         <Icon  icon_id={props.icon.unwrap()} width="16px" height="16px" {onclick} />
       }

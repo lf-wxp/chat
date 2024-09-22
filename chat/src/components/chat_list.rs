@@ -8,8 +8,14 @@ use crate::{
   utils::{get_client_execute, style},
 };
 
+#[derive(Properties, PartialEq)]
+pub struct Props {
+  #[prop_or_default]
+  pub keyword: String,
+}
+
 #[function_component]
-pub fn ChatList() -> Html {
+pub fn ChatList(props: &Props) -> Html {
   let class_name = get_class_name();
   let chats = use_atom_value::<Chats>();
   let onclick = Callback::from(move |item: Chat| {

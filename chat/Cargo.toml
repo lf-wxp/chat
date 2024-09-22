@@ -108,4 +108,6 @@ yew_icons = {version = "0.8.0", features = [
   "LucidePhoneCall",
   "LucidePhoneOff",
   "BootstrapTelephoneForwardFill",
+  "HeroiconsSolidChatBubbleLeft",
+  "OcticonsXCircleFill16"
 ]}

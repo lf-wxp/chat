@@ -1,6 +1,5 @@
 use std::time::Duration;
-
-use bounce::{use_atom_value, use_selector_value};
+use bounce::use_selector_value;
 use gloo_timers::future::sleep;
 use stylist::{self, style};
 use yew::prelude::*;
@@ -9,15 +8,19 @@ use yew_icons::{Icon, IconId};
 use crate::{
   components::Avatar,
   model::Option,
-  store::{FilterWord, User, Users},
+  store::{ User, Users},
   utils::{get_client_execute, style, ChannelMessage},
 };
+#[derive(Properties, PartialEq)]
+pub struct Props {
+  #[prop_or_default]
+  pub keyword: String,
+}
 
 #[function_component]
-pub fn UserList() -> Html {
+pub fn UserList(props: &Props) -> Html {
   let class_name = get_class_name();
   let users = use_selector_value::<Users>();
-  let filter_word = use_atom_value::<FilterWord>();
 
   let options = [
     Option {
@@ -44,7 +47,7 @@ pub fn UserList() -> Html {
 
   html! {
     <div class={class_name}>
-      { for users.group_with_alphabet(filter_word.0.clone()).iter().filter(|item| !item.users.is_empty()).map(|item| {
+      { for users.group_with_alphabet(props.keyword.clone()).iter().filter(|item| !item.users.is_empty()).map(|item| {
         html!{
           <section class="user-group">
               <header class="group-tag">

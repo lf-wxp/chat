@@ -1,10 +1,10 @@
 use stylist::{self, style};
 use yew::prelude::*;
 
-use crate::{components::{UserList, Search, VideoStream}, utils::style};
+use crate::{components::{ChatList, Search}, utils::style};
 
 #[function_component]
-pub fn User() -> Html {
+pub fn Chat() -> Html {
   let class_name = get_class_name();
   let keyword = use_state(|| "".to_string());
   let onsearch = {
@@ -15,14 +15,11 @@ pub fn User() -> Html {
   };
   html! {
     <section class={class_name}>
-      <div class="user-box">
+      <div class="chat-box">
         <Search {onsearch} />
-        <div class="user-list-container scroll-bar">
-          <UserList keyword={(*keyword).clone()} />
+        <div class="chat-list-container scroll-bar">
+          <ChatList keyword={(*keyword).clone()} />
         </div>
-      </div>
-      <div class="user-video">
-        <VideoStream />
       </div>
     </section>
   }
@@ -36,18 +33,15 @@ fn get_class_name() -> String {
     
     block-size: 100%;
     inline-size: 100%;
-    .user-box {
+    .chat-box {
       inline-size: 300px;
       block-size: 100%;
       flex: 0 0 auto;
     }
-    .user-list-container {
+    .chat-list-container {
       block-size: calc(100% - 32px);
       overflow-y: auto;
       overflow-x: hidden;
-    }
-    .user-video {
-
     }
     "#
   ))
