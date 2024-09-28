@@ -40,12 +40,11 @@ pub struct IceCandidate {
 impl TryFrom<IceCandidate> for RtcIceCandidate {
   type Error = JsValue;
   fn try_from(value: IceCandidate) -> Result<Self, Self::Error> {
-    let mut binding = RtcIceCandidateInit::new(&value.candidate);
-    let ice_candidate_init = binding
-      .candidate(&value.candidate)
-      .sdp_mid(value.sdp_mid.as_deref())
-      .sdp_m_line_index(value.sdp_m_line_index);
-    RtcIceCandidate::new(ice_candidate_init)
+    let ice_candidate_init = RtcIceCandidateInit::new(&value.candidate);
+    ice_candidate_init.set_candidate(&value.candidate);
+    ice_candidate_init.set_sdp_mid(value.sdp_mid.as_deref());
+    ice_candidate_init.set_sdp_m_line_index(value.sdp_m_line_index);
+    RtcIceCandidate::new(&ice_candidate_init)
   }
 }
 

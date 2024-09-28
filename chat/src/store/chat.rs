@@ -1,7 +1,8 @@
 use bounce::Atom;
 use fake::{uuid::UUIDv1, Dummy, Fake, Faker};
+use nanoid::nanoid;
 
-use crate::utils::faker::{FakeUsers, RandomName, FakeUser};
+use crate::utils::faker::{FakeUser, FakeUsers, RandomName};
 
 use super::User;
 
@@ -23,36 +24,50 @@ pub struct ChatGroup {
   pub users: Vec<User>,
 }
 
-#[derive(Atom, PartialEq, Clone, Dummy)]
-pub struct ChatGroups(pub Vec<ChatGroup>);
-
-impl Dummy<ChatGroups> for ChatGroups {
-  fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &ChatGroups, _rng: &mut R) -> Self {
-    ChatGroups(
-      (0..10)
-        .map(|_| Faker.fake::<ChatGroup>())
-        .collect::<Vec<ChatGroup>>(),
-    )
-  }
-}
-
-impl Default for ChatGroups {
-  fn default() -> Self {
-    #[cfg(feature = "dev")]
-    return Faker.fake::<ChatGroups>();
-    #[cfg(not(feature = "dev"))]
-    return ChatGroups::default()
-  }
-}
-
 #[derive(PartialEq, Clone)]
 pub enum Chat {
   Single(ChatSingle),
   Group(ChatGroup),
 }
 
-#[derive(Atom, PartialEq, Clone, Default)]
+impl Chat {
+  pub fn filter(&self, keyword: &str) -> bool {
+    match self {
+      Chat::Single(chat_single) => {
+        chat_single.user.name.contains(keyword)
+      }
+      Chat::Group(chat_group) => {
+        chat_group.name.contains(keyword)
+      },
+    }
+  }
+}
+
+#[derive(Atom, PartialEq, Clone)]
 pub struct Chats(pub Vec<Chat>);
+
+impl Dummy<Faker> for Chats {
+  fn dummy_with_rng<R: rand::Rng + ?Sized>(_: &Faker, _rng: &mut R) -> Self {
+    let mut chats = (0..3)
+      .map(|_| Chat::Single(Faker.fake::<ChatSingle>()))
+      .collect::<Vec<Chat>>();
+    chats.extend(
+      (0..2)
+        .map(|_| Chat::Group(Faker.fake::<ChatGroup>()))
+        .collect::<Vec<Chat>>(),
+    );
+    Chats(chats)
+  }
+}
+
+impl Default for Chats {
+  fn default() -> Self {
+    #[cfg(feature = "dev")]
+    return Faker.fake::<Chats>();
+    #[cfg(not(feature = "dev"))]
+    return Chats(vec![]);
+  }
+}
 
 #[derive(Atom, PartialEq, Clone, Default)]
 pub struct CurrentChat(pub Option<Chat>);
@@ -66,5 +81,14 @@ impl CurrentChat {
       };
     }
     ""
+  }
+}
+
+impl Dummy<CurrentChat> for CurrentChat {
+  fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &CurrentChat, _rng: &mut R) -> Self {
+    CurrentChat(Some(Chat::Single(ChatSingle {
+      id: nanoid!(),
+      user: Faker.fake::<User>(),
+    })))
   }
 }

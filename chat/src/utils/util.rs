@@ -237,3 +237,13 @@ pub async fn get_user_media(
   let result = JsFuture::from(promise).await?;
   Ok(result.into())
 }
+
+pub fn safe_slice<T>(vec: &[T], start: usize, end: usize) -> &[T] {
+  let len = vec.len();
+  if start >= len {
+    &[] // 如果start超出范围，返回空切片
+  } else {
+    let valid_end = if end > len { len } else { end };
+    &vec[start..valid_end]
+  }
+}

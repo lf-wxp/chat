@@ -24,30 +24,30 @@ pub fn ChatList(props: &Props) -> Html {
 
   html! {
     <section class={class_name}>
-      { for chats.0.iter().map(|item| {
+      <div class="chat-list">
+      { for chats.0.iter().filter(|x| x.filter(&props.keyword)).map(|item| {
         let item_clone = item.clone();
         let name = match item {
           Chat::Single(chat_single) => chat_single.user.name.clone(),
           Chat::Group(chat_group) => chat_group.name.clone(),
         };
         html!{
-          <div class="chat-list">
-            <div class="chat-item">
-              <div class="chat"
-                onclick={onclick.reform(move |_| item_clone.clone())}
-              >
-                if let Chat::Group(item) = item {
-                  <AvatarMultitude names={item.users.clone().iter().map(|x| x.name.clone()).collect::<Vec<String>>()} />
-                }
-                if let Chat::Single(item) = item {
-                  <Avatar name={item.user.name.clone()} />
-                }
-                <span class="chat-name">{name.clone()}</span>
-              </div>
+          <div class="chat-item">
+            <div class="chat"
+              onclick={onclick.reform(move |_| item_clone.clone())}
+            >
+              if let Chat::Group(item) = item {
+                <AvatarMultitude names={item.users.clone().iter().map(|x| x.name.clone()).collect::<Vec<String>>()} />
+              }
+              if let Chat::Single(item) = item {
+                <Avatar name={item.user.name.clone()} />
+              }
+              <span class="chat-name">{name.clone()}</span>
             </div>
-        </div>
+          </div>
         }
       })}
+      </div>
     </section>
   }
 }
@@ -59,7 +59,10 @@ fn get_class_name() -> String {
       display: flex;
       flex-flow: column nowrap;
       block-size: 100%;
-      avatar {
+      .chat > avatar {
+       margin-inline-end: 10px;
+      }
+      .chat > .avatar-multi {
        margin-inline-end: 10px;
       }
       .chat-list {

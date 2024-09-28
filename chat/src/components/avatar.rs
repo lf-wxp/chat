@@ -24,13 +24,17 @@ pub fn Avatar(props: &Props) -> Html {
 fn get_class_name() -> String {
   style::get_class_name(style!(
     r#"
-        background: var(--theme-color);
-        border-radius: var(--radius);
-        display: inline-block;
-        block-size: var(--avatar-size, 40px);
-        inline-size: var(--avatar-size, 40px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        flex: 0 0 auto;
+      background: var(--theme-color);
+      border-radius: var(--radius);
+      display: inline-block;
+      block-size: var(--avatar-size, 40px);
+      inline-size: var(--avatar-size, 40px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      flex: 0 0 auto;
+      svg {
+        inline-size: 100%;
+        block-size: 100%;
+      }
     "#
   ))
 }
