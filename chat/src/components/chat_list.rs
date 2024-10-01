@@ -1,11 +1,11 @@
-use bounce::use_atom_value;
+use bounce::{use_atom_setter, use_atom_value, use_slice};
 use stylist::{self, style};
 use yew::prelude::*;
 
 use crate::{
   components::{Avatar, AvatarMultitude},
-  store::{Chat, Chats},
-  utils::{get_client_execute, style},
+  store::{Chat, Chats, ChatsAction, CurrentChat},
+  utils::style,
 };
 
 #[derive(Properties, PartialEq)]
@@ -18,8 +18,11 @@ pub struct Props {
 pub fn ChatList(props: &Props) -> Html {
   let class_name = get_class_name();
   let chats = use_atom_value::<Chats>();
+  let chats_slice = use_slice::<Chats>();
+  let chat_setter = use_atom_setter::<CurrentChat>();
   let onclick = Callback::from(move |item: Chat| {
-    get_client_execute(Box::new(|client| Box::pin(async move {})));
+     chats_slice.dispatch(ChatsAction::Append(item.clone()));
+     chat_setter(CurrentChat(Some(item)))
   });
 
   html! {

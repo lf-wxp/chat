@@ -38,9 +38,14 @@ pub fn UserList(props: &Props) -> Html {
     get_client_execute(Box::new(|client| {
       Box::pin(async move {
         // client.request_media(user.uuid, MediaType::Video).await;
+      })
+    }));
+  });
+
+  let ondblclick = Callback::from(move |user: User| {
+    get_client_execute(Box::new(|client| {
+      Box::pin(async move {
         client.request_datachannel(user.uuid.clone()).await;
-        sleep(Duration::from_secs(2)).await;
-        client.send_message(user.uuid, ChannelMessage::String("hello world"));
       })
     }));
   });
@@ -55,9 +60,10 @@ pub fn UserList(props: &Props) -> Html {
               </header>
               <div class="user-list">
               { for item.users.iter().map(|x| {
+                let user = x.clone();
                 html! {
                   <div class="user-item">
-                    <div class="user">
+                    <div class="user" ondblclick={ondblclick.reform(move |_| user.clone())} >
                       <Avatar name={x.name.clone()} />
                       <span class="user-name">{x.name.clone()}</span>
                     </div>

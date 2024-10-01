@@ -1,11 +1,12 @@
 use bounce::{use_atom_value, use_selector_value};
 use stylist::{self, style};
 use yew::prelude::*;
+use yew_icons::{IconId, Icon};
 
 use crate::{
   components::{ChatBox, ChatMessage},
   model::MessageAlignment,
-  store::{HistoryMessage, User},
+  store::{CurrentChat, HistoryMessage, User},
   utils::style,
 };
 
@@ -13,6 +14,7 @@ use crate::{
 pub fn Chat() -> Html {
   let class_name = get_class_name();
   let current_user = use_atom_value::<User>();
+  let current_chat = use_atom_value::<CurrentChat>();
   let history_message = use_selector_value::<HistoryMessage>();
 
   let get_alignment = |name: String| {
@@ -31,7 +33,18 @@ pub fn Chat() -> Html {
   };
 
   html! {
-    <div class={class_name}>
+    <section class={class_name}>
+      <header>
+        <span>
+          { current_chat.name()} 
+        </span>
+        <Icon
+          class="more"
+          icon_id={IconId::HeroiconsMiniSolidEllipsisHorizontal}
+          width="16px"
+          height="16px"
+        />
+      </header> 
       <div class="history-message scroll-bar">
       { for history_message.0.iter().map(|msg| html! {
           <ChatMessage
@@ -47,7 +60,7 @@ pub fn Chat() -> Html {
       <div class="chat-box">
         <ChatBox />
       </div>
-    </div>
+    </section>
   }
 }
 
@@ -55,23 +68,41 @@ pub fn Chat() -> Html {
 fn get_class_name() -> String {
   style::get_class_name(style!(
     r#"
-        inline-size: 300px;
-        block-size: 100%;
-        display: flex;
-        flex-flow: column nowrap;
-        background: rgba(var(--theme-ancillary-color-rgb), 0.3);
+      inline-size: 300px;
+      block-size: 100%;
+      display: flex;
+      flex-flow: column nowrap;
+      background: rgba(var(--theme-ancillary-color-rgb), 0.3);
+      header {
+        block-size: 50px;
         padding: 10px;
-
-        .history-message {
-          flex: 1;  
-          overflow: auto;
-        }
-        .history-message >div {
-          margin-block-end: 30px;
-        }
-        .chat-box {
-          flex: 0; 
-        }
+        margin-block-end: 10px;
+        border-block-end: 1px solid var(--primary-color);
+        color: var(--font-color);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      header span {
+        margin-inline-start: auto;
+      }
+      .more {
+        margin-inline-start: auto;
+        cursor: pointer;
+        color: var(--primary-color);
+      }
+      .history-message {
+        flex: 1;  
+        padding: 10px;
+        overflow: auto;
+      }
+      .history-message >div {
+        margin-block-end: 30px;
+      }
+      .chat-box {
+        padding: 10px;
+        flex: 0; 
+      }
     "#
   ))
 }

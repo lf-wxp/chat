@@ -1,12 +1,14 @@
-use bounce::Atom;
+use bounce::{Atom, Slice};
 use fake::{uuid::UUIDv1, Dummy, Fake, Faker};
 use nanoid::nanoid;
+use std::rc::Rc;
+use yew::Reducible;
 
 use crate::utils::faker::{FakeUser, FakeUsers, RandomName};
 
 use super::User;
 
-#[derive(PartialEq, Clone, Default, Dummy)]
+#[derive(PartialEq, Clone, Default, Dummy, Debug)]
 pub struct ChatSingle {
   #[dummy(faker = "UUIDv1")]
   pub id: String,
@@ -14,7 +16,7 @@ pub struct ChatSingle {
   pub user: User,
 }
 
-#[derive(PartialEq, Clone, Dummy, Atom, Default)]
+#[derive(PartialEq, Clone, Dummy, Atom, Default, Debug)]
 pub struct ChatGroup {
   #[dummy(faker = "UUIDv1")]
   pub id: String,
@@ -24,7 +26,7 @@ pub struct ChatGroup {
   pub users: Vec<User>,
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum Chat {
   Single(ChatSingle),
   Group(ChatGroup),
@@ -33,17 +35,37 @@ pub enum Chat {
 impl Chat {
   pub fn filter(&self, keyword: &str) -> bool {
     match self {
-      Chat::Single(chat_single) => {
-        chat_single.user.name.contains(keyword)
-      }
-      Chat::Group(chat_group) => {
-        chat_group.name.contains(keyword)
-      },
+      Chat::Single(chat_single) => chat_single.user.name.contains(keyword),
+      Chat::Group(chat_group) => chat_group.name.contains(keyword),
     }
+  }
+
+  pub fn single(user: User) -> Self {
+    Chat::Single(ChatSingle {
+      id: nanoid!(),
+      user,
+    })
+  }
+
+  pub fn group(users: Vec<User>) -> Self {
+    let name = users
+      .iter()
+      .map(|x| x.name.clone())
+      .collect::<Vec<String>>()
+      .join("、");
+    Chat::Group(ChatGroup {
+      id: nanoid!(),
+      users,
+      name,
+    })
   }
 }
 
-#[derive(Atom, PartialEq, Clone)]
+#[derive(PartialEq, Clone)]
+pub enum ChatsAction {
+  Append(Chat),
+}
+#[derive(Slice, Atom, PartialEq, Clone)]
 pub struct Chats(pub Vec<Chat>);
 
 impl Dummy<Faker> for Chats {
@@ -60,6 +82,19 @@ impl Dummy<Faker> for Chats {
   }
 }
 
+impl Reducible for Chats {
+  type Action = ChatsAction;
+  fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
+    match action {
+      ChatsAction::Append(chat) => {
+        let mut chats = self.0.clone();
+        chats.push(chat);
+        Self(chats).into()
+      }
+    }
+  }
+}
+
 impl Default for Chats {
   fn default() -> Self {
     #[cfg(feature = "dev")]
@@ -69,7 +104,7 @@ impl Default for Chats {
   }
 }
 
-#[derive(Atom, PartialEq, Clone, Default)]
+#[derive(Atom, PartialEq, Clone, Default, Debug)]
 pub struct CurrentChat(pub Option<Chat>);
 
 impl CurrentChat {
@@ -78,6 +113,15 @@ impl CurrentChat {
       return match chat {
         Chat::Single(chat_single) => &chat_single.id,
         Chat::Group(chat_group) => &chat_group.id,
+      };
+    }
+    ""
+  }
+  pub fn name(&self) -> &str {
+    if let Some(chat) = &self.0 {
+      return match chat {
+        Chat::Single(chat_single) => &chat_single.user.name,
+        Chat::Group(chat_group) => &chat_group.name,
       };
     }
     ""

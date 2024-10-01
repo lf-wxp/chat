@@ -29,6 +29,7 @@
         "onconnectionstatechange",
         "ondatachanel",
         "ondatachannel",
+        "ondblclick",
         "onenter",
         "onicecandidate",
         "oniceconnectionstatechange",
