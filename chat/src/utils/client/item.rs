@@ -174,6 +174,12 @@ impl Client {
     }
   }
 
+  pub fn send_message_multi(&mut self, remote_ids: Vec<String>, message: ChannelMessage) {
+    remote_ids.iter().for_each(|x| {
+      self.send_message(x.to_string(), message.clone());
+    });
+  }
+
   pub async fn request_datachannel(&mut self, remote_id: String) {
     if self.is_datachannel_ready(&remote_id) {
       return;

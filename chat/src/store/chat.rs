@@ -97,9 +97,9 @@ impl Reducible for Chats {
 
 impl Default for Chats {
   fn default() -> Self {
-    #[cfg(feature = "dev")]
+    #[cfg(feature = "fake")]
     return Faker.fake::<Chats>();
-    #[cfg(not(feature = "dev"))]
+    #[cfg(not(feature = "fake"))]
     return Chats(vec![]);
   }
 }
@@ -125,6 +125,16 @@ impl CurrentChat {
       };
     }
     ""
+  }
+
+  pub fn remote_client_ids(&self) -> Vec<String> {
+    if let Some(chat) = &self.0 {
+      return match chat {
+        Chat::Single(chat_single) => vec![chat_single.user.uuid.clone()],
+        Chat::Group(chat_group) => chat_group.users.iter().map(|x| x.uuid.clone()).collect(),
+      };
+    }
+    vec![]
   }
 }
 

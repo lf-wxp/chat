@@ -9,14 +9,15 @@ use crate::{
   components::{ChatText, ChatValue, EmojiBox, ImageInput, Selection, VoiceInput},
   hook::{use_chat, use_click_exclusive},
   model::{ChatMessage, Message, MessageBinary},
-  store::User,
-  utils::{class_name_determine, get_string_len, style},
+  store::{CurrentChat, User},
+  utils::{class_name_determine, get_client_execute, get_string_len, style, ChannelMessage},
 };
 
 #[function_component]
 pub fn ChatBox() -> Html {
   let class_name = get_class_name();
   let user_name = use_atom_value::<User>();
+  let current_chat = use_atom_value::<CurrentChat>();
   let text = use_state(|| "".to_string());
   let visible = use_state(|| false);
   let selection = use_state(|| Selection {
@@ -67,6 +68,14 @@ pub fn ChatBox() -> Html {
     let add = add_message.clone();
     let user_name = user_name.clone();
     move |_| {
+      let text_clone = text.clone();
+      let current_chat = current_chat.clone();
+      get_client_execute(Box::new(|client| {
+        Box::pin(async move {
+          let remote_ids = current_chat.remote_client_ids();
+          client.send_message_multi(remote_ids, ChannelMessage::String(&text_clone));
+        })
+      }));
       add(ChatMessage::new(
         user_name.name.clone(),
         Message::Text((*text).clone()),
@@ -132,7 +141,12 @@ pub fn ChatBox() -> Html {
         }
       </div>
       <div class="chat-tool">
-        <Icon onclick={emoji_visible_callback} icon_id={IconId::BootstrapEmojiSmile} class={Classes::from(emoji_class)} width="16px" height="16px" />
+        <Icon onclick={emoji_visible_callback}
+          icon_id={IconId::BootstrapEmojiSmile}
+          class={Classes::from(emoji_class)}
+          width="16px"
+          height="16px"
+        />
         <ImageInput onchange={image_input_callback} />
         <VoiceInput onchange={voice_input_callback} />
       </div>

@@ -15,10 +15,11 @@ use crate::{bind_event, model::IceCandidate};
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ChannelMessage<'a> {
   String(&'a str),
   ArrayBuffer(ArrayBuffer),
+  Command,
 }
 
 #[derive(Debug)]
@@ -251,6 +252,7 @@ impl WebRTC {
         ChannelMessage::ArrayBuffer(message) => {
           let _ = channel.send_with_array_buffer(&message);
         }
+        ChannelMessage::Command => todo!(),
       }
     }
     Ok(())

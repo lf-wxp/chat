@@ -1,4 +1,4 @@
-use bounce::{use_atom_setter, use_atom_value, use_slice};
+use bounce::{use_atom_setter, use_slice, use_slice_value};
 use stylist::{self, style};
 use yew::prelude::*;
 
@@ -17,12 +17,12 @@ pub struct Props {
 #[function_component]
 pub fn ChatList(props: &Props) -> Html {
   let class_name = get_class_name();
-  let chats = use_atom_value::<Chats>();
+  let chats = use_slice_value::<Chats>();
   let chats_slice = use_slice::<Chats>();
   let chat_setter = use_atom_setter::<CurrentChat>();
   let onclick = Callback::from(move |item: Chat| {
-     chats_slice.dispatch(ChatsAction::Append(item.clone()));
-     chat_setter(CurrentChat(Some(item)))
+    chats_slice.dispatch(ChatsAction::Append(item.clone()));
+    chat_setter(CurrentChat(Some(item)))
   });
 
   html! {

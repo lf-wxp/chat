@@ -115,10 +115,11 @@ where
   e.as_ref().target().and_then(|t| t.dyn_into::<H>().ok())
 }
 
-pub fn get_history(chat: &str) -> Option<&'static mut Vec<ChatMessage>> {
-  get_chat_history()
-    .map(|x| &mut x.0)
-    .and_then(|x| x.get_mut(chat))
+pub fn get_history(chat_id: &str) -> Option<&'static mut Vec<ChatMessage>> {
+  get_chat_history().map(|chat_history| {
+    let chat_entry = chat_history.0.entry(chat_id.to_string()).or_default();
+    chat_entry
+  })
 }
 
 pub fn get_correct_selection_start(s: &str, utf16_position: u32) -> usize {
