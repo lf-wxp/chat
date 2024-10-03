@@ -9,7 +9,7 @@ use crate::{
 use super::ChatMessage;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct Information {
+pub struct Information {
   message: ChatMessage,
   chat: Chat,
 }
@@ -26,9 +26,9 @@ impl ChannelMessage {
   }
 }
 
-impl Into<ArrayBuffer> for ChannelMessage {
-  fn into(self) -> ArrayBuffer {
-    struct_to_array_buffer(&self)
+impl From<ChannelMessage> for ArrayBuffer {
+  fn from(val: ChannelMessage) -> Self {
+    struct_to_array_buffer(&val)
   }
 }
 
