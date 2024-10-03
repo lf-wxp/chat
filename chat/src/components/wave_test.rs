@@ -8,9 +8,9 @@ use yew_icons::{Icon, IconId};
 
 use crate::{
   hook::use_chat,
-  model::{ChatMessage, Message, MessageBinary},
+  model::{ChatMessage, Message},
   store::User,
-  utils::{get_target, style},
+  utils::{get_target, read_file, style},
 };
 
 #[function_component]
@@ -37,9 +37,10 @@ pub fn WaveTest() -> Html {
     if let Some(target) = target {
       if let Some(file) = target.files().and_then(|x| x.get(0)) {
         spawn_local(async move {
+          let buffer = read_file(file.clone()).await.unwrap();
           add(ChatMessage::new(
             user_name.name.clone(),
-            Message::Audio(MessageBinary::File(file)),
+            Message::Audio(buffer),
           ));
         });
       }

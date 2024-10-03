@@ -1,17 +1,17 @@
+use js_sys::ArrayBuffer;
 use stylist::{self, style};
 use wasm_bindgen_futures::spawn_local;
-use web_sys::Blob;
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
 
 use crate::{
   hook::use_wave_recorder,
-  utils::{get_dpr, style},
+  utils::{blob_to_array_buffer, get_dpr, style},
 };
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
-  pub onchange: Callback<Blob>,
+  pub onchange: Callback<ArrayBuffer>,
 }
 
 #[function_component]
@@ -20,16 +20,16 @@ pub fn VoiceInput(props: &Props) -> Html {
   let visible = use_state(|| false);
   let (canvas_node_ref, start, end) = use_wave_recorder();
 
-  let get_blob = {
+  let get_buffer = {
     let onchange = props.onchange.clone();
-    move |blob: Blob| {
-      onchange.emit(blob);
+    move |buffer: ArrayBuffer| {
+      onchange.emit(buffer);
     }
   };
 
   let onclick = {
     let visible = visible.clone();
-    let get_blob = get_blob.clone();
+    let get_buffer = get_buffer.clone();
     Callback::from(move |_| {
       let val = !*visible;
       visible.set(val);
@@ -37,10 +37,11 @@ pub fn VoiceInput(props: &Props) -> Html {
         start();
       } else {
         let end = end.clone();
-        let get_blob = get_blob.clone();
+        let get_buffer = get_buffer.clone();
         let future = async move {
           if let Ok(blob) = end().await {
-            get_blob(blob);
+            let buffer = blob_to_array_buffer(&blob).await.unwrap();
+            get_buffer(buffer);
           }
         };
         spawn_local(future);

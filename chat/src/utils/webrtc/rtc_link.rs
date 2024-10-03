@@ -1,6 +1,6 @@
 use async_broadcast::{Receiver, Sender};
 use gloo_console::log;
-use js_sys::JSON;
+use js_sys::{ArrayBuffer, JSON};
 use message::{
   CastMessage, ConnectMessage, ConnectState, MediaType, MessageType, RequestMessage,
   RequestMessageData, ResponseMessage, ResponseMessageData, SdpMessage, SdpType, SignalMessage,
@@ -15,7 +15,7 @@ use yew::Event;
 use crate::utils::{get_link, get_target, get_user_media, query_selector, to_connect_state, Link};
 
 use super::{
-  rtc::{ChannelMessage, TransmitMessage, WebRTC},
+  rtc::{TransmitMessage, WebRTC},
   Connect, ConnectError,
 };
 
@@ -43,10 +43,11 @@ pub struct RTCLink {
   link: &'static mut Link,
   rtc: Rc<RefCell<WebRTC>>,
   rtc_type: RtcType,
+  sender: Sender<ArrayBuffer>,
 }
 
 impl RTCLink {
-  pub fn new(id: String, remote_id: String, rtc_type: RtcType) -> Result<Self, JsValue> {
+  pub fn new(id: String, remote_id: String, sender: Sender<ArrayBuffer>, rtc_type: RtcType) -> Result<Self, JsValue> {
     let rtc = WebRTC::new()?;
     let link = get_link().unwrap();
     let remote_media = MediaStream::new()?;
@@ -59,6 +60,7 @@ impl RTCLink {
       remote_media: Rc::new(RefCell::new(remote_media)),
       link,
       rtc_type,
+      sender,
     };
     link.watch_rtc_event();
     if link.rtc_type == RtcType::Caller {
@@ -83,6 +85,7 @@ impl RTCLink {
     }
   }
 
+
   fn watch_rtc_event(&self) {
     let mut receiver_rtc = self.rtc.borrow().message_receiver.clone();
     let sender = self.link.sender();
@@ -91,6 +94,7 @@ impl RTCLink {
     let ready = self.ready.clone();
     let datachannel_ready = self.datachannel_ready.clone();
     let base_info = self.get_base_info();
+    let channel_message_sender = self.sender.clone();
     spawn_local(async move {
       while let Ok(msg) = receiver_rtc.recv().await {
         match msg {
@@ -120,7 +124,7 @@ impl RTCLink {
           TransmitMessage::DataChannelCloseEvent => {}
           TransmitMessage::DataChannelErrorEvent => {}
           TransmitMessage::DataChannelMessage(ev) => {
-            log!("receive channel message", ev);
+            let _ = channel_message_sender.broadcast(ev.data().into()).await;
           }
           TransmitMessage::IceConnectionStateChange(ev) => {
             let target = get_target::<Event, RtcPeerConnection>(ev);
@@ -292,7 +296,7 @@ impl RTCLink {
     Ok(())
   }
 
-  pub fn send_message(&self, message: ChannelMessage) {
+  pub fn send_message(&self, message: ArrayBuffer) {
     let data = self.rtc.borrow().send_message(message);
     log!("send_message result", format!("{:?}", data));
   }

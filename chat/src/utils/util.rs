@@ -2,6 +2,8 @@ use base64::{engine::general_purpose, Engine as _};
 use indexmap::{self, IndexMap};
 use js_sys::{ArrayBuffer, Uint8Array};
 use rand::{self, Rng};
+use serde::{de::DeserializeOwned, Serialize};
+use serde_json::{from_str, to_string};
 use std::ops::Range;
 use unicode_segmentation::UnicodeSegmentation;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
@@ -247,4 +249,22 @@ pub fn safe_slice<T>(vec: &[T], start: usize, end: usize) -> &[T] {
     let valid_end = if end > len { len } else { end };
     &vec[start..valid_end]
   }
+}
+
+pub fn struct_to_array_buffer<T: Serialize>(my_struct: &T) -> ArrayBuffer {
+  let json_str = to_string(my_struct).unwrap();
+  let u8_vec = json_str.into_bytes();
+  let array_buffer = ArrayBuffer::new(u8_vec.len() as u32);
+  let u8_array = Uint8Array::new(&array_buffer);
+  u8_array.copy_from(&u8_vec);
+  array_buffer
+}
+
+pub fn array_buffer_to_struct<T: DeserializeOwned>(array_buffer: &ArrayBuffer) -> T {
+  let u8_array = Uint8Array::new(array_buffer);
+  let mut u8_vec = vec![0; u8_array.length() as usize];
+  u8_array.copy_to(&mut u8_vec);
+  let json_str = String::from_utf8(u8_vec).unwrap();
+  let my_struct: T = from_str(&json_str).unwrap();
+  my_struct
 }

@@ -1,13 +1,14 @@
+use js_sys::ArrayBuffer;
 use stylist::{self, style};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
 
-use crate::{hook::use_wave_surfer, model::MessageBinary, utils::style};
+use crate::{hook::use_wave_surfer, utils::style};
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
-  pub message: MessageBinary,
+  pub message: ArrayBuffer,
 }
 
 #[function_component]
@@ -34,8 +35,7 @@ pub fn VoiceMessage(props: &Props) -> Html {
   let duration = duration.clone();
   use_effect_with((), move |_| {
     spawn_local(async move {
-      let buffer = message.get_buffer().await;
-      let _ = load(buffer).await;
+      let _ = load(message).await;
     });
   });
 

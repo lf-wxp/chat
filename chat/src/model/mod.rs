@@ -1,15 +1,15 @@
 use std::fmt::{self, Display, Formatter};
-
 use serde::{Deserialize, Serialize};
-
-pub mod chat_history;
-pub mod message;
-
-pub use chat_history::*;
-pub use message::*;
 use wasm_bindgen::JsValue;
 use web_sys::{RtcIceCandidate, RtcIceCandidateInit};
 use yew_icons::IconId;
+
+pub mod chat_history;
+pub mod channel_message;
+
+pub use chat_history::*;
+pub use channel_message::*;
+
 
 pub type Error = Box<dyn std::error::Error>;
 pub type UResult<T> = std::result::Result<T, Error>;

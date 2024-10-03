@@ -1,6 +1,7 @@
 use bounce::{Atom, Slice};
 use fake::{uuid::UUIDv1, Dummy, Fake, Faker};
 use nanoid::nanoid;
+use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 use yew::Reducible;
 
@@ -8,7 +9,7 @@ use crate::utils::faker::{FakeUser, FakeUsers, RandomName};
 
 use super::User;
 
-#[derive(PartialEq, Clone, Default, Dummy, Debug)]
+#[derive(PartialEq, Clone, Default, Dummy, Debug, Serialize, Deserialize)]
 pub struct ChatSingle {
   #[dummy(faker = "UUIDv1")]
   pub id: String,
@@ -16,7 +17,7 @@ pub struct ChatSingle {
   pub user: User,
 }
 
-#[derive(PartialEq, Clone, Dummy, Atom, Default, Debug)]
+#[derive(PartialEq, Clone, Dummy, Atom, Default, Debug, Serialize, Deserialize)]
 pub struct ChatGroup {
   #[dummy(faker = "UUIDv1")]
   pub id: String,
@@ -26,7 +27,7 @@ pub struct ChatGroup {
   pub users: Vec<User>,
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Chat {
   Single(ChatSingle),
   Group(ChatGroup),

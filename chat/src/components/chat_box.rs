@@ -1,16 +1,15 @@
 use bounce::use_atom_value;
 use js_sys::ArrayBuffer;
 use stylist::{self, style};
-use web_sys::Blob;
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
 
 use crate::{
   components::{ChatText, ChatValue, EmojiBox, ImageInput, Selection, VoiceInput},
   hook::{use_chat, use_click_exclusive},
-  model::{ChatMessage, Message, MessageBinary},
+  model::{ChannelMessage, ChatMessage, Message},
   store::{CurrentChat, User},
-  utils::{class_name_determine, get_client_execute, get_string_len, style, ChannelMessage},
+  utils::{class_name_determine, get_client_execute, get_string_len, style},
 };
 
 #[function_component]
@@ -68,18 +67,17 @@ pub fn ChatBox() -> Html {
     let add = add_message.clone();
     let user_name = user_name.clone();
     move |_| {
-      let text_clone = text.clone();
       let current_chat = current_chat.clone();
+      let message = ChatMessage::new(user_name.name.clone(), Message::Text((*text).clone()));
+      add(message.clone());
       get_client_execute(Box::new(|client| {
         Box::pin(async move {
           let remote_ids = current_chat.remote_client_ids();
-          client.send_message_multi(remote_ids, ChannelMessage::String(&text_clone));
+          let chat = current_chat.0.clone().unwrap();
+          let message = ChannelMessage::message(message, chat);
+          client.send_message_multi(remote_ids, message);
         })
       }));
-      add(ChatMessage::new(
-        user_name.name.clone(),
-        Message::Text((*text).clone()),
-      ));
       text.set("".to_string());
       visible.set(false);
     }
@@ -114,7 +112,7 @@ pub fn ChatBox() -> Html {
     Callback::from(move |buffer: ArrayBuffer| {
       add(ChatMessage::new(
         user_name.name.clone(),
-        Message::Image(MessageBinary::Buffer(buffer)),
+        Message::Image(buffer),
       ));
     })
   };
@@ -122,10 +120,10 @@ pub fn ChatBox() -> Html {
   let voice_input_callback = {
     let add = add_message.clone();
     let user_name = user_name.clone();
-    Callback::from(move |blob: Blob| {
+    Callback::from(move |buffer: ArrayBuffer| {
       add(ChatMessage::new(
         user_name.name.clone(),
-        Message::Audio(MessageBinary::Blob(blob)),
+        Message::Audio(buffer),
       ));
     })
   };

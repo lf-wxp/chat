@@ -15,13 +15,6 @@ use crate::{bind_event, model::IceCandidate};
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 
-#[derive(Debug, Clone)]
-pub enum ChannelMessage<'a> {
-  String(&'a str),
-  ArrayBuffer(ArrayBuffer),
-  Command,
-}
-
 #[derive(Debug)]
 pub struct WebRTC {
   peer: RtcPeerConnection,
@@ -243,17 +236,9 @@ impl WebRTC {
     Ok(())
   }
 
-  pub fn send_message(&self, message: ChannelMessage) -> Result<(), JsValue> {
+  pub fn send_message(&self, message: ArrayBuffer) -> Result<(), JsValue> {
     if let Some(channel) = self.data_channel.borrow().as_ref() {
-      match message {
-        ChannelMessage::String(message) => {
-          let _ = channel.send_with_str(&message);
-        }
-        ChannelMessage::ArrayBuffer(message) => {
-          let _ = channel.send_with_array_buffer(&message);
-        }
-        ChannelMessage::Command => todo!(),
-      }
+      let _ = channel.send_with_array_buffer(&message);
     }
     Ok(())
   }

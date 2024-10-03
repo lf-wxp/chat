@@ -1,12 +1,13 @@
+use js_sys::ArrayBuffer;
 use stylist::{self, style};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use crate::{model::MessageBinary, utils::style};
+use crate::utils::{array_buffer_to_blob_url, style};
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
-  pub message: MessageBinary,
+  pub message: ArrayBuffer,
 }
 
 #[function_component]
@@ -20,7 +21,7 @@ pub fn ImageMessage(props: &Props) -> Html {
   use_effect_with(message_clone, move |_| {
     let src_clone = src_clone.clone();
     spawn_local(async move {
-      let url = message.get_url().await;
+      let url = array_buffer_to_blob_url(&message, "").unwrap_or("".to_string());
       src_clone.set(url);
     });
   });
