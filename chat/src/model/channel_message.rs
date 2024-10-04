@@ -10,8 +10,8 @@ use super::ChatMessage;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Information {
-  message: ChatMessage,
-  chat: Chat,
+  pub message: ChatMessage,
+  pub chat: Chat,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,10 +1,10 @@
-use bounce::{use_atom_setter, use_slice, use_slice_value};
+use bounce::{use_atom_setter, use_atom_value, use_slice, use_slice_value};
 use stylist::{self, style};
 use yew::prelude::*;
 
 use crate::{
   components::{Avatar, AvatarMultitude},
-  store::{Chat, Chats, ChatsAction, CurrentChat},
+  store::{Chat, Chats, ChatsAction, CurrentChat, User},
   utils::style,
 };
 
@@ -18,6 +18,7 @@ pub struct Props {
 pub fn ChatList(props: &Props) -> Html {
   let class_name = get_class_name();
   let chats = use_slice_value::<Chats>();
+  let user = use_atom_value::<User>();
   let chats_slice = use_slice::<Chats>();
   let chat_setter = use_atom_setter::<CurrentChat>();
   let onclick = Callback::from(move |item: Chat| {
@@ -25,27 +26,34 @@ pub fn ChatList(props: &Props) -> Html {
     chat_setter(CurrentChat(Some(item)))
   });
 
+  let render_avatar = move |users: Vec<User>| {
+    let users = users
+      .iter()
+      .filter(|x| **x != *user)
+      .map(|x| x.name.clone())
+      .collect::<Vec<String>>();
+    if users.len() == 1 {
+      return html! {
+        <Avatar name={users[0].clone()} />
+      };
+    }
+    html! {
+      <AvatarMultitude names={users} />
+    }
+  };
+
   html! {
     <section class={class_name}>
       <div class="chat-list">
       { for chats.0.iter().filter(|x| x.filter(&props.keyword)).map(|item| {
         let item_clone = item.clone();
-        let name = match item {
-          Chat::Single(chat_single) => chat_single.user.name.clone(),
-          Chat::Group(chat_group) => chat_group.name.clone(),
-        };
         html!{
           <div class="chat-item">
             <div class="chat"
               onclick={onclick.reform(move |_| item_clone.clone())}
             >
-              if let Chat::Group(item) = item {
-                <AvatarMultitude names={item.users.clone().iter().map(|x| x.name.clone()).collect::<Vec<String>>()} />
-              }
-              if let Chat::Single(item) = item {
-                <Avatar name={item.user.name.clone()} />
-              }
-              <span class="chat-name">{name.clone()}</span>
+              { render_avatar(item.users.clone())}
+              <span class="chat-name">{item.name.clone()}</span>
             </div>
           </div>
         }

@@ -22,7 +22,7 @@ pub struct Client {
   links: Rc<RefCell<HashMap<String, RTCLink>>>,
   link: &'static mut Link,
   sender: Sender<ArrayBuffer>,
-  receiver: Receiver<ArrayBuffer>,
+  pub receiver: Receiver<ArrayBuffer>,
 }
 
 impl Client {
@@ -46,12 +46,6 @@ impl Client {
     let sender = self.link.sender();
     let channel_message_sender = self.sender.clone();
     let user = self.user.clone();
-    let mut channel_message_receiver = self.receiver.clone();
-    spawn_local(async move {
-      while let Ok(msg) = channel_message_receiver.recv().await {
-        log!("message is ", format!("{:?}", ChannelMessage::from(msg)));
-      }
-    });
     spawn_local(async move {
       while let Ok(msg) = receiver.recv().await {
         if let Ok(origin_message) = serde_json::from_str::<ResponseMessage>(&msg) {

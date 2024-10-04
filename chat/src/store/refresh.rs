@@ -1,13 +1,25 @@
-use bounce::Atom;
-use std::fmt::{self, Display};
+use std::{
+  fmt::{self, Display},
+  rc::Rc,
+};
+use bounce::Slice;
+use yew::Reducible;
 
-#[derive(Atom, PartialEq, Default)]
+#[derive(PartialEq, Clone)]
+pub enum RefreshAction {
+  Toggle,
+}
+#[derive(Slice, PartialEq, Default)]
 pub struct Refresh(bool);
 
-impl Refresh {
-  pub fn refresh(&self) -> Self {
-    let val = self.0;
-    Refresh(!val)
+impl Reducible for Refresh {
+  type Action = RefreshAction;
+  fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
+    match action {
+      RefreshAction::Toggle => {
+        Self(!self.0).into()
+      }
+    }
   }
 }
 

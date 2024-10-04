@@ -15,7 +15,7 @@ use crate::{
 #[function_component]
 pub fn ChatBox() -> Html {
   let class_name = get_class_name();
-  let user_name = use_atom_value::<User>();
+  let user = use_atom_value::<User>();
   let current_chat = use_atom_value::<CurrentChat>();
   let text = use_state(|| "".to_string());
   let visible = use_state(|| false);
@@ -65,14 +65,15 @@ pub fn ChatBox() -> Html {
     let text = text.clone();
     let visible = visible.clone();
     let add = add_message.clone();
-    let user_name = user_name.clone();
+    let user = user.clone();
     move |_| {
       let current_chat = current_chat.clone();
-      let message = ChatMessage::new(user_name.name.clone(), Message::Text((*text).clone()));
-      add(message.clone());
+      let message = ChatMessage::new(user.name.clone(), Message::Text((*text).clone()));
+      let user_uuid = user.uuid.clone();
+      add(message.clone(), None);
       get_client_execute(Box::new(|client| {
         Box::pin(async move {
-          let remote_ids = current_chat.remote_client_ids();
+          let remote_ids = current_chat.remote_client_ids(&user_uuid);
           let chat = current_chat.0.clone().unwrap();
           let message = ChannelMessage::message(message, chat);
           client.send_message_multi(remote_ids, message);
@@ -107,24 +108,18 @@ pub fn ChatBox() -> Html {
   };
 
   let image_input_callback = {
-    let user_name = user_name.clone();
+    let user = user.clone();
     let add = add_message.clone();
     Callback::from(move |buffer: ArrayBuffer| {
-      add(ChatMessage::new(
-        user_name.name.clone(),
-        Message::Image(buffer),
-      ));
+      add(ChatMessage::new(user.name.clone(), Message::Image(buffer)), None);
     })
   };
 
   let voice_input_callback = {
     let add = add_message.clone();
-    let user_name = user_name.clone();
+    let user = user.clone();
     Callback::from(move |buffer: ArrayBuffer| {
-      add(ChatMessage::new(
-        user_name.name.clone(),
-        Message::Audio(buffer),
-      ));
+      add(ChatMessage::new(user.name.clone(), Message::Audio(buffer)), None);
     })
   };
 

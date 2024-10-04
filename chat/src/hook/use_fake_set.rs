@@ -6,7 +6,7 @@ use yew::prelude::*;
 use yew::use_effect_with;
 
 use crate::{
-  store::{Chat, ChatSingle, CurrentChat, User},
+  store::{Chat, CurrentChat, User},
   utils::get_chat_history,
 };
 
@@ -30,13 +30,14 @@ pub fn use_fake_set() -> () {
     .clone();
   use_effect_with((), move |_| {
     conversation_handle(CurrentChat(
-      Some(Chat::Single(ChatSingle {
+      Some(Chat {
         id: first_key.to_string(),
-        user: User {
+        name: "".to_string(),
+        users: vec![User {
           uuid: nanoid!(),
           name: "".to_string(),
-        },
-      }))
+        }],
+      })
       .clone(),
     ));
   });

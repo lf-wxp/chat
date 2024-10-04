@@ -1,4 +1,4 @@
-use bounce::{use_atom_setter, use_selector_value, use_slice};
+use bounce::{use_atom_setter, use_atom_value, use_selector_value, use_slice};
 use stylist::{self, style};
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
@@ -21,6 +21,7 @@ pub struct Props {
 pub fn UserList(props: &Props) -> Html {
   let class_name = get_class_name();
   let users = use_selector_value::<Users>();
+  let user = use_atom_value::<User>();
   let chats = use_slice::<Chats>();
   let chat_setter = use_atom_setter::<CurrentChat>();
   let navigator = use_navigator().unwrap();
@@ -45,14 +46,18 @@ pub fn UserList(props: &Props) -> Html {
     }));
   });
 
-  let ondblclick = Callback::from(move |user: User| {
+  let ondblclick = Callback::from(move |remote_user: User| {
     let chats = chats.clone();
     let chat_setter = chat_setter.clone();
     let navigator = navigator.clone();
+    let user = user.clone();
     get_client_execute(Box::new(|client| {
       Box::pin(async move {
-        client.request_datachannel(user.uuid.clone()).await;
-        let chat = Chat::single(user.clone());
+        client.request_datachannel(remote_user.uuid.clone()).await;
+        let chat = Chat::new(
+          vec![remote_user.clone(), (*user).clone()],
+          Some(&remote_user.name),
+        );
         chats.dispatch(ChatsAction::Append(chat.clone()));
         chat_setter(CurrentChat(Some(chat)));
         navigator.push(&Route::Chat);

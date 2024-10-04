@@ -9,6 +9,7 @@ pub mod use_i18n;
 pub mod use_user_list_watch;
 pub mod use_init;
 pub mod use_media_request_watch;
+pub mod use_client_message_watch;
 
 pub use use_movement::*;
 pub use use_click_exclusive::*;
@@ -21,3 +22,4 @@ pub use use_i18n::*;
 pub use use_user_list_watch::*;
 pub use use_init::*;
 pub use use_media_request_watch::*;
+pub use use_client_message_watch::*;

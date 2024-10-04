@@ -41,7 +41,7 @@ pub fn WaveTest() -> Html {
           add(ChatMessage::new(
             user_name.name.clone(),
             Message::Audio(buffer),
-          ));
+          ), None);
         });
       }
     }

@@ -1,27 +1,27 @@
+use bounce::{use_atom_value, use_slice_dispatch};
 use std::rc::Rc;
-
-use bounce::{use_atom, use_atom_value};
 use yew::prelude::*;
 
 use crate::{
   model::{ChatMessage, MessageState},
-  store::{CurrentChat, Refresh},
+  store::{CurrentChat, Refresh, RefreshAction},
   utils::get_history,
 };
 
-type AddAction = Rc<dyn Fn(ChatMessage)>;
+type AddAction = Rc<dyn Fn(ChatMessage, Option<String>)>;
 type UpdateAction = Rc<dyn Fn(String, MessageState)>;
 
 #[hook]
 pub fn use_chat() -> (AddAction, UpdateAction) {
   let current_chat = use_atom_value::<CurrentChat>();
-  let refresh = use_atom::<Refresh>();
+  let refresh_dispatch = use_slice_dispatch::<Refresh>();
   let add = {
     let chat = current_chat.clone();
-    Rc::new(move |chat_message: ChatMessage| {
-      if let Some(x) = get_history(chat.id()) {
+    Rc::new(move |chat_message: ChatMessage, chat_id: Option<String>| {
+      let id = chat_id.unwrap_or(chat.id().to_string());
+      if let Some(x) = get_history(&id) {
         x.push(chat_message);
-        refresh.set(refresh.refresh());
+        refresh_dispatch(RefreshAction::Toggle);
       }
     })
   };

@@ -1,7 +1,7 @@
-use bounce::{use_atom_value, use_selector_value};
+use bounce::{use_atom_value, use_selector_value, use_slice_value};
 use stylist::{self, style};
 use yew::prelude::*;
-use yew_icons::{IconId, Icon};
+use yew_icons::{Icon, IconId};
 
 use crate::{
   components::{ChatBox, ChatMessage},
@@ -36,7 +36,7 @@ pub fn Chat() -> Html {
     <section class={class_name}>
       <header>
         <span>
-          { current_chat.name()} 
+          { current_chat.name()}
         </span>
         <Icon
           class="more"
@@ -44,7 +44,7 @@ pub fn Chat() -> Html {
           width="16px"
           height="16px"
         />
-      </header> 
+      </header>
       <div class="history-message scroll-bar">
       { for history_message.0.iter().map(|msg| html! {
           <ChatMessage
