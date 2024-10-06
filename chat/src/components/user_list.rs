@@ -58,8 +58,15 @@ pub fn UserList(props: &Props) -> Html {
           vec![remote_user.clone(), (*user).clone()],
           Some(&remote_user.name),
         );
-        chats.dispatch(ChatsAction::Append(chat.clone()));
-        chat_setter(CurrentChat(Some(chat)));
+        match chats.find(&chat) {
+          Some(chat) => {
+            chat_setter(CurrentChat(Some(chat.clone())));
+          }
+          None => {
+            chats.dispatch(ChatsAction::Append(chat.clone()));
+            chat_setter(CurrentChat(Some(chat)));
+          }
+        }
         navigator.push(&Route::Chat);
       })
     }));

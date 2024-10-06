@@ -59,6 +59,18 @@ where
       let buffer = Uint8Array::from(v).buffer();
       Ok(buffer)
     }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+      A: de::SeqAccess<'de>,
+    {
+      let mut bytes = Vec::new();
+      while let Some(byte) = seq.next_element()? {
+        bytes.push(byte);
+      }
+      let buffer = Uint8Array::from(bytes.as_slice()).buffer();
+      Ok(buffer)
+    }
   }
 
   deserializer.deserialize_bytes(ArrayBufferVisitor)

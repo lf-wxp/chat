@@ -14,9 +14,9 @@ base64 = "0.22.1"
 bounce = "0.9.0"
 chrono = { version = "0.4.38", features = ["serde"] }
 derivative = "2.2.0"
-fake = {version = "2.9.2", features = ["derive", "uuid", "chrono"]}
+fake = {version = "2.10.0", features = ["derive", "uuid", "chrono"]}
 futures = {workspace = true}
-futures-channel = "0.3.30"
+futures-channel = "0.3.31"
 getrandom = {version = "0.2.15", features = ["js"]}
 gloo-console = {workspace = true}
 gloo-events = "0.2.0"
@@ -24,7 +24,7 @@ gloo-net = {workspace = true}
 gloo-render = "0.2.0"
 gloo-timers = "0.3.0"
 gloo-utils = "0.2.0"
-indexmap = "2.4.0"
+indexmap = "2.6.0"
 js-sys = "0.3.70"
 lazy_static = "1.5.0"
 message = {path = "../message"}
@@ -34,7 +34,7 @@ rand = "0.8.5"
 serde = {workspace = true, features = ["derive"]}
 serde_json = {workspace = true}
 stylist = {version = "0.13.0", features = ["yew_integration"]}
-unicode-segmentation = "1.11.0"
+unicode-segmentation = "1.12.0"
 wasm-bindgen = "0.2.93"
 wasm-bindgen-futures = "0.4.43"
 web-sys = {workspace = true, features = [
@@ -42,6 +42,7 @@ web-sys = {workspace = true, features = [
   "Element",
   "Window",
   "HtmlCanvasElement",
+  "HtmlDivElement",
   "CanvasRenderingContext2d",
   "DomStringMap",
   "HtmlTextAreaElement",
@@ -49,6 +50,8 @@ web-sys = {workspace = true, features = [
   "BlobEvent",
   "BlobPropertyBag",
   "Url",
+  "ScrollToOptions",
+  "ScrollBehavior",
   "MediaRecorder",
   "MediaStreamConstraints",
   "AudioContext",

@@ -2,7 +2,7 @@ use bounce::{Atom, Slice};
 use fake::{uuid::UUIDv1, Dummy, Fake, Faker};
 use nanoid::nanoid;
 use serde::{Deserialize, Serialize};
-use std::rc::Rc;
+use std::{collections::HashSet, rc::Rc};
 use yew::Reducible;
 
 use crate::utils::faker::{FakeUsers, RandomName};
@@ -54,7 +54,9 @@ impl Chat {
 
 impl PartialEq for Chat {
   fn eq(&self, other: &Self) -> bool {
-    self.users == other.users
+    let set_a: HashSet<_> = self.users.iter().collect();
+    let set_b: HashSet<_> = other.users.iter().collect();
+    set_a == set_b
   }
 }
 
@@ -73,9 +75,8 @@ impl Dummy<Faker> for Chats {
 }
 
 impl Chats {
-  pub fn find(&self, chat: &Chat) -> bool {
-    let chats = self.0.clone();
-    chats.iter().any(|x| *x == *chat)
+  pub fn find(&self, chat: &Chat) -> Option<&Chat> {
+    self.0.iter().find(|x| *x == chat)
   }
 }
 
@@ -85,7 +86,7 @@ impl Reducible for Chats {
     match action {
       ChatsAction::Append(chat) => {
         let mut chats = self.0.clone();
-        if !self.find(&chat) {
+        if self.find(&chat).is_none() {
           chats.push(chat);
           return Self(chats).into();
         }

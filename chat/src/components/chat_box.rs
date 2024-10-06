@@ -66,6 +66,7 @@ pub fn ChatBox() -> Html {
     let visible = visible.clone();
     let add = add_message.clone();
     let user = user.clone();
+    let current_chat = current_chat.clone();
     move |_| {
       let current_chat = current_chat.clone();
       let message = ChatMessage::new(user.name.clone(), Message::Text((*text).clone()));
@@ -110,8 +111,21 @@ pub fn ChatBox() -> Html {
   let image_input_callback = {
     let user = user.clone();
     let add = add_message.clone();
+    let user = user.clone();
+    let current_chat = current_chat.clone();
     Callback::from(move |buffer: ArrayBuffer| {
-      add(ChatMessage::new(user.name.clone(), Message::Image(buffer)), None);
+      let user_uuid = user.uuid.clone();
+      let message = ChatMessage::new(user.name.clone(), Message::Image(buffer));
+      let current_chat = current_chat.clone();
+      add(message.clone(), None);
+      get_client_execute(Box::new(|client| {
+        Box::pin(async move {
+          let remote_ids = current_chat.remote_client_ids(&user_uuid);
+          let chat = current_chat.0.clone().unwrap();
+          let message = ChannelMessage::message(message, chat);
+          client.send_message_multi(remote_ids, message);
+        })
+      }));
     })
   };
 

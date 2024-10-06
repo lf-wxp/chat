@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use crate::utils::faker::RandomName;
 
-#[derive(PartialEq, Debug, Dummy, Clone, Atom, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Dummy, Clone, Atom, Serialize, Deserialize, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
   #[dummy(faker = "UUIDv1")]
