@@ -1,6 +1,5 @@
 use async_broadcast::Receiver;
 use futures::{ready, select, Future, FutureExt, StreamExt};
-use gloo_console::log;
 use gloo_timers::future::TimeoutFuture;
 use message::{ConnectMessage, ConnectState, ResponseMessage, ResponseMessageData};
 use std::{
@@ -72,7 +71,6 @@ impl Future for ConnectFuture {
   fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
     let this = self.get_mut();
     let msg = ready!(this.receiver.poll_next_unpin(cx));
-    log!("connect poll", format!("{:?}", &msg));
     if let Some(msg) = msg {
       if let Ok(ResponseMessage {
         message: ResponseMessageData::Connect(ConnectMessage { state, from, .. }),

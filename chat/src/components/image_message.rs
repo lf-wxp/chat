@@ -3,11 +3,11 @@ use stylist::{self, style};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use crate::utils::{array_buffer_to_blob_url, style};
+use crate::utils::{array_buffer_to_blob_url, style, vec_to_array_buffer};
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
-  pub message: ArrayBuffer,
+  pub message: Vec<u8>,
 }
 
 #[function_component]
@@ -21,7 +21,8 @@ pub fn ImageMessage(props: &Props) -> Html {
   use_effect_with(message_clone, move |_| {
     let src_clone = src_clone.clone();
     spawn_local(async move {
-      let url = array_buffer_to_blob_url(&message, "").unwrap_or("".to_string());
+      let buffer = vec_to_array_buffer(&message);
+      let url = array_buffer_to_blob_url(&buffer, "").unwrap_or("".to_string());
       src_clone.set(url);
     });
   });

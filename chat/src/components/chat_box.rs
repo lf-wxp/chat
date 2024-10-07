@@ -1,5 +1,6 @@
 use bounce::use_atom_value;
 use js_sys::ArrayBuffer;
+use message::{Information, Message};
 use stylist::{self, style};
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
@@ -7,9 +8,8 @@ use yew_icons::{Icon, IconId};
 use crate::{
   components::{ChatText, ChatValue, EmojiBox, ImageInput, Selection, VoiceInput},
   hook::{use_chat, use_click_exclusive},
-  model::{ChannelMessage, ChatMessage, Message},
   store::{CurrentChat, User},
-  utils::{class_name_determine, get_client_execute, get_string_len, style},
+  utils::{array_buffer_to_vec, class_name_determine, get_client_execute, get_string_len, style},
 };
 
 #[function_component]
@@ -24,9 +24,7 @@ pub fn ChatBox() -> Html {
     end: None,
   });
   let (add_message, _update_message_state) = use_chat();
-
   let emoji_class = class_name_determine(*visible, "tool-icon", "active");
-
   let update_selection = {
     let selection = selection.clone();
     move |idx: u32| {
@@ -68,16 +66,16 @@ pub fn ChatBox() -> Html {
     let user = user.clone();
     let current_chat = current_chat.clone();
     move |_| {
+      if text.is_empty() { return };
       let current_chat = current_chat.clone();
-      let message = ChatMessage::new(user.name.clone(), Message::Text((*text).clone()));
+      let message = Information::new(user.name.clone(), Message::Text((*text).clone()));
       let user_uuid = user.uuid.clone();
       add(message.clone(), None);
       get_client_execute(Box::new(|client| {
         Box::pin(async move {
           let remote_ids = current_chat.remote_client_ids(&user_uuid);
           let chat = current_chat.0.clone().unwrap();
-          let message = ChannelMessage::message(message, chat);
-          client.send_message_multi(remote_ids, message);
+          client.send_message(remote_ids, message, chat.into()).await;
         })
       }));
       text.set("".to_string());
@@ -115,15 +113,15 @@ pub fn ChatBox() -> Html {
     let current_chat = current_chat.clone();
     Callback::from(move |buffer: ArrayBuffer| {
       let user_uuid = user.uuid.clone();
-      let message = ChatMessage::new(user.name.clone(), Message::Image(buffer));
+      let buffer = array_buffer_to_vec(&buffer);
+      let message = Information::new(user.name.clone(), Message::Image(buffer));
       let current_chat = current_chat.clone();
       add(message.clone(), None);
       get_client_execute(Box::new(|client| {
         Box::pin(async move {
           let remote_ids = current_chat.remote_client_ids(&user_uuid);
           let chat = current_chat.0.clone().unwrap();
-          let message = ChannelMessage::message(message, chat);
-          client.send_message_multi(remote_ids, message);
+          client.send_message(remote_ids, message, chat.into()).await;
         })
       }));
     })
@@ -133,7 +131,11 @@ pub fn ChatBox() -> Html {
     let add = add_message.clone();
     let user = user.clone();
     Callback::from(move |buffer: ArrayBuffer| {
-      add(ChatMessage::new(user.name.clone(), Message::Audio(buffer)), None);
+      let buffer = array_buffer_to_vec(&buffer);
+      add(
+        Information::new(user.name.clone(), Message::Audio(buffer)),
+        None,
+      );
     })
   };
 

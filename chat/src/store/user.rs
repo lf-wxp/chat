@@ -37,6 +37,20 @@ impl From<Client> for User {
   }
 }
 
+impl From<message::User> for User {
+  fn from(value: message::User) -> Self {
+    let message::User { uuid, name } = value;
+    Self { uuid, name }
+  }
+}
+
+impl From<User> for message::User {
+  fn from(value: User) -> Self {
+    let User { uuid, name } = value;
+    Self { uuid, name }
+  }
+}
+
 impl From<User> for Client {
   fn from(value: User) -> Self {
     Self {

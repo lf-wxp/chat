@@ -1,4 +1,5 @@
 use bounce::{use_atom_value, use_selector_value};
+use message::MessageAlignment;
 use stylist::{self, style};
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlDivElement, ScrollBehavior, ScrollToOptions};
@@ -8,7 +9,6 @@ use yew_icons::{Icon, IconId};
 
 use crate::{
   components::{ChatBox, ChatMessage},
-  model::MessageAlignment,
   store::{CurrentChat, HistoryMessage, User},
   utils::style,
 };

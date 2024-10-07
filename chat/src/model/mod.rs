@@ -5,10 +5,8 @@ use web_sys::{RtcIceCandidate, RtcIceCandidateInit};
 use yew_icons::IconId;
 
 pub mod chat_history;
-pub mod channel_message;
 
 pub use chat_history::*;
-pub use channel_message::*;
 
 
 pub type Error = Box<dyn std::error::Error>;

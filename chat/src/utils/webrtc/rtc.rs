@@ -1,5 +1,4 @@
 use async_broadcast::{broadcast, Receiver, Sender};
-use gloo_console::log;
 use js_sys::{Array, ArrayBuffer, Reflect};
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
@@ -12,8 +11,6 @@ use web_sys::{
 use yew::Event;
 
 use crate::{bind_event, model::IceCandidate};
-
-pub type Error = Box<dyn std::error::Error + Send + Sync>;
 
 #[derive(Debug)]
 pub struct WebRTC {
@@ -216,7 +213,6 @@ impl WebRTC {
         .dyn_into::<web_sys::MediaStreamTrack>()
         .unwrap();
       let more_streams = Array::new();
-      log!("set media video");
       self.peer.add_track(&track, &stream, &more_streams);
     }
   }

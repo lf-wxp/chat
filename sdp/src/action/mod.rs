@@ -4,6 +4,7 @@ pub mod list;
 pub mod media;
 pub mod room;
 pub mod signal;
+pub mod chat;
 
 use message::{Action, MessageType, RequestMessage, RequestMessageData, ResponseMessage};
 use tokio_tungstenite::tungstenite::{self, Message};
@@ -89,6 +90,10 @@ impl ParamResponseOptionExecute for RequestMessage {
         signal.execute(session_id, message_type);
         None
       }
+      RequestMessageData::Chat(chat_message) => {
+        chat_message.execute(session_id, message_type);
+        None
+      },
     }
   }
 }

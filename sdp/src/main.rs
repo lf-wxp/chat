@@ -1,5 +1,4 @@
 use std::{env, io::Error as IoError, net::SocketAddr};
-
 use futures::{
   future::{self, Either},
   pin_mut, StreamExt, TryStreamExt,
@@ -44,29 +43,19 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr) {
     .await
     .expect("Error during the websocket handshake occurred");
   println!("WebSocket connection established: {}", addr);
-
   let (tx, rx) = unbounded_channel();
-  let client = Client::new( None, tx);
+  let client = Client::new(None, tx);
   let uuid_key = client.uuid();
-
   if let Some(client_map) = get_client_map() {
     client_map.insert(uuid_key.clone(), client);
   }
-
   let (sink, stream) = ws_stream.split();
-
   let (transform_tx, transform_rx) = unbounded_channel::<Message>();
-
   let message_tx = transform_tx.clone();
-
   let execute_message = stream.try_for_each(|msg| {
     let message = match bincode::deserialize::<RequestMessage>(&msg.into_data()) {
       Ok(message) => {
-        println!(
-          "Received a message from {}: {:?}",
-          addr,
-          message,
-        );
+        println!("Received a message from {}: {:?}", addr, message,);
         message.execute(uuid_key.clone(), None)
       }
       Err(_) => None,

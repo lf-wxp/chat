@@ -11,9 +11,9 @@ fake = []
 [dependencies]
 async-broadcast = {git = "https://github.com/smol-rs/async-broadcast"}
 base64 = "0.22.1"
-bounce = "0.9.0"
 bincode = {workspace = true}
-chrono = { version = "0.4.38", features = ["serde"] }
+bounce = "0.9.0"
+chrono = {workspace = true, features = ["serde"]}
 derivative = "2.2.0"
 fake = {version = "2.10.0", features = ["derive", "uuid", "chrono"]}
 futures = {workspace = true}
@@ -114,5 +114,5 @@ yew_icons = {version = "0.8.0", features = [
   "BootstrapTelephoneForwardFill",
   "HeroiconsSolidChatBubbleLeft",
   "OcticonsXCircleFill16",
-  "HeroiconsMiniSolidEllipsisHorizontal"
+  "HeroiconsMiniSolidEllipsisHorizontal",
 ]}

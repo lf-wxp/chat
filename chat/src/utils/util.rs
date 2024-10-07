@@ -1,6 +1,7 @@
 use base64::{engine::general_purpose, Engine as _};
 use indexmap::{self, IndexMap};
 use js_sys::{ArrayBuffer, Uint8Array};
+use message::Information;
 use rand::{self, Rng};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{from_str, to_string};
@@ -17,7 +18,7 @@ use yew::{
   AttrValue,
 };
 
-use crate::{components::Selection, model::ChatMessage, utils::get_chat_history};
+use crate::{components::Selection, utils::get_chat_history};
 
 pub fn random(rang: Range<u16>) -> u16 {
   rand::thread_rng().gen_range(rang)
@@ -117,7 +118,7 @@ where
   e.as_ref().target().and_then(|t| t.dyn_into::<H>().ok())
 }
 
-pub fn get_history(chat_id: &str) -> Option<&'static mut Vec<ChatMessage>> {
+pub fn get_history(chat_id: &str) -> Option<&'static mut Vec<Information>> {
   get_chat_history().map(|chat_history| {
     let chat_entry = chat_history.0.entry(chat_id.to_string()).or_default();
     chat_entry
@@ -254,17 +255,26 @@ pub fn safe_slice<T>(vec: &[T], start: usize, end: usize) -> &[T] {
 pub fn struct_to_array_buffer<T: Serialize>(my_struct: &T) -> ArrayBuffer {
   let json_str = to_string(my_struct).unwrap();
   let u8_vec = json_str.into_bytes();
+  vec_to_array_buffer(&u8_vec)
+}
+
+pub fn array_buffer_to_struct<T: DeserializeOwned>(array_buffer: &ArrayBuffer) -> T {
+  let u8_vec = array_buffer_to_vec(array_buffer);
+  let json_str = String::from_utf8(u8_vec).unwrap();
+  let my_struct: T = from_str(&json_str).unwrap();
+  my_struct
+}
+
+pub fn vec_to_array_buffer(u8_vec: &Vec<u8>) -> ArrayBuffer {
   let array_buffer = ArrayBuffer::new(u8_vec.len() as u32);
   let u8_array = Uint8Array::new(&array_buffer);
   u8_array.copy_from(&u8_vec);
   array_buffer
 }
 
-pub fn array_buffer_to_struct<T: DeserializeOwned>(array_buffer: &ArrayBuffer) -> T {
+pub fn array_buffer_to_vec(array_buffer: &ArrayBuffer) -> Vec<u8> {
   let u8_array = Uint8Array::new(array_buffer);
   let mut u8_vec = vec![0; u8_array.length() as usize];
   u8_array.copy_to(&mut u8_vec);
-  let json_str = String::from_utf8(u8_vec).unwrap();
-  let my_struct: T = from_str(&json_str).unwrap();
-  my_struct
+  u8_vec
 }

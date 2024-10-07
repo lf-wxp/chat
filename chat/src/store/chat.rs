@@ -60,6 +60,21 @@ impl PartialEq for Chat {
   }
 }
 
+impl From<message::Chat> for Chat {
+  fn from(value: message::Chat) -> Self {
+    let message::Chat { id, name, users } = value;
+    let users = users.into_iter().map(|x| x.into()).collect();
+    Self { id, name, users }
+  }
+}
+impl From<Chat> for message::Chat {
+  fn from(value: Chat) -> Self {
+    let Chat { id, name, users } = value;
+    let users = users.into_iter().map(|x| x.into()).collect();
+    Self { id, name, users }
+  }
+}
+
 #[derive(PartialEq, Clone)]
 pub enum ChatsAction {
   Append(Chat),

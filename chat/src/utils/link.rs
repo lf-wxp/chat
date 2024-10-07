@@ -9,7 +9,7 @@ use crate::utils::SDP_SERVER;
 #[derive(Debug)]
 pub struct Link {
   sender: Sender<Vec<u8>>,
-  pub receiver: Receiver<Vec<u8>>,
+  receiver: Receiver<Vec<u8>>,
   read_sender: Sender<Vec<u8>>,
 }
 
@@ -30,7 +30,7 @@ impl Link {
           }
           Err(msg) => {
             log!("error is ", format!("{:?}", msg));
-          },
+          }
         }
       }
     });

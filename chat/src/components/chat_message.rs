@@ -1,10 +1,10 @@
 use chrono::prelude::*;
+use message::{Message, MessageAlignment};
 use stylist::{self, style};
 use yew::prelude::*;
 
 use crate::{
-  components::{Avatar, VoiceMessage, ImageMessage},
-  model::{Message, MessageAlignment},
+  components::{Avatar, ImageMessage, VoiceMessage},
   utils::style,
 };
 

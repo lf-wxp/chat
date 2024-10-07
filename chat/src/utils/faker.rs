@@ -1,14 +1,11 @@
 use fake::{
-  faker::{lorem::raw::Sentence, name::raw::FirstName},
+  faker::name::raw::FirstName,
   locales::{EN, ZH_CN},
   Dummy, Fake, Faker,
 };
 use nanoid::nanoid;
 
-use crate::{
-  model::{Message, MessageState},
-  store::User,
-};
+use crate::store::User;
 
 pub struct RandomName;
 impl Dummy<RandomName> for String {
@@ -19,20 +16,6 @@ impl Dummy<RandomName> for String {
     } else {
       FirstName(EN).fake()
     }
-  }
-}
-
-pub struct FakeMessage;
-impl Dummy<FakeMessage> for Message {
-  fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &FakeMessage, _rng: &mut R) -> Self {
-    Message::Text(Sentence(ZH_CN, 2..10).fake())
-  }
-}
-
-pub struct FakeMessageState;
-impl Dummy<FakeMessageState> for MessageState {
-  fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &FakeMessageState, _rng: &mut R) -> Self {
-    MessageState::Success
   }
 }
 

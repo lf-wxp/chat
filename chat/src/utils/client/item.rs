@@ -1,17 +1,18 @@
-use async_broadcast::{broadcast, Receiver, Sender};
+use async_broadcast::Sender;
 use futures::Future;
 use gloo_console::log;
-use js_sys::ArrayBuffer;
+use nanoid::nanoid;
 use message::{
-  self, Action, ActionMessage, ClientAction, ConnectMessage, ConnectState, GetInfo, ListAction,
-  ListMessage, MediaMessage, MediaType, MessageType, RequestMessage, RequestMessageData,
-  ResponseMessage, ResponseMessageData, ResponseMessageData::Media, SignalMessage, UpdateName,
+  self, Action, ActionMessage, Chat, ChatMessage, ClientAction, ConnectMessage, ConnectState,
+  GetInfo, Information, ListAction, ListMessage, MediaMessage, MediaType, MessageType,
+  RequestMessage, RequestMessageData, ResponseMessage,
+  ResponseMessageData::{self, Media},
+  SignalMessage, UpdateName,
 };
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-  model::ChannelMessage,
   store::User,
   utils::{get_link, get_window, query_selector, Link, RTCLink, Request, RequestError, RtcType},
 };
@@ -20,21 +21,16 @@ use crate::{
 pub struct Client {
   pub user: Rc<RefCell<User>>,
   links: Rc<RefCell<HashMap<String, RTCLink>>>,
-  link: &'static mut Link,
-  sender: Sender<ArrayBuffer>,
-  pub receiver: Receiver<ArrayBuffer>,
+  pub link: &'static mut Link,
 }
 
 impl Client {
   pub fn new(user: User) -> Self {
     let link = get_link().unwrap();
-    let (sender, receiver) = broadcast(20);
     let client = Client {
       user: Rc::new(RefCell::new(user)),
       links: Rc::new(RefCell::new(HashMap::new())),
       link,
-      sender,
-      receiver,
     };
     client.watch_message();
     client
@@ -44,7 +40,6 @@ impl Client {
     let mut receiver = self.link.receiver();
     let links = self.links.clone();
     let sender = self.link.sender();
-    let channel_message_sender = self.sender.clone();
     let user = self.user.clone();
     spawn_local(async move {
       while let Ok(msg) = receiver.recv().await {
@@ -73,7 +68,6 @@ impl Client {
             links.clone(),
             message,
             sender.clone(),
-            channel_message_sender.clone(),
           )
           .await;
         }
@@ -157,50 +151,28 @@ impl Client {
   fn set_link(&self, remote_id: &str, rtc_type: RtcType) {
     let (uuid, ..) = self.extract_user();
     let links = self.links.clone();
-    let sender = self.sender.clone();
-    Client::set_link_static(links, &uuid, remote_id, rtc_type, sender);
+    Client::set_link_static(links, &uuid, remote_id, rtc_type);
   }
 
   pub fn is_link_ready(&self, to: &str) -> bool {
     self.links.borrow().get(to).map_or(false, |x| x.is_ready())
   }
 
-  pub fn is_datachannel_ready(&self, to: &str) -> bool {
-    self
-      .links
-      .borrow()
-      .get(to)
-      .map_or(false, |x| x.is_datachannel_ready())
-  }
-
-  pub fn send_message(&mut self, remote_id: String, message: ChannelMessage) {
-    let links = self.links.borrow();
-    let link = links.get(&remote_id);
-    if let Some(link) = link {
-      if link.is_ready() {
-        link.send_message(message.into());
-      }
-    }
-  }
-
-  pub fn send_message_multi(&mut self, remote_ids: Vec<String>, message: ChannelMessage) {
-    remote_ids.iter().for_each(|x| {
-      self.send_message(x.to_string(), message.clone());
-    });
-  }
-
-  pub async fn request_datachannel(&mut self, remote_id: String) {
-    if self.is_datachannel_ready(&remote_id) {
-      return;
-    }
-    let links = self.links.clone();
-    match self.request_connect(&remote_id, None).await {
-      Ok(_) => {
-        self.set_link(&remote_id, RtcType::Caller);
-        Client::set_link_datachannel(links, &remote_id);
-      }
-      Err(_) => todo!(),
-    }
+  pub async fn send_message(&mut self, remote_ids: Vec<String>, message: Information, chat: Chat) {
+    let (uuid, _name) = self.extract_user();
+    let message = RequestMessage {
+      message: RequestMessageData::Chat(ChatMessage {
+        from: uuid,
+        to: remote_ids.clone(),
+        message,
+        chat,
+      }),
+      session_id: nanoid!(),
+      message_type: MessageType::Request,
+    };
+    let message = bincode::serialize(&message).unwrap();
+    let sender = self.link.sender();
+    let _ = sender.broadcast_direct(message).await;
   }
 
   pub async fn request_media(&mut self, to: String, media_type: MediaType) {
@@ -287,10 +259,9 @@ impl Client {
     id: &str,
     remote_id: &str,
     rtc_type: RtcType,
-    sender: Sender<ArrayBuffer>,
   ) {
     if links.borrow().get(remote_id).is_none() {
-      let link = RTCLink::new(id.to_string(), remote_id.to_string(), sender, rtc_type).unwrap();
+      let link = RTCLink::new(id.to_string(), remote_id.to_string(), rtc_type).unwrap();
       links.borrow_mut().insert(remote_id.to_string(), link);
     }
   }
@@ -305,7 +276,6 @@ impl Client {
     let dom = query_selector(".local-stream");
     if let Some(link) = link {
       let _ = link.set_media(dom, media_type).await;
-      log!("set link media");
     }
   }
 
@@ -321,7 +291,6 @@ impl Client {
     links: Rc<RefCell<HashMap<String, RTCLink>>>,
     message: &ResponseMessageData,
     sender: Sender<Vec<u8>>,
-    channel_message_sender: Sender<ArrayBuffer>,
   ) {
     if let ResponseMessageData::Connect(ConnectMessage {
       from,
@@ -334,13 +303,7 @@ impl Client {
         return;
       }
       if !Client::has_link(links.clone(), from) {
-        Client::set_link_static(
-          links.clone(),
-          uuid,
-          from,
-          RtcType::Callee,
-          channel_message_sender,
-        );
+        Client::set_link_static(links.clone(), uuid, from, RtcType::Callee);
         Client::set_link_media(links.clone(), from, media_type).await;
       }
       Client::replay_request_connect(

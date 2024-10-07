@@ -4,6 +4,7 @@ mod connect;
 mod media;
 mod room;
 mod signal;
+mod chat;
 
 pub use action::*;
 pub use client::*;
@@ -11,6 +12,7 @@ pub use connect::*;
 pub use media::*;
 pub use room::*;
 pub use signal::*;
+pub use chat::*;
 
 use serde::{Deserialize, Serialize};
 
@@ -36,6 +38,7 @@ pub enum RequestMessageData {
   Connect(ConnectMessage),
   Media(MediaMessage),
   Signal(SignalMessage),
+  Chat(ChatMessage),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -53,4 +56,5 @@ pub enum ResponseMessageData {
   Connect(ConnectMessage),
   Media(MediaMessage),
   Signal(SignalMessage),
+  Chat(ChatMessage),
 }

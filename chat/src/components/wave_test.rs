@@ -1,4 +1,5 @@
 use bounce::use_atom_value;
+use message::{Information, Message};
 use stylist::{self, style};
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
@@ -8,9 +9,8 @@ use yew_icons::{Icon, IconId};
 
 use crate::{
   hook::use_chat,
-  model::{ChatMessage, Message},
   store::User,
-  utils::{get_target, read_file, style},
+  utils::{array_buffer_to_vec, get_target, read_file, style},
 };
 
 #[function_component]
@@ -38,10 +38,11 @@ pub fn WaveTest() -> Html {
       if let Some(file) = target.files().and_then(|x| x.get(0)) {
         spawn_local(async move {
           let buffer = read_file(file.clone()).await.unwrap();
-          add(ChatMessage::new(
-            user_name.name.clone(),
-            Message::Audio(buffer),
-          ), None);
+          let buffer = array_buffer_to_vec(&buffer);
+          add(
+            Information::new(user_name.name.clone(), Message::Audio(buffer)),
+            None,
+          );
         });
       }
     }

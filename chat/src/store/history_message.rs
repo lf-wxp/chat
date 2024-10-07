@@ -1,14 +1,14 @@
 use bounce::{BounceStates, Selector};
+use message::Information;
 use std::rc::Rc;
 
 use crate::{
-  model::ChatMessage,
   store::{CurrentChat, Refresh},
   utils::get_history,
 };
 
 #[derive(PartialEq)]
-pub struct HistoryMessage(pub Vec<ChatMessage>);
+pub struct HistoryMessage(pub Vec<Information>);
 
 impl Selector for HistoryMessage {
   fn select(states: &BounceStates) -> Rc<Self> {

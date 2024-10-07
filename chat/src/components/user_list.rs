@@ -51,25 +51,20 @@ pub fn UserList(props: &Props) -> Html {
     let chat_setter = chat_setter.clone();
     let navigator = navigator.clone();
     let user = user.clone();
-    get_client_execute(Box::new(|client| {
-      Box::pin(async move {
-        client.request_datachannel(remote_user.uuid.clone()).await;
-        let chat = Chat::new(
-          vec![remote_user.clone(), (*user).clone()],
-          Some(&remote_user.name),
-        );
-        match chats.find(&chat) {
-          Some(chat) => {
-            chat_setter(CurrentChat(Some(chat.clone())));
-          }
-          None => {
-            chats.dispatch(ChatsAction::Append(chat.clone()));
-            chat_setter(CurrentChat(Some(chat)));
-          }
-        }
-        navigator.push(&Route::Chat);
-      })
-    }));
+    let chat = Chat::new(
+      vec![remote_user.clone(), (*user).clone()],
+      Some(&remote_user.name),
+    );
+    match chats.find(&chat) {
+      Some(chat) => {
+        chat_setter(CurrentChat(Some(chat.clone())));
+      }
+      None => {
+        chats.dispatch(ChatsAction::Append(chat.clone()));
+        chat_setter(CurrentChat(Some(chat)));
+      }
+    }
+    navigator.push(&Route::Chat);
   });
 
   html! {

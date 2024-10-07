@@ -1,5 +1,4 @@
 use async_broadcast::{Receiver, Sender};
-use gloo_console::log;
 use js_sys::{ArrayBuffer, JSON};
 use message::{
   CastMessage, ConnectMessage, ConnectState, MediaType, MessageType, RequestMessage,
@@ -39,20 +38,13 @@ pub struct RTCLink {
   remote_id: String,
   remote_media: Rc<RefCell<MediaStream>>,
   ready: Rc<RefCell<bool>>,
-  datachannel_ready: Rc<RefCell<bool>>,
   link: &'static mut Link,
   rtc: Rc<RefCell<WebRTC>>,
   rtc_type: RtcType,
-  sender: Sender<ArrayBuffer>,
 }
 
 impl RTCLink {
-  pub fn new(
-    id: String,
-    remote_id: String,
-    sender: Sender<ArrayBuffer>,
-    rtc_type: RtcType,
-  ) -> Result<Self, JsValue> {
+  pub fn new(id: String, remote_id: String, rtc_type: RtcType) -> Result<Self, JsValue> {
     let rtc = WebRTC::new()?;
     let link = get_link().unwrap();
     let remote_media = MediaStream::new()?;
@@ -61,11 +53,9 @@ impl RTCLink {
       remote_id,
       rtc: Rc::new(RefCell::new(rtc)),
       ready: Rc::new(RefCell::new(false)),
-      datachannel_ready: Rc::new(RefCell::new(false)),
       remote_media: Rc::new(RefCell::new(remote_media)),
       link,
       rtc_type,
-      sender,
     };
     link.watch_rtc_event();
     if link.rtc_type == RtcType::Caller {
@@ -96,23 +86,18 @@ impl RTCLink {
     let receiver = self.link.receiver();
     let remote_media = self.remote_media.clone();
     let ready = self.ready.clone();
-    let datachannel_ready = self.datachannel_ready.clone();
     let base_info = self.get_base_info();
-    let channel_message_sender = self.sender.clone();
     spawn_local(async move {
       while let Ok(msg) = receiver_rtc.recv().await {
         match msg {
           TransmitMessage::ErrorEvent => {}
           TransmitMessage::TrackEvent(ev) => {
-            log!("track event");
             remote_media.borrow_mut().add_track(&ev.track());
             if let Some(dom) = query_selector::<HtmlMediaElement>(".remote-stream") {
               dom.set_src_object(Some(&remote_media.borrow()));
             }
           }
-          TransmitMessage::DataChannelEvent(ev) => {
-            log!("data channel data");
-          }
+          TransmitMessage::DataChannelEvent(ev) => {}
           TransmitMessage::IceEvent(ev) => {
             let ice = ev.candidate().map(|candidate| {
               JSON::stringify(&candidate.to_json())
@@ -127,13 +112,10 @@ impl RTCLink {
           }
           TransmitMessage::DataChannelCloseEvent => {}
           TransmitMessage::DataChannelErrorEvent => {}
-          TransmitMessage::DataChannelMessage(ev) => {
-            let _ = channel_message_sender.broadcast(ev.data().into()).await;
-          }
+          TransmitMessage::DataChannelMessage(ev) => {}
           TransmitMessage::IceConnectionStateChange(ev) => {
             let target = get_target::<Event, RtcPeerConnection>(ev);
             let state = target.as_ref().unwrap().ice_connection_state();
-            log!("ice change", format!("{:?}", &state));
             if target.is_some() {
               let is_connected = state == RtcIceConnectionState::Connected;
               *ready.borrow_mut() = is_connected;
@@ -147,12 +129,9 @@ impl RTCLink {
             }
           }
           TransmitMessage::Negotiationneeded(ev) => {
-            log!("track negotiation");
             let _ = RTCLink::negotiation(&sender, receiver.clone(), base_info.clone()).await;
           }
-          TransmitMessage::DataChannelOpenEvent(ev) => {
-            *datachannel_ready.borrow_mut() = true;
-          }
+          TransmitMessage::DataChannelOpenEvent(event) => todo!(),
         }
       }
     })
@@ -201,10 +180,6 @@ impl RTCLink {
 
   pub fn is_ready(&self) -> bool {
     *self.ready.clone().borrow()
-  }
-
-  pub fn is_datachannel_ready(&self) -> bool {
-    *self.datachannel_ready.clone().borrow()
   }
 
   pub async fn negotiation(
@@ -301,8 +276,7 @@ impl RTCLink {
   }
 
   pub fn send_message(&self, message: ArrayBuffer) {
-    let data = self.rtc.borrow().send_message(message);
-    log!("send_message result", format!("{:?}", data));
+    let _ = self.rtc.borrow().send_message(message);
   }
 
   pub fn create_datachannel(&mut self) {
