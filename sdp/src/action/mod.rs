@@ -16,11 +16,11 @@ pub trait ParamResponseExecute {
 
 pub trait UnicastMessage {
   fn get_to(&self) -> String;
-  fn get_message(&self, session_id: String, message_type: MessageType) -> String;
+  fn get_message(&self, session_id: String, message_type: MessageType) -> Vec<u8>;
 }
 
 pub trait BroadcastMessage {
-  fn get_message(&self, session_id: String) -> String;
+  fn get_message(&self, session_id: String) -> Vec<u8>;
 }
 
 pub trait UnicastExecute {
@@ -32,7 +32,7 @@ pub trait UnicastExecute {
       let target_peer = peers.get(&self.get_to()).unwrap();
       target_peer
         .tx
-        .send(Message::Text(self.get_message(session_id, message_type)))
+        .send(Message::Binary(self.get_message(session_id, message_type)))
         .unwrap();
     }
   }
@@ -47,7 +47,7 @@ pub trait BroadcastExecute {
       let broadcast_recipients = peers.iter().map(|(_, ws_sink)| ws_sink);
       for rec in broadcast_recipients {
         let message = self.get_message(session_id.clone());
-        rec.tx.send(Message::Text(message)).unwrap();
+        rec.tx.send(Message::Binary(message)).unwrap();
       }
     }
   }
@@ -93,6 +93,6 @@ impl ParamResponseOptionExecute for RequestMessage {
   }
 }
 
-pub fn msg_try_into(message: ResponseMessage) -> Result<tungstenite::Message, serde_json::Error> {
-  Ok(tungstenite::Message::Text(serde_json::to_string(&message)?))
+pub fn msg_try_into(message: ResponseMessage) -> Result<tungstenite::Message, bincode::Error> {
+  Ok(tungstenite::Message::Binary(bincode::serialize(&message)?))
 }

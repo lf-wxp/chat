@@ -18,13 +18,13 @@ pub enum RequestError {
 }
 #[derive(Debug, Clone)]
 pub struct Request {
-  sender: Sender<String>,
-  receiver: Receiver<String>,
+  sender: Sender<Vec<u8>>,
+  receiver: Receiver<Vec<u8>>,
   session_id: String,
 }
 
 impl Request {
-  pub fn new(sender: Sender<String>, receiver: Receiver<String>) -> Self {
+  pub fn new(sender: Sender<Vec<u8>>, receiver: Receiver<Vec<u8>>) -> Self {
     let session_id = nanoid!();
     Request {
       sender,
@@ -56,7 +56,7 @@ impl Request {
     &self,
     message: RequestMessageData,
   ) -> impl Future<Output = Result<ResponseMessageData, RequestError>> {
-    let message = serde_json::to_string(&RequestMessage {
+    let message = bincode::serialize(&RequestMessage {
       message,
       session_id: self.session_id.clone(),
       message_type: MessageType::Request,

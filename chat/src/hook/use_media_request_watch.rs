@@ -18,7 +18,7 @@ pub fn use_media_request_watch() {
             message: ResponseMessageData::Media(message),
             message_type,
             session_id,
-          }) = serde_json::from_str::<ResponseMessage>(&msg)
+          }) = bincode::deserialize::<ResponseMessage>(&msg)
           {
             if MessageType::Request == message_type {
               use_media(message, session_id);

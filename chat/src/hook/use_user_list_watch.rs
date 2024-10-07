@@ -17,7 +17,7 @@ pub fn use_user_list_watch() {
           if let Ok(ResponseMessage {
             message: ResponseMessageData::Action(ActionMessage::ClientList(message)),
             ..
-          }) = serde_json::from_str::<ResponseMessage>(&msg)
+          }) = bincode::deserialize::<ResponseMessage>(&msg)
           {
             users_setter(Users(message.into_iter().map(Into::into).collect()));
           }

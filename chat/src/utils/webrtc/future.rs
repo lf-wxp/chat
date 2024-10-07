@@ -18,11 +18,11 @@ pub enum ConnectError {
 #[derive(Debug, Clone)]
 pub struct Connect {
   remote_id: String,
-  receiver: Receiver<String>,
+  receiver: Receiver<Vec<u8>>,
 }
 
 impl Connect {
-  pub fn new(remote_id: String, receiver: Receiver<String>) -> Self {
+  pub fn new(remote_id: String, receiver: Receiver<Vec<u8>>) -> Self {
     Connect {
       remote_id,
       receiver,
@@ -54,11 +54,11 @@ impl Connect {
 
 pub struct ConnectFuture {
   remote_id: String,
-  receiver: Receiver<String>,
+  receiver: Receiver<Vec<u8>>,
 }
 
 impl ConnectFuture {
-  pub fn new(remote_id: String, receiver: Receiver<String>) -> Self {
+  pub fn new(remote_id: String, receiver: Receiver<Vec<u8>>) -> Self {
     ConnectFuture {
       remote_id,
       receiver,
@@ -77,7 +77,7 @@ impl Future for ConnectFuture {
       if let Ok(ResponseMessage {
         message: ResponseMessageData::Connect(ConnectMessage { state, from, .. }),
         ..
-      }) = serde_json::from_str::<ResponseMessage>(&msg)
+      }) = bincode::deserialize::<ResponseMessage>(&msg)
       {
         if from == this.remote_id {
           match state {

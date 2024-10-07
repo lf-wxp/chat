@@ -5,7 +5,6 @@ use message::{
 use crate::{
   action::{BroadcastExecute, BroadcastMessage, ParamResponseExecute},
   data::{get_client_list, get_client_map},
-  msg_try_into,
 };
 
 impl ParamResponseExecute for UpdateName {
@@ -47,7 +46,7 @@ impl ParamResponseExecute for ListClient {
 }
 impl BroadcastExecute for ListClient {}
 impl BroadcastMessage for ListClient {
-  fn get_message(&self, session_id: String) -> String {
+  fn get_message(&self, session_id: String) -> Vec<u8> {
     let message = match get_client_map() {
       Some(map) => {
         let list = map.values().map(Client::from).collect::<Vec<Client>>();
@@ -55,7 +54,7 @@ impl BroadcastMessage for ListClient {
       }
       None => ActionMessage::to_resp_msg(session_id, ActionMessage::Error(None)),
     };
-    msg_try_into(message).unwrap().to_string()
+    bincode::serialize(&message).unwrap()
   }
 }
 

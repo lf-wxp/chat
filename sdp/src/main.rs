@@ -60,12 +60,12 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr) {
   let message_tx = transform_tx.clone();
 
   let execute_message = stream.try_for_each(|msg| {
-    let message = match serde_json::from_str::<RequestMessage>(msg.to_text().unwrap()) {
+    let message = match bincode::deserialize::<RequestMessage>(&msg.into_data()) {
       Ok(message) => {
         println!(
-          "Received a message from {}: {}",
+          "Received a message from {}: {:?}",
           addr,
-          msg.to_text().unwrap()
+          message,
         );
         message.execute(uuid_key.clone(), None)
       }

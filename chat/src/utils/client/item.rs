@@ -48,7 +48,7 @@ impl Client {
     let user = self.user.clone();
     spawn_local(async move {
       while let Ok(msg) = receiver.recv().await {
-        if let Ok(origin_message) = serde_json::from_str::<ResponseMessage>(&msg) {
+        if let Ok(origin_message) = bincode::deserialize::<ResponseMessage>(&msg) {
           let ResponseMessage {
             message,
             message_type,
@@ -87,12 +87,12 @@ impl Client {
   }
 
   async fn send_static(
-    sender: &Sender<String>,
+    sender: &Sender<Vec<u8>>,
     message: RequestMessageData,
     message_type: MessageType,
     session_id: String,
   ) {
-    let message = serde_json::to_string(&RequestMessage {
+    let message = bincode::serialize(&RequestMessage {
       message,
       session_id,
       message_type,
@@ -264,7 +264,7 @@ impl Client {
   }
 
   pub async fn replay_request_connect(
-    sender: &Sender<String>,
+    sender: &Sender<Vec<u8>>,
     from: String,
     to: String,
     session_id: String,
@@ -320,7 +320,7 @@ impl Client {
     session_id: &str,
     links: Rc<RefCell<HashMap<String, RTCLink>>>,
     message: &ResponseMessageData,
-    sender: Sender<String>,
+    sender: Sender<Vec<u8>>,
     channel_message_sender: Sender<ArrayBuffer>,
   ) {
     if let ResponseMessageData::Connect(ConnectMessage {

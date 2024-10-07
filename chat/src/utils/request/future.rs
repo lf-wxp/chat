@@ -8,11 +8,11 @@ use message::{ResponseMessage, ResponseMessageData};
 
 pub struct RequestFuture {
   session_id: String,
-  receiver: Receiver<String>,
+  receiver: Receiver<Vec<u8>>,
 }
 
 impl RequestFuture {
-  pub fn new(session_id: String, receiver: Receiver<String>) -> Self {
+  pub fn new(session_id: String, receiver: Receiver<Vec<u8>>) -> Self {
     RequestFuture {
       session_id,
       receiver,
@@ -31,7 +31,7 @@ impl Future for RequestFuture {
           message,
           session_id,
           ..
-        }) = serde_json::from_str::<ResponseMessage>(&msg) {
+        }) = bincode::deserialize::<ResponseMessage>(&msg) {
         if session_id == this.session_id {
           return Poll::Ready(message);
         }

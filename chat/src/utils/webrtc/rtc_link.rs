@@ -47,7 +47,12 @@ pub struct RTCLink {
 }
 
 impl RTCLink {
-  pub fn new(id: String, remote_id: String, sender: Sender<ArrayBuffer>, rtc_type: RtcType) -> Result<Self, JsValue> {
+  pub fn new(
+    id: String,
+    remote_id: String,
+    sender: Sender<ArrayBuffer>,
+    rtc_type: RtcType,
+  ) -> Result<Self, JsValue> {
     let rtc = WebRTC::new()?;
     let link = get_link().unwrap();
     let remote_media = MediaStream::new()?;
@@ -84,7 +89,6 @@ impl RTCLink {
       rtc_type: (*rtc_type).clone(),
     }
   }
-
 
   fn watch_rtc_event(&self) {
     let mut receiver_rtc = self.rtc.borrow().message_receiver.clone();
@@ -155,13 +159,13 @@ impl RTCLink {
   }
 
   async fn send_signal(
-    sender: &Sender<String>,
+    sender: &Sender<Vec<u8>>,
     base_info: BaseInfo,
     message: CastMessage,
     session_id: String,
   ) {
     let BaseInfo { id, remote_id, .. } = base_info;
-    let message = serde_json::to_string(&RequestMessage {
+    let message = bincode::serialize(&RequestMessage {
       message: RequestMessageData::Signal(SignalMessage {
         from: id,
         to: remote_id,
@@ -175,13 +179,13 @@ impl RTCLink {
   }
 
   async fn transmit_ice_state_message(
-    sender: &Sender<String>,
+    sender: &Sender<Vec<u8>>,
     base_info: BaseInfo,
     state: ConnectState,
     media_type: Option<MediaType>,
   ) {
     let BaseInfo { id, remote_id, .. } = base_info;
-    let message = serde_json::to_string(&RequestMessage {
+    let message = bincode::serialize(&RequestMessage {
       message: RequestMessageData::Connect(ConnectMessage {
         from: id,
         to: remote_id,
@@ -204,8 +208,8 @@ impl RTCLink {
   }
 
   pub async fn negotiation(
-    sender: &Sender<String>,
-    receiver: Receiver<String>,
+    sender: &Sender<Vec<u8>>,
+    receiver: Receiver<Vec<u8>>,
     base_info: BaseInfo,
   ) -> Result<(), ConnectError> {
     if base_info.rtc_type == RtcType::Callee {
@@ -217,7 +221,7 @@ impl RTCLink {
     connect.connect(send_future).await
   }
 
-  pub async fn send_offer(sender: &Sender<String>, base_info: BaseInfo) -> Result<(), JsValue> {
+  pub async fn send_offer(sender: &Sender<Vec<u8>>, base_info: BaseInfo) -> Result<(), JsValue> {
     let rtc = base_info.rtc.clone();
     let offer = rtc.borrow().get_send_offer().await?;
     let message = CastMessage::Sdp(SdpMessage {
@@ -229,7 +233,7 @@ impl RTCLink {
   }
 
   pub async fn send_answer(
-    sender: &Sender<String>,
+    sender: &Sender<Vec<u8>>,
     base_info: BaseInfo,
     session_id: String,
   ) -> Result<(), JsValue> {
