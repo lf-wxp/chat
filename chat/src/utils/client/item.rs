@@ -1,7 +1,6 @@
 use async_broadcast::Sender;
 use futures::Future;
 use gloo_console::log;
-use nanoid::nanoid;
 use message::{
   self, Action, ActionMessage, Chat, ChatMessage, ClientAction, ConnectMessage, ConnectState,
   GetInfo, Information, ListAction, ListMessage, MediaMessage, MediaType, MessageType,
@@ -9,6 +8,7 @@ use message::{
   ResponseMessageData::{self, Media},
   SignalMessage, UpdateName,
 };
+use nanoid::nanoid;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use wasm_bindgen_futures::spawn_local;
 
