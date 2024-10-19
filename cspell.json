@@ -6,6 +6,7 @@
         "autoplay",
         "bezier",
         "bindgen",
+        "bitvec",
         "chrono",
         "consts",
         "contenteditable",

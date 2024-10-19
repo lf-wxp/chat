@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 bit-vec = "0.8.0"
 bincode = {workspace = true}
+encoding_rs = { version = "0.8.34", features = ["serde"] }
