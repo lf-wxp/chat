@@ -53,6 +53,8 @@ use std::ops::Range;
 
 // 16k = 131072 bits
 const MAX: usize = 131072;
+const CHUNK_TYPE_RANGE: Range<usize> = 0..1;
+const REQUEST_ID_RANGE: Range<usize> = 1..169;
 
 struct RouteChunk {
   data: BitVec,
@@ -76,7 +78,7 @@ impl RouteChunk {
     Self { data, max: MAX }
   }
   fn get_mapping(&self) -> Vec<String> {
-    let bv = self.get_bitvec_from(169);
+    let bv = self.get_bitvec_from(REQUEST_ID_RANGE.count() + 1);
     bincode::deserialize::<Vec<String>>(&bv.to_bytes()).unwrap()
   }
 }
@@ -90,7 +92,7 @@ impl Chunk for RouteChunk {
 pub trait Chunk {
   fn get_data(&self) -> &BitVec;
   fn get_request_id(&self) -> String {
-    let bv = self.get_bitvec_range(1..169);
+    let bv = self.get_bitvec_range(REQUEST_ID_RANGE);
     let binding = bv.to_bytes();
     let (val, _, _) = UTF_8.decode(&binding);
     val.to_string()
@@ -109,7 +111,7 @@ pub trait Chunk {
       .collect()
   }
   fn get_chunk_type(&self) -> u8 {
-    let bv = self.get_bitvec_range(0..1);
+    let bv = self.get_bitvec_range(CHUNK_TYPE_RANGE);
     let mut num = 0;
     for bit in bv.iter() {
       num <<= 1; // 左移一位
