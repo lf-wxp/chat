@@ -1,0 +1,133 @@
+/* =============================================================================
+ * Global Reset
+ * ============================================================================= */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  transition: background-color var(--transition), color var(--transition);
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* =============================================================================
+ * Application Container
+ * ============================================================================= */
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* =============================================================================
+ * Responsive Layout
+ * ============================================================================= */
+
+/* Desktop (≥1024px): Two-column layout */
+@media (min-width: 1024px) {
+  .layout-sidebar {
+    width: 320px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background-color: var(--bg-secondary);
+    overflow-y: auto;
+  }
+
+  .layout-main {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* Tablet (768px - 1024px): Collapsible sidebar */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .layout-sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background-color: var(--bg-secondary);
+    overflow-y: auto;
+    transition: transform var(--transition);
+  }
+
+  .layout-sidebar.collapsed {
+    transform: translateX(-100%);
+    position: absolute;
+    z-index: 100;
+    height: 100%;
+  }
+
+  .layout-main {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* Mobile (<768px): Single column + drawer navigation */
+@media (max-width: 767px) {
+  .layout-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 85%;
+    max-width: 320px;
+    height: 100%;
+    background-color: var(--bg-secondary);
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    overflow-y: auto;
+  }
+
+  .layout-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .layout-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 199;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .layout-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .layout-main {
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+}
+

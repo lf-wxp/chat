@@ -1,0 +1,153 @@
+/* =============================================================================
+ * Invite Modal
+ * ============================================================================= */
+.invite-modal {
+  max-width: 380px;
+  text-align: center;
+}
+.invite-modal-header {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 24px 20px 12px;
+  gap: 8px;
+}
+.invite-modal-icon {
+  font-size: 2rem;
+  width: 56px; height: 56px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-alpha);
+  border-radius: var(--radius-full);
+}
+.invite-modal-body {
+  padding: 12px 20px 20px;
+}
+.invite-user-info {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.invite-user-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.invite-message {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.invite-modal-actions {
+  display: flex; gap: 12px;
+  padding: 0 20px 20px;
+  justify-content: center;
+}
+.invite-modal-actions .btn {
+  min-width: 100px;
+}
+
+/* =============================================================================
+ * Incoming Call Modal
+ * ============================================================================= */
+.call-overlay {
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+.call-modal {
+  max-width: 340px;
+  text-align: center;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+}
+.call-modal-header {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 28px 20px 8px;
+  gap: 8px;
+}
+.call-modal-icon {
+  font-size: 2rem;
+  width: 64px; height: 64px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--success);
+  border-radius: var(--radius-full);
+  color: #fff;
+}
+.call-modal-body {
+  padding: 16px 20px 24px;
+}
+.call-user-info {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8px;
+}
+.call-avatar-ring {
+  position: relative;
+  padding: 4px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--success);
+  animation: callRing 2s ease-in-out infinite;
+}
+.call-user-name {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.call-status-text {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  animation: callDots 1.5s ease-in-out infinite;
+}
+.call-modal-actions {
+  display: flex; gap: 32px;
+  padding: 0 20px 28px;
+  justify-content: center;
+}
+.call-btn {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 6px;
+  background: none; border: none;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.call-btn:hover { transform: scale(1.1); }
+.call-btn:active { transform: scale(0.95); }
+.call-btn-icon {
+  width: 56px; height: 56px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-full);
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: #fff;
+  transition: box-shadow 0.2s ease;
+}
+.call-btn-reject .call-btn-icon {
+  background: var(--error);
+}
+.call-btn-reject:hover .call-btn-icon {
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
+}
+.call-btn-accept .call-btn-icon {
+  background: var(--success);
+}
+.call-btn-accept:hover .call-btn-icon {
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
+}
+.call-btn-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Incoming Call Pulse Animation */
+.call-pulse {
+  animation: callPulse 1.5s ease-in-out infinite;
+}
+@keyframes callPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  50% { transform: scale(1.05); box-shadow: 0 0 0 12px rgba(34, 197, 94, 0); }
+}
+@keyframes callRing {
+  0%, 100% { border-color: var(--success); }
+  50% { border-color: var(--accent); }
+}
+@keyframes callDots {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+

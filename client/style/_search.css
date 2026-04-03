@@ -1,0 +1,278 @@
+/* =============================================================================
+ * Message Search
+ * ============================================================================= */
+
+/* Sidebar Global Search */
+.sidebar-search {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  transition: border-color var(--transition);
+}
+.sidebar-search-wrap:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+.sidebar-search-icon {
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.sidebar-search-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  min-width: 0;
+}
+.sidebar-search-input::placeholder {
+  color: var(--text-secondary);
+}
+.sidebar-search-clear {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition);
+}
+.sidebar-search-clear:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Search Results Panel */
+.search-panel-hidden { display: none; }
+.search-results-panel {
+  flex: 1;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--border);
+  max-height: 60vh;
+}
+.search-results-loading {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+.search-results-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+.search-results-title {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.search-results-list {
+  overflow-y: auto;
+}
+.search-result-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background var(--transition);
+  border-bottom: 1px solid rgba(128, 128, 128, 0.1);
+}
+.search-result-item:hover {
+  background: var(--bg-hover);
+}
+.search-result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.search-result-conv {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-result-time {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+.search-result-body {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-result-from {
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-right: 4px;
+}
+.search-result-preview {
+  color: var(--text-secondary);
+}
+
+/* In-Conversation Search Bar */
+.chat-search-hidden { display: none; }
+.chat-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  animation: slideDown 0.15s ease;
+}
+.chat-search-input-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 5px 10px;
+  transition: border-color var(--transition);
+}
+.chat-search-input-wrap:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+.chat-search-icon {
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+.chat-search-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  min-width: 0;
+}
+.chat-search-input::placeholder {
+  color: var(--text-secondary);
+}
+.chat-search-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.chat-search-count {
+  font-size: 0.75rem;
+  color: var(--accent);
+  font-weight: 500;
+  white-space: nowrap;
+  min-width: 40px;
+  text-align: center;
+}
+.chat-search-count.no-match {
+  color: var(--error, #ef4444);
+}
+.chat-search-nav-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+  line-height: 1;
+}
+.chat-search-nav-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+.chat-search-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+}
+.chat-search-close-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Search Highlight */
+.search-highlight {
+  background: rgba(99, 102, 241, 0.08);
+  border-radius: var(--radius-md);
+  transition: background 0.3s ease;
+}
+.search-highlight-current {
+  background: rgba(99, 102, 241, 0.2);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 2px var(--accent);
+  animation: searchPulse 1s ease-in-out;
+}
+@keyframes searchPulse {
+  0% { box-shadow: inset 0 0 0 2px var(--accent), 0 0 12px rgba(99, 102, 241, 0.4); }
+  50% { box-shadow: inset 0 0 0 2px var(--accent), 0 0 20px rgba(99, 102, 241, 0.6); }
+  100% { box-shadow: inset 0 0 0 2px var(--accent); }
+}
+
+/* =============================================================================
+ * Pinned Conversations / Do Not Disturb
+ * ============================================================================= */
+
+/* Highlight background for pinned conversations */
+.chat-list-item-pinned {
+  background: var(--accent-light);
+  border-left: 3px solid var(--accent);
+}
+.chat-list-item-pinned:hover {
+  background: var(--bg-hover);
+}
+
+/* Badge Container */
+.chat-list-item-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Do Not Disturb Icon */
+.conv-muted-icon {
+  font-size: 0.8rem;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+/* Unread dot for muted conversations (replaces numeric badge) */
+.conv-muted-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+/* Context Menu Hidden */
+.conv-ctx-hidden { display: none; }
+
+/* Conversation Context Menu Tweaks */
+.conv-context-menu {
+  min-width: 160px;
+}
+

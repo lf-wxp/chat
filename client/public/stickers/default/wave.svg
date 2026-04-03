@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="handGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFCA28"/>
+      <stop offset="100%" stop-color="#FFA000"/>
+    </linearGradient>
+  </defs>
+  <circle cx="60" cy="60" r="56" fill="#FFF8E1" stroke="#FFE082" stroke-width="2"/>
+  <g transform="translate(30, 20) rotate(-15, 30, 40)">
+    <path d="M25 80 C25 80 20 50 22 40 C24 30 30 28 32 38 L34 50" fill="url(#handGrad)" stroke="#F9A825" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M34 50 L36 30 C37 20 43 19 43 29 L42 48" fill="url(#handGrad)" stroke="#F9A825" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M42 48 L45 25 C46 15 52 14 52 24 L50 48" fill="url(#handGrad)" stroke="#F9A825" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M50 48 L52 30 C53 22 58 21 58 30 L56 50" fill="url(#handGrad)" stroke="#F9A825" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M56 50 C58 42 63 42 62 50 L58 60" fill="url(#handGrad)" stroke="#F9A825" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M25 80 C20 85 30 90 40 85 C50 80 60 70 58 60 L56 50 L50 48 L42 48 L34 50 L25 80Z" fill="url(#handGrad)" stroke="#F9A825" stroke-width="1.5"/>
+  </g>
+  <line x1="18" y1="30" x2="10" y2="22" stroke="#FFB300" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="60" y1="12" x2="60" y2="3" stroke="#FFB300" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="95" y1="25" x2="103" y2="18" stroke="#FFB300" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

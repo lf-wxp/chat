@@ -1,0 +1,151 @@
+[package]
+name = "client"
+version = "0.1.0"
+edition = "2024"
+description = "WebRTC chat application — Leptos frontend (CSR + WASM)"
+
+[dependencies]
+message = { workspace = true }
+leptos = { workspace = true }
+leptos_router = { workspace = true }
+leptos_meta = { workspace = true }
+leptos_i18n = { workspace = true }
+serde = { workspace = true }
+bitcode = { workspace = true }
+chrono = { workspace = true }
+nanoid = { workspace = true }
+thiserror = { workspace = true }
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+js-sys = { workspace = true }
+web-sys = { workspace = true, features = [
+  "console",
+  "Window",
+  "Document",
+  "Element",
+  "HtmlElement",
+  "HtmlInputElement",
+  "HtmlTextAreaElement",
+  "HtmlVideoElement",
+  "HtmlCanvasElement",
+  "HtmlMediaElement",
+  "HtmlAudioElement",
+  "MediaStream",
+  "MediaStreamTrack",
+  "MediaStreamConstraints",
+  "DisplayMediaStreamConstraints",
+  "MediaDevices",
+  "Navigator",
+  "RtcPeerConnection",
+  "RtcPeerConnectionIceEvent",
+  "RtcSessionDescription",
+  "RtcSessionDescriptionInit",
+  "RtcSdpType",
+  "RtcIceCandidate",
+  "RtcIceCandidateInit",
+  "RtcDataChannel",
+  "RtcDataChannelInit",
+  "RtcDataChannelEvent",
+  "RtcDataChannelState",
+  "RtcConfiguration",
+  "RtcIceServer",
+  "RtcTrackEvent",
+  "RtcStatsReport",
+  "RtcRtpSender",
+  "WebSocket",
+  "MessageEvent",
+  "CloseEvent",
+  "BinaryType",
+  "Blob",
+  "BlobPropertyBag",
+  "FileReader",
+  "File",
+  "FileList",
+  "Url",
+  "CanvasRenderingContext2d",
+  "TextMetrics",
+  "DragEvent",
+  "DataTransfer",
+  "DataTransferItem",
+  "DataTransferItemList",
+  "ClipboardEvent",
+  "Notification",
+  "NotificationPermission",
+  "NotificationOptions",
+  "Storage",
+  "Location",
+  "KeyboardEvent",
+  "MouseEvent",
+  "TouchEvent",
+  "Touch",
+  "TouchList",
+  "MediaRecorder",
+  "MediaRecorderOptions",
+  "RecordingState",
+  "BlobEvent",
+  "AudioContext",
+  "BaseAudioContext",
+  "AnalyserNode",
+  "GainNode",
+  "MediaStreamAudioSourceNode",
+  "MediaElementAudioSourceNode",
+  "AudioDestinationNode",
+  "Clipboard",
+  "CssStyleDeclaration",
+  "DomRect",
+  "IntersectionObserver",
+  "IntersectionObserverInit",
+  "IntersectionObserverEntry",
+  "Performance",
+  "ScrollBehavior",
+  "ScrollToOptions",
+  "IdbFactory",
+  "IdbOpenDbRequest",
+  "IdbRequest",
+  "IdbDatabase",
+  "IdbTransaction",
+  "IdbTransactionMode",
+  "IdbObjectStore",
+  "IdbObjectStoreParameters",
+  "IdbCursorDirection",
+  "IdbCursor",
+  "IdbCursorWithValue",
+  "IdbKeyRange",
+  "IdbVersionChangeEvent",
+  "IdbIndex",
+  "IdbIndexParameters",
+  "DomStringList",
+  "DomException",
+  "Crypto",
+  "SubtleCrypto",
+  "CryptoKey",
+  "CryptoKeyPair",
+  "AesGcmParams",
+  "EcdhKeyDeriveParams",
+  "EcKeyGenParams",
+  "HkdfParams",
+  "Algorithm",
+] }
+serde_json = { workspace = true }
+futures-channel = { workspace = true }
+tracing = { workspace = true }
+console_error_panic_hook = "0.1"
+getrandom = { version = "0.4.2", features = ["wasm_js"] }
+# Force getrandom 0.2.x to use js feature for WASM (required by nanoid/rand/ring transitive deps)
+# Using original name ensures feature unification with transitive dependencies
+getrandom_0_2 = { package = "getrandom", version = "0.2", features = ["js"] }
+gloo-timers = { workspace = true }
+
+[lints]
+workspace = true
+
+[build-dependencies]
+leptos_i18n_build = { workspace = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[package.metadata.leptos-i18n]
+default = "zh"
+locales = ["zh", "en"]
+locales-dir = "locales"

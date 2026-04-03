@@ -17,3 +17,11 @@ Cargo.lock
 */dist
 
 .DS_Store
+
+
+# Added by cargo
+
+/target
+
+# Local binaries (e.g., chromedriver for WASM tests)
+.bin/

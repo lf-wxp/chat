@@ -1,18 +1,16 @@
 [package]
-edition = "2021"
 name = "message"
 version = "0.1.0"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+edition = "2024"
+description = "WebRTC chat application — shared protocol and message type definitions"
 
 [dependencies]
-futures = {workspace = true}
-gloo-console = {workspace = true}
-gloo-net = {workspace = true}
-nanoid = {workspace = true}
-serde = {workspace = true, features = ["derive"]}
-serde_json = {workspace = true}
-bincode = {workspace = true}
-chrono = {workspace = true, features = ["serde"]}
-encoding_rs = { version = "0.8.34", features = ["serde"] }
-bit-vec = "0.8.0"
+bitcode = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+chrono = { workspace = true, features = ["serde"] }
+nanoid = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

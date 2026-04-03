@@ -1,0 +1,226 @@
+/* =============================================================================
+ * User Profile Card Popup
+ * ============================================================================= */
+
+.user-profile-card {
+  max-width: 360px;
+  width: 90%;
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* Top decorative banner */
+.profile-card-banner {
+  height: 80px;
+  background: linear-gradient(135deg, var(--accent), #7c3aed, #ec4899);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+/* Avatar area */
+.profile-card-avatar-area {
+  display: flex;
+  justify-content: center;
+  margin-top: -36px;
+  position: relative;
+  z-index: 2;
+}
+.profile-card-avatar-ring {
+  padding: 4px;
+  background: var(--bg-primary);
+  border-radius: 50%;
+  box-shadow: 0 2px 12px var(--shadow);
+}
+
+/* User info */
+.profile-card-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 20px 0;
+}
+.profile-card-name {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+.profile-card-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 3px 12px;
+  border-radius: var(--radius-full);
+}
+.profile-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.profile-status-online {
+  color: var(--success);
+  background: rgba(34, 197, 94, 0.1);
+}
+.profile-status-online .profile-status-dot {
+  background: var(--success);
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+}
+.profile-status-busy {
+  color: var(--error);
+  background: rgba(239, 68, 68, 0.1);
+}
+.profile-status-busy .profile-status-dot {
+  background: var(--error);
+}
+.profile-status-away {
+  color: var(--warning);
+  background: rgba(245, 158, 11, 0.1);
+}
+.profile-status-away .profile-status-dot {
+  background: var(--warning);
+}
+.profile-status-offline {
+  color: var(--text-tertiary);
+  background: rgba(128, 128, 128, 0.1);
+}
+.profile-status-offline .profile-status-dot {
+  background: var(--text-tertiary);
+}
+
+.profile-card-id {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+.profile-card-id-label {
+  font-weight: 500;
+}
+.profile-card-id-value {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  user-select: all;
+}
+
+/* Action buttons */
+.profile-card-actions {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px 20px 24px;
+  margin-top: 8px;
+}
+.profile-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  padding: 8px;
+}
+.profile-action-btn:hover {
+  transform: scale(1.1);
+}
+.profile-action-btn:active {
+  transform: scale(0.95);
+}
+.profile-action-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 1.3rem;
+  transition: box-shadow 0.2s ease;
+}
+.profile-action-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+/* Chat button */
+.profile-action-chat .profile-action-icon {
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--accent);
+}
+.profile-action-chat:hover .profile-action-icon {
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+  background: rgba(99, 102, 241, 0.2);
+}
+
+/* Voice call button */
+.profile-action-audio .profile-action-icon {
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--success);
+}
+.profile-action-audio:hover .profile-action-icon {
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.3);
+  background: rgba(34, 197, 94, 0.2);
+}
+
+/* Video call button */
+.profile-action-video .profile-action-icon {
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--info);
+}
+.profile-action-video:hover .profile-action-icon {
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+  background: rgba(59, 130, 246, 0.2);
+}
+
+/* Close button */
+.profile-card-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
+  border: none;
+  color: #fff;
+  font-size: 1rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+  z-index: 3;
+}
+.profile-card-close:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Empty state when user unavailable */
+.profile-card-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+.profile-card-empty-icon {
+  font-size: 3rem;
+  opacity: 0.5;
+}
+
+/* Dark theme adaptation */
+[data-theme="dark"] .profile-card-close {
+  background: rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+}
+[data-theme="dark"] .profile-card-close:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+

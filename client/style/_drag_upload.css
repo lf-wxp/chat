@@ -1,0 +1,84 @@
+/* =============================================================================
+ * Drag and drop file upload overlay
+ * ============================================================================= */
+
+.drop-overlay-hidden { display: none; }
+
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(79, 70, 229, 0.08);
+  backdrop-filter: blur(4px);
+  border: 3px dashed var(--accent, #4f46e5);
+  border-radius: var(--radius-lg);
+  pointer-events: none;
+  animation: dropOverlayIn 0.2s ease-out;
+}
+
+@keyframes dropOverlayIn {
+  from { opacity: 0; border-color: transparent; }
+  to { opacity: 1; border-color: var(--accent, #4f46e5); }
+}
+
+.drop-overlay-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 32px 48px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 8px 32px var(--shadow-lg);
+  animation: dropContentBounce 0.3s ease-out;
+}
+
+@keyframes dropContentBounce {
+  0% { transform: scale(0.9); opacity: 0; }
+  60% { transform: scale(1.03); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.drop-overlay-icon {
+  font-size: 3rem;
+  line-height: 1;
+  animation: dropIconFloat 1.5s ease-in-out infinite;
+}
+
+@keyframes dropIconFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.drop-overlay-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent, #4f46e5);
+}
+
+.drop-overlay-hint {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Dark theme adaptation */
+[data-theme="dark"] .drop-overlay {
+  background: rgba(129, 140, 248, 0.06);
+  border-color: var(--accent, #818cf8);
+}
+[data-theme="dark"] .drop-overlay-title {
+  color: var(--accent, #818cf8);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .drop-overlay {
+    background: rgba(129, 140, 248, 0.06);
+    border-color: var(--accent, #818cf8);
+  }
+  :root:not([data-theme="light"]) .drop-overlay-title {
+    color: var(--accent, #818cf8);
+  }
+}

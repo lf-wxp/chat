@@ -1,21 +1,492 @@
+# =============================================================================
+# WebRTC Chat Project — cargo-make Build Configuration
+# =============================================================================
+# Usage:
+#   cargo make dev          — Development mode (start signaling server + frontend in parallel)
+#   cargo make build        — Build all crates (native + WASM)
+#   cargo make test         — Run all tests
+#   cargo make clean        — Clean build artifacts
+#   cargo make fmt          — Format code
+#   cargo make lint         — Code linting
+#   cargo make release      — Production build
+# =============================================================================
+
 [env]
 CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = true
+SERVER_HOST = "127.0.0.1"
+SERVER_PORT = "8888"
 
-[tasks.serve-yew]
-script = [
-  "cd $CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY/chat && trunk serve --features dev",
-]
+# Binary paths
+BIN_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/.bin"
+CHROMEDRIVER_PATH = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/.bin/chromedriver"
+
+# =============================================================================
+# Environment Check
+# =============================================================================
+
+[tasks.check-tools]
+description = "Check if required development tools are installed"
 script_runner = "@shell"
-
-[tasks.build-yew]
 script = [
-  "cd $CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY/chat && trunk build",
-]
-script_runner = "@shell"
+  '''
+  echo "🔍 Checking development tools..."
 
-[tasks.sdp]
-args = ["watch", "-x", "run", "-p", "sdp"]
+  missing=""
+
+  if ! command -v trunk &> /dev/null; then
+    missing="$missing trunk"
+    echo "  ❌ trunk not installed — cargo install trunk"
+  else
+    echo "  ✅ trunk $(trunk --version)"
+  fi
+
+  if ! command -v wasm-pack &> /dev/null; then
+    missing="$missing wasm-pack"
+    echo "  ❌ wasm-pack not installed — run 'cargo make install-wasm-pack'"
+  else
+    wasm_version=$(wasm-pack --version 2>/dev/null | cut -d' ' -f2 || echo "unknown")
+    echo "  ✅ wasm-pack $wasm_version"
+  fi
+
+  if ! command -v cargo-watch &> /dev/null; then
+    missing="$missing cargo-watch"
+    echo "  ❌ cargo-watch not installed — cargo install cargo-watch"
+  else
+    echo "  ✅ cargo-watch installed"
+  fi
+
+  if ! rustup target list --installed | grep -q wasm32-unknown-unknown; then
+    missing="$missing wasm32-unknown-unknown"
+    echo "  ❌ wasm32-unknown-unknown target not installed — rustup target add wasm32-unknown-unknown"
+  else
+    echo "  ✅ wasm32-unknown-unknown target installed"
+  fi
+
+  # Check for Chrome/Chromium (required for wasm-pack test --headless)
+  if ! command -v google-chrome-stable &> /dev/null && \
+     ! command -v google-chrome &> /dev/null && \
+     ! command -v chromium &> /dev/null && \
+     ! command -v chromium-browser &> /dev/null && \
+     ! command -v "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" &> /dev/null; then
+    echo "  ⚠️  Chrome/Chromium not found — wasm-pack test --headless may not work"
+    echo "     Install Chrome or Chromium for WASM tests"
+  else
+    echo "  ✅ Chrome/Chromium available for WASM tests"
+  fi
+
+  # Check for chromedriver (required for wasm-pack test --headless)
+  CHROMEDRIVER_PATH="${CHROMEDRIVER_PATH}"
+  if [ ! -f "$CHROMEDRIVER_PATH" ]; then
+    if ! command -v chromedriver &> /dev/null; then
+      echo "  ⚠️  chromedriver not found — run 'cargo make install-chromedriver'"
+    else
+      echo "  ⚠️  chromedriver available in PATH (consider using .bin/chromedriver for version control)"
+    fi
+  else
+    chromedriver_version=$("$CHROMEDRIVER_PATH" --version 2>/dev/null | head -1 | cut -d' ' -f2 || echo "unknown")
+    echo "  ✅ chromedriver $chromedriver_version (.bin/chromedriver)"
+  fi
+
+  if [ -n "$missing" ]; then
+    echo ""
+    echo "⚠️  Missing tools:$missing"
+    echo "Please install them before continuing."
+    exit 1
+  fi
+
+  echo "✅ All tools check passed!"
+  '''
+]
+
+# =============================================================================
+# Development Mode
+# =============================================================================
+
+[tasks.serve-client]
+description = "Start frontend development server (Trunk + HMR)"
+script_runner = "@shell"
+script = [
+  "cd $CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY/client && trunk serve",
+]
+
+[tasks.serve-server]
+description = "Start signaling server (cargo-watch hot reload)"
 command = "cargo"
+args = ["watch", "-x", "run -p server"]
 
 [tasks.dev]
-run_task = {name = ["sdp", "serve-yew"], parallel = true}
+description = "Development mode — start signaling server + frontend in parallel"
+dependencies = ["check-tools"]
+run_task = { name = ["serve-server", "serve-client"], parallel = true }
+
+# =============================================================================
+# Build
+# =============================================================================
+
+[tasks.build-server]
+description = "Build signaling server"
+command = "cargo"
+args = ["build", "-p", "server"]
+
+[tasks.build-server-release]
+description = "Build signaling server (Release mode)"
+command = "cargo"
+args = ["build", "-p", "server", "--release"]
+
+[tasks.build-client]
+description = "Build frontend WASM (Debug mode)"
+script_runner = "@shell"
+script = [
+  "cd $CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY/client && trunk build",
+]
+
+[tasks.build-client-release]
+description = "Build frontend WASM (Release mode)"
+script_runner = "@shell"
+script = [
+  "cd $CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY/client && trunk build --release",
+]
+
+[tasks.build-native]
+description = "Build all native crates (server, message)"
+command = "cargo"
+args = ["build", "-p", "server", "-p", "message"]
+
+[tasks.build]
+description = "Build all (native crates + frontend WASM)"
+dependencies = ["build-native", "build-client"]
+
+# =============================================================================
+# Production Build
+# =============================================================================
+
+[tasks.release]
+description = "Production build — build all components in Release mode"
+dependencies = ["fmt", "lint", "test", "release-build"]
+
+[tasks.release-build]
+description = "Release mode build (signaling server + frontend)"
+run_task = { name = ["build-server-release", "build-client-release"] }
+
+# =============================================================================
+# Test
+# =============================================================================
+
+[tasks.test-native]
+description = "Run native crate unit tests"
+command = "cargo"
+args = ["test", "-p", "server", "-p", "message"]
+
+[tasks.test-client-native]
+description = "Run client pure unit tests (native target, #[test] only)"
+command = "cargo"
+args = ["test", "-p", "client"]
+
+[tasks.test-wasm]
+description = "Run WASM unit tests (wasm-bindgen-test) in headless Chrome"
+script_runner = "@shell"
+script = [
+  '''
+  CHROMEDRIVER_PATH="$CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY/.bin/chromedriver"
+  if [ ! -f "$CHROMEDRIVER_PATH" ]; then
+    echo "⚠️  chromedriver not found at .bin/chromedriver — skipping WASM tests"
+    echo "   Download matching version from: https://googlechromelabs.github.io/chrome-for-testing/"
+    exit 0
+  fi
+  cd $CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY/client
+  CHROMEDRIVER="$CHROMEDRIVER_PATH" wasm-pack test --headless --chrome --release
+  '''
+]
+
+[tasks.test]
+description = "Run all tests (native + WASM)"
+dependencies = ["test-native", "test-client-native", "test-wasm"]
+
+# =============================================================================
+# Code Quality
+# =============================================================================
+
+[tasks.fmt]
+description = "Format all code"
+command = "cargo"
+args = ["fmt", "--all"]
+
+[tasks.fmt-check]
+description = "Check code format (without modifying files)"
+command = "cargo"
+args = ["fmt", "--all", "--check"]
+
+[tasks.clippy-native]
+description = "Clippy check for native crates"
+command = "cargo"
+args = ["clippy", "-p", "server", "-p", "message", "--", "-D", "warnings"]
+
+[tasks.clippy-wasm]
+description = "Clippy check for frontend WASM crate"
+command = "cargo"
+args = ["clippy", "-p", "client", "--target", "wasm32-unknown-unknown", "--", "-D", "warnings"]
+
+[tasks.lint]
+description = "Code linting (fmt-check + clippy)"
+dependencies = ["fmt-check", "clippy-native", "clippy-wasm"]
+
+# =============================================================================
+# Clean
+# =============================================================================
+
+[tasks.clean-dist]
+description = "Clean frontend build artifacts (dist directory)"
+script_runner = "@shell"
+script = [
+  "rm -rf $CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY/client/dist",
+]
+
+[tasks.clean-cargo]
+description = "Clean Cargo build cache"
+command = "cargo"
+args = ["clean"]
+
+[tasks.clean]
+description = "Clean all build artifacts"
+dependencies = ["clean-dist", "clean-cargo"]
+
+# =============================================================================
+# Tool Installation
+# =============================================================================
+
+[tasks.install-wasm-pack]
+description = "Install or update wasm-pack to latest version"
+script_runner = "@shell"
+script = [
+  '''
+  echo "📦 Installing wasm-pack (latest)..."
+
+  # Check if wasm-pack is already installed
+  if command -v wasm-pack &> /dev/null; then
+    current_version=$(wasm-pack --version 2>/dev/null | cut -d' ' -f2 || echo "unknown")
+    echo "  → Current version: $current_version, updating to latest..."
+  fi
+
+  # Install latest wasm-pack via cargo
+  cargo install wasm-pack
+
+  new_version=$(wasm-pack --version 2>/dev/null | cut -d' ' -f2 || echo "unknown")
+  echo "✅ wasm-pack $new_version installed successfully!"
+  '''
+]
+
+[tasks.install-chromedriver]
+description = "Download chromedriver matching installed Chrome version to .bin directory"
+script_runner = "@shell"
+script = [
+  '''
+  set -e
+
+  BIN_DIR="${BIN_DIR}"
+  CHROMEDRIVER_PATH="${CHROMEDRIVER_PATH}"
+
+  echo "📦 Setting up chromedriver..."
+
+  # Create .bin directory if it doesn't exist
+  mkdir -p "$BIN_DIR"
+
+  # Detect platform
+  OS="$(uname -s)"
+  ARCH="$(uname -m)"
+
+  case "$OS" in
+    Darwin)
+      if [ "$ARCH" = "arm64" ]; then
+        PLATFORM="mac-arm64"
+      else
+        PLATFORM="mac-x64"
+      fi
+      # Try to get Chrome version on macOS
+      CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+      if [ -f "$CHROME_PATH" ]; then
+        CHROME_VERSION=$("$CHROME_PATH" --version 2>/dev/null | cut -d' ' -f3 || echo "")
+      fi
+      ;;
+    Linux)
+      PLATFORM="linux64"
+      # Try to get Chrome version on Linux
+      if command -v google-chrome-stable &> /dev/null; then
+        CHROME_VERSION=$(google-chrome-stable --version 2>/dev/null | cut -d' ' -f3 || echo "")
+      elif command -v google-chrome &> /dev/null; then
+        CHROME_VERSION=$(google-chrome --version 2>/dev/null | cut -d' ' -f3 || echo "")
+      elif command -v chromium &> /dev/null; then
+        CHROME_VERSION=$(chromium --version 2>/dev/null | cut -d' ' -f2 || echo "")
+      fi
+      ;;
+    *)
+      echo "❌ Unsupported platform: $OS $ARCH"
+      echo "   Please download chromedriver manually from: https://googlechromelabs.github.io/chrome-for-testing/"
+      exit 1
+      ;;
+  esac
+
+  echo "  → Detected platform: $PLATFORM"
+
+  # Get latest stable chromedriver version first (most reliable)
+  LATEST_URL="https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"
+  echo "  → Fetching latest stable chromedriver version..."
+
+  if command -v jq &> /dev/null; then
+    # Use jq for reliable JSON parsing
+    STABLE_VERSION=$(curl -fsSL "$LATEST_URL" 2>/dev/null | \
+      jq -r '.channels.Stable.version' 2>/dev/null || echo "")
+  else
+    # Fallback to grep
+    STABLE_VERSION=$(curl -fsSL "$LATEST_URL" 2>/dev/null | \
+      sed -n 's/.*"Stable"[^}]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1 || echo "")
+  fi
+
+  # If Chrome version detected, try to find matching chromedriver
+  if [ -n "$CHROME_VERSION" ]; then
+    CHROME_MAJOR=$(echo "$CHROME_VERSION" | cut -d'.' -f1)
+    STABLE_MAJOR=$(echo "$STABLE_VERSION" | cut -d'.' -f1 2>/dev/null || echo "0")
+
+    echo "  → Detected Chrome version: $CHROME_VERSION (major: $CHROME_MAJOR)"
+    echo "  → Latest stable Chrome for Testing: $STABLE_VERSION (major: $STABLE_MAJOR)"
+
+    if [ "$CHROME_MAJOR" = "$STABLE_MAJOR" ]; then
+      # Chrome major matches stable, use stable chromedriver
+      CHROMEDRIVER_VERSION="$STABLE_VERSION"
+      echo "  ✅ Chrome version matches stable, using chromedriver $CHROMEDRIVER_VERSION"
+    elif [ "$CHROME_MAJOR" -gt "$STABLE_MAJOR" ] 2>/dev/null; then
+      # Chrome is newer than stable, use stable chromedriver (may have compatibility issues)
+      echo "  ⚠️  Chrome $CHROME_MAJOR.x is newer than stable Chrome for Testing ($STABLE_MAJOR.x)"
+      echo "     Using latest stable chromedriver $STABLE_VERSION (may have compatibility issues)"
+      CHROMEDRIVER_VERSION="$STABLE_VERSION"
+    else
+      # Chrome is older, try to find matching version
+      VERSIONS_URL="https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json"
+
+      if command -v jq &> /dev/null; then
+        CHROMEDRIVER_VERSION=$(curl -fsSL "$VERSIONS_URL" 2>/dev/null | \
+          jq -r ".versions[] | select(.version | startswith(\"$CHROME_MAJOR.\")) | .version" 2>/dev/null | tail -1 || echo "")
+      else
+        CHROMEDRIVER_VERSION=$(curl -fsSL "$VERSIONS_URL" 2>/dev/null | \
+          grep -o "\"version\": \"[^\"]*" | \
+          grep "$CHROME_MAJOR\." | \
+          tail -1 | \
+          cut -d'"' -f4 || echo "")
+      fi
+
+      if [ -n "$CHROMEDRIVER_VERSION" ]; then
+        echo "  ✅ Found matching chromedriver $CHROMEDRIVER_VERSION for Chrome $CHROME_MAJOR.x"
+      else
+        echo "  ⚠️  No matching chromedriver for Chrome $CHROME_MAJOR.x, using stable"
+        CHROMEDRIVER_VERSION="$STABLE_VERSION"
+      fi
+    fi
+  else
+    # No Chrome detected, use stable
+    CHROMEDRIVER_VERSION="$STABLE_VERSION"
+    echo "  → Using latest stable chromedriver: $CHROMEDRIVER_VERSION"
+  fi
+
+  if [ -z "$CHROMEDRIVER_VERSION" ]; then
+    echo "❌ Failed to determine chromedriver version"
+    echo "   Please download manually from: https://googlechromelabs.github.io/chrome-for-testing/"
+    exit 1
+  fi
+
+  echo "  → Using chromedriver version: $CHROMEDRIVER_VERSION"
+
+  # Check if we already have this version
+  if [ -f "$CHROMEDRIVER_PATH" ]; then
+    existing_version=$("$CHROMEDRIVER_PATH" --version 2>/dev/null | head -1 | cut -d' ' -f2 || echo "")
+    if [ "$existing_version" = "$CHROMEDRIVER_VERSION" ]; then
+      echo "  ✅ chromedriver $CHROMEDRIVER_VERSION already installed at .bin/chromedriver"
+      exit 0
+    else
+      echo "  → Updating from $existing_version to $CHROMEDRIVER_VERSION..."
+      rm -f "$CHROMEDRIVER_PATH"
+    fi
+  fi
+
+  echo "  → Downloading chromedriver $CHROMEDRIVER_VERSION..."
+
+  # Download URL for Chrome for Testing
+  DOWNLOAD_URL="https://storage.googleapis.com/chrome-for-testing-public/${CHROMEDRIVER_VERSION}/${PLATFORM}/chromedriver-${PLATFORM}.zip"
+
+  TEMP_DIR=$(mktemp -d)
+  ZIP_FILE="$TEMP_DIR/chromedriver.zip"
+
+  # Download with curl
+  if ! curl -fsSL "$DOWNLOAD_URL" -o "$ZIP_FILE"; then
+    echo "❌ Failed to download chromedriver from: $DOWNLOAD_URL"
+    echo "   Please download manually from: https://googlechromelabs.github.io/chrome-for-testing/"
+    rm -rf "$TEMP_DIR"
+    exit 1
+  fi
+
+  # Extract
+  echo "  → Extracting..."
+  cd "$TEMP_DIR"
+  unzip -q -o "$ZIP_FILE"
+
+  # Find chromedriver binary (it may be in a subdirectory)
+  CHROMEDRIVER_BIN=$(find "$TEMP_DIR" -name "chromedriver" -type f | head -1)
+
+  if [ -z "$CHROMEDRIVER_BIN" ]; then
+    echo "❌ chromedriver binary not found in downloaded archive"
+    rm -rf "$TEMP_DIR"
+    exit 1
+  fi
+
+  # Move to .bin directory
+  mv "$CHROMEDRIVER_BIN" "$CHROMEDRIVER_PATH"
+  chmod +x "$CHROMEDRIVER_PATH"
+
+  # Cleanup
+  rm -rf "$TEMP_DIR"
+
+  # Verify installation
+  installed_version=$("$CHROMEDRIVER_PATH" --version 2>/dev/null | head -1 || echo "unknown")
+  echo "✅ chromedriver installed successfully at .bin/chromedriver"
+  echo "   Version: $installed_version"
+  '''
+]
+
+[tasks.install-tools]
+description = "Install all required Rust tools (trunk, wasm-pack, cargo-watch, cargo-make)"
+dependencies = ["install-wasm-pack"]
+script_runner = "@shell"
+script = [
+  '''
+  echo "📦 Installing Rust development tools..."
+
+  echo "  → Adding wasm32-unknown-unknown target..."
+  rustup target add wasm32-unknown-unknown
+
+  echo "  → Installing trunk..."
+  cargo install trunk
+
+  echo "  → Installing cargo-watch..."
+  cargo install cargo-watch
+
+  echo "  → Installing cargo-make..."
+  cargo install cargo-make
+
+  echo ""
+  echo "✅ All Rust tools installed successfully!"
+  '''
+]
+
+[tasks.setup]
+description = "Install all required development tools (Rust tools + chromedriver)"
+dependencies = ["install-tools", "install-chromedriver"]
+script_runner = "@shell"
+script = [
+  '''
+  echo ""
+  echo "⚠️  Additional requirements for WASM tests:"
+  echo "   - Ensure Chrome or Chromium browser is installed"
+  echo "   - chromedriver version should match Chrome version"
+  echo ""
+  echo "✅ All tools installed successfully!"
+  echo "Run 'cargo make dev' to start the development environment."
+  '''
+]
