@@ -40,6 +40,13 @@ Core objectives include:
 | Build Tools | Trunk / cargo-leptos + cargo-make | Frontend build + task management |
 | Testing | wasm-pack test + cargo test + Playwright | Unit / Integration / E2E testing |
 
+#### Crate Dependency Version Policy
+- All crate dependencies in `Cargo.toml` SHALL use the **latest stable version** available at the time of implementation
+- When adding a new dependency, the developer SHALL check [crates.io](https://crates.io) for the latest stable release and use that version
+- Version specifiers SHALL use the caret (`^`) syntax (e.g., `tokio = "1.44"`) to allow compatible patch updates while pinning the minor version
+- `Cargo.lock` SHALL be committed to version control to ensure reproducible builds
+- WASM-compatible crates SHALL be verified to support `wasm32-unknown-unknown` target before adoption
+
 ---
 
 ## Requirement Dependency Diagram

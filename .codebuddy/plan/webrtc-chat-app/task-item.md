@@ -76,8 +76,9 @@
    - 创建 Rust Workspace，包含 `message`、`server`、`frontend` 三个 crate
    - 编写 `Makefile.toml`，定义 `dev`、`build`、`test`、`test-unit`、`test-integration`、`test-wasm`、`test-e2e`、`lint`、`fmt`、`clean`、`docker` 等任务及依赖关系
    - 配置 `message` crate 支持双目标编译（native + `wasm32-unknown-unknown`），使用条件编译 `#[cfg(target_arch = "wasm32")]`
+   - 所有 crate 依赖使用当前最新稳定版本（查阅 crates.io），版本号使用 caret 语法（如 `tokio = "1.44"`）
    - 配置 Clippy pedantic 规则，确保零警告
-   - _需求：requirements.md 非功能需求 (Build & Task Management)、Req 8 (WASM Compatibility Requirements)_
+   - _需求：requirements.md 非功能需求 (Build & Task Management, Crate Dependency Version Policy)、Req 8 (WASM Compatibility Requirements)_
 
 - [ ] 2. 实现核心数据类型与枚举定义
    - 定义所有基础类型：`UserId`、`RoomId`、`MessageId (Uuid)`、`TransferId`
