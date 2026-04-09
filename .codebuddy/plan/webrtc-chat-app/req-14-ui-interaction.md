@@ -1044,10 +1044,31 @@
 
 ## Technical Implementation Notes
 
-1. **CSS Variables**: All design tokens (colors, spacing, typography) SHALL be defined as CSS variables for theme switching
-2. **Component Library**: Build custom accessible Leptos components (no equivalent headless UI library exists for Leptos/WASM yet); implement ARIA attributes and keyboard navigation directly in component code
-3. **Animation**: Use CSS transitions/animations for simple interactions, `requestAnimationFrame` for complex animations (e.g., waveform, danmaku); avoid JavaScript-based animation libraries incompatible with WASM
-4. **Icon System**: Use `leptos-icons` with Lucide icon set for consistent, tree-shakable, performant iconography
-5. **Responsive Utilities**: Use CSS Grid and Flexbox for layouts, avoid fixed pixel widths
-6. **Performance**: Use `will-change`, `transform`, and `opacity` for animations to leverage GPU acceleration
-7. **Testing**: Implement visual regression testing using Playwright screenshot comparison to catch unintended UI changes
+> **CSS Architecture Constraint:** This project uses **native CSS only** — no third-party CSS frameworks (e.g., Tailwind CSS, Bootstrap, Bulma, Stylist, etc.) are permitted. All styling SHALL be implemented using modern native CSS features. This ensures zero external CSS dependencies, full control over the styling layer, and leverages the latest CSS specifications for maximum expressiveness and performance.
+
+1. **Native CSS with Modern Features**: All styling SHALL use native CSS with the following modern features:
+   - **CSS Custom Properties (Variables)**: All design tokens (colors, spacing, typography, shadows, border-radius) SHALL be defined as CSS custom properties on `:root` / `[data-theme]` selectors for theme switching
+   - **CSS Nesting**: Use native CSS nesting (`&` selector) for component-scoped styles, reducing selector repetition and improving readability
+   - **`@layer`**: Organize styles into cascade layers (`@layer reset, tokens, base, components, utilities`) for predictable specificity management
+   - **`@container` Queries**: Use container queries for component-level responsive design (e.g., sidebar items adapting to sidebar width, message bubbles adapting to chat area width), in addition to `@media` queries for page-level layout
+   - **`color-mix()` & `oklch()`**: Use `color-mix()` for hover/pressed state color derivation (e.g., `color-mix(in oklch, var(--color-primary) 90%, black)`) and `oklch()` for perceptually uniform color definitions
+   - **`:has()` Selector**: Use `:has()` for parent-based conditional styling (e.g., `.message:has(.reaction-bar)` to adjust message padding when reactions are present)
+   - **`@scope`**: Use `@scope` for component-level style encapsulation where CSS Modules are not used, preventing style leakage between components
+   - **CSS Subgrid**: Use `subgrid` for aligning nested grid items (e.g., message list items with aligned avatars, names, and timestamps)
+   - **`@starting-style`**: Use `@starting-style` for entry animations on dynamically inserted elements (e.g., new messages appearing in chat, toast notifications)
+   - **Anchor Positioning (`anchor()`)**: Use CSS anchor positioning for tooltips, popovers, and context menus, replacing JavaScript-based positioning logic
+   - **View Transitions API**: Use `document.startViewTransition()` for smooth page/view transitions (e.g., switching between rooms, opening settings)
+   - **Scroll-driven Animations**: Use `animation-timeline: scroll()` for scroll-linked effects (e.g., parallax headers, progress indicators on long message lists)
+2. **CSS File Organization**: Styles SHALL be organized as follows:
+   - `/styles/tokens.css` — Design tokens (CSS custom properties for colors, spacing, typography, shadows)
+   - `/styles/reset.css` — CSS reset / normalize
+   - `/styles/base.css` — Base element styles (body, headings, links, forms)
+   - `/styles/components/*.css` — Per-component styles (e.g., `message.css`, `sidebar.css`, `modal.css`)
+   - `/styles/utilities.css` — Utility classes (if needed, kept minimal)
+   - `/styles/main.css` — Entry point that imports all layers via `@layer` and `@import`
+3. **Component Library**: Build custom accessible Leptos components (no equivalent headless UI library exists for Leptos/WASM yet); implement ARIA attributes and keyboard navigation directly in component code
+4. **Animation**: Use CSS transitions/animations and `@starting-style` for simple interactions, `requestAnimationFrame` for complex animations (e.g., waveform, danmaku), View Transitions API for page-level transitions; avoid JavaScript-based animation libraries incompatible with WASM
+5. **Icon System**: Use `leptos-icons` with Lucide icon set for consistent, tree-shakable, performant iconography
+6. **Responsive Design**: Use CSS Grid (with Subgrid), Flexbox, `@container` queries, and `@media` queries for layouts; avoid fixed pixel widths; use `clamp()` for fluid typography and spacing
+7. **Performance**: Use `will-change`, `transform`, and `opacity` for animations to leverage GPU acceleration; use `content-visibility: auto` for off-screen content optimization; use `@layer` to minimize specificity conflicts
+8. **Testing**: Implement visual regression testing using Playwright screenshot comparison to catch unintended UI changes

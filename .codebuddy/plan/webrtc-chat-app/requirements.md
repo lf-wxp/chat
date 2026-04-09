@@ -32,7 +32,7 @@ Core objectives include:
 | Language | Rust (Edition 2024) | Unified frontend & backend |
 | Frontend Framework | Leptos 0.8+ (CSR + WASM) | Fine-grained Signals reactive, built via Trunk or cargo-leptos |
 | State Management | Leptos Signals (signal / memo / effect) | Built-in fine-grained reactive system, no extra state management library needed |
-| Styling | CSS Modules + CSS Variables | Supports Stylist or native CSS variable theme system |
+| Styling | Native CSS (Modern CSS Features) | No third-party CSS frameworks; use native CSS with modern features: CSS Custom Properties (variables), CSS Nesting, `@layer`, `@container` queries, `color-mix()`, `oklch()`, `:has()`, `@scope`, Subgrid, `@starting-style`, `anchor()` positioning, View Transitions API, Scroll-driven Animations, etc. |
 | Signaling Service | Axum + WebSocket | Signaling only (SDP/ICE/control-plane), does not carry chat messages or files |
 | Serialization | bitcode (binary) | Full-link binary, more compact than bincode |
 | Concurrency | DashMap + Tokio | Server-side concurrency management |

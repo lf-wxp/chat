@@ -1,0 +1,17 @@
+{
+	"words": [
+		"bindgen",
+		"cdylib",
+		"chrono",
+		"Clippy",
+		"leptos",
+		"rlib",
+		"rustup",
+		"serde",
+		"thiserror",
+		"webrtc"
+	],
+	"language": "en",
+	"version": "0.2",
+	"flagWords": []
+}

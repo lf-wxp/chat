@@ -3,6 +3,69 @@
 > **分层策略**: 公共库 → 后端服务 → 前端 → 整合联调
 > 每一层完成所有类型的测试后再进入下一层，确保每层的质量可控。
 
+### ⛔ 全局任务完成门禁（适用于每一个任务项）
+
+**每个任务完成前，必须依次通过以下三项检查，全部零错误/零警告后方可进入下一个任务：**
+
+1. `cargo check` — 编译检查零错误
+2. `cargo clippy -- -D warnings` — Clippy 零警告（所有警告视为错误）
+3. `cargo test` — 所有测试通过
+
+> **⚠️ Rust 编译耗时注意事项**
+>
+> 由于 Rust 编译时间较长，在执行 shell 命令（如 `cargo check`、`cargo clippy`、`cargo test`）时，
+> 可能因超时而无法直接获取到 shell 输出。遇到此情况时，应采用**后台执行 + 标记文件 + 轮询等待**的方式。
+>
+> ### 执行策略：后台运行 + 完成标记文件
+>
+> ```bash
+> # Step 1: 后台执行命令，将输出重定向到临时文件，完成后写入退出码到标记文件
+> (cargo check 2>&1 | tee /tmp/cargo-check-output.txt; echo $? > /tmp/cargo-check-done) &
+>
+> # Step 2: 轮询等待标记文件出现（表示命令已执行完毕）
+> # 每隔几秒检查一次 /tmp/cargo-check-done 是否存在
+> while [ ! -f /tmp/cargo-check-done ]; do sleep 3; done
+>
+> # Step 3: 读取退出码，判断是否成功
+> cat /tmp/cargo-check-done    # 0 表示成功，非 0 表示失败
+>
+> # Step 4: 读取完整输出
+> cat /tmp/cargo-check-output.txt
+> ```
+>
+> ### 三项门禁的完整执行示例
+>
+> **必须严格串行执行**，因为 Cargo 使用文件锁（`cargo.lock`），多个 cargo 命令不能并行运行，否则会因锁冲突而失败。
+>
+> ```bash
+> # ---- 1. cargo check ----
+> rm -f /tmp/cargo-check-done /tmp/cargo-check-output.txt
+> (cargo check 2>&1 | tee /tmp/cargo-check-output.txt; echo $? > /tmp/cargo-check-done) &
+> # 轮询等待完成
+> while [ ! -f /tmp/cargo-check-done ]; do sleep 3; done
+> # 检查结果：读取 /tmp/cargo-check-done（应为 0）和 /tmp/cargo-check-output.txt
+>
+> # ---- 2. cargo clippy（仅在 check 通过后执行）----
+> rm -f /tmp/cargo-clippy-done /tmp/cargo-clippy-output.txt
+> (cargo clippy -- -D warnings 2>&1 | tee /tmp/cargo-clippy-output.txt; echo $? > /tmp/cargo-clippy-done) &
+> while [ ! -f /tmp/cargo-clippy-done ]; do sleep 3; done
+> # 检查结果
+>
+> # ---- 3. cargo test（仅在 clippy 通过后执行）----
+> rm -f /tmp/cargo-test-done /tmp/cargo-test-output.txt
+> (cargo test 2>&1 | tee /tmp/cargo-test-output.txt; echo $? > /tmp/cargo-test-done) &
+> while [ ! -f /tmp/cargo-test-done ]; do sleep 3; done
+> # 检查结果
+> ```
+>
+> ### ⚠️ Cargo 文件锁注意事项
+>
+> - Cargo 在编译时会获取 `target/` 目录下的文件锁，**同一时间只能运行一个 cargo 命令**
+> - 如果前一个 cargo 命令尚未结束就启动下一个，后者会阻塞等待锁释放，或直接报错
+> - 因此三项门禁检查**必须严格按顺序串行执行**：`cargo check` → `cargo clippy` → `cargo test`
+> - 每一步必须确认**标记文件已生成**（即命令已完成）后，才能启动下一步
+> - 执行前务必 `rm -f` 清理上一轮的临时文件和标记文件，避免误读旧结果
+
 ---
 
 ## Phase 1: 公共库 (message crate + shared types)
@@ -172,11 +235,25 @@
      - `conversations: RwSignal<Vec<Conversation>>`（会话列表，含置顶/免打扰状态）
      - `active_conversation: RwSignal<Option<ConversationId>>`（当前活跃会话）
      - `network_quality: RwSignal<HashMap<UserId, NetworkQuality>>`（网络质量指标）
-   - 实现 CSS Variables 主题系统（Light/Dark/System）、CSS Modules 样式架构
+   - 实现原生 CSS 样式架构（不使用任何第三方 CSS 框架）：
+     - 创建 CSS 文件组织结构：`/styles/tokens.css`（设计令牌）、`/styles/reset.css`（CSS Reset）、`/styles/base.css`（基础元素样式）、`/styles/components/*.css`（组件样式）、`/styles/utilities.css`（工具类）、`/styles/main.css`（入口，通过 `@layer` 和 `@import` 组织）
+     - 使用 `@layer reset, tokens, base, components, utilities` 组织级联层
+     - 使用 CSS Custom Properties 定义所有设计令牌（颜色、间距、排版、阴影、圆角），在 `:root` / `[data-theme]` 选择器上定义
+     - 使用 CSS Nesting（`&` 选择器）编写组件作用域样式
+     - 使用 `@container` queries 实现组件级响应式设计
+     - 使用 `color-mix(in oklch, ...)` 实现 hover/pressed 状态颜色派生
+     - 使用 `:has()` 选择器实现父级条件样式
+     - 使用 `@scope` 实现组件级样式封装
+     - 使用 CSS Subgrid 对齐嵌套网格项
+     - 使用 `@starting-style` 实现动态插入元素的入场动画
+     - 使用 CSS Anchor Positioning 实现 tooltip/popover/context menu 定位
+     - 使用 View Transitions API 实现页面/视图切换动画
+     - 使用 Scroll-driven Animations 实现滚动驱动效果
+   - 实现主题系统（Light/Dark/System）：基于 CSS Custom Properties + `[data-theme]` 属性切换，200ms 过渡动画
    - 实现 `leptos-i18n` 国际化框架：加载 `/assets/i18n/{locale}.json`、语言切换、浏览器语言检测
-   - 实现响应式布局框架（Desktop/Tablet/Mobile 三档断点）
+   - 实现响应式布局框架：Desktop(≥1024px)/Tablet(768-1023px)/Mobile(<768px) 三档断点，使用 CSS Grid + Flexbox + `@container` + `@media` queries，`clamp()` 流式排版
    - 编写单元测试：Signal 状态管理、主题切换、i18n 语言切换
-   - _需求：Req 14 (UI Interaction Design)、requirements.md (Internationalization)、requirements.md (Performance - WASM bundle)_
+   - _需求：Req 14 (UI Interaction Design)、Req 14 Technical Implementation Notes (Native CSS Architecture)、requirements.md (Internationalization)、requirements.md (Performance - WASM bundle)_
 
 - [ ] 14. 实现 WebSocket 信令客户端与认证系统
    - 实现 WebSocket 连接管理：二进制模式、bitcode 消息编解码（调用 message crate WASM 接口）
