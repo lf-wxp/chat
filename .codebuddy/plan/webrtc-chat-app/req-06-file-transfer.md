@@ -1,0 +1,24 @@
+# Requirement 6: File Transfer
+
+> Back to [Requirements Overview](./requirements.md)
+
+**User Story:** As a user, I want to send and receive files in chat, so that I can conveniently share materials.
+
+## Acceptance Criteria
+
+1. WHEN a user chooses to send a file THEN the system SHALL support selecting files via file picker or drag-and-drop
+2. WHEN file transfer begins THEN the system SHALL use an efficient binary chunking protocol to transfer the file via DataChannel P2P (chunk size should dynamically adjust based on DataChannel buffer and network conditions, suggested initial 64KB, supporting adaptive adjustment)
+3. WHEN file transfer is in progress THEN the system SHALL display a transfer progress bar, transfer speed, and estimated remaining time in the UI
+4. WHEN file transfer is in progress THEN the system SHALL implement flow control (based on DataChannel's `bufferedAmount` monitoring), preventing send speed from exceeding receive speed causing buffer overflow
+5. WHEN file transfer completes THEN the system SHALL display a file message card in the chat, containing filename, size, type icon, and a download button
+5a. WHEN file transfer completes THEN the receiver SHALL perform SHA-256 hash verification on the received file, comparing with the hash value provided by the sender in the file metadata; IF hash values don't match THEN the system SHALL prompt the user "File may be corrupted, recommend re-receiving" and provide a re-transfer button
+
+> **Hash Calculation Timing:** The sender SHALL calculate SHA-256 hash **after user selects the file and before transfer begins** (displaying a "Preparing file..." status during calculation). This ensures hash is ready in file metadata when transfer starts, without blocking transfer progress. The hash is calculated only once and sent to all recipients. For large files near 100MB, hash calculation may take 2-5 seconds (depending on device performance), the UI SHALL display a progress indicator during this phase.
+6. IF file transfer is interrupted (e.g., PeerConnection disconnects then reconnects) THEN the system SHALL support resume transfer, continuing from the interruption point based on a bitmap of transferred chunks
+7. WHEN a user sends an image file THEN the system SHALL auto-generate a thumbnail preview and display it inline in the chat
+8. The system SHALL support a maximum single file size of 100MB (chat file transfer), prompting the user when exceeded
+8a. IF a user sends a file in multi-user chat (≥3 people) THEN the system SHALL reduce the single file size limit to 20MB, and prompt in the UI "File size limit is 20MB in multi-user chat (due to separate transfer to each member)"; the system SHALL display an estimated bandwidth requirement prompt before sending (e.g., "This file will be transferred separately to N members, estimated total upload is X MB")
+8b. WHEN a user attempts to send a file with a potentially dangerous extension (including but not limited to: .exe, .bat, .cmd, .sh, .ps1, .vbs, .js, .jar, .msi, .dmg, .app, .deb, .rpm) THEN the system SHALL display a security warning dialog: "This file type may pose security risks. Only accept files from trusted sources. Continue sending?"; the system SHALL provide "Continue" and "Cancel" buttons; IF the user clicks "Continue" THEN the system SHALL proceed with the file transfer; this warning is advisory only, the system does not block file transfer based on file extension
+8c. WHEN a user receives a file THEN the system SHALL display the file extension prominently in the file message card (e.g., show ".exe" in a warning color); IF the file has a potentially dangerous extension THEN the system SHALL display an additional "⚠️ Security Risk" label next to the file name
+9. IF the file is a theater local video file THEN it is NOT subject to the 100MB limit (video files are only loaded and played locally by the owner, distributed as real-time streams via `captureStream()`, not transferred as raw files via DataChannel)
+10. WHEN a user sends a file in multi-user chat THEN the system SHALL adopt a **serial P2P transfer strategy** — the sender transfers file copies to each Peer with an established DataChannel **one by one serially** (rather than in parallel, to avoid the sender's uplink bandwidth being instantly exhausted causing all transfers to slow down); the system SHALL display independent transfer progress for each Peer and overall progress in the UI (e.g., "Sending to User C (2/5 people)"); **estimated transfer time prompt**: WHEN a user selects a file ≥20MB in multi-user chat (≥3 people) THEN the system SHALL display an estimated total transfer time before sending (e.g., "Estimated transfer time: ~8 minutes (depending on network conditions, 5 recipients serially)") — the estimate is calculated as: `(file_size / estimated_upload_speed) × peer_count`, where estimated_upload_speed defaults to 2MB/s (configurable based on user's historical transfer data if available)

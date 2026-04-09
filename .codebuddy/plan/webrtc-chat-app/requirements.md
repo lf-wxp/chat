@@ -1,326 +1,579 @@
-# 需求文档 — WebRTC 多人聊天应用（Rust 全栈）
+# Requirements Document — WebRTC Multi-User Chat Application (Rust Full-Stack)
 
-## 引言
+## Introduction
 
-本项目旨在构建一个基于 WebRTC 的全功能多人聊天应用，整个技术栈采用 Rust 语言。前端使用 Leptos (WASM) 框架（细粒度 Signals 响应式模型），后端信令服务器基于 Axum + WebSocket。
+This project aims to build a full-featured multi-user chat application based on WebRTC, with the entire tech stack in Rust. The frontend uses the Leptos (WASM) framework (fine-grained Signals reactive model), and the backend signaling server is built on Axum + WebSocket.
 
-> **注意：** `chat-back` 目录中的现有代码仅作为架构参考，不作为实现标准。实际开发时应采用更优的技术方案和设计模式，不必受限于参考代码的实现方式。
+Core objectives include:
+1. **SDP Signaling Service Enhancement** ([req-01-signaling.md](./req-01-signaling.md)) — Multi-user WebRTC connection establishment (Mesh topology)
+2. **Chat System** ([req-02-chat.md](./req-02-chat.md)) — Text, Sticker, voice, image messaging for 1-on-1 & multi-user sessions
+3. **Multi-User Audio/Video Calling** ([req-03-av-call.md](./req-03-av-call.md)) — Mesh topology video calls, audio/video switching, screen sharing
+4. **Room System** ([req-04-room.md](./req-04-room.md)) — Chat/Theater room types, password protection, permission management
+5. **End-to-End Encryption** ([req-05-e2ee.md](./req-05-e2ee.md)) — Pairwise ECDH + AES-256-GCM
+6. **File Transfer** ([req-06-file-transfer.md](./req-06-file-transfer.md)) — DataChannel-based P2P chunked transfer
+7. **Audio/Video Mode Switching & Common Features** ([req-07-av-features.md](./req-07-av-features.md))
+8. **Full-Link Binary Transport** ([req-08-binary.md](./req-08-binary.md)) — bitcode serialization for transport efficiency
+9. **Online User Discovery & Connection Invitation** ([req-09-discovery.md](./req-09-discovery.md)) — Online user list, invitation mechanism
+10. **User Auth, Session Management & Refresh Recovery** ([req-10-auth-recovery.md](./req-10-auth-recovery.md)) — JWT auth, connection recovery protocol
+11. **Message Persistence & Offline Support** ([req-11-persistence.md](./req-11-persistence.md)) — IndexedDB storage, message ACK & resend
+12. **Shared Theater** ([req-12-theater.md](./req-12-theater.md)) — Theater room for shared video streaming with real-time danmaku
+13. **Settings Page** ([req-13-settings.md](./req-13-settings.md)) — Unified settings management for audio/video, appearance, privacy, notifications, and data
+14. **UI Interaction Design** ([req-14-ui-interaction.md](./req-14-ui-interaction.md)) — Comprehensive UI/UX design specification including responsive layout & theme switching
+15. **User Profile Management & Unified Room Permission System** ([req-15-profile-permissions.md](./req-15-profile-permissions.md)) — User nickname customization, room announcement management, unified administrator role with moderation powers for both Chat & Theater rooms, room member search
 
-本次需求进行全面设计和实现，核心目标包括：
-1. **完善 SDP 信令服务**，支持多人 WebRTC 连接建立（Mesh / SFU 拓扑）
-2. **多人聊天与通话**，支持文本、语音、视频的多人会话
-3. **房间系统**，支持加密房间、邀请机制、权限管理
-4. **文件传输**，基于 DataChannel 的 P2P 文件传输
-5. **响应式 UI + 自动暗色主题**
-6. **音视频模式无缝切换**及常用聊天功能
-7. **全链路二进制传输**，提升传输效率
+> **Architecture Constraint:** WebSocket is used **only** for signaling communication (SDP exchange, ICE Candidate, user status sync, room management, and other control-plane messages). All chat messages (text, Sticker, voice, image) and file transfers go through WebRTC DataChannel for P2P transport, never relayed by the server. **Exception:** The signaling server (Axum) also serves as a static resource host for Sticker assets (under `/assets/stickers/`), which are loaded by clients via HTTP — this is a deliberate design choice to keep the deployment simple (single server binary), and does not violate the "signaling only" constraint since Sticker resources are static files, not real-time message relay.
+>
+> **Participant Limit:** Both Chat rooms and Theater rooms are limited to a maximum of 8 participants. This unified limit simplifies the architecture by eliminating the need for dual transport paths (DataChannel P2P + WebSocket relay) and ensures all messages benefit from end-to-end encryption.
 
-> **架构约束：** WebSocket 仅用于信令通信（SDP 交换、ICE Candidate、用户状态同步、房间管理等控制面消息）。所有聊天消息（文本、Sticker、语音、图片）和文件传输均通过 WebRTC DataChannel 进行 P2P 传输，不经过服务器中转。`chat-back` 中的 DataChunk 分块协议仅作参考，实际开发应采用更优的分块传输方案。
-8. **在线用户发现与连接邀请**，用户可查看在线用户列表，通过邀请机制建立聊天连接
-9. **共享放映厅**，支持创建放映厅房间，共享本地/在线视频流给房间内所有观众，并支持实时弹幕与消息互动
+### Tech Stack Constraints
 
-### 技术栈约束
-
-| 层级 | 技术 | 说明 |
-|------|------|------|
-| 语言 | Rust (Edition 2024) | 前后端统一 |
-| 前端框架 | Leptos 0.7+ (CSR + WASM) | 细粒度 Signals 响应式，通过 Trunk 或 cargo-leptos 构建 |
-| 状态管理 | Leptos Signals (signal / memo / effect) | 内置细粒度响应式系统，无需额外状态管理库 |
-| 样式 | CSS Modules + CSS 变量 | 支持 Stylist 或原生 CSS 变量主题系统 |
-| 信令服务 | Axum + WebSocket | 仅用于信令（SDP/ICE/控制面），不承载聊天消息和文件 |
-| 序列化 | bincode (二进制) | 全链路二进制 |
-| 并发 | DashMap + Tokio | 服务端并发管理 |
-| 共享协议 | message crate | 前后端共用 |
-| 构建工具 | Trunk / cargo-leptos + cargo-make | 前端构建 + 任务管理 |
+| Layer | Technology | Notes |
+|-------|-----------|-------|
+| Language | Rust (Edition 2024) | Unified frontend & backend |
+| Frontend Framework | Leptos 0.8+ (CSR + WASM) | Fine-grained Signals reactive, built via Trunk or cargo-leptos |
+| State Management | Leptos Signals (signal / memo / effect) | Built-in fine-grained reactive system, no extra state management library needed |
+| Styling | CSS Modules + CSS Variables | Supports Stylist or native CSS variable theme system |
+| Signaling Service | Axum + WebSocket | Signaling only (SDP/ICE/control-plane), does not carry chat messages or files |
+| Serialization | bitcode (binary) | Full-link binary, more compact than bincode |
+| Concurrency | DashMap + Tokio | Server-side concurrency management |
+| Shared Protocol | message crate | Shared between frontend & backend |
+| Build Tools | Trunk / cargo-leptos + cargo-make | Frontend build + task management |
+| Testing | wasm-pack test + cargo test + Playwright | Unit / Integration / E2E testing |
 
 ---
 
-## 需求
-
-### 需求 1：SDP 信令服务增强
-
-**用户故事：** 作为一名开发者，我希望信令服务器能够支持多人 WebRTC 连接的建立与管理，以便用户可以进行多人音视频通话和数据传输。
-
-#### 验收标准
-
-1. WHEN 客户端发起多人通话请求 THEN 信令服务器 SHALL 向房间内所有目标客户端转发 SDP Offer，并收集 SDP Answer 返回给发起方
-2. WHEN 新用户加入已有通话房间 THEN 信令服务器 SHALL 协调新用户与房间内每个已有成员建立 PeerConnection（Mesh 拓扑）
-3. WHEN 用户离开通话 THEN 信令服务器 SHALL 通知房间内所有其他成员更新连接状态，并清理对应的信令会话
-4. WHEN ICE Candidate 产生 THEN 信令服务器 SHALL 将 ICE Candidate 精确转发到对应的目标 Peer
-5. IF 信令服务器检测到 WebSocket 连接断开 THEN 信令服务器 SHALL 自动清理该客户端的所有信令会话，并通知相关 Peer
-6. WHEN 信令服务器启动 THEN 信令服务器 SHALL 支持通过环境变量或命令行参数配置 STUN/TURN 服务器地址，并在客户端连接时下发 ICE 配置
-7. WHEN 客户端连接 WebSocket THEN 信令服务器 SHALL 实现心跳检测机制（Ping/Pong），超时未响应则断开连接
-8. WHEN WebSocket 连接意外断开 THEN 客户端 SHALL 自动尝试重连（指数退避策略），重连成功后恢复会话状态
-
-### 需求 2：多人聊天系统
-
-**用户故事：** 作为一名用户，我希望能够与多人同时进行文本聊天，以便进行群组交流。
-
-#### 验收标准
-
-1. WHEN 用户创建聊天会话并选择多个参与者 THEN 系统 SHALL 创建一个多人聊天会话，所有参与者均可收发消息
-2. WHEN 用户在多人聊天中发送文本消息 THEN 系统 SHALL 通过 DataChannel P2P 传输消息到所有参与者（WebSocket 仅用于信令，不承载聊天消息）
-3. WHEN 用户发送消息 THEN 系统 SHALL 显示消息状态（发送中/已发送/发送失败），并在发送失败时提供重试选项
-4. WHEN 用户收到新消息 THEN 系统 SHALL 在聊天列表中更新未读消息计数，并显示最新消息预览
-5. WHEN 用户在聊天中 THEN 系统 SHALL 支持发送以下四种核心消息类型：
-   - **文本消息**：支持纯文本输入，支持 Markdown 基础格式渲染（加粗、斜体、代码块、链接），支持 URL 自动识别并生成可点击链接
-   - **Sticker 消息**：系统 SHALL 提供内置 Sticker 表情包面板，用户点击 Sticker 后以图片形式发送到聊天中，Sticker 以较大尺寸展示（区别于普通图片）；系统 SHALL 支持 Sticker 包管理，内置至少一套默认 Sticker 包，Sticker 资源以 WebP/SVG 格式存储以优化体积
-   - **语音消息**：用户长按或点击录音按钮后开始录制语音，录制完成后以语音气泡形式展示（显示波形图和时长），接收方点击即可播放；系统 SHALL 使用 Opus 编码压缩语音数据以减小体积
-   - **图片消息**：支持通过文件选择器或粘贴剪贴板发送图片，发送前自动生成缩略图预览，聊天中以缩略图展示，点击可查看原图（支持缩放和左右滑动浏览）；系统 SHALL 支持 JPEG、PNG、WebP、GIF 格式
-6. WHEN 用户发送文件（非图片/语音/Sticker 类型）THEN 系统 SHALL 以文件卡片形式展示（参见需求 6）
-7. WHEN 用户长按或右键点击消息 THEN 系统 SHALL 显示上下文菜单，支持回复、引用、撤回（仅自己的消息，2分钟内）、复制等操作
-8. WHEN 对方正在输入文字 THEN 系统 SHALL 在聊天界面显示"正在输入..."状态提示
-9. WHEN 用户 @ 某个参与者 THEN 系统 SHALL 高亮显示被 @ 的消息，并向被 @ 的用户发送特殊通知
-10. WHEN 用户点击 Sticker 面板按钮 THEN 系统 SHALL 弹出 Sticker 选择面板，以网格形式展示可用 Sticker，支持按 Sticker 包分类切换和搜索
-11. WHEN 用户录制语音消息 THEN 系统 SHALL 在录制过程中显示实时波形动画和录制时长，支持取消录制（上滑取消）和发送（松开发送）
-12. WHEN 用户粘贴图片到输入框 THEN 系统 SHALL 自动识别剪贴板中的图片内容，显示预览确认弹窗，用户确认后发送
-
-### 需求 3：多人音视频通话
-
-**用户故事：** 作为一名用户，我希望能够与多人同时进行语音或视频通话，以便进行实时沟通。
-
-#### 验收标准
-
-1. WHEN 用户在房间中发起视频通话 THEN 系统 SHALL 向房间内所有在线成员发送通话邀请，并在对方接受后建立 WebRTC PeerConnection
-2. WHEN 多人视频通话进行中 THEN 系统 SHALL 以网格布局（Grid Layout）展示所有参与者的视频流，并自动根据参与人数调整布局
-3. WHEN 用户在视频通话中点击"切换到语音" THEN 系统 SHALL 关闭本地摄像头视频轨道，仅保留音频轨道，并通知其他参与者更新 UI
-4. WHEN 用户在语音通话中点击"开启视频" THEN 系统 SHALL 请求摄像头权限，添加视频轨道到现有 PeerConnection，并通知其他参与者
-5. WHEN 用户点击静音按钮 THEN 系统 SHALL 禁用本地音频轨道，并在 UI 上显示静音图标，同时通知其他参与者该用户已静音
-6. WHEN 用户点击关闭摄像头按钮 THEN 系统 SHALL 禁用本地视频轨道，其他参与者的界面上该用户的视频区域 SHALL 显示头像占位符
-7. WHEN 通话中有用户说话 THEN 系统 SHALL 检测音频活动（Voice Activity Detection），并在 UI 上高亮当前说话者
-8. WHEN 通话中网络质量下降 THEN 系统 SHALL 自动降低视频分辨率/帧率以维持通话质量，并在 UI 上显示网络质量指示器
-9. WHEN 用户在通话中 THEN 系统 SHALL 支持屏幕共享功能，共享的屏幕以大画面展示，其他参与者视频缩小排列
-
-### 需求 4：房间系统
-
-**用户故事：** 作为一名用户，我希望能够创建和管理聊天房间，以便组织不同的聊天群组。
-
-#### 验收标准
-
-1. WHEN 用户创建房间 THEN 系统 SHALL 允许设置房间名称、描述、密码（可选）和最大人数限制
-2. IF 房间设置了密码 THEN 系统 SHALL 在用户加入时要求输入正确密码，密码错误则拒绝加入
-3. WHEN 房间创建者邀请其他用户 THEN 系统 SHALL 生成邀请链接或直接发送邀请通知给目标用户
-4. WHEN 用户收到房间邀请 THEN 系统 SHALL 显示邀请通知，用户可以选择接受或拒绝
-5. WHEN 房间创建者（房主）管理房间 THEN 系统 SHALL 提供踢出成员、转让房主、修改房间信息等管理功能
-6. WHEN 用户加入房间 THEN 系统 SHALL 在房间成员列表中显示该用户，并向房间内其他成员广播加入通知
-7. WHEN 用户退出房间 THEN 系统 SHALL 从成员列表中移除该用户，并广播退出通知
-8. IF 房间内所有成员都已退出 THEN 系统 SHALL 自动销毁该房间并释放资源
-9. WHEN 用户浏览房间列表 THEN 系统 SHALL 显示房间名称、描述、当前人数/最大人数、是否加密等信息
-
-### 需求 5：端到端加密
-
-**用户故事：** 作为一名用户，我希望我的聊天内容和通话数据是加密的，以便保护我的隐私安全。
-
-#### 验收标准
-
-1. WHEN 两个用户建立聊天会话 THEN 系统 SHALL 通过 ECDH 密钥交换协议协商共享密钥，用于加密后续通信
-2. WHEN 用户发送文本消息 THEN 系统 SHALL 使用 AES-256-GCM 对消息内容进行加密后再传输
-3. WHEN 用户发送文件 THEN 系统 SHALL 对文件数据进行分块加密后传输
-4. WHEN WebRTC DataChannel 建立 THEN 系统 SHALL 在 DataChannel 上层实现端到端加密（E2EE），信令服务器无法解密消息内容
-5. IF 密钥协商失败 THEN 系统 SHALL 通知用户加密通道建立失败，并提供重试选项
-6. WHEN 用户查看聊天信息 THEN 系统 SHALL 显示加密状态图标，表明当前会话是否已加密
-
-### 需求 6：文件传输
-
-**用户故事：** 作为一名用户，我希望能够在聊天中发送和接收文件，以便方便地共享资料。
-
-#### 验收标准
-
-1. WHEN 用户选择发送文件 THEN 系统 SHALL 支持通过文件选择器或拖拽方式选择文件
-2. WHEN 文件开始传输 THEN 系统 SHALL 使用高效的二进制分块协议将文件通过 DataChannel P2P 传输（分块大小应根据 DataChannel 缓冲区和网络状况动态调整，建议初始 64KB，支持自适应调节）
-3. WHEN 文件传输进行中 THEN 系统 SHALL 在 UI 上显示传输进度条、传输速度和预计剩余时间
-4. WHEN 文件传输进行中 THEN 系统 SHALL 实现流控机制（基于 DataChannel 的 `bufferedAmount` 监控），防止发送速度超过接收速度导致缓冲区溢出
-5. WHEN 文件传输完成 THEN 系统 SHALL 在聊天中显示文件消息卡片，包含文件名、大小、类型图标，并提供下载按钮
-6. IF 文件传输中断（如 PeerConnection 断开后重连）THEN 系统 SHALL 支持断点续传，基于已传输分块的位图（bitmap）记录从中断位置继续传输
-7. WHEN 用户发送图片文件 THEN 系统 SHALL 自动生成缩略图预览并在聊天中内联显示
-8. 系统 SHALL 支持的单文件最大大小为 100MB，超过限制时提示用户
-
-### 需求 7：响应式 UI 与自动暗色主题
-
-**用户故事：** 作为一名用户，我希望应用在不同设备上都有良好的使用体验，并且能够自动适配系统的暗色/亮色主题。
-
-#### 验收标准
-
-1. WHEN 用户在桌面浏览器（宽度 ≥ 1024px）访问 THEN 系统 SHALL 显示完整的侧边栏 + 主内容区双栏布局
-2. WHEN 用户在平板设备（768px ≤ 宽度 < 1024px）访问 THEN 系统 SHALL 显示可折叠的侧边栏布局
-3. WHEN 用户在手机设备（宽度 < 768px）访问 THEN 系统 SHALL 显示单栏布局，侧边栏通过抽屉式导航访问
-4. WHEN 系统检测到操作系统的暗色模式偏好（`prefers-color-scheme: dark`）THEN 系统 SHALL 自动切换到暗色主题
-5. WHEN 用户手动切换主题 THEN 系统 SHALL 立即应用新主题，并将偏好持久化到 localStorage
-6. IF 用户未手动设置主题偏好 THEN 系统 SHALL 跟随系统主题自动切换
-7. WHEN 主题切换 THEN 系统 SHALL 通过 CSS 变量实现平滑过渡动画（transition），避免闪烁
-8. WHEN 视频通话进行中且在移动端 THEN 系统 SHALL 提供全屏模式，最大化视频显示区域
-
-### 需求 8：音视频模式切换与常用功能
-
-**用户故事：** 作为一名用户，我希望在通话过程中能够灵活切换音视频模式，并使用常见的聊天应用功能。
-
-#### 验收标准
-
-1. WHEN 用户在视频通话中点击"仅语音"按钮 THEN 系统 SHALL 平滑关闭视频轨道，切换到语音通话模式，无需重新建立连接
-2. WHEN 用户在语音通话中点击"开启视频"按钮 THEN 系统 SHALL 请求摄像头权限并添加视频轨道，无需重新建立连接
-3. WHEN 用户在通话中 THEN 系统 SHALL 提供浮动小窗（Picture-in-Picture）模式，允许用户在浏览其他页面时继续通话
-4. WHEN 用户收到来电 THEN 系统 SHALL 显示来电通知弹窗，包含来电者信息和接听/拒绝按钮
-5. WHEN 通话结束 THEN 系统 SHALL 显示通话时长统计
-6. WHEN 用户在聊天中 THEN 系统 SHALL 支持消息搜索功能，可按关键词搜索历史消息
-7. WHEN 用户在聊天列表中 THEN 系统 SHALL 支持置顶会话、免打扰设置
-8. WHEN 用户使用应用 THEN 系统 SHALL 通过浏览器 Notification API 推送新消息通知（需用户授权）
-
-### 需求 9：全链路二进制传输
-
-**用户故事：** 作为一名开发者，我希望所有数据传输都使用二进制格式，以便提升传输效率和减少带宽消耗。
-
-#### 验收标准
-
-1. WHEN 客户端与信令服务器通信 THEN 系统 SHALL 使用 bincode 二进制序列化格式传输所有 WebSocket 信令消息（WebSocket 仅承载信令，不承载聊天消息和文件数据）
-2. WHEN DataChannel 传输聊天消息和文件数据 THEN 系统 SHALL 使用二进制格式（ArrayBuffer），复用 message crate 的 bincode 序列化
-3. WHEN 传输文件数据 THEN 系统 SHALL 使用高效的二进制分块协议（分块大小动态可调，支持流控和断点续传，基于分块位图追踪传输进度）
-4. WHEN 传输大型消息（超过单个 DataChannel 消息大小限制）THEN 系统 SHALL 自动进行分块传输，接收端自动重组
-5. 系统 SHALL 在 message crate 中统一定义所有消息类型（文本、Sticker、语音、图片、文件、弹幕、系统通知等）的 bincode 序列化/反序列化实现，确保前后端协议一致
-6. 系统 SHALL 为每种消息类型定义独立的二进制编码格式：文本消息携带 UTF-8 内容；Sticker 消息携带 Sticker 包 ID + Sticker ID（资源按需加载）；语音消息携带 Opus 编码的音频数据 + 时长元信息；图片消息携带缩略图二进制数据 + 原图元信息（宽高、大小、格式）
-
-### 需求 10：在线用户发现与连接邀请
-
-**用户故事：** 作为一名用户，我希望能够看到当前有哪些用户在线，并通过发送连接邀请来建立聊天，以便我能主动发起与其他用户的交流，同时对方也有权决定是否接受。
-
-#### 验收标准
-
-1. WHEN 用户登录成功 THEN 系统 SHALL 在侧边栏显示"在线用户"面板，实时展示当前所有已登录用户的列表（包含用户名、头像、在线状态）
-2. WHEN 有新用户登录或用户下线 THEN 信令服务器 SHALL 通过 WebSocket 向所有在线客户端广播用户列表变更事件，客户端 SHALL 实时更新在线用户列表
-3. WHEN 用户在在线用户列表中点击某个用户 THEN 系统 SHALL 显示该用户的简要信息卡片（用户名、在线时长、状态签名），并提供"发送连接邀请"按钮
-4. WHEN 用户点击"发送连接邀请"按钮 THEN 系统 SHALL 通过信令服务器向目标用户发送一条连接邀请消息（包含发起者信息和可选的附言），发起方 UI SHALL 显示"邀请已发送，等待对方响应"状态
-5. WHEN 目标用户收到连接邀请 THEN 系统 SHALL 以弹窗或通知卡片的形式展示邀请信息（发起者用户名、头像、附言），并提供"接受"和"拒绝"两个操作按钮
-6. WHEN 目标用户点击"接受" THEN 系统 SHALL 在双方之间建立 WebRTC PeerConnection（通过信令服务器交换 SDP），连接建立成功后双方自动进入一对一聊天界面
-7. WHEN 目标用户点击"拒绝" THEN 系统 SHALL 通过信令服务器通知发起方邀请被拒绝，发起方 UI SHALL 显示"对方已拒绝您的邀请"提示
-8. IF 目标用户在 60 秒内未响应邀请 THEN 系统 SHALL 自动将邀请标记为超时，并通知发起方"邀请已超时"
-9. IF 发起方已向某用户发送了未处理的邀请 THEN 系统 SHALL 禁止重复发送邀请，按钮显示为"邀请待处理"不可点击状态
-10. WHEN 用户已与某用户建立过连接 THEN 系统 SHALL 在在线用户列表中标记该用户为"已连接"，点击后直接进入聊天界面而非再次发送邀请
-11. WHEN 用户在在线用户列表中 THEN 系统 SHALL 支持按用户名搜索/过滤在线用户
-12. WHEN 用户想邀请多人聊天 THEN 系统 SHALL 支持多选在线用户并批量发送连接邀请，所有被邀请者接受后自动创建多人聊天房间
-
-### 需求 11：用户认证与会话管理（无持久化存储）
-
-**用户故事：** 作为一名用户，我希望有基本的身份认证机制，以便在聊天中拥有唯一身份标识，同时不需要复杂的注册流程。
-
-> **约束：** 用户注册和登录信息**不会持久化存储在服务端**（无数据库）。服务端仅在内存中维护当前活跃用户的会话信息（`DashMap<UserId, UserSession>`），服务重启后所有用户数据清空，用户需重新注册/登录。这是一个轻量级的临时会话模型，适合 P2P 聊天场景。
-
-#### 验收标准
-
-1. WHEN 用户首次访问应用 THEN 系统 SHALL 显示注册/登录界面，要求输入用户名和密码
-2. WHEN 用户注册 THEN 服务端 SHALL 将用户信息（用户名 + 密码哈希）存储在内存中（`DashMap`），不写入任何持久化存储（数据库/文件）；IF 用户名已被占用（内存中已存在）THEN 系统 SHALL 提示"用户名已存在"
-3. WHEN 用户成功登录 THEN 系统 SHALL 生成 JWT Token 并存储在客户端（localStorage），后续 WebSocket 连接时携带 Token 进行身份验证；服务端在内存中记录该用户的活跃会话
-4. IF Token 过期或无效（如服务端重启导致内存中用户数据丢失）THEN 系统 SHALL 要求用户重新注册/登录
-5. WHEN 用户在线 THEN 系统 SHALL 在用户列表中显示在线状态（在线/离线/忙碌/离开）
-6. WHEN 用户关闭浏览器后重新打开 THEN 系统 SHALL 尝试使用本地存储的 Token 自动恢复登录状态；IF 服务端已重启（内存中无该用户记录）THEN 系统 SHALL 引导用户重新注册/登录
-7. WHEN 用户设置个人状态（忙碌/离开/自定义签名）THEN 系统 SHALL 将状态同步广播给所有在线用户
-8. WHEN 服务端重启 THEN 所有内存中的用户数据、房间数据、会话数据 SHALL 被清空，所有在线用户的 WebSocket 连接将断开，客户端 SHALL 检测到断线并引导用户重新注册/登录
-
-### 需求 12：消息持久化与离线支持
-
-**用户故事：** 作为一名用户，我希望聊天记录不会因为刷新页面而丢失，以便随时查看历史消息。
-
-> **约束：** 由于服务端不做持久化存储，消息持久化完全依赖客户端本地存储（IndexedDB）。服务端仅在内存中暂存少量离线邀请（非聊天消息），聊天消息通过 DataChannel P2P 传输，服务端不经手。
-
-#### 验收标准
-
-1. WHEN 用户发送或接收消息 THEN 系统 SHALL 将消息存储到浏览器 IndexedDB 中
-2. WHEN 用户重新打开应用 THEN 系统 SHALL 从 IndexedDB 加载历史聊天记录
-3. WHEN 用户离线期间有其他用户发送的 P2P 消息 THEN 由于 DataChannel 连接已断开，这些消息将无法送达；系统 SHALL 在用户重新上线并重新建立 PeerConnection 后，由对方客户端检测到连接恢复并可选择重发未确认的消息
-4. IF IndexedDB 存储空间不足 THEN 系统 SHALL 自动清理最早的消息记录，并提示用户
-5. WHEN 用户离线期间收到连接邀请 THEN 信令服务器 SHALL 在内存中暂存邀请，用户上线后推送（邀请超时规则仍然适用；服务端重启后暂存的邀请将丢失）
-
-### 需求 13：共享放映厅（Theater Mode）
-
-**用户故事：** 作为一名用户，我希望能够创建一个"放映厅"房间，将本地视频或在线视频共享给房间内的所有观众一起观看，同时支持实时弹幕和消息互动，以便与朋友们一起享受共同观影的体验。
-
-#### 验收标准
-
-##### 13.1 放映厅房间管理
-
-1. WHEN 用户点击"创建放映厅"按钮 THEN 系统 SHALL 显示创建表单，允许设置放映厅名称、描述、密码（可选）、最大观众人数（默认 20 人）
-2. WHEN 放映厅创建成功 THEN 系统 SHALL 将创建者设为房主（Owner），房主拥有完整的播放控制权和管理权限
-3. WHEN 用户浏览放映厅列表 THEN 系统 SHALL 显示放映厅名称、房主名称、当前观众数/最大人数、播放状态（空闲/播放中）、是否加密等信息
-4. WHEN 用户加入放映厅 THEN 系统 SHALL 通过信令服务器与房主建立 WebRTC PeerConnection，接收房主分发的视频流
-5. IF 放映厅设置了密码 THEN 系统 SHALL 在用户加入时要求输入正确密码
-6. WHEN 房主离开放映厅 THEN 系统 SHALL 暂停播放并通知所有观众"房主已离开"，房主可选择转让房主权限给其他观众后再离开
-7. IF 放映厅内所有用户都已退出 THEN 系统 SHALL 自动销毁该放映厅并释放资源
-
-##### 13.2 视频源选择与播放
-
-1. WHEN 房主选择"本地视频" THEN 系统 SHALL 打开文件选择器，支持选择常见视频格式（MP4、WebM、MKV 等），选中后在房主端通过 `<video>` 元素加载并使用 `captureStream()` API 捕获 MediaStream
-2. WHEN 房主选择"在线视频" THEN 系统 SHALL 显示 URL 输入框，房主输入视频直链 URL 后，系统通过 `<video>` 元素加载该 URL 并使用 `captureStream()` 捕获 MediaStream
-3. IF 在线视频 URL 因 CORS 策略无法加载 THEN 系统 SHALL 提示用户"该视频源不支持跨域播放"，并建议用户下载后使用本地视频方式播放
-4. WHEN 视频源加载成功 THEN 房主端 SHALL 将捕获的 MediaStream（包含视频轨道和音频轨道）通过 WebRTC PeerConnection 分发给房间内所有已连接的观众
-5. WHEN 新观众加入正在播放的放映厅 THEN 系统 SHALL 自动为新观众建立 PeerConnection 并推送当前视频流，新观众从当前播放位置开始观看
-6. 系统 SHALL 支持的视频格式至少包括：MP4 (H.264/H.265)、WebM (VP8/VP9)、OGG
-
-##### 13.3 播放控制（仅房主）
-
-1. WHEN 房主点击播放/暂停按钮 THEN 系统 SHALL 控制本地 `<video>` 元素的播放状态，由于视频流是实时捕获的，观众端将自动同步（暂停时流冻结，播放时流恢复）
-2. WHEN 房主拖动进度条 THEN 系统 SHALL 调整本地 `<video>` 元素的 `currentTime`，视频流自动从新位置继续捕获，同时通过 DataChannel 向所有观众广播当前播放进度信息
-3. WHEN 房主调整音量 THEN 系统 SHALL 仅调整房主本地音量，不影响观众端音量（观众端有独立音量控制）
-4. WHEN 房主切换视频源（更换视频文件或 URL）THEN 系统 SHALL 停止当前视频流，加载新视频源，重新捕获 MediaStream 并替换所有 PeerConnection 中的视频/音频轨道
-5. 系统 SHALL 在播放界面底部显示播放控制栏，包含：播放/暂停、进度条、当前时间/总时长、音量控制、全屏切换
-6. 系统 SHALL 定期（每 5 秒）通过 DataChannel 向观众同步播放进度信息，用于 UI 展示（观众端进度条为只读状态）
-
-##### 13.4 弹幕系统
-
-1. WHEN 用户在放映厅中输入弹幕文字并发送 THEN 系统 SHALL 通过 DataChannel（P2P）将弹幕消息广播给房间内所有用户
-2. WHEN 弹幕消息到达客户端 THEN 系统 SHALL 在视频画面上方以从右向左滚动的方式渲染弹幕文字
-3. WHEN 用户发送弹幕 THEN 系统 SHALL 支持设置弹幕颜色（预设调色板）和弹幕位置（顶部固定/底部固定/滚动）
-4. WHEN 弹幕密度过高（同时显示超过 50 条）THEN 系统 SHALL 自动降低弹幕渲染密度（跳过部分弹幕），优先显示最新弹幕
-5. WHEN 用户点击"关闭弹幕"按钮 THEN 系统 SHALL 隐藏弹幕渲染层，但不影响弹幕消息的接收和发送
-6. WHEN 用户点击"弹幕设置"按钮 THEN 系统 SHALL 显示弹幕设置面板，支持调整弹幕透明度（0%-100%）、字体大小（小/中/大）、滚动速度（慢/中/快）
-7. 系统 SHALL 使用 Canvas 或 CSS 动画渲染弹幕，确保弹幕渲染不影响视频播放性能
-
-##### 13.5 放映厅消息互动
-
-1. WHEN 用户在放映厅中 THEN 系统 SHALL 在视频播放区域右侧（桌面端）或下方（移动端）显示消息面板
-2. WHEN 用户在消息面板中发送文本消息 THEN 系统 SHALL 通过 DataChannel 将消息广播给房间内所有用户，消息以聊天气泡形式展示
-3. WHEN 消息面板中有新消息 THEN 系统 SHALL 自动滚动到最新消息，并在面板折叠时显示未读消息计数徽章
-4. 系统 SHALL 在消息中显示发送者用户名、发送时间和消息内容
-
-##### 13.6 房主权限管理
-
-1. WHEN 房主在观众列表中选择某个用户并点击"踢出" THEN 系统 SHALL 断开该用户的 PeerConnection，将其从放映厅移除，并通知该用户"您已被房主移出放映厅"
-2. WHEN 房主在观众列表中选择某个用户并点击"禁言" THEN 系统 SHALL 禁止该用户发送弹幕和消息，被禁言用户的输入框 SHALL 显示"您已被禁言"且不可输入
-3. WHEN 房主点击"解除禁言" THEN 系统 SHALL 恢复该用户的发言权限
-4. WHEN 房主点击"全体禁言" THEN 系统 SHALL 禁止除房主外所有用户发送弹幕和消息
-5. IF 被踢出的用户尝试重新加入同一放映厅 THEN 系统 SHALL 拒绝加入并提示"您已被房主移出该放映厅"
-6. WHEN 房主在观众列表中 THEN 系统 SHALL 显示每个观众的用户名、在线状态、是否被禁言，并提供踢出/禁言/解除禁言的操作按钮
-7. WHEN 房主点击"转让房主" THEN 系统 SHALL 将房主权限转移给指定观众，原房主变为普通观众
-
-##### 13.7 放映厅 UI 布局
-
-1. WHEN 用户在桌面端进入放映厅 THEN 系统 SHALL 显示左侧大面积视频播放区 + 右侧消息/观众面板的布局
-2. WHEN 用户在移动端进入放映厅 THEN 系统 SHALL 显示上方视频播放区 + 下方可切换的消息/观众面板
-3. WHEN 用户点击全屏按钮 THEN 系统 SHALL 将视频播放区全屏显示，弹幕叠加在视频上方，消息面板隐藏（可通过手势或按钮唤出）
-4. 系统 SHALL 在放映厅页面顶部显示放映厅名称、当前观众人数和房主标识
+## Requirement Dependency Diagram
+
+```mermaid
+graph TD
+    R1["Req 1: Signaling"] --> R3["Req 3: AV Call"]
+    R1 --> R9["Req 9: Discovery"]
+    R1 --> R10["Req 10: Auth & Recovery"]
+    R9 --> R2["Req 2: Chat"]
+    R9 --> R4["Req 4: Room"]
+    R2 --> R5["Req 5: E2EE"]
+    R2 --> R6["Req 6: File Transfer"]
+    R2 --> R11["Req 11: Persistence"]
+    R3 --> R7["Req 7: AV Features"]
+    R4 --> R3
+    R4 --> R12["Req 12: Theater"]
+    R5 --> R12
+    R8["Req 8: Binary Transport"] --> R1
+    R8 --> R2
+    R14["Req 14: UI Interaction"] -.-> R2
+    R14 -.-> R3
+    R14 -.-> R12
+    R10 --> R11
+    R14 -.-> R13["Req 13: Settings"]
+    R3 -.-> R13
+    R9 -.-> R13
+    R10 -.-> R13
+    R11 -.-> R13
+    R4 --> R15["Req 15: Profile & Permissions"]
+    R10 --> R15
+    R15 -.-> R2
+    R15 -.-> R14
+
+    style R1 fill:#4A90D9,color:#fff
+    style R8 fill:#4A90D9,color:#fff
+    style R2 fill:#50C878,color:#fff
+    style R3 fill:#50C878,color:#fff
+    style R4 fill:#F5A623,color:#fff
+    style R5 fill:#D0021B,color:#fff
+    style R6 fill:#50C878,color:#fff
+    style R7 fill:#50C878,color:#fff
+    style R9 fill:#4A90D9,color:#fff
+    style R10 fill:#F5A623,color:#fff
+    style R11 fill:#F5A623,color:#fff
+    style R12 fill:#D0021B,color:#fff
+    style R13 fill:#9B59B6,color:#fff
+    style R14 fill:#9B59B6,color:#fff
+    style R15 fill:#F5A623,color:#fff
+```
+
+> **Legend:** Blue = Infrastructure layer, Green = Feature layer, Orange = Session/State management, Red = Advanced features. Solid arrows = hard dependency (must implement first), Dashed arrows = soft dependency (UI integration).
 
 ---
 
-## 非功能性需求
+## Requirements Overview
 
-### 性能
-- 系统 SHALL 支持单个房间最多 8 人同时视频通话（Mesh 拓扑限制）
-- 系统 SHALL 在消息量大时使用虚拟滚动（Virtual Scrolling）优化渲染性能
-- 系统 SHALL 确保 WASM 包体积经过 `opt-level=z` + LTO 优化
-- 系统 SHALL 在在线用户列表超过 100 人时使用虚拟列表渲染，避免 DOM 节点过多
-- 系统 SHALL 在放映厅场景下，房主端视频流分发采用 Mesh 拓扑（≤8 人）或考虑 SFU 中转（>8 人）以平衡房主上行带宽压力
-- 系统 SHALL 对弹幕渲染进行性能优化，使用 `requestAnimationFrame` 驱动动画，避免频繁 DOM 操作
+| ID | Name | Brief Description | Sub-Document |
+|----|------|-------------------|--------------|
+| 1 | SDP Signaling Service Enhancement | Multi-user WebRTC connection establishment & management, heartbeat, reconnection | [req-01-signaling.md](./req-01-signaling.md) |
+| 2 | Chat System (1-on-1 & Multi-User) | Text/Sticker/voice/image messages, message status, context menu, forward, reactions, reply/quote | [req-02-chat.md](./req-02-chat.md) |
+| 3 | Multi-User Audio/Video Calling | Mesh topology video calls, audio/video switching, screen sharing, VAD, network quality monitoring | [req-03-av-call.md](./req-03-av-call.md) |
+| 4 | Room System | Chat/Theater room types, password protection, permission management (max 8 participants) | [req-04-room.md](./req-04-room.md) |
+| 5 | End-to-End Encryption | Pairwise ECDH, AES-256-GCM, Theater DTLS-SRTP fallback | [req-05-e2ee.md](./req-05-e2ee.md) |
+| 6 | File Transfer | DataChannel P2P chunked transfer, resume, flow control, integrity check | [req-06-file-transfer.md](./req-06-file-transfer.md) |
+| 7 | Audio/Video Mode Switching & Common Features | Call mode switching, PiP, message search, notifications, conversation pinning/archive | [req-07-av-features.md](./req-07-av-features.md) |
+| 8 | Full-Link Binary Transport | bitcode serialization, DataChannel binary chunking protocol | [req-08-binary.md](./req-08-binary.md) |
+| 9 | Online User Discovery & Connection Invitation | Online user list, invitation mechanism, multi-invite, concurrency conflict handling | [req-09-discovery.md](./req-09-discovery.md) |
+| 10 | User Auth, Session Management & Refresh Recovery | JWT auth, connection recovery protocol, state persistence | [req-10-auth-recovery.md](./req-10-auth-recovery.md) |
+| 11 | Message Persistence & Offline Support | IndexedDB storage, message ACK & resend, deduplication | [req-11-persistence.md](./req-11-persistence.md) |
+| 12 | Shared Theater (Theater Mode) | Star topology video distribution, danmaku system, subtitle support, owner permission management (max 8: owner + 7 viewers) | [req-12-theater.md](./req-12-theater.md) |
+| 13 | Settings Page | Unified settings management for audio/video devices, appearance, privacy, notifications, and data management | [req-13-settings.md](./req-13-settings.md) |
+| 14 | UI Interaction Design | Comprehensive UI/UX design specification: responsive design (desktop/tablet/mobile), theme switching (auto/manual), page layout, component designs, interaction flows, animations, gestures, design tokens, network quality indicator | [req-14-ui-interaction.md](./req-14-ui-interaction.md) |
+| 15 | User Profile Management & Unified Room Permission System | User nickname customization, room announcement management, unified administrator role with moderation powers (applies to both Chat & Theater rooms), room member search | [req-15-profile-permissions.md](./req-15-profile-permissions.md) |
 
-### 安全
-- 系统 SHALL 对所有用户输入进行 XSS 防护
-- 系统 SHALL 使用 WSS（WebSocket Secure）进行信令传输
-- 系统 SHALL 对密码进行内存中哈希处理（Argon2），不持久化到磁盘或数据库
-- 系统 SHALL 对连接邀请进行频率限制（Rate Limiting），防止恶意用户滥发邀请
-- 系统 SHALL 对弹幕内容进行 XSS 过滤和敏感词检测
-- 系统 SHALL 对放映厅的踢出/禁言操作进行权限校验，仅房主可执行管控操作
+---
 
-### 可维护性
-- 系统 SHALL 保持 Workspace 多 crate 架构（message / sdp / chat）
-- 系统 SHALL 保持 Clippy pedantic 零警告
-- 系统 SHALL 为所有新增功能编写单元测试
-- 系统 SHALL 使用 cargo-make 统一任务管理
+## Non-Functional Requirements
 
-### 国际化
-- 系统 SHALL 支持中文/英文双语界面（使用 leptos-i18n 或自实现 I18n 方案）
+### Performance
+- The system SHALL support up to 8 simultaneous video call participants per room (Mesh topology limit)
+- The system SHALL use Virtual Scrolling to optimize rendering performance when message volume is high; message list rendering latency SHALL NOT exceed 16ms (60fps target)
+- The system SHALL ensure WASM bundle size is optimized via `opt-level=z` + LTO; initial WASM bundle size (gzipped) SHALL NOT exceed 500KB
+- The system SHALL ensure page first contentful paint (FCP) time is under 2 seconds on 4G network
+- The system SHALL use virtual list rendering when the online user list exceeds 100 users, to avoid excessive DOM nodes
+- The system SHALL use Star Topology for theater video stream distribution, with the owner as the central node pushing video to each viewer; limit 8 users (owner + 7 viewers) to keep owner uplink bandwidth pressure within reasonable bounds
+- The system SHALL optimize danmaku rendering performance using `requestAnimationFrame` to drive animations, avoiding frequent DOM operations; maximum simultaneous danmaku display count SHALL be 100
+- The system SHALL monitor browser WebRTC resource usage under Mesh topology, including PeerConnection count, DataChannel count, and media track count; WHEN PeerConnection count exceeds 6 THEN the system SHALL output resource warnings in debug logs; the system SHALL periodically (every 30 seconds) collect connection quality metrics via `RTCPeerConnection.getStats()` (RTT, packet loss rate, bandwidth estimation) for network quality indicator display
+- The system SHALL ensure IndexedDB query latency for message history (1000 messages) is under 100ms
+
+### Security
+- The system SHALL apply XSS protection to all user inputs:
+  - **Text Messages**: Use DOMPurify-equivalent sanitization (Rust implementation via `ammon` crate) before rendering Markdown; strip `<script>`, `<iframe>`, `javascript:` URLs, and other dangerous HTML
+  - **Usernames**: Alphanumeric + underscore only, max 20 characters, no special characters or whitespace
+  - **Room Names/Descriptions**: Plain text only, no HTML/Markdown rendering, max 100 characters for name, 500 characters for description
+  - **Danmaku Content**: Same sanitization as text messages, plus max 100 characters limit
+- The system SHALL use WSS (WebSocket Secure) for signaling transport
+- The system SHALL hash passwords in memory (Argon2), never persisting to disk or database; Argon2 parameters: `memory_cost = 65536` (64MB), `time_cost = 3`, `parallelism = 4`, `output_length = 32` (256-bit)
+- The system SHALL apply rate limiting to connection invitations to prevent abuse:
+  - Max 10 invitations per user per minute
+  - Max 50 invitations per user per hour
+  - Max 5 unanswered invitations per target user (auto-decline oldest when exceeded)
+- The system SHALL apply XSS filtering and sensitive word detection to danmaku content
+- The system SHALL enforce permission checks on all room moderation operations (kick/mute/ban), following the unified role hierarchy defined in Requirement 15.3 (Owner > Admin > Member); only users with a higher role than the target can execute moderation actions
+- The system SHALL apply log desensitization:
+  - JWT tokens SHALL be logged as `[REDACTED_TOKEN]` (show only first 8 and last 4 characters)
+  - Passwords SHALL never appear in logs
+  - User messages SHALL be logged as message summary only (message_id, type, length), not full content
+  - ICE Candidates SHALL be logged with IP addresses masked (e.g., `192.168.x.x`, `10.x.x.x`)
+
+### Maintainability
+- The system SHALL maintain a Workspace multi-crate architecture (message / sdp / chat)
+- The system SHALL maintain Clippy pedantic zero warnings
+- The system SHALL write unit tests for all new features
+- The system SHALL use cargo-make for unified task management
+
+### Build & Task Management (cargo-make)
+- The project SHALL use `cargo-make` (`Makefile.toml`) as the unified task runner for all development, build, test, and deployment workflows
+- The `Makefile.toml` SHALL define at minimum the following tasks:
+  - `makers dev` — Start development server (signaling server + Trunk dev server with hot reload)
+  - `makers build` — Production build (optimized WASM + signaling server binary)
+  - `makers test` — Run all tests (unit + integration + WASM)
+  - `makers test-unit` — Run Rust unit tests only (`cargo test --lib`)
+  - `makers test-integration` — Run integration tests only (`cargo test --test '*'`)
+  - `makers test-wasm` — Run WASM-specific tests via `wasm-pack test --headless --chrome`
+  - `makers test-e2e` — Run E2E tests via Playwright
+  - `makers lint` — Run `cargo clippy --all-targets -- -D warnings` + `cargo fmt --check`
+  - `makers fmt` — Run `cargo fmt --all`
+  - `makers clean` — Clean all build artifacts
+  - `makers docker` — Multi-stage Docker build for production image
+- Each task SHALL have clear dependencies (e.g., `build` depends on `lint`, `test` depends on `test-unit` + `test-integration` + `test-wasm`)
+
+### Testing Strategy
+- **Unit Tests**: The system SHALL maintain unit tests for all core logic modules using Rust's built-in `#[cfg(test)]` and `#[test]` attributes; coverage targets:
+  - `message` crate (serialization/deserialization, validation): ≥ 90% line coverage
+  - Signaling server (room management, user session, peer tracking): ≥ 80% line coverage
+  - Frontend utility functions (encryption helpers, message formatting, avatar generation): ≥ 80% line coverage
+- **Integration Tests**: The system SHALL maintain integration tests under each crate's `tests/` directory:
+  - Signaling server: WebSocket connection lifecycle, multi-user room join/leave, SDP/ICE forwarding, TokenAuth flow, active_peers tracking
+  - Message crate: Cross-platform serialization compatibility (ensure WASM and native produce identical bitcode output)
+- **WASM Tests**: The system SHALL maintain WASM-specific tests using `wasm-pack test` (running in headless Chrome):
+  - IndexedDB read/write operations (message persistence, avatar cache)
+  - Web Crypto API operations (ECDH key exchange, AES-256-GCM encrypt/decrypt)
+  - DataChannel message encoding/decoding in WASM environment
+  - i18n language switching and localStorage persistence
+- **E2E Tests**: The system SHALL maintain end-to-end tests using Playwright (or similar browser automation framework):
+  - User registration → login → connection invitation → chat message send/receive → logout flow
+  - Multi-user room creation → join → group chat → leave flow
+  - Audio/video call initiation → mode switching → hang up flow
+  - Page refresh → connection recovery → message resend flow
+  - Theater creation → video playback → danmaku send/receive flow
+  - E2E tests SHALL run against a real signaling server instance (started as part of the test setup)
+- **Test Data & Fixtures**: The system SHALL maintain test fixtures in a shared `tests/fixtures/` directory, including sample messages, mock user data, and test Sticker assets
+- **CI Integration**: All test tasks (`test-unit`, `test-integration`, `test-wasm`, `test-e2e`) SHALL be runnable via `makers test` and suitable for CI pipeline integration
+
+### Internationalization
+- The system SHALL support Chinese/English bilingual interface using `leptos-i18n` (compatible with Leptos 0.8+)
+- i18n scope SHALL cover: UI label text, button text, system notification messages, error messages, form validation prompts
+- Date/time display SHALL be localized according to user language preference (Chinese: YYYY年MM月DD日 HH:mm, English: MMM DD, YYYY HH:mm)
+- Danmaku content and user chat messages are user-generated content (UGC), no translation processing
+- WHEN user switches language THEN the system SHALL immediately update all UI text (no page refresh needed), and persist language preference to localStorage
+- WHEN user first visits the app without a language preference set THEN the system SHALL detect browser language via `navigator.language`, automatically selecting the matching language (only zh-CN and en supported, other languages default to en)
+
+#### i18n Resource File Specification
+- i18n resource files SHALL be stored as JSON under `/assets/i18n/{locale}.json` (e.g., `en.json`, `zh-CN.json`)
+- i18n keys SHALL use dot-separated hierarchical naming: `{module}.{component}.{element}` (e.g., `chat.input.placeholder`, `room.create.title`, `auth.login.button`)
+- Each locale JSON file SHALL be a flat key-value map (no nested objects) for simplicity and fast lookup
+- The system SHALL load i18n resource files lazily (fetch on first use, cache in memory)
+- WHEN adding new UI text THEN developers SHALL add the key to both `en.json` and `zh-CN.json` simultaneously; the build process (`makers lint`) SHALL include a check that both locale files have identical key sets
+
+### Browser Compatibility
+- The system SHALL support the latest two major versions of: Chrome, Firefox, Edge
+- The system SHALL require browser support for: WebRTC (RTCPeerConnection), WebSocket, IndexedDB, Notification API, MediaDevices (getUserMedia / getDisplayMedia), `captureStream()` / `mozCaptureStream()`, Web Crypto API
+- The system SHALL display a friendly prompt page on unsupported browsers, guiding users to upgrade
+- The system SHALL NOT require Safari support (due to known limitations in Safari's WebRTC DataChannel and `captureStream()` support)
+
+### Accessibility (a11y)
+- All interactive elements (buttons, links, inputs, toggles) SHALL have appropriate `aria-label` attributes and be keyboard-navigable (`tabindex="0"`, `Enter`/`Space` to activate)
+- The system SHALL support full keyboard navigation: `Tab` to move focus between elements, `Escape` to close modals/popups, arrow keys for list navigation
+- All form inputs SHALL have associated `<label>` elements or `aria-labelledby` references
+- The system SHALL maintain a minimum color contrast ratio of 4.5:1 for normal text and 3:1 for large text (WCAG 2.1 AA)
+- WHEN a new message arrives THEN the system SHALL announce it to screen readers via `aria-live="polite"` region
+- WHEN a call is incoming THEN the system SHALL announce it via `aria-live="assertive"` region
+- The system SHALL provide visible focus indicators (outline) on all focusable elements, styled consistently with the current theme
+- Image messages and avatars SHALL have descriptive `alt` text (e.g., "Image from {username}" or "{username}'s avatar")
+
+### Observability & Debugging
+- The client SHALL support an optional debug log mode (enabled via URL parameter `?debug=true` or localStorage toggle `debug_mode`), outputting structured logs to browser Console when enabled, including: WebRTC connection state changes, DataChannel open/close events, signaling message summaries (excluding encrypted content), ICE Candidate exchange process
+- The signaling server SHALL use the `tracing` crate for structured logging, including: user connect/disconnect events, signaling message routing, room create/destroy events, errors and exceptions
+- The signaling server SHALL support log level configuration via the `RUST_LOG` environment variable (default `info`)
+
+### Error Code Specification
+
+The system SHALL implement a unified error code specification for consistent error handling across all modules.
+
+#### Error Code Format
+- Error codes SHALL use the format: `{MODULE}{CATEGORY}{SEQUENCE}` (e.g., `SIG001`, `CHT102`, `AV203`)
+  - **MODULE**: 3-letter module prefix
+    - `SIG` — Signaling (connection, SDP/ICE exchange, heartbeat)
+    - `CHT` — Chat (message send/receive, sticker, voice, image)
+    - `AV` — Audio/Video (calls, screen share, media devices)
+    - `ROM` — Room (create, join, leave, permissions)
+    - `E2E` — End-to-End Encryption (key exchange, encrypt/decrypt)
+    - `FIL` — File Transfer (upload, download, chunk, resume)
+    - `THR` — Theater (video share, danmaku, owner controls)
+    - `AUTH` — Authentication/Session (login, JWT, recovery)
+    - `PST` — Persistence (IndexedDB, message storage)
+    - `SYS` — System (general errors, browser compatibility)
+  - **CATEGORY**: 1-digit error category
+    - `0` — Informational (not an error, status update)
+    - `1` — Client error (invalid input, permission denied)
+    - `2` — Network error (connection lost, timeout)
+    - `3` — Server error (internal failure)
+    - `4` — Media error (device access, codec issue)
+    - `5` — Security error (encryption, authentication)
+  - **SEQUENCE**: 2-digit sequence number within the module-category combination
+
+#### Error Code Registry
+The system SHALL maintain a centralized error code registry in the `message` crate:
+
+| Code | Module | Category | Description | i18n Key |
+|------|--------|----------|-------------|----------|
+| SIG001 | Signaling | Network | WebSocket connection failed | `error.sig001` |
+| SIG002 | Signaling | Network | SDP negotiation timeout | `error.sig002` |
+| SIG003 | Signaling | Network | ICE connection failed | `error.sig003` |
+| SIG101 | Signaling | Client | Invalid SDP format | `error.sig101` |
+| CHT001 | Chat | Network | DataChannel send failed | `error.cht001` |
+| CHT101 | Chat | Client | Message too long (>10000 chars) | `error.cht101` |
+| CHT102 | Chat | Client | Invalid sticker ID | `error.cht102` |
+| AV001 | Audio/Video | Network | PeerConnection disconnected during call | `error.av001` |
+| AV201 | Audio/Video | Server | No available STUN/TURN servers | `error.av201` |
+| AV401 | Audio/Video | Media | Camera access denied | `error.av401` |
+| AV402 | Audio/Video | Media | Microphone access denied | `error.av402` |
+| AV403 | Audio/Video | Media | Screen share cancelled | `error.av403` |
+| ROM001 | Room | Network | Room join timeout | `error.rom001` |
+| ROM101 | Room | Client | Room password incorrect | `error.rom101` |
+| ROM102 | Room | Client | Room is full (8 participants max) | `error.rom102` |
+| ROM103 | Room | Client | Insufficient permissions | `error.rom103` |
+| E2E001 | E2EE | Network | Key exchange timeout | `error.e2e001` |
+| E2E501 | E2EE | Security | Key negotiation failed | `error.e2e501` |
+| E2E502 | E2EE | Security | Message decryption failed | `error.e2e502` |
+| FIL001 | File Transfer | Network | Transfer interrupted | `error.fil001` |
+| FIL101 | File Transfer | Client | File exceeds size limit | `error.fil101` |
+| FIL102 | File Transfer | Client | Dangerous file extension warning | `error.fil102` |
+| FIL201 | File Transfer | Server | Hash verification failed | `error.fil201` |
+| THR001 | Theater | Network | Theater stream disconnected | `error.thr001` |
+| THR101 | Theater | Client | Theater room full | `error.thr101` |
+| THR102 | Theater | Client | Only owner can share video | `error.thr102` |
+| AUTH001 | Auth | Network | JWT token expired | `error.auth001` |
+| AUTH501 | Auth | Security | Invalid JWT signature | `error.auth501` |
+| AUTH502 | Auth | Security | Session hijacking detected | `error.auth502` |
+| PST001 | Persistence | Network | IndexedDB write failed | `error.pst001` |
+| PST101 | Persistence | Client | Message not found | `error.pst101` |
+| SYS001 | System | Network | Browser offline | `error.sys001` |
+| SYS201 | System | Server | Unexpected internal error | `error.sys201` |
+| SYS301 | System | Client | Browser not supported | `error.sys301` |
+| ROM104 | Room | Client | Nickname validation failed | `error.rom104` |
+| ROM105 | Room | Client | Announcement exceeds max length | `error.rom105` |
+| ROM106 | Room | Client | User is banned from this room | `error.rom106` |
+| ROM107 | Room | Client | Invalid mute duration | `error.rom107` |
+| ROM108 | Room | Client | Cannot moderate user with equal or higher role | `error.rom108` |
+| CHT103 | Chat | Client | Read receipt send failed | `error.cht103` |
+| CHT104 | Chat | Client | Forward target not available | `error.cht104` |
+| CHT105 | Chat | Client | Maximum reactions per message reached (20) | `error.cht105` |
+| THR103 | Theater | Client | Subtitle file format not supported | `error.thr103` |
+| THR104 | Theater | Client | Subtitle file parse failed | `error.thr104` |
+
+#### Error Response Structure
+All error responses (both frontend UI and backend signaling) SHALL use a unified JSON structure:
+
+```json
+{
+  "code": "SIG003",
+  "message": "ICE connection failed",
+  "i18n_key": "error.sig003",
+  "details": {
+    "retry_count": 2,
+    "last_ice_state": "failed",
+    "suggested_action": "check_network"
+  },
+  "timestamp": "2026-04-08T17:46:56Z",
+  "trace_id": "abc123def456"
+}
+```
+
+- `code`: Error code from the registry
+- `message`: Default English error message (fallback for i18n)
+- `i18n_key`: Key for looking up localized message in `/assets/i18n/{locale}.json`
+- `details`: Optional contextual information (varies by error type)
+- `timestamp`: ISO 8601 timestamp when the error occurred
+- `trace_id`: Unique identifier for tracing the error across logs (frontend + backend)
+
+#### Error Message Internationalization
+- All error messages SHALL be stored in i18n resource files under keys matching the pattern `error.{code_lowercase}` (e.g., `error.sig003` for `SIG003`)
+- i18n resource files SHALL include both the short error message and optional detailed description:
+  ```json
+  {
+    "error.sig003": "ICE connection failed. Please check your network settings.",
+    "error.sig003.detail": "The WebRTC connection could not be established. This may be due to firewall restrictions or NAT traversal issues."
+  }
+  ```
+- WHEN displaying an error in the UI THEN the system SHALL show the localized short message first, with an expandable "Learn more" section for the detailed description
+- WHEN an error has a suggested action (e.g., `suggested_action: "check_network"`) THEN the UI SHALL display a contextual action button (e.g., "Check Network Settings") alongside the error message
+
+#### Error Logging Format
+- **Frontend (Debug Mode)**: WHEN debug mode is enabled THEN errors SHALL be logged to browser Console in structured format:
+  ```javascript
+  console.error("[ERROR]", {
+    code: "SIG003",
+    message: "ICE connection failed",
+    trace_id: "abc123def456",
+    context: { peer_id: "user123", room_id: "room456" }
+  });
+  ```
+- **Backend (Signaling Server)**: All errors SHALL be logged using the `tracing` crate with structured fields:
+  ```rust
+  tracing::error!(
+    error_code = %code,
+    trace_id = %trace_id,
+    user_id = %user_id,
+    room_id = %room_id,
+    "Error occurred: {}",
+    message
+  );
+  ```
+- Sensitive information (JWT tokens, passwords, message content) SHALL NEVER be included in error logs (see "Security" section for log desensitization rules)
+
+---
+
+### Error Handling & Degradation Strategy
+- WHEN WebRTC PeerConnection establishment fails (ICE connection timeout or SDP negotiation failure) THEN the system SHALL display a "Connection failed" prompt in the UI with a "Retry" button; after 3 consecutive failures, prompt the user to check their network environment
+- WHEN DataChannel message send fails THEN the system SHALL mark the message status as "Send failed" and provide a resend button
+- WHEN media device (camera/microphone) access is denied THEN the system SHALL degrade to text-only chat mode and prompt the user on how to enable media permissions
+- WHEN file transfer is interrupted (PeerConnection disconnected) THEN the system SHALL retain transferred chunk progress, automatically attempt resume on reconnection; if 3 resume attempts fail, prompt the user to manually resend
+- WHEN E2EE key negotiation fails THEN the system SHALL automatically retry once; if still failing, notify the user "Encrypted channel establishment failed" and provide "Retry" and "Continue in unencrypted mode" options
+- WHEN WebSocket signaling connection drops THEN the system SHALL display a global "Connection lost, reconnecting..." banner at the top, using exponential backoff for automatic reconnection; restore session state upon successful reconnection
+
+### Deployment & Operations
+- The project SHALL provide a `Dockerfile` using multi-stage build: Stage 1 builds the signaling server binary (Rust release build), Stage 2 builds the WASM frontend (via Trunk), Stage 3 produces a minimal runtime image (e.g., `debian-slim` or `distroless`) containing only the server binary and static frontend assets
+- The signaling server SHALL serve the built frontend static files (HTML/JS/WASM/CSS/assets) from a configurable directory (default `./dist/`), eliminating the need for a separate web server in production
+- The system SHALL support configuration via environment variables for: `PORT` (default 3000), `RUST_LOG` (default `info`), `JWT_SECRET` (required), `STUN_SERVERS` (comma-separated, default `stun:stun.l.google.com:19302`), `TURN_SERVERS` (optional), `TLS_CERT_PATH` and `TLS_KEY_PATH` (optional, for HTTPS/WSS)
+- IF `TLS_CERT_PATH` and `TLS_KEY_PATH` are provided THEN the signaling server SHALL serve over HTTPS/WSS directly; otherwise the system SHALL document the recommended reverse proxy setup (e.g., Nginx/Caddy) for TLS termination
+- The `Makefile.toml` SHALL include a `makers docker` task that builds the production Docker image
+- The project SHALL include a `docker-compose.yml` for local development/testing with the signaling server
+
+### Progressive Web App (PWA)
+- The system SHALL provide a `manifest.json` for PWA installation, including: app name, short name, icons (192x192 and 512x512), theme color, background color, display mode (`standalone`), start URL
+- The system SHALL provide a Service Worker for offline capability: caching static assets (HTML/JS/WASM/CSS) with cache-first strategy; caching Sticker resources with cache-first strategy; caching i18n resource files with cache-first strategy
+- The system SHALL support "Add to Home Screen" prompt on mobile devices
+- WHEN the app is launched from home screen THEN the system SHALL display in standalone mode (no browser UI)
+- WHEN the app is offline THEN the system SHALL display an "You are offline" banner and allow viewing cached chat history from IndexedDB
+- The system SHALL support Web Push Notifications (optional feature, requires backend Push service integration): WHEN a user receives a new message while the app is in background or closed THEN the system SHALL send a push notification (if user has granted notification permission)
+- WHEN user grants notification permission THEN the system SHALL subscribe to push notifications and store the subscription on the server (in-memory, associated with user session)
+
+---
+
+## Requirements Audit Report
+
+> **Audit Date:** 2026-04-08
+> **Scope:** Full review of requirements.md + 15 sub-requirement documents (req-01 through req-15)
+> **Auditor:** AI Code Assistant
+> **Status:** ✅ All 13 issues resolved + 6 feature enhancements added (2026-04-08)
+
+### Audit Summary
+
+The requirements document set is **comprehensive, well-structured, and of high quality**. The 15 sub-requirements cover all major aspects of a WebRTC-based multi-user chat application. The documents demonstrate strong architectural thinking, consistent cross-referencing, and attention to edge cases. Below is a detailed analysis organized by category.
+
+### ✅ Strengths
+
+1. **Excellent Cross-Referencing**: Sub-requirements consistently reference each other (e.g., Req 2 references Req 10.12 for multi-invite, Req 3 references Req 4.1 for participant limits). This ensures traceability and reduces ambiguity.
+
+2. **Architecture Notes & Rationale**: Each sub-requirement includes architecture notes explaining design decisions (e.g., why Theater uses Star topology, why E2EE is not applied to Theater danmaku). This is invaluable for implementation.
+
+3. **Consistent Participant Limit**: The 8-person limit is consistently enforced across Chat rooms (Req 4.1), Theater rooms (Req 12.1), and AV calls (Req 3.10), with clear rationale.
+
+4. **Comprehensive Binary Protocol Spec (Req 8)**: The binary protocol specification is exceptionally detailed with byte-level encoding examples, message type discriminators, and WASM integration requirements.
+
+5. **Thorough Error Handling**: The main document defines a complete error code system with module prefixes, categories, i18n keys, and structured logging formats.
+
+6. **Edge Case Coverage**: Documents address many edge cases: bidirectional invitation conflicts (Req 9.13), concurrent SDP negotiation queuing (Req 9.14), owner unexpected disconnection (Req 12.6a), server restart scenarios (Req 10.10).
+
+7. **Non-Functional Requirements**: Performance targets, security measures, accessibility standards, browser compatibility, and i18n are all well-defined with specific, measurable criteria.
+
+8. **Unified Permission Model (Req 15)**: The permission system is explicitly designed as room-type-agnostic, applying identically to Chat and Theater rooms.
+
+### ✅ Issues Found & Resolved
+
+#### Issue 1: Cross-Reference Numbering Inconsistency (Req 2 → Req 11/12) — ✅ FIXED
+
+**Severity:** Low
+**Location:** [req-02-chat.md](./req-02-chat.md), Acceptance Criteria 2a
+**Fix Applied:** Updated Req 2.2a reference from "Requirement 12.3" to "Requirement 11.3".
+
+#### Issue 2: Duplicate Section Numbering in Req 12 — ✅ FIXED
+
+**Severity:** Low
+**Location:** [req-12-theater.md](./req-12-theater.md)
+**Fix Applied:** Renumbered sections: 12.2 (Theater Room Management), 12.3 (Video Source Selection & Playback), 12.4 (Playback Controls), 12.5 (Danmaku System), 12.6 (Theater Message Interaction), 12.7 (Owner Permission Management), 12.8 (Theater UI Layout).
+
+#### Issue 3: Duplicate Section Numbering in Req 14 — ✅ FIXED
+
+**Severity:** Low
+**Location:** [req-14-ui-interaction.md](./req-14-ui-interaction.md)
+**Fix Applied:** Renumbered: 14.7.2 (Color System), 14.7.3 (Typography System), 14.7.4 (Spacing & Layout Grid).
+
+#### Issue 4: Security — Permission Check Scope Needs Update — ✅ FIXED
+
+**Severity:** Medium
+**Location:** [requirements.md](./requirements.md), Security section
+**Fix Applied:** Updated Security section to: "The system SHALL enforce permission checks on all room moderation operations (kick/mute/ban), following the unified role hierarchy defined in Requirement 15.3 (Owner > Admin > Member)."
+
+#### Issue 5: Missing Signaling Messages for Req 15 Features — ✅ FIXED
+
+**Severity:** Medium
+**Location:** [req-08-binary.md](./req-08-binary.md), Signaling Message Type Catalog
+**Fix Applied:** Added new "Room Moderation & Profile" signaling message section with: `MuteMember`, `UnmuteMember`, `BanMember`, `UnbanMember`, `PromoteAdmin`, `DemoteAdmin`, `NicknameChange`, `RoomAnnouncement`, `ModerationNotification`. Unified Theater-specific `TheaterMute`/`TheaterUnmute`/`TheaterKick` into general-purpose `MuteMember`/`UnmuteMember`/`KickMember` (already in Room Management). Added discriminator values 0x75-0x7D. Updated req-12-theater.md to reference unified messages.
+
+#### Issue 6: Missing Error Codes for Req 15 Features — ✅ FIXED
+
+**Severity:** Low
+**Location:** [requirements.md](./requirements.md), Error Code Registry
+**Fix Applied:** Added error codes: `ROM104` (Nickname validation failed), `ROM105` (Announcement exceeds max length), `ROM106` (User is banned from this room), `ROM107` (Invalid mute duration), `ROM108` (Cannot moderate user with equal or higher role), `CHT103` (Read receipt send failed).
+
+#### Issue 7: Req 7 Context Menu Inconsistency with Req 14 — ✅ FIXED
+
+**Severity:** Low
+**Location:** [req-14-ui-interaction.md](./req-14-ui-interaction.md), Section 14.2.1
+**Fix Applied:** Removed "Edit" and "Delete" from Req 14.2.1 context menu options (chose option b: align UI spec with functional requirements). Added "Quote" to match Req 2.7 functional spec.
+
+#### Issue 8: Read Receipts Feature Gap — ✅ FIXED
+
+**Severity:** Low
+**Location:** [req-02-chat.md](./req-02-chat.md), [req-08-binary.md](./req-08-binary.md)
+**Fix Applied:** Added read receipt acceptance criteria (3a-3d) to Req 2 defining: message status lifecycle (sending → sent → delivered → read), `MessageRead` DataChannel message type (batched, 500ms window), privacy setting integration (Req 13.3), multi-user read count display. Added `MessageRead` to Req 8 DataChannel message catalog with discriminator 0xA3.
+
+#### Issue 9: Req 14 Technical Notes Reference Non-Rust Libraries — ✅ FIXED
+
+**Severity:** Low
+**Location:** [req-14-ui-interaction.md](./req-14-ui-interaction.md), Technical Implementation Notes
+**Fix Applied:** Replaced "Radix, Headless UI" with custom Leptos components, "framer-motion" with CSS transitions/animations + `requestAnimationFrame`, "Percy, Chromatic" with Playwright screenshot comparison.
+
+#### Issue 10: Blacklist Storage Strategy Limitation — ✅ FIXED
+
+**Severity:** Low
+**Location:** [req-09-discovery.md](./req-09-discovery.md), Section 9.2
+**Fix Applied:** Changed Req 9.17 from server-side silent rejection to client-side auto-decline with random delay (30-60 seconds) to simulate timeout behavior. This preserves the client-side-only blacklist design while preventing the blocked user from detecting the block action.
+
+#### Issue 11: Cross-Reference Error in Req 2.7a — ✅ FIXED
+
+**Severity:** Low
+**Location:** [req-02-chat.md](./req-02-chat.md), Acceptance Criteria 7a
+**Fix Applied:** Updated Req 2.7a reference from "Requirement 12.3" to "Requirement 11.3" (message ACK mechanism is defined in Req 11, not Req 12).
+
+#### Issue 12: Cross-Reference Error in Req 10.16a — ✅ FIXED
+
+**Severity:** Low
+**Location:** [req-10-auth-recovery.md](./req-10-auth-recovery.md), Acceptance Criteria 16a
+**Fix Applied:** Updated Req 10.16a reference from "Requirement 12.3" to "Requirement 11.3" (message ACK synchronization mechanism is defined in Req 11).
+
+#### Issue 13: Cross-Reference Ambiguity in Req 3.3/3.4 — ✅ FIXED
+
+**Severity:** Low
+**Location:** [req-03-av-call.md](./req-03-av-call.md), Acceptance Criteria 3 and 4
+**Fix Applied:** Updated Req 3.3 reference from "Requirement 8.1" to "Requirement 7.1" and Req 3.4 reference from "Requirement 8.2" to "Requirement 7.2". Audio/Video mode switching interaction controls are defined in Req 7 (AV Features), not Req 8 (Binary Transport).
+
+### 📊 Completeness Matrix
+
+| Aspect | Coverage | Notes |
+|--------|----------|-------|
+| Core Chat Features | ✅ Complete | Text, Sticker, Voice, Image, File, Forward, Reactions, Reply/Quote |
+| Audio/Video Calling | ✅ Complete | Mesh topology, mode switching, screen share, network quality monitoring |
+| Room Management | ✅ Complete | Chat + Theater types, password, permissions |
+| Security (E2EE) | ✅ Complete | Pairwise ECDH, Theater DTLS-SRTP fallback |
+| Binary Protocol | ✅ Excellent | Byte-level spec with examples |
+| User Discovery | ✅ Complete | Online list, invitation, blacklist |
+| Auth & Recovery | ✅ Complete | JWT, refresh recovery, multi-device policy |
+| Persistence | ✅ Complete | IndexedDB, ACK/resend, deduplication |
+| Theater Mode | ✅ Complete | Star topology, danmaku, subtitle support, owner controls |
+| Settings | ✅ Complete | AV, appearance, privacy, notifications, data |
+| UI/UX Design | ✅ Excellent | Responsive, themes, animations, icons, a11y |
+| Profile & Permissions | ✅ Complete | Nickname, announcements, unified admin role |
+| Error Handling | ✅ Complete | Error codes, i18n, degradation strategies |
+| Non-Functional | ✅ Complete | Performance, security, testing, deployment |
+| Read Receipts | ✅ Complete | Functional spec added to Req 2, DataChannel message type defined in Req 8 |
+| Message Edit/Delete | ✅ Resolved | Removed from UI spec (Req 14) to align with functional requirements |
+| Message Forward | ✅ Complete | Forward logic in Req 2.13, DataChannel message type in Req 8, UI spec in Req 14.2.1 |
+| Message Reactions | ✅ Complete | Reaction logic in Req 2.14, DataChannel message type in Req 8, UI spec in Req 14.2.1 |
+| Reply/Quote Display | ✅ Complete | Reply/quote logic in Req 2.15, quoted block UI spec in Req 14.2.1 |
+| Network Quality Indicator | ✅ Complete | Metrics collection in Req 3.8a-8d, UI spec in Req 14.10 |
+| Theater Subtitles | ✅ Complete | Subtitle loading/sync in Req 12.4a, DataChannel messages in Req 8 |
+| Conversation Pinning/Archive | ✅ Complete | Pin/archive logic in Req 7.7a-7f, persistence in IndexedDB |
+
+### 🔄 Recommended Priority for Fixes
+
+1. **High Priority**: Issue 5 (Missing signaling messages for Req 15) — blocks implementation
+2. **Medium Priority**: Issue 4 (Permission check scope), Issue 10 (Blacklist contradiction)
+3. **Low Priority**: Issues 1-3 (numbering), Issues 6-9 (completeness gaps), Issues 11-13 (cross-reference corrections)
+
+### ✅ Feature Enhancements Added (Round 2)
+
+The following 6 feature enhancements were added based on functional completeness analysis:
+
+#### Enhancement A1: Message Forward — ✅ ADDED
+
+**Priority:** High (UI already designed, functional logic was missing)
+**Location:** [req-02-chat.md](./req-02-chat.md) Req 2.13, [req-08-binary.md](./req-08-binary.md) DataChannel messages, [req-14-ui-interaction.md](./req-14-ui-interaction.md) Section 14.2.1
+**What was added:** Complete forward functionality including: forward target selection modal, `ForwardMessage` DataChannel message type (discriminator 0xA4), forwarded message display with "Forwarded from" header, support for all message types (text/sticker/voice/image), anti-chain-forwarding rule (forwarded messages cannot be re-forwarded).
+
+#### Enhancement A2: Message Reaction (Emoji) — ✅ ADDED
+
+**Priority:** High (UI already designed, functional logic was missing)
+**Location:** [req-02-chat.md](./req-02-chat.md) Req 2.14, [req-08-binary.md](./req-08-binary.md) DataChannel messages, [req-14-ui-interaction.md](./req-14-ui-interaction.md) Section 14.2.1
+**What was added:** Complete reaction functionality including: `MessageReaction` DataChannel message type (discriminator 0xA5) with add/remove toggle, max 20 unique emoji per message, IndexedDB persistence as `{ emoji: Vec<UserId> }` map, best-effort delivery (no ACK), Mesh broadcast in multi-user sessions.
+
+#### Enhancement A3: Network Quality Indicator — ✅ ADDED
+
+**Priority:** High (metrics collection existed but UI spec was missing)
+**Location:** [req-03-av-call.md](./req-03-av-call.md) Req 3.8a-8d, [req-14-ui-interaction.md](./req-14-ui-interaction.md) Section 14.10
+**What was added:** Detailed network quality monitoring: 4-level classification (Excellent/Good/Fair/Poor) based on RTT and packet loss thresholds, per-peer quality indicators on video tiles, hover tooltip with detailed metrics (RTT, loss, bandwidth, connection type), automatic quality degradation triggers, Leptos Signal-based reactive state.
+
+#### Enhancement B1: Message Reply & Quote Display — ✅ ADDED
+
+**Priority:** Medium (reply/quote existed in context menu but display format was undefined)
+**Location:** [req-02-chat.md](./req-02-chat.md) Req 2.15, [req-14-ui-interaction.md](./req-14-ui-interaction.md) Section 14.2.1
+**What was added:** Complete reply/quote display: reply preview bar above input, `reply_to` field in ChatText payload, quoted message block with left accent border and sender name, click-to-scroll-to-original behavior, revoked message handling, blockquote format for inline quotes.
+
+#### Enhancement B2: Theater Subtitle Support — ✅ ADDED
+
+**Priority:** Medium (useful for foreign language video co-watching)
+**Location:** [req-12-theater.md](./req-12-theater.md) Req 12.4a, [req-08-binary.md](./req-08-binary.md) DataChannel messages
+**What was added:** SRT and WebVTT subtitle file loading, subtitle sync with playback timeline, `SubtitleData` (discriminator 0xC2) and `SubtitleClear` (discriminator 0xC3) DataChannel messages for owner-to-viewer sync, subtitle appearance customization (font size, color, background opacity, position), error handling for unsupported formats.
+
+#### Enhancement B3: Conversation Pinning & Archive — ✅ ADDED
+
+**Priority:** Medium (pinning was mentioned but lacked detailed specification)
+**Location:** [req-07-av-features.md](./req-07-av-features.md) Req 7.7a-7f
+**What was added:** Detailed pin/unpin behavior, pin sorting rules (pinned-at-time order, not activity-based), max 5 pinned conversations limit, IndexedDB persistence, do-not-disturb with muted badge color, optional archive functionality with auto-unarchive on new message.
