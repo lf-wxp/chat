@@ -157,14 +157,23 @@
 > 后端信令服务器负责 WebSocket 连接管理、信令转发、房间管理、用户认证等。不处理聊天消息（聊天走 DataChannel P2P）。
 
 - [ ] 8. 实现 Axum 服务器基础框架与 WebSocket 连接管理
-   - 搭建 Axum HTTP/WebSocket 服务器，支持环境变量配置（PORT、RUST_LOG、JWT_SECRET、STUN/TURN_SERVERS、TLS 路径）
+   - 搭建 Axum HTTP/WebSocket 服务器，支持环境变量配置（PORT、RUST_LOG、JWT_SECRET、STUN/TURN_SERVERS、TLS 路径、RUST_LOG_FORMAT、LOG_OUTPUT、LOG_ROTATION、LOG_DIR、LOG_MAX_FILES、LOG_MAX_SIZE_MB）
    - 实现 WebSocket 连接处理：二进制模式、bitcode 消息解码/编码（复用 message crate）
    - 实现心跳检测机制（Ping/Pong），超时断开
    - 实现连接断开自动清理（清理信令会话、通知相关 Peer）
    - 实现静态文件服务（前端 dist/ 目录 + Sticker 资源 /assets/stickers/）
-   - 实现 `tracing` 结构化日志（含日志脱敏：JWT token 脱敏、IP 掩码）
-   - 编写单元测试：WebSocket 连接生命周期、心跳超时、消息编解码
-   - _需求：Req 1.7 (Heartbeat)、Req 1.5 (Connection cleanup)、Req 8.1 (bitcode signaling)、requirements.md (Observability)、requirements.md (Security - log desensitization)_
+   - 实现生产级日志系统（`tracing` + `tracing-subscriber` + `tracing-appender`）：
+     - 结构化日志输出：JSON 格式（`RUST_LOG_FORMAT=json`，生产环境）和 pretty 格式（`RUST_LOG_FORMAT=pretty`，开发环境，默认）
+     - 日志同时输出到 stdout 和文件（`LOG_OUTPUT`：`stdout`/`file`/`both`，默认 `both`）
+     - 日志轮转策略（`tracing-appender::rolling`）：daily（默认）/hourly/never，文件命名 `server.log.YYYY-MM-DD`
+     - 日志文件保留与清理：最大文件数（`LOG_MAX_FILES`，默认 30）、最大目录大小（`LOG_MAX_SIZE_MB`，默认 500MB），超限自动清理最旧文件
+     - 日志目录配置（`LOG_DIR`，默认 `./logs/`）
+     - 日志级别策略：error/warn/info/debug/trace 五级，支持 per-module 级别覆盖（`RUST_LOG=info,backend::ws=debug`）
+     - 异步日志写入（`tracing-appender::non_blocking`），持有 `WorkerGuard` 直到关闭
+     - 优雅关闭时日志刷新：SIGTERM/SIGINT 信号处理，确保所有日志写入磁盘
+   - 实现日志脱敏：JWT token 脱敏（仅显示前 8 后 4 字符）、IP 掩码、密码不入日志、消息仅记录摘要
+   - 编写单元测试：WebSocket 连接生命周期、心跳超时、消息编解码、日志轮转配置解析
+   - _需求：Req 1.7 (Heartbeat)、Req 1.5 (Connection cleanup)、Req 8.1 (bitcode signaling)、requirements.md (Observability - Backend Logging System)、requirements.md (Security - log desensitization)_
 
 - [ ] 9. 实现用户认证与会话管理
    - 实现用户注册/登录：内存存储 `DashMap<UserId, UserSession>`、Argon2 密码哈希
@@ -238,6 +247,13 @@
      - `conversations: RwSignal<Vec<Conversation>>`（会话列表，含置顶/免打扰状态）
      - `active_conversation: RwSignal<Option<ConversationId>>`（当前活跃会话）
      - `network_quality: RwSignal<HashMap<UserId, NetworkQuality>>`（网络质量指标）
+   - 实现前端日志系统（Client-Side Debug Logs）：
+     - 定义日志级别：error/warn/info/debug/trace
+     - 非 debug 模式仅输出 error/warn 到 Console；debug 模式（`?debug=true` 或 `localStorage.debug_mode`）输出全部级别
+     - 支持 per-module 日志过滤（`localStorage.debug_filter`，如 `"webrtc,signaling"`）
+     - 实现内存环形缓冲区（Ring Buffer）：保留最近 1000 条日志（`localStorage.debug_buffer_size` 可配置），每条含 timestamp/level/module/message/data
+     - 实现 Debug 面板（`Ctrl/Cmd + Shift + D` 快捷键或 Settings → Data Management → Debug Logs 入口）：可滚动/可过滤的日志查看器，支持按级别/模块过滤、文本搜索、导出 JSON、清空缓冲区
+     - 实现诊断报告生成（Settings → Data Management → "Generate Diagnostic Report"）：浏览器信息、连接状态、性能指标、最近 50 条 error 日志、当前配置，不含敏感数据，下载为 `diagnostic-{timestamp}.json`
    - 实现原生 CSS 样式架构（不使用任何第三方 CSS 框架）：
      - 创建 CSS 文件组织结构：`/styles/tokens.css`（设计令牌）、`/styles/reset.css`（CSS Reset）、`/styles/base.css`（基础元素样式）、`/styles/components/*.css`（组件样式）、`/styles/utilities.css`（工具类）、`/styles/main.css`（入口，通过 `@layer` 和 `@import` 组织）
      - 使用 `@layer reset, tokens, base, components, utilities` 组织级联层
@@ -255,8 +271,8 @@
    - 实现主题系统（Light/Dark/System）：基于 CSS Custom Properties + `[data-theme]` 属性切换，200ms 过渡动画
    - 实现 `leptos-i18n` 国际化框架：加载 `/assets/i18n/{locale}.json`、语言切换、浏览器语言检测
    - 实现响应式布局框架：Desktop(≥1024px)/Tablet(768-1023px)/Mobile(<768px) 三档断点，使用 CSS Grid + Flexbox + `@container` + `@media` queries，`clamp()` 流式排版
-   - 编写单元测试：Signal 状态管理、主题切换、i18n 语言切换
-   - _需求：Req 14 (UI Interaction Design)、Req 14 Technical Implementation Notes (Native CSS Architecture)、requirements.md (Internationalization)、requirements.md (Performance - WASM bundle)_
+   - 编写单元测试：Signal 状态管理、主题切换、i18n 语言切换、日志 Ring Buffer 写入/溢出/过滤
+   - _需求：Req 14 (UI Interaction Design)、Req 14 Technical Implementation Notes (Native CSS Architecture)、requirements.md (Internationalization)、requirements.md (Performance - WASM bundle)、requirements.md (Observability - Frontend Logging System)_
 
 - [ ] 14. 实现 WebSocket 信令客户端与认证系统
    - 实现 WebSocket 连接管理：二进制模式、bitcode 消息编解码（调用 message crate WASM 接口）
@@ -295,21 +311,32 @@
    - 实现消息转发：转发目标选择 Modal、`ForwardMessage` 发送、转发消息展示（"Forwarded from" 头部）、禁止链式转发
    - 实现消息 Reaction：emoji 选择器、`MessageReaction` 发送/接收、toggle 行为、20 种 emoji 上限、IndexedDB 持久化
    - 实现消息回复引用：回复预览栏、`reply_to` 字段、引用消息块展示、点击跳转原消息、已撤回消息处理
-   - 编写单元测试：消息格式化、XSS 过滤、ACK 队列管理、Reaction 状态管理
+   - 实现消息列表滚动行为（Req 14.11）：
+     - Auto-Scroll：用户在底部（150px 内）时新消息自动滚动到底部（200ms smooth scroll）；用户发送消息时强制滚动到底部
+     - "New messages ↓" 浮动徽章：用户滚动到上方阅读历史时显示，展示未读计数，点击平滑滚动到底部（300ms）
+     - Scroll-to-Message 跳转导航：点击回复引用/搜索结果跳转到目标消息，高亮闪烁（1.5s 黄色渐隐），目标不在已加载范围时从 IndexedDB 加载周围消息（前 25 + 后 25）
+     - "↓ Back to latest" 浮动按钮：跳转到历史消息后显示，点击重新加载最新 50 条并滚动到底部
+     - 未读消息分隔线（Unread Divider）："── {N} New Messages ──" 分隔线，>50 条未读时滚动到分隔线位置而非底部
+   - 编写单元测试：消息格式化、XSS 过滤、ACK 队列管理、Reaction 状态管理、滚动位置判断逻辑
    - 编写 WASM 测试：IndexedDB 消息读写、消息编解码
-   - _需求：Req 2 (Chat System)、Req 11.3 (Message ACK)_
+   - _需求：Req 2 (Chat System)、Req 11.3 (Message ACK)、Req 14.11 (Message List Scrolling Behavior)_
 
 - [ ] 17. 实现消息持久化与离线支持
    - 实现 IndexedDB 存储层：消息表（含 Reaction 数据）、头像缓存表、搜索索引表、置顶会话表
-   - 实现消息历史加载：分页加载、虚拟滚动（Virtual Scrolling）
+   - 实现消息历史加载与虚拟滚动（Req 14.11.2 + 14.11.3）：
+     - Virtual Scrolling：>100 条消息激活虚拟滚动，仅渲染可视区域 + overscan buffer（上下各 3 条），DOM 节点回收
+     - 消息高度估算与缓存：按消息类型估算高度（text 可变、image 固定比例、voice ~60px、file ~80px、sticker ~120px），实际高度缓存到 `HashMap<MessageId, f64>`，高度修正不可感知
+     - 快速滚动占位符：momentum scroll 时使用 skeleton 占位，减速后替换为实际内容
+     - Infinite Scroll 历史加载：滚动到顶部加载 50 条旧消息、prepend 后保持滚动位置、防重复加载 debounce、"Beginning of conversation" 分隔线
+     - 切换会话时加载最近 50 条消息并滚动到底部
    - 实现消息搜索：当前会话/全局搜索、关键词模糊匹配、分页加载策略（每批 5000 条）、结果高亮、相关性排序
    - 实现轻量级倒排索引（>50000 条消息时自动构建，存储在 IndexedDB 独立 object store）
    - 实现未确认消息队列持久化与自动重发（DataChannel 重建后）
    - 实现消息去重（基于 message_id）
    - 实现 72 小时过期清理（可配置：24h/72h/7天）
    - 实现 IndexedDB 空间不足自动清理
-   - 编写 WASM 测试：IndexedDB CRUD、搜索性能（10000 条消息 < 500ms）、去重逻辑
-   - _需求：Req 11 (Persistence)、Req 7.6 (Message Search)_
+   - 编写 WASM 测试：IndexedDB CRUD、搜索性能（10000 条消息 < 500ms）、去重逻辑、虚拟滚动高度计算
+   - _需求：Req 11 (Persistence)、Req 7.6 (Message Search)、Req 14.11.2 (Virtual Scrolling)、Req 14.11.3 (Infinite Scroll)_
 
 - [ ] 18. 实现音视频通话与屏幕共享
    - 实现通话发起/接受/拒绝/结束流程（`CallInvite`/`CallAccept`/`CallDecline`/`CallEnd`）
@@ -381,23 +408,28 @@
    - 实现外观设置：主题切换（System/Light/Dark）、语言切换（中/英）、字号调节（小/中/大）
    - 实现隐私安全设置：黑名单管理入口、在线状态可见性、已读回执开关
    - 实现通知设置：消息通知开关、来电通知开关、免打扰时段
-   - 实现数据管理：清除聊天记录（选择性）、清除缓存（显示大小）、导出数据（JSON/HTML）
+   - 实现数据管理：清除聊天记录（选择性）、清除缓存（显示大小）、导出数据（JSON/HTML）、Debug Logs 入口（打开 Debug 面板）、"Generate Diagnostic Report" 按钮（生成诊断报告 JSON 下载）
    - 实现设置页 UI：侧边栏/抽屉布局、即时保存反馈、权限状态显示
    - 实现所有设置项的 localStorage 持久化与 Leptos Signal 响应式更新
-   - 编写单元测试：设置项持久化/恢复、数据导出格式
-   - _需求：Req 13 (Settings)_
+   - 编写单元测试：设置项持久化/恢复、数据导出格式、诊断报告生成（验证不含敏感数据）
+   - _需求：Req 13 (Settings)、requirements.md (Observability - Frontend Logging System - Diagnostic Report)_
 
 - [ ] 24. 实现 UI 交互细节与无障碍
    - 实现会话置顶/免打扰/归档：置顶排序（按置顶时间）、最多 5 个、IndexedDB 持久化、归档自动取消
    - 实现网络质量指示器 UI：4 格信号图标、hover 详细 tooltip、Poor 质量 toast 通知
    - 实现全局 "连接断开/重连中" Banner
    - 实现浏览器通知（Notification API）：新消息/来电通知
+   - 实现消息列表滚动性能优化（Req 14.11.6）：
+     - CSS `contain: content` 布局隔离、`content-visibility: auto` 离屏优化
+     - `will-change: transform` 仅在滚动时启用，空闲 2 秒后移除释放 GPU 内存
+     - 图片/媒体 aspect-ratio 占位防止布局偏移、`loading="lazy"` 懒加载
+     - 性能目标：滚动 FPS ≥ 55、新消息渲染 < 8ms、50 条历史 prepend < 50ms、DOM 节点 ≤ 200
    - 实现键盘导航：Tab 焦点移动、Escape 关闭弹窗、方向键列表导航
    - 实现 ARIA 标签：所有交互元素的 aria-label、aria-live 区域（新消息/来电）
    - 实现焦点指示器：所有可聚焦元素的 outline 样式
    - 实现颜色对比度：WCAG 2.1 AA 标准（正常文本 4.5:1、大文本 3:1）
    - 编写单元测试：置顶排序逻辑、通知权限检查
-   - _需求：Req 7.7 (Pinning/Archive)、Req 14.10 (Network Quality)、requirements.md (Accessibility)_
+   - _需求：Req 7.7 (Pinning/Archive)、Req 14.10 (Network Quality)、Req 14.11.6 (Scroll Performance Optimization)、requirements.md (Accessibility)_
 
 - [ ] **Phase 3 测试门禁**
    - 运行 `makers test-unit`：前端工具函数覆盖率 ≥ 80%

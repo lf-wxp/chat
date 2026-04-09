@@ -1031,13 +1031,186 @@
 
 ---
 
+## 14.11 Message List Scrolling Behavior
+
+### 14.11.1 Auto-Scroll & Scroll Position Management
+
+**User Story:** As a user, I want the message list to automatically scroll to show new messages when I'm at the bottom, but preserve my reading position when I'm scrolling through history, so that I can read messages without interruption.
+
+#### Acceptance Criteria
+
+1. WHEN the user is at or near the bottom of the message list (within 150px of the bottom edge) AND a new message arrives THEN the system SHALL:
+   - Automatically scroll to the bottom to reveal the new message
+   - Use a smooth scroll animation (duration: 200ms, easing: `ease-out`)
+   - The auto-scroll SHALL apply to both incoming messages from other users and messages sent by the current user
+
+2. WHEN the user has scrolled up to read older messages (more than 150px from the bottom edge) AND a new message arrives THEN the system SHALL:
+   - NOT auto-scroll the message list (preserve the user's current reading position)
+   - Display a floating "New messages ↓" badge/button at the bottom of the message list area
+   - The badge SHALL show the count of unread new messages since the user scrolled away (e.g., "3 new messages ↓")
+   - The badge SHALL use `@starting-style` for a slide-up entry animation (200ms)
+
+3. WHEN the user clicks the "New messages ↓" badge THEN the system SHALL:
+   - Smoothly scroll to the bottom of the message list (duration: 300ms, easing: `ease-in-out`)
+   - Dismiss the badge with a fade-out animation (150ms)
+   - Reset the unread new message counter
+
+4. WHEN the user manually scrolls to the bottom of the message list THEN the system SHALL:
+   - Dismiss the "New messages ↓" badge (if visible)
+   - Re-enable auto-scroll behavior for subsequent new messages
+
+5. WHEN the current user sends a message THEN the system SHALL:
+   - ALWAYS scroll to the bottom of the message list (regardless of current scroll position)
+   - Dismiss the "New messages ↓" badge (if visible)
+   - Use smooth scroll animation (200ms)
+
+---
+
+### 14.11.2 Virtual Scrolling (Virtualized List)
+
+**User Story:** As a user with a long chat history, I want the message list to remain performant even with thousands of messages, so that scrolling feels smooth and the app doesn't lag.
+
+#### Acceptance Criteria
+
+1. WHEN the message list contains more than 100 messages THEN the system SHALL activate virtual scrolling:
+   - Only render messages that are within the visible viewport plus an overscan buffer (3 items above and 3 items below the viewport)
+   - Maintain accurate scroll position and scrollbar size by calculating total content height from message height estimates
+   - Message height estimation SHALL account for different message types: text (variable height based on content length), image (fixed aspect ratio), voice (fixed height ~60px), file card (fixed height ~80px), sticker (fixed height ~120px)
+
+2. WHEN the user scrolls through the virtualized message list THEN the system SHALL:
+   - Render new messages entering the viewport within a single animation frame (< 16ms)
+   - Recycle DOM nodes for messages leaving the viewport (remove from DOM, not just hide)
+   - Maintain smooth 60fps scrolling performance (no jank or frame drops)
+   - Use `content-visibility: auto` on off-screen message containers for additional rendering optimization
+
+3. WHEN a message's actual rendered height differs from the estimated height THEN the system SHALL:
+   - Recalculate the total content height and adjust the scroll position to prevent visual jumps
+   - Cache the actual measured height for future renders (stored in a `HashMap<MessageId, f64>`)
+   - The height correction SHALL be imperceptible to the user (no visible scroll position shift)
+
+4. WHEN the user rapidly scrolls (flick/momentum scroll) THEN the system SHALL:
+   - Use placeholder elements (lightweight skeleton items) for messages that haven't been measured yet
+   - Replace placeholders with actual message content as scrolling decelerates
+   - Prioritize rendering messages closest to the viewport center
+
+---
+
+### 14.11.3 Infinite Scroll (History Loading)
+
+**User Story:** As a user, I want to load older messages by scrolling up, so that I can browse my complete chat history without manual pagination.
+
+#### Acceptance Criteria
+
+1. WHEN the user scrolls to the top of the message list THEN the system SHALL:
+   - Display a loading spinner at the top of the list (centered, 32px circular spinner)
+   - Load the next batch of older messages from IndexedDB (batch size: 50 messages)
+   - Prepend the loaded messages above the current messages
+   - Preserve the user's current scroll position (the message the user was reading SHALL remain at the same viewport position after new messages are prepended)
+
+2. WHEN older messages are being loaded THEN the system SHALL:
+   - Prevent duplicate load requests (debounce: ignore scroll-to-top events while a load is in progress)
+   - Show the loading spinner for a minimum of 200ms (to avoid flicker for fast IndexedDB reads)
+   - Animate new messages appearing with a subtle fade-in (opacity 0 → 1, 150ms)
+
+3. WHEN there are no more older messages to load THEN the system SHALL:
+   - Display a "Beginning of conversation" divider at the top of the message list
+   - The divider SHALL show the conversation start date (localized format)
+   - Stop triggering load requests on subsequent scroll-to-top events
+
+4. WHEN the user switches to a different room/conversation THEN the system SHALL:
+   - Load the most recent 50 messages from IndexedDB
+   - Scroll to the bottom of the message list
+   - Reset the infinite scroll state (allow loading older messages again)
+
+---
+
+### 14.11.4 Scroll-to-Message (Jump Navigation)
+
+**User Story:** As a user, I want to jump to a specific message (e.g., when clicking a reply quote, search result, or unread divider), so that I can quickly navigate to relevant context.
+
+#### Acceptance Criteria
+
+1. WHEN the user clicks a reply/quote block to jump to the original message THEN the system SHALL:
+   - IF the target message is within the currently loaded message range THEN scroll to the target message with smooth animation (300ms) and briefly highlight it (yellow flash background, fade out over 1.5 seconds)
+   - IF the target message is NOT in the currently loaded range THEN load messages from IndexedDB around the target message (25 messages before + 25 messages after), replace the current message list, scroll to the target message, and highlight it
+   - After jumping, display a floating "↓ Back to latest" button at the bottom to allow the user to return to the most recent messages
+
+2. WHEN the user clicks a search result to jump to a message THEN the system SHALL:
+   - Apply the same jump behavior as reply/quote navigation (load surrounding messages if needed)
+   - Highlight the search keyword within the target message text (yellow background on matched text)
+   - The keyword highlight SHALL persist until the user scrolls away or closes the search panel
+
+3. WHEN the user clicks the "↓ Back to latest" button THEN the system SHALL:
+   - Reload the most recent 50 messages (if the current view is showing historical messages)
+   - Scroll to the bottom of the message list
+   - Dismiss the "↓ Back to latest" button
+
+---
+
+### 14.11.5 Unread Message Divider
+
+**User Story:** As a user returning to a conversation, I want to see where new messages start, so that I can quickly catch up on what I missed.
+
+#### Acceptance Criteria
+
+1. WHEN the user opens a conversation that has unread messages THEN the system SHALL:
+   - Insert a visual "New Messages" divider line between the last read message and the first unread message
+   - The divider SHALL display: a horizontal line spanning the full width, with centered text "── {N} New Messages ──" (where N is the unread count)
+   - The divider SHALL use a distinct color (primary color or accent color) to stand out from regular message separators
+
+2. WHEN the user scrolls past the "New Messages" divider (all unread messages are now in the viewport or above) THEN the system SHALL:
+   - Mark all messages as read (trigger read receipt sending per Req 2.3b)
+   - Keep the divider visible in the message list (do not remove it) until the user leaves and re-enters the conversation
+
+3. WHEN the user opens a conversation with more than 50 unread messages THEN the system SHALL:
+   - Scroll to the "New Messages" divider position (not to the bottom)
+   - Allow the user to scroll down to see newer messages or scroll up to see context before the unread messages
+   - Display the "↓ {N} more new messages" badge at the bottom if there are unread messages below the viewport
+
+4. WHEN the user opens a conversation with 0 unread messages THEN the system SHALL:
+   - NOT display any "New Messages" divider
+   - Scroll to the bottom of the message list (most recent messages)
+
+---
+
+### 14.11.6 Scroll Performance Optimization
+
+**User Story:** As a user, I want smooth scrolling performance even in long conversations, so that the app feels responsive and native-like.
+
+#### Acceptance Criteria
+
+1. WHEN rendering the message list THEN the system SHALL apply the following performance optimizations:
+   - Use CSS `contain: content` on the message list container to create a layout containment boundary
+   - Use CSS `content-visibility: auto` on individual message items that are far from the viewport
+   - Use `will-change: transform` on the scroll container (only during active scrolling, remove after scroll ends to free GPU memory)
+   - Avoid forced synchronous layouts (no reading layout properties like `offsetHeight` immediately after DOM writes)
+
+2. WHEN images or media load within messages THEN the system SHALL:
+   - Reserve space for the media element using aspect-ratio-based placeholders (prevent layout shifts)
+   - Use `loading="lazy"` attribute for images outside the viewport
+   - WHEN an image finishes loading THEN the system SHALL NOT cause a scroll position jump (the reserved space SHALL match the actual image dimensions)
+
+3. WHEN the message list is idle (no scrolling for 2 seconds) THEN the system SHALL:
+   - Remove `will-change` hints from the scroll container
+   - Allow the browser to reclaim GPU memory for off-screen compositing layers
+   - Garbage-collect any orphaned message height cache entries (for messages no longer in IndexedDB)
+
+4. WHEN measuring scroll performance THEN the system SHALL meet the following targets:
+   - Message list scroll FPS: ≥ 55fps (measured via `requestAnimationFrame` timing)
+   - Time to render a new incoming message (append to bottom): < 8ms
+   - Time to prepend a batch of 50 historical messages (infinite scroll): < 50ms
+   - Maximum DOM node count in the message list: ≤ 200 nodes (enforced by virtual scrolling)
+
+---
+
 ## Relationship with Other Requirements
 
 - **Req 7 (UI & Theme)**: This document extends Req 7 with detailed component designs, interaction patterns, and animation specifications
-- **Req 2 (Chat)**: Chat message components (14.2.1-14.2.5) define the visual and interactive design for chat features
+- **Req 2 (Chat)**: Chat message components (14.2.1-14.2.5) define the visual and interactive design for chat features; message list scrolling behavior (14.11) defines auto-scroll, virtual scrolling, infinite scroll, and unread divider interactions
 - **Req 3 (AV Call)**: Call interface transitions (14.3.3) define the animations for audio/video calling
 - **Req 14 (Settings)**: Appearance settings in Req 14.2 allow users to customize theme and font size, which affects design tokens (14.7)
 - **Req 13 (Theater)**: Theater mode UI will follow the same component and animation principles defined in this document
+- **Req 11 (Persistence)**: Message list scrolling (14.11) depends on IndexedDB message storage for infinite scroll history loading and unread message tracking
 - **Icon System**: Section 14.8 defines the icon library (leptos-icons), usage guidelines, theming, accessibility, and performance optimization
 
 ---

@@ -159,7 +159,7 @@ graph TD
 
 ### Performance
 - The system SHALL support up to 8 simultaneous video call participants per room (Mesh topology limit)
-- The system SHALL use Virtual Scrolling to optimize rendering performance when message volume is high; message list rendering latency SHALL NOT exceed 16ms (60fps target)
+- The system SHALL use Virtual Scrolling to optimize rendering performance when message volume is high; message list rendering latency SHALL NOT exceed 16ms (60fps target); detailed scrolling behavior specification is defined in Req 14.11 (Message List Scrolling Behavior), including auto-scroll, virtual scrolling activation threshold, infinite scroll history loading, scroll-to-message navigation, unread message divider, and scroll performance optimization targets
 - The system SHALL ensure WASM bundle size is optimized via `opt-level=z` + LTO; initial WASM bundle size (gzipped) SHALL NOT exceed 500KB
 - The system SHALL ensure page first contentful paint (FCP) time is under 2 seconds on 4G network
 - The system SHALL use virtual list rendering when the online user list exceeds 100 users, to avoid excessive DOM nodes
@@ -268,6 +268,85 @@ graph TD
 - The client SHALL support an optional debug log mode (enabled via URL parameter `?debug=true` or localStorage toggle `debug_mode`), outputting structured logs to browser Console when enabled, including: WebRTC connection state changes, DataChannel open/close events, signaling message summaries (excluding encrypted content), ICE Candidate exchange process
 - The signaling server SHALL use the `tracing` crate for structured logging, including: user connect/disconnect events, signaling message routing, room create/destroy events, errors and exceptions
 - The signaling server SHALL support log level configuration via the `RUST_LOG` environment variable (default `info`)
+
+#### Backend Logging System (Structured Logging & Log Rotation)
+
+The signaling server SHALL implement a production-grade logging system with structured output and log rotation:
+
+##### Log Output Format
+- The server SHALL output logs in **JSON format** (structured logging) when running in production mode (`RUST_LOG_FORMAT=json`), and in **human-readable pretty format** when running in development mode (`RUST_LOG_FORMAT=pretty`, default)
+- Each log entry in JSON format SHALL include the following fields:
+  ```json
+  {
+    "timestamp": "2026-04-09T10:30:00.123Z",
+    "level": "INFO",
+    "target": "backend::ws::handler",
+    "message": "User connected",
+    "span": { "user_id": "abc123", "room_id": "room456" },
+    "fields": { "peer_addr": "192.168.x.x", "ws_protocol": "binary" }
+  }
+  ```
+- The server SHALL use `tracing-subscriber` with `fmt::Layer` for console output and `tracing-appender` for file output
+- The server SHALL support simultaneous output to both console (stdout) and log files (configurable via `LOG_OUTPUT` environment variable: `stdout`, `file`, `both`; default `both`)
+
+##### Log Rotation / Rolling Policy
+- The server SHALL implement **time-based log rotation** using `tracing-appender::rolling`:
+  - **Daily rotation** (default): A new log file is created every day at midnight UTC
+  - Log files SHALL be named with the pattern: `server.log.YYYY-MM-DD` (e.g., `server.log.2026-04-09`)
+  - The current active log file SHALL always be named `server.log`
+- The server SHALL support configurable rotation policy via the `LOG_ROTATION` environment variable:
+  - `daily` (default) — Rotate daily at midnight UTC
+  - `hourly` — Rotate every hour (for high-traffic debugging scenarios)
+  - `never` — No rotation (single log file, useful for containerized deployments where log aggregation is external)
+- The server SHALL implement **log file retention / cleanup**:
+  - Maximum number of retained log files SHALL be configurable via `LOG_MAX_FILES` environment variable (default: `30`)
+  - WHEN the number of log files exceeds `LOG_MAX_FILES` THEN the server SHALL delete the oldest log files at rotation time
+  - The server SHALL also support `LOG_MAX_SIZE_MB` (default: `500`) — WHEN total log directory size exceeds this limit THEN the oldest files SHALL be pruned regardless of file count
+- Log files SHALL be stored in a configurable directory via `LOG_DIR` environment variable (default: `./logs/`)
+
+##### Log Level Strategy
+- The server SHALL use the following default log level hierarchy:
+  - `error` — Unrecoverable errors, panics, critical failures (always logged)
+  - `warn` — Recoverable errors, deprecated usage, resource pressure warnings (e.g., PeerConnection count > 6)
+  - `info` — Key lifecycle events: user connect/disconnect, room create/destroy, authentication success/failure, signaling message routing summary
+  - `debug` — Detailed operational data: individual SDP/ICE message routing, WebSocket frame details, DashMap state changes
+  - `trace` — Extremely verbose: raw message bytes (redacted), timer ticks, internal state machine transitions
+- Per-module log level overrides SHALL be supported via `RUST_LOG` (e.g., `RUST_LOG=info,backend::ws=debug,backend::room=trace`)
+
+##### Graceful Shutdown & Log Flushing
+- WHEN the server receives a shutdown signal (SIGTERM/SIGINT) THEN it SHALL flush all pending log entries to disk before exiting
+- The server SHALL use `tracing-appender::non_blocking` for async log writing to avoid blocking the Tokio runtime, with a `WorkerGuard` held until shutdown to ensure all logs are flushed
+
+#### Frontend Logging System (Client-Side Debug Logs)
+
+The frontend SHALL implement a structured client-side logging system for debugging and diagnostics:
+
+##### Log Levels & Filtering
+- The frontend SHALL define log levels: `error`, `warn`, `info`, `debug`, `trace`
+- WHEN debug mode is disabled THEN only `error` and `warn` level logs SHALL be output to browser Console
+- WHEN debug mode is enabled (`?debug=true` or `localStorage.debug_mode = "true"`) THEN all log levels SHALL be output to browser Console
+- The frontend SHALL support per-module log filtering via `localStorage.debug_filter` (e.g., `"webrtc,signaling"` to only show logs from WebRTC and signaling modules)
+
+##### Log Ring Buffer (In-Memory)
+- The frontend SHALL maintain an in-memory **ring buffer** of the last 1000 log entries (configurable via `localStorage.debug_buffer_size`)
+- Each log entry in the ring buffer SHALL include: `timestamp`, `level`, `module`, `message`, `data` (optional structured context)
+- WHEN the user opens the debug panel (accessible via `Ctrl/Cmd + Shift + D` shortcut or Settings → Data Management → Debug Logs) THEN the system SHALL display the ring buffer contents in a scrollable, filterable log viewer
+- The debug log viewer SHALL support:
+  - Filtering by log level (checkboxes for error/warn/info/debug/trace)
+  - Filtering by module (dropdown with all modules that have emitted logs)
+  - Text search within log messages
+  - "Export Logs" button to download the ring buffer as a JSON file (for sharing with developers)
+  - "Clear Logs" button to reset the ring buffer
+
+##### Diagnostic Report
+- The frontend SHALL support generating a **diagnostic report** (accessible via Settings → Data Management → "Generate Diagnostic Report"):
+  - Browser info: user agent, viewport size, WebRTC support status
+  - Connection status: WebSocket state, active PeerConnection count, DataChannel states
+  - Performance metrics: memory usage (`performance.memory` if available), WASM heap size
+  - Recent errors: last 50 error-level log entries from the ring buffer
+  - Configuration: current settings (theme, language, notification permissions, debug mode)
+  - The diagnostic report SHALL NOT include any sensitive data (no JWT tokens, no message content, no encryption keys)
+  - The report SHALL be downloadable as a JSON file with filename `diagnostic-{timestamp}.json`
 
 ### Error Code Specification
 
@@ -418,7 +497,7 @@ All error responses (both frontend UI and backend signaling) SHALL use a unified
 ### Deployment & Operations
 - The project SHALL provide a `Dockerfile` using multi-stage build: Stage 1 builds the signaling server binary (Rust release build), Stage 2 builds the WASM frontend (via Trunk), Stage 3 produces a minimal runtime image (e.g., `debian-slim` or `distroless`) containing only the server binary and static frontend assets
 - The signaling server SHALL serve the built frontend static files (HTML/JS/WASM/CSS/assets) from a configurable directory (default `./dist/`), eliminating the need for a separate web server in production
-- The system SHALL support configuration via environment variables for: `PORT` (default 3000), `RUST_LOG` (default `info`), `JWT_SECRET` (required), `STUN_SERVERS` (comma-separated, default `stun:stun.l.google.com:19302`), `TURN_SERVERS` (optional), `TLS_CERT_PATH` and `TLS_KEY_PATH` (optional, for HTTPS/WSS)
+- The system SHALL support configuration via environment variables for: `PORT` (default 3000), `RUST_LOG` (default `info`), `JWT_SECRET` (required), `STUN_SERVERS` (comma-separated, default `stun:stun.l.google.com:19302`), `TURN_SERVERS` (optional), `TLS_CERT_PATH` and `TLS_KEY_PATH` (optional, for HTTPS/WSS), `RUST_LOG_FORMAT` (`json` or `pretty`, default `pretty`), `LOG_OUTPUT` (`stdout`, `file`, or `both`, default `both`), `LOG_ROTATION` (`daily`, `hourly`, or `never`, default `daily`), `LOG_DIR` (default `./logs/`), `LOG_MAX_FILES` (default `30`), `LOG_MAX_SIZE_MB` (default `500`)
 - IF `TLS_CERT_PATH` and `TLS_KEY_PATH` are provided THEN the signaling server SHALL serve over HTTPS/WSS directly; otherwise the system SHALL document the recommended reverse proxy setup (e.g., Nginx/Caddy) for TLS termination
 - The `Makefile.toml` SHALL include a `makers docker` task that builds the production Docker image
 - The project SHALL include a `docker-compose.yml` for local development/testing with the signaling server
