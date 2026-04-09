@@ -5,12 +5,13 @@
 
 ### ⛔ 全局任务完成门禁（适用于每一个任务项）
 
-**每个任务完成前，必须依次通过以下四项检查，全部零错误/零警告后方可进入下一个任务：**
+**每个任务完成前，必须依次通过以下五项检查，全部零错误/零警告后方可进入下一个任务：**
 
 1. `cargo fmt --check` — 代码格式检查（基于项目根目录 `rustfmt.toml`：2-space indent, 100 char width, edition 2024）
 2. `cargo check` — 编译检查零错误
 3. `cargo clippy -- -D warnings` — Clippy 零警告（所有警告视为错误）
 4. `cargo test` — 所有测试通过
+5. **代码注释语言检查** — 所有代码注释、docstrings、错误提示信息必须使用纯英文，禁止中文字符（硬性要求，无例外）
 
 > **⚠️ Rust 编译耗时注意事项**
 >
@@ -74,7 +75,7 @@
 > 公共库是前后端共享的基础，必须最先完成并充分测试。所有消息类型、协议定义、序列化/反序列化逻辑都在此层实现。
 
 - [ ] 1. 初始化 Workspace 项目结构与 cargo-make 配置
-   - 创建 Rust Workspace，包含 `message`、`server`、`frontend` 三个 crate
+   - 创建 Rust Workspace，包含 `message`、`server`、`frontend` 三个 crate, 就在当前目录创建，不用嵌套目录创建
    - 编写 `Makefile.toml`，定义 `dev`、`build`、`test`、`test-unit`、`test-integration`、`test-wasm`、`test-e2e`、`lint`、`fmt`、`clean`、`docker` 等任务及依赖关系
    - 配置 `message` crate 支持双目标编译（native + `wasm32-unknown-unknown`），使用条件编译 `#[cfg(target_arch = "wasm32")]`
    - **所有 crate 依赖必须使用当前最新稳定版本**（硬性要求，无例外）：每个依赖须查阅 [crates.io](https://crates.io) 确认最新稳定版，版本号使用 caret 语法（如 `tokio = "1.44"`）

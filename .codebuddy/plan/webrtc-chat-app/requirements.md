@@ -194,6 +194,15 @@ graph TD
 - The system SHALL write unit tests for all new features
 - The system SHALL use cargo-make for unified task management
 
+#### Code Documentation Standards
+- **All code comments SHALL be written in English only** — this is a hard requirement with no exceptions, applying to all crates (message, server, frontend) and all file types (.rs, .toml, .css, .md, .json, etc.)
+- **All docstrings (Rust `///` and `//!` documentation comments) SHALL be written in English only**
+- **All inline comments (`//`) SHALL be written in English only**
+- **All error messages in code SHALL be written in English** — user-facing error messages SHALL additionally support i18n via the error code system (see Error Code Specification), but the source code error strings SHALL be in English
+- **All commit messages SHALL be written in English only**
+- **All variable names, function names, type names, and other identifiers SHALL use English words** — no Pinyin or non-ASCII characters in identifiers
+- This policy ensures code readability and maintainability across international development teams and aligns with Rust community conventions
+
 ### Build & Task Management (cargo-make)
 - The project SHALL use `cargo-make` (`Makefile.toml`) as the unified task runner for all development, build, test, and deployment workflows
 - The `Makefile.toml` SHALL define at minimum the following tasks:
