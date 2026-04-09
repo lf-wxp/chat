@@ -1,7 +1,7 @@
 # 实施计划 — WebRTC Multi-User Chat Application (Rust Full-Stack)
 
 > **分层策略**: 公共库 → 后端服务 → 前端 → 整合联调
-> 每一层完成所有类型的测试后再进入下一层，确保每层的质量可控。
+> 每一层完成所有类型的测试后就是停止当前进度， 等待用户确认后。 再进入下一层，确保每层的质量可控。
 
 ### ⛔ 全局任务完成门禁（适用于每一个任务项）
 
@@ -75,7 +75,7 @@
 > 公共库是前后端共享的基础，必须最先完成并充分测试。所有消息类型、协议定义、序列化/反序列化逻辑都在此层实现。
 
 - [ ] 1. 初始化 Workspace 项目结构与 cargo-make 配置
-   - 创建 Rust Workspace，包含 `message`、`server`、`frontend` 三个 crate, 就在当前目录创建，不用嵌套目录创建
+   - 创建 Rust Workspace，包含 `message`、`server`、`frontend` 三个 crate, 就在当前目录创建，不用嵌套目录创建, 不是crates/backend, crates/message, crates/frontend,就是 backend， message， frontend 三个目录
    - 编写 `Makefile.toml`，定义 `dev`、`build`、`test`、`test-unit`、`test-integration`、`test-wasm`、`test-e2e`、`lint`、`fmt`、`clean`、`docker` 等任务及依赖关系
    - 配置 `message` crate 支持双目标编译（native + `wasm32-unknown-unknown`），使用条件编译 `#[cfg(target_arch = "wasm32")]`
    - **所有 crate 依赖必须使用当前最新稳定版本**（硬性要求，无例外）：每个依赖须查阅 [crates.io](https://crates.io) 确认最新稳定版，版本号使用 caret 语法（如 `tokio = "1.44"`）

@@ -13,6 +13,7 @@
 		"Ecdh",
 		"Flexbox",
 		"gloo",
+		"idents",
 		"indexmap",
 		"jsonwebtoken",
 		"leptos",
