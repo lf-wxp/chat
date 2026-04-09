@@ -25,6 +25,10 @@ Core objectives include:
 >
 > **Participant Limit:** Both Chat rooms and Theater rooms are limited to a maximum of 8 participants. This unified limit simplifies the architecture by eliminating the need for dual transport paths (DataChannel P2P + WebSocket relay) and ensures all messages benefit from end-to-end encryption.
 
+### Project Directory
+
+The project resides in the current working directory (repository root). All crate paths, configuration files, and build outputs are relative to this root.
+
 ### Tech Stack Constraints
 
 | Layer | Technology | Notes |
@@ -41,11 +45,38 @@ Core objectives include:
 | Testing | wasm-pack test + cargo test + Playwright | Unit / Integration / E2E testing |
 
 #### Crate Dependency Version Policy
-- All crate dependencies in `Cargo.toml` SHALL use the **latest stable version** available at the time of implementation
-- When adding a new dependency, the developer SHALL check [crates.io](https://crates.io) for the latest stable release and use that version
+- **All crate dependencies in `Cargo.toml` SHALL use the latest stable version** available at the time of implementation — this is a hard requirement, no exceptions
+- When adding a new dependency, the developer SHALL check [crates.io](https://crates.io) for the latest stable release and use that exact version
 - Version specifiers SHALL use the caret (`^`) syntax (e.g., `tokio = "1.44"`) to allow compatible patch updates while pinning the minor version
 - `Cargo.lock` SHALL be committed to version control to ensure reproducible builds
 - WASM-compatible crates SHALL be verified to support `wasm32-unknown-unknown` target before adoption
+- Before starting implementation of each task, the developer SHALL verify that all existing dependencies are still at their latest stable versions and update if necessary
+
+#### Code Formatting (rustfmt)
+- The project SHALL use the existing `rustfmt.toml` at the repository root as the single source of truth for code formatting
+- The `rustfmt.toml` configuration is as follows and SHALL NOT be modified without explicit approval:
+  ```toml
+  max_width = 100
+  hard_tabs = false
+  tab_spaces = 2
+  newline_style = "Auto"
+  use_small_heuristics = "Default"
+  reorder_imports = true
+  reorder_modules = true
+  remove_nested_parens = true
+  edition = "2024"
+  merge_derives = true
+  use_try_shorthand = false
+  use_field_init_shorthand = false
+  force_explicit_abi = true
+  ```
+- Key formatting rules derived from this config:
+  - **2-space indentation** (soft tabs, no hard tabs)
+  - **100-character max line width**
+  - **Imports and modules are auto-reordered** alphabetically
+  - **Rust Edition 2024** formatting rules apply
+- All code SHALL pass `cargo fmt --check` before committing
+- The `makers fmt` task SHALL run `cargo fmt --all` using this configuration
 
 ---
 
