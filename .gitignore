@@ -1,1 +1,55 @@
-/target
+# Rust build artifacts
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# WASM build artifacts
+/pkg/
+/dist/
+*.wasm
+
+# Node modules (if any frontend tooling uses it)
+node_modules/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Log files
+/logs/
+*.log
+
+# Debug files
+/debug/
+
+# Test coverage
+/coverage/
+*.profraw
+*.profdata
+
+# Documentation build
+/doc/
+
+# Temporary files
+/tmp/
+*.tmp
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+
+# Docker volumes (if using local mounts)
+/docker-volumes/

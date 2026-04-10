@@ -1,0 +1,120 @@
+[workspace]
+resolver = "2"
+members = ["message", "server", "frontend"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+authors = ["WebRTC Chat Team"]
+license = "MIT"
+repository = "https://github.com/webrtc-chat/webrtc-chat"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.51.1", features = ["full"] }
+
+# Web framework
+axum = { version = "0.8.8", features = ["ws", "macros"] }
+axum-extra = { version = "0.12.5", features = ["typed-header"] }
+tower = { version = "0.5.3", features = ["util"] }
+tower-http = { version = "0.6.8", features = ["fs", "cors", "trace"] }
+
+# Serialization
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+bitcode = { version = "0.6.9", features = ["serde", "uuid"] }
+
+# Frontend framework (WASM)
+leptos = "0.8.17"
+leptos_router = "0.8"
+leptos_meta = "0.8"
+leptos_i18n = "0.6.1"
+
+# WASM bindings
+wasm-bindgen = "0.2.117"
+wasm-bindgen-futures = "0.4.67"
+js-sys = "0.3.94"
+web-sys = "0.3.94"
+
+# Logging and tracing
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
+tracing-appender = "0.2.4"
+
+# Error handling
+thiserror = "2.0.18"
+anyhow = "1.0.102"
+
+# UUID and identifiers
+uuid = { version = "1.23.0", features = ["v4", "v5", "serde"] }
+
+# Cryptography
+argon2 = { version = "0.5.3", features = ["std"] }
+rand = "0.10.0"
+getrandom = { version = "0.4.2", features = ["wasm_js"] }
+jsonwebtoken = { version = "10.3.0", features = ["aws_lc_rs"] }
+hmac = "0.13.0"
+sha2 = "0.11.0"
+base64 = "0.22.1"
+# Data structures
+dashmap = "6.1"
+indexmap = "2.13.1"
+smallvec = { version = "1.15.1", features = ["serde"] }
+
+# Time handling
+chrono = { version = "0.4.44", features = ["serde"] }
+time = "0.3.47"
+
+# Validation
+validator = { version = "0.20", features = ["derive"] }
+
+# Async utilities
+futures = "0.3.32"
+async-trait = "0.1.89"
+pin-project-lite = "0.2.17"
+
+# Testing
+wasm-bindgen-test = "0.3.67"
+proptest = "1.11.0"
+criterion = "0.8.2"
+tokio-tungstenite = "0.29.0"
+
+# Build tools
+trunk = "0.21.14"
+
+[workspace.lints.rust]
+missing_docs = "warn"
+rust_2018_idioms = "warn"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+return_self_not_must_use = "allow"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.release.package.frontend]
+opt-level = "z"
+
+[profile.bench]
+inherits = "release"
+debug = true
+strip = false
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.dev.package."*"]
+opt-level = 3

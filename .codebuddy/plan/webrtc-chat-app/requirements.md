@@ -20,6 +20,7 @@ Core objectives include:
 13. **Settings Page** ([req-13-settings.md](./req-13-settings.md)) — Unified settings management for audio/video, appearance, privacy, notifications, and data
 14. **UI Interaction Design** ([req-14-ui-interaction.md](./req-14-ui-interaction.md)) — Comprehensive UI/UX design specification including responsive layout & theme switching
 15. **User Profile Management & Unified Room Permission System** ([req-15-profile-permissions.md](./req-15-profile-permissions.md)) — User nickname customization, room announcement management, unified administrator role with moderation powers for both Chat & Theater rooms, room member search
+16. **E2E Messaging Test** ([req-16-e2e-messaging-test.md](./req-16-e2e-messaging-test.md)) — Comprehensive Playwright-based E2E tests covering registration, invitation, text/rich messaging, message actions, persistence, file transfer, multi-user chat, theme/a11y, and E2EE verification
 
 > **Architecture Constraint:** WebSocket is used **only** for signaling communication (SDP exchange, ICE Candidate, user status sync, room management, and other control-plane messages). All chat messages (text, Sticker, voice, image) and file transfers go through WebRTC DataChannel for P2P transport, never relayed by the server. **Exception:** The signaling server (Axum) also serves as a static resource host for Sticker assets (under `/assets/stickers/`), which are loaded by clients via HTTP — this is a deliberate design choice to keep the deployment simple (single server binary), and does not violate the "signaling only" constraint since Sticker resources are static files, not real-time message relay.
 >
@@ -111,6 +112,13 @@ graph TD
     R10 --> R15
     R15 -.-> R2
     R15 -.-> R14
+    R2 --> R16["Req 16: E2E Messaging Test"]
+    R5 --> R16
+    R6 --> R16
+    R9 --> R16
+    R10 --> R16
+    R11 --> R16
+    R14 -.-> R16
 
     style R1 fill:#4A90D9,color:#fff
     style R8 fill:#4A90D9,color:#fff
@@ -127,9 +135,10 @@ graph TD
     style R13 fill:#9B59B6,color:#fff
     style R14 fill:#9B59B6,color:#fff
     style R15 fill:#F5A623,color:#fff
+    style R16 fill:#7F8C8D,color:#fff
 ```
 
-> **Legend:** Blue = Infrastructure layer, Green = Feature layer, Orange = Session/State management, Red = Advanced features. Solid arrows = hard dependency (must implement first), Dashed arrows = soft dependency (UI integration).
+> **Legend:** Blue = Infrastructure layer, Green = Feature layer, Orange = Session/State management, Red = Advanced features, Gray = Testing. Solid arrows = hard dependency (must implement first), Dashed arrows = soft dependency (UI integration).
 
 ---
 
@@ -152,6 +161,7 @@ graph TD
 | 13 | Settings Page | Unified settings management for audio/video devices, appearance, privacy, notifications, and data management | [req-13-settings.md](./req-13-settings.md) |
 | 14 | UI Interaction Design | Comprehensive UI/UX design specification: responsive design (desktop/tablet/mobile), theme switching (auto/manual), page layout, component designs, interaction flows, animations, gestures, design tokens, network quality indicator | [req-14-ui-interaction.md](./req-14-ui-interaction.md) |
 | 15 | User Profile Management & Unified Room Permission System | User nickname customization, room announcement management, unified administrator role with moderation powers (applies to both Chat & Theater rooms), room member search | [req-15-profile-permissions.md](./req-15-profile-permissions.md) |
+| 16 | E2E Messaging Test | Playwright-based E2E tests: registration/login, connection invitation, text/rich messaging, message actions (reply/quote/revoke/forward/reaction), conversation list, persistence, file transfer, multi-user chat, scrolling, theme/a11y, E2EE verification | [req-16-e2e-messaging-test.md](./req-16-e2e-messaging-test.md) |
 
 ---
 
@@ -647,6 +657,7 @@ The requirements document set is **comprehensive, well-structured, and of high q
 | Settings | ✅ Complete | AV, appearance, privacy, notifications, data |
 | UI/UX Design | ✅ Excellent | Responsive, themes, animations, icons, a11y |
 | Profile & Permissions | ✅ Complete | Nickname, announcements, unified admin role |
+| E2E Messaging Test | ✅ Complete | 20 test scenarios covering full chat user journey (Req 16) |
 | Error Handling | ✅ Complete | Error codes, i18n, degradation strategies |
 | Non-Functional | ✅ Complete | Performance, security, testing, deployment |
 | Read Receipts | ✅ Complete | Functional spec added to Req 2, DataChannel message type defined in Req 8 |

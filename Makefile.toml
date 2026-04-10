@@ -1,0 +1,250 @@
+# Makefile.toml - Task runner for WebRTC Chat Application
+# Uses cargo-make (makers) for task management
+
+[config]
+skip_core_tasks = true
+
+[env]
+CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = true
+
+# Default task
+[tasks.default]
+dependencies = ["dev"]
+
+# ============================================================================
+# Development Tasks
+# ============================================================================
+
+[tasks.dev]
+description = "Start development environment (backend server)"
+dependencies = ["build-message"]
+run_task = { name = "run-server" }
+
+[tasks.run-server]
+description = "Run the backend server"
+cwd = "server"
+command = "cargo"
+args = ["run"]
+
+[tasks.run-frontend]
+description = "Start the frontend development server with Trunk"
+cwd = "frontend"
+command = "trunk"
+args = ["serve", "--open"]
+
+# ============================================================================
+# Build Tasks
+# ============================================================================
+
+[tasks.build]
+description = "Build all workspace members"
+dependencies = ["build-message", "build-server", "build-frontend"]
+
+[tasks.build-message]
+description = "Build the message crate"
+cwd = "message"
+command = "cargo"
+args = ["build"]
+
+[tasks.build-server]
+description = "Build the server crate"
+cwd = "server"
+command = "cargo"
+args = ["build"]
+
+[tasks.build-frontend]
+description = "Build the frontend crate"
+cwd = "frontend"
+command = "trunk"
+args = ["build"]
+
+[tasks.build-release]
+description = "Build all workspace members in release mode"
+dependencies = ["build-message-release", "build-server-release", "build-frontend-release"]
+
+[tasks.build-message-release]
+description = "Build the message crate in release mode"
+cwd = "message"
+command = "cargo"
+args = ["build", "--release"]
+
+[tasks.build-server-release]
+description = "Build the server crate in release mode"
+cwd = "server"
+command = "cargo"
+args = ["build", "--release"]
+
+[tasks.build-frontend-release]
+description = "Build the frontend crate in release mode"
+cwd = "frontend"
+command = "trunk"
+args = ["build", "--release"]
+
+# ============================================================================
+# Test Tasks
+# ============================================================================
+
+[tasks.test]
+description = "Run all tests (unit + integration)"
+workspace = false
+dependencies = ["test-unit", "test-integration", "test-wasm"]
+
+[tasks.test-unit]
+description = "Run unit tests for all workspace members"
+workspace = false
+command = "cargo"
+args = ["test", "--lib"]
+
+[tasks.test-integration]
+description = "Run integration tests"
+workspace = false
+command = "cargo"
+args = ["test", "--test", "*"]
+ignore_errors = true
+
+[tasks.test-wasm]
+description = "Run WASM tests for message crate"
+workspace = false
+cwd = "message"
+command = "wasm-pack"
+args = ["test", "--node"]
+
+[tasks.test-wasm-frontend]
+description = "Run WASM tests for frontend crate"
+workspace = false
+cwd = "frontend"
+command = "wasm-pack"
+args = ["test", "--node"]
+
+# ============================================================================
+# Lint Tasks
+# ============================================================================
+
+[tasks.lint]
+description = "Run all linting checks (fmt + clippy)"
+dependencies = ["fmt-check", "clippy"]
+
+[tasks.fmt]
+description = "Format all code"
+command = "cargo"
+args = ["fmt", "--all"]
+
+[tasks.fmt-check]
+description = "Check code formatting"
+command = "cargo"
+args = ["fmt", "--all", "--check"]
+
+[tasks.clippy]
+description = "Run Clippy with pedantic warnings"
+command = "cargo"
+args = ["clippy", "--all-targets", "--all-features", "--", "-D", "warnings"]
+
+# ============================================================================
+# Clean Tasks
+# ============================================================================
+
+[tasks.clean]
+description = "Clean all build artifacts"
+command = "cargo"
+args = ["clean"]
+
+[tasks.clean-frontend]
+description = "Clean frontend build artifacts"
+cwd = "frontend"
+command = "trunk"
+args = ["clean"]
+
+# ============================================================================
+# Docker Tasks
+# ============================================================================
+
+[tasks.docker]
+description = "Build Docker image"
+command = "docker"
+args = ["build", "-t", "webrtc-chat:latest", "."]
+
+[tasks.docker-compose]
+description = "Run with docker-compose"
+command = "docker-compose"
+args = ["up", "-d"]
+
+[tasks.docker-stop]
+description = "Stop docker-compose services"
+command = "docker-compose"
+args = ["down"]
+
+# ============================================================================
+# WASM Tasks
+# ============================================================================
+
+[tasks.wasm-pack-message]
+description = "Build message crate as WASM package"
+cwd = "message"
+command = "wasm-pack"
+args = ["build", "--target", "web"]
+
+[tasks.wasm-pack-frontend]
+description = "Build frontend crate as WASM package"
+cwd = "frontend"
+command = "wasm-pack"
+args = ["build", "--target", "web"]
+
+# ============================================================================
+# Quality Gates
+# ============================================================================
+
+[tasks.check-all]
+description = "Run all quality gates (fmt-check + check + clippy + test)"
+dependencies = ["fmt-check", "check", "clippy", "test-unit"]
+
+[tasks.check]
+description = "Run cargo check for all workspace members"
+command = "cargo"
+args = ["check", "--all"]
+
+# ============================================================================
+# Documentation
+# ============================================================================
+
+[tasks.docs]
+description = "Generate documentation"
+command = "cargo"
+args = ["doc", "--no-deps", "--open"]
+
+[tasks.docs-all]
+description = "Generate documentation with dependencies"
+command = "cargo"
+args = ["doc", "--open"]
+
+# ============================================================================
+# Watch Tasks
+# ============================================================================
+
+[tasks.watch-server]
+description = "Watch and rebuild server on changes"
+cwd = "server"
+command = "cargo"
+args = ["watch", "-x", "run"]
+
+[tasks.watch-frontend]
+description = "Watch and rebuild frontend on changes"
+cwd = "frontend"
+command = "trunk"
+args = ["serve"]
+
+# ============================================================================
+# Benchmark Tasks
+# ============================================================================
+
+[tasks.bench]
+description = "Run benchmarks"
+command = "cargo"
+args = ["bench"]
+
+# ============================================================================
+# CI Tasks
+# ============================================================================
+
+[tasks.ci]
+description = "Run all CI checks"
+dependencies = ["fmt-check", "check", "clippy", "test-unit", "build"]

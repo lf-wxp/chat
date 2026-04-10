@@ -74,7 +74,7 @@
 
 > 公共库是前后端共享的基础，必须最先完成并充分测试。所有消息类型、协议定义、序列化/反序列化逻辑都在此层实现。
 
-- [ ] 1. 初始化 Workspace 项目结构与 cargo-make 配置
+- [x] 1. 初始化 Workspace 项目结构与 cargo-make 配置
    - 创建 Rust Workspace，包含 `message`、`server`、`frontend` 三个 crate, 就在当前目录创建，不用嵌套目录创建, 不是crates/backend, crates/message, crates/frontend,就是 backend， message， frontend 三个目录
    - 编写 `Makefile.toml`，定义 `dev`、`build`、`test`、`test-unit`、`test-integration`、`test-wasm`、`test-e2e`、`lint`、`fmt`、`clean`、`docker` 等任务及依赖关系
    - 配置 `message` crate 支持双目标编译（native + `wasm32-unknown-unknown`），使用条件编译 `#[cfg(target_arch = "wasm32")]`
@@ -83,7 +83,7 @@
    - 配置 Clippy pedantic 规则，确保零警告
    - _需求：requirements.md 非功能需求 (Build & Task Management, Crate Dependency Version Policy, Code Formatting)、Req 8 (WASM Compatibility Requirements)_
 
-- [ ] 2. 实现核心数据类型与枚举定义
+- [x] 2. 实现核心数据类型与枚举定义
    - 定义所有基础类型：`UserId`、`RoomId`、`MessageId (Uuid)`、`TransferId`
    - 定义所有枚举：`UserStatus`、`RoomType`、`MediaType`、`DanmakuPosition`、`MessageContentType`、`ReactionAction`、`MuteInfo`、`RoomRole (Owner/Admin/Member)`
    - 定义所有结构体：`UserInfo`、`RoomInfo`、`MemberInfo`、`ImageMeta`、`SubtitleEntry`、`NetworkQuality`
@@ -91,7 +91,7 @@
    - 编写单元测试：每个类型的序列化/反序列化 roundtrip 测试
    - _需求：Req 8.5、Req 8.6、Req 4.1 (RoomType)、Req 15.3 (RoomRole)、Req 3.8b (NetworkQuality)_
 
-- [ ] 3. 实现信令消息类型（WebSocket 消息）
+- [x] 3. 实现信令消息类型（WebSocket 消息）
    - 实现所有信令消息枚举及其 payload 结构体：
      - 连接认证：`TokenAuth`、`AuthSuccess`、`AuthFailure`、`ErrorResponse`、`UserLogout`、`Ping`、`Pong`
      - 用户发现：`UserListUpdate`、`UserStatusChange`
@@ -106,7 +106,7 @@
    - 编写单元测试：所有信令消息的 encode/decode roundtrip，验证 discriminator 值正确
    - _需求：Req 8 (Signaling Message Type Catalog)、Req 8 (Message Type Mapping)_
 
-- [ ] 4. 实现 DataChannel 消息类型（P2P 消息）
+- [x] 4. 实现 DataChannel 消息类型（P2P 消息）
    - 实现所有 DataChannel 消息枚举及其 payload 结构体：
      - 聊天消息：`ChatText`、`ChatSticker`、`ChatVoice`、`ChatImage`
      - 文件传输：`FileChunk`、`FileMetadata`
@@ -119,7 +119,7 @@
    - 编写单元测试：所有 DataChannel 消息的 encode/decode roundtrip
    - _需求：Req 8 (DataChannel Message Types)、Req 2.13 (ForwardMessage)、Req 2.14 (MessageReaction)、Req 12.4a (SubtitleData/SubtitleClear)_
 
-- [ ] 5. 实现二进制协议帧结构与大消息分片
+- [x] 5. 实现二进制协议帧结构与大消息分片
    - 实现 Message Frame 结构：Magic Number (0xBCBC) + Message Type (1 byte) + Payload
    - 实现 `encode_frame()` 和 `decode_frame()` 函数，包含 Magic Number 校验
    - 实现大消息分片协议（>64KB 自动分片）：分片头（message_id + total_size + chunk_index + chunk_data）
@@ -128,7 +128,7 @@
    - 编写单元测试：帧编解码、大消息分片/重组、bitmap 操作、超时清理、边界条件
    - _需求：Req 8 (Binary Protocol Specification)、Req 8 (Large Message Chunking Protocol)、Req 8 (File Transfer Protocol)_
 
-- [ ] 6. 实现统一错误码系统与 i18n 键映射
+- [x] 6. 实现统一错误码系统与 i18n 键映射
    - 定义 `ErrorCode` 枚举，包含所有错误码（SIG001-SYS301、ROM104-ROM108、CHT103-CHT105、THR103-THR104）
    - 实现 `ErrorResponse` 结构体（code、message、i18n_key、details、timestamp、trace_id）
    - 实现错误码到 i18n 键的映射函数
@@ -136,7 +136,7 @@
    - 编写单元测试：所有错误码映射、所有验证函数的正向/反向测试
    - _需求：requirements.md (Error Code Specification)、requirements.md (Security - XSS protection)、Req 15.1 (Nickname validation)_
 
-- [ ] 7. 实现 WASM 兼容层与 wasm-bindgen 接口
+- [x] 7. 实现 WASM 兼容层与 wasm-bindgen 接口
    - 为 `message` crate 添加 `wasm-bindgen` feature gate
    - 实现 `#[wasm_bindgen]` 导出的 `encode_message()` 和 `decode_message()` 函数
    - 实现 ArrayBuffer ↔ `Vec<u8>` 的零拷贝转换
@@ -145,7 +145,7 @@
    - 验证 `bitcode` crate 的 WASM 兼容性
    - _需求：Req 8 (WASM Binary Parsing Implementation)、Req 8 (WASM Interface Requirements)_
 
-- [ ] **Phase 1 测试门禁**
+- [x] **Phase 1 测试门禁**
    - 运行 `makers test-unit`：message crate 单元测试覆盖率 ≥ 90%
    - 运行 `makers test-wasm`：所有 WASM 测试通过（wasm-pack test --headless --chrome）
    - 运行 `makers lint`：Clippy pedantic 零警告 + cargo fmt 检查通过
@@ -157,7 +157,7 @@
 
 > 后端信令服务器负责 WebSocket 连接管理、信令转发、房间管理、用户认证等。不处理聊天消息（聊天走 DataChannel P2P）。
 
-- [ ] 8. 实现 Axum 服务器基础框架与 WebSocket 连接管理
+- [x] 8. 实现 Axum 服务器基础框架与 WebSocket 连接管理
    - 搭建 Axum HTTP/WebSocket 服务器，支持环境变量配置（PORT、RUST_LOG、JWT_SECRET、STUN/TURN_SERVERS、TLS 路径、RUST_LOG_FORMAT、LOG_OUTPUT、LOG_ROTATION、LOG_DIR、LOG_MAX_FILES、LOG_MAX_SIZE_MB）
    - 实现 WebSocket 连接处理：二进制模式、bitcode 消息解码/编码（复用 message crate）
    - 实现心跳检测机制（Ping/Pong），超时断开
@@ -176,7 +176,7 @@
    - 编写单元测试：WebSocket 连接生命周期、心跳超时、消息编解码、日志轮转配置解析
    - _需求：Req 1.7 (Heartbeat)、Req 1.5 (Connection cleanup)、Req 8.1 (bitcode signaling)、requirements.md (Observability - Backend Logging System)、requirements.md (Security - log desensitization)_
 
-- [ ] 9. 实现用户认证与会话管理
+- [x] 9. 实现用户认证与会话管理
    - 实现用户注册/登录：内存存储 `DashMap<UserId, UserSession>`、Argon2 密码哈希
    - 实现 JWT Token 生成与验证（AES 加密用户数据）
    - 实现 `TokenAuth` 信令处理：页面刷新后的无状态认证恢复

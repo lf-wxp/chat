@@ -1,0 +1,21 @@
+[build]
+target = "index.html"
+dist = "dist"
+public_url = "/"
+
+[watch]
+watch = ["src", "index.html", "styles"]
+
+[serve]
+address = "127.0.0.1"
+port = 8080
+open = false
+
+[tools]
+sass = "1.77"
+wasm_bindgen = "0.2"
+
+[[hooks]]
+stage = "post_build"
+command = "echo"
+arguments = ["Frontend build complete"]

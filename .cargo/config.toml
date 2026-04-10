@@ -1,0 +1,25 @@
+# Cargo configuration for WebRTC Chat Application
+#
+# This file configures build settings for different targets.
+
+# =============================================================================
+# WASM Target Configuration
+# =============================================================================
+
+# Enable getrandom's wasm_js backend for wasm32-unknown-unknown target
+# This is required for UUID generation and other crypto operations in WASM
+# See: https://docs.rs/getrandom/#webassembly-support
+[target.wasm32-unknown-unknown]
+rustflags = ["--cfg", "getrandom_backend=\"wasm_js\""]
+
+# =============================================================================
+# Build Settings
+# =============================================================================
+
+[build]
+# Use all available CPU cores for compilation
+jobs = -1
+
+[term]
+# Enable colorful output
+color = "auto"
