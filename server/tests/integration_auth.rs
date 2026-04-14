@@ -7,118 +7,37 @@
 //! - User status management
 //! - Logout flow
 
-use std::net::SocketAddr;
-use std::sync::Arc;
+mod common;
+
 use std::time::Duration;
 
-use axum::Router;
-use futures::{SinkExt, StreamExt};
-use message::frame::{decode_frame, encode_frame};
-use message::signaling::{AuthFailure, AuthSuccess, Ping, SignalingMessage, TokenAuth, UserListUpdate};
+use common::{WsStream, connect_ws, create_test_server, recv_signaling_filtered, send_signaling};
+use message::signaling::{
+  AuthFailure, AuthSuccess, Ping, SignalingMessage, TokenAuth, UserListUpdate,
+};
 use message::types::UserStatus;
-use server::auth::UserStore;
-use server::config::Config;
-use server::ws::WebSocketState;
-use tokio::net::TcpListener;
-use tokio::time::timeout;
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async, tungstenite::Message};
-
-// ... existing code ...
-
-/// Test helper to create a test server and return its address.
-async fn create_test_server() -> (SocketAddr, Arc<WebSocketState>, UserStore) {
-  let config = Config::default();
-  let user_store = UserStore::new(&config);
-  let ws_state = Arc::new(WebSocketState::new(config.clone(), user_store.clone()));
-
-  // Create a TCP listener on a random port
-  let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-  let addr = listener.local_addr().unwrap();
-
-  // Build the Axum app
-  let app = Router::new()
-    .route("/ws", axum::routing::get(server::ws::ws_handler))
-    .with_state(ws_state.clone());
-
-  // Spawn the server with ConnectInfo support
-  tokio::spawn(async move {
-    axum::serve(
-      listener,
-      app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .await
-    .unwrap();
-  });
-
-  // Wait for server to start
-  tokio::time::sleep(Duration::from_millis(100)).await;
-
-  (addr, ws_state, user_store)
-}
-
-/// Test helper to connect to WebSocket server.
-async fn connect_ws(addr: SocketAddr) -> WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>> {
-  let url = format!("ws://{}/ws", addr);
-  let (ws_stream, _) = connect_async(&url).await.unwrap();
-  ws_stream
-}
-
-/// Test helper to send a signaling message.
-async fn send_signaling(
-  ws: &mut WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>,
-  msg: &SignalingMessage,
-) {
-  let discriminator = msg.discriminator();
-  let payload = bitcode::encode(msg);
-  let frame = message::frame::MessageFrame::new(discriminator, payload);
-  let encoded = encode_frame(&frame).unwrap();
-  ws.send(Message::Binary(encoded.into())).await.unwrap();
-}
 
 /// Test helper to receive a signaling message.
 /// Skips Ping/Pong heartbeat messages and waits for actual signaling messages.
-async fn recv_signaling(
-  ws: &mut WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>,
-) -> Option<SignalingMessage> {
+async fn recv_signaling(ws: &mut WsStream) -> Option<SignalingMessage> {
   recv_signaling_with_heartbeat(ws, false).await
 }
 
 /// Test helper to receive a signaling message.
 /// If `include_heartbeat` is true, also returns Ping/Pong messages.
 async fn recv_signaling_with_heartbeat(
-  ws: &mut WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>,
+  ws: &mut WsStream,
   include_heartbeat: bool,
 ) -> Option<SignalingMessage> {
-  timeout(Duration::from_secs(10), async {
-    loop {
-      match ws.next().await? {
-        Ok(Message::Binary(data)) => {
-          let frame = decode_frame(&data).ok()?;
-          let msg: SignalingMessage = bitcode::decode(&frame.payload).ok()?;
-          // Skip heartbeat messages if not included
-          if !include_heartbeat {
-            match &msg {
-              SignalingMessage::Ping(_) | SignalingMessage::Pong(_) => {
-                continue;
-              }
-              _ => {}
-            }
-          }
-          return Some(msg);
-        }
-        Ok(Message::Ping(_) | Message::Pong(_)) => {
-          // Ignore WebSocket-level ping/pong
-          continue;
-        }
-        _ => return None,
-      }
+  recv_signaling_filtered(ws, |msg| {
+    if !include_heartbeat {
+      matches!(msg, SignalingMessage::Ping(_) | SignalingMessage::Pong(_))
+    } else {
+      false
     }
   })
   .await
-  .ok()?
 }
-
-// ... existing code ...
 
 /// Test: Complete user registration and login flow via HTTP.
 #[tokio::test]
@@ -171,7 +90,10 @@ async fn test_websocket_auth_valid_token() {
 
   // Should also receive UserListUpdate
   let user_list = recv_signaling(&mut ws).await;
-  assert!(matches!(user_list, Some(SignalingMessage::UserListUpdate(_))));
+  assert!(matches!(
+    user_list,
+    Some(SignalingMessage::UserListUpdate(_))
+  ));
 }
 
 /// Test: WebSocket authentication with invalid token.
@@ -213,7 +135,9 @@ async fn test_single_device_login_policy() {
 
   // Connect first WebSocket
   let mut ws1 = connect_ws(addr).await;
-  let auth_msg1 = SignalingMessage::TokenAuth(TokenAuth { token: token1.clone() });
+  let auth_msg1 = SignalingMessage::TokenAuth(TokenAuth {
+    token: token1.clone(),
+  });
   send_signaling(&mut ws1, &auth_msg1).await;
 
   // Should receive AuthSuccess
@@ -316,7 +240,9 @@ async fn test_tokenauth_recovery() {
   // First connection
   {
     let mut ws = connect_ws(addr).await;
-    let auth_msg = SignalingMessage::TokenAuth(TokenAuth { token: token.clone() });
+    let auth_msg = SignalingMessage::TokenAuth(TokenAuth {
+      token: token.clone(),
+    });
     send_signaling(&mut ws, &auth_msg).await;
 
     let response = recv_signaling(&mut ws).await;
@@ -346,7 +272,10 @@ async fn test_tokenauth_recovery() {
       Some(SignalingMessage::AuthFailure(AuthFailure { reason })) => {
         // Token might be invalidated if login was called in between
         // This is expected behavior for single-device login
-        println!("Token invalidated (expected for single-device policy): {}", reason);
+        println!(
+          "Token invalidated (expected for single-device policy): {}",
+          reason
+        );
       }
       other => panic!("Unexpected response: {:?}", other),
     }
@@ -369,9 +298,21 @@ async fn test_multiple_users_simultaneous() {
   let mut ws3 = connect_ws(addr).await;
 
   // Authenticate all users
-  send_signaling(&mut ws1, &SignalingMessage::TokenAuth(TokenAuth { token: token1 })).await;
-  send_signaling(&mut ws2, &SignalingMessage::TokenAuth(TokenAuth { token: token2 })).await;
-  send_signaling(&mut ws3, &SignalingMessage::TokenAuth(TokenAuth { token: token3 })).await;
+  send_signaling(
+    &mut ws1,
+    &SignalingMessage::TokenAuth(TokenAuth { token: token1 }),
+  )
+  .await;
+  send_signaling(
+    &mut ws2,
+    &SignalingMessage::TokenAuth(TokenAuth { token: token2 }),
+  )
+  .await;
+  send_signaling(
+    &mut ws3,
+    &SignalingMessage::TokenAuth(TokenAuth { token: token3 }),
+  )
+  .await;
 
   // All should receive AuthSuccess
   let r1 = recv_signaling(&mut ws1).await;
@@ -400,13 +341,21 @@ async fn test_user_status_broadcast() {
 
   // First user connects
   let mut ws1 = connect_ws(addr).await;
-  send_signaling(&mut ws1, &SignalingMessage::TokenAuth(TokenAuth { token: token1 })).await;
+  send_signaling(
+    &mut ws1,
+    &SignalingMessage::TokenAuth(TokenAuth { token: token1 }),
+  )
+  .await;
   let _ = recv_signaling(&mut ws1).await; // AuthSuccess
   let _ = recv_signaling(&mut ws1).await; // UserListUpdate
 
   // Second user connects
   let mut ws2 = connect_ws(addr).await;
-  send_signaling(&mut ws2, &SignalingMessage::TokenAuth(TokenAuth { token: token2 })).await;
+  send_signaling(
+    &mut ws2,
+    &SignalingMessage::TokenAuth(TokenAuth { token: token2 }),
+  )
+  .await;
   let _ = recv_signaling(&mut ws2).await; // AuthSuccess
 
   // First user should receive UserStatusChange for second user

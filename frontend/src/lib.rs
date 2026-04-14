@@ -16,7 +16,6 @@ mod config;
 mod logging;
 mod state;
 
-pub use app::App;
 pub use config::Config;
 pub use state::AppState;
 

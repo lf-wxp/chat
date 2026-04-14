@@ -1,12 +1,12 @@
 [package]
-name = "frontend"
-description = "WebRTC Chat frontend built with Leptos and WASM"
-version.workspace = true
-edition.workspace = true
-rust-version.workspace = true
 authors.workspace = true
+description = "WebRTC Chat frontend built with Leptos and WASM"
+edition.workspace = true
 license.workspace = true
+name = "frontend"
 repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -14,16 +14,16 @@ name = "frontend"
 
 [dependencies]
 # Leptos framework
-leptos = { workspace = true, features = ["csr"] }
-leptos_router = { workspace = true }
-leptos_meta = { workspace = true }
-leptos_i18n = { workspace = true } 
+leptos = {workspace = true, features = ["csr"]}
+leptos_i18n = {workspace = true}
+leptos_meta = {workspace = true}
+leptos_router = {workspace = true}
 
 # WASM bindings
-wasm-bindgen.workspace = true
-wasm-bindgen-futures.workspace = true
 js-sys.workspace = true
-web-sys = { workspace = true, features = [
+wasm-bindgen-futures.workspace = true
+wasm-bindgen.workspace = true
+web-sys = {workspace = true, features = [
   "Window",
   "Document",
   "Element",
@@ -37,40 +37,40 @@ web-sys = { workspace = true, features = [
   "MediaStream",
   "MediaDevices",
   "Navigator",
-] }
+]}
 
 # Serialization
+bitcode.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-bitcode.workspace = true
 
 # Error handling
-thiserror.workspace = true
 anyhow.workspace = true
+thiserror.workspace = true
 
 # UUID
 uuid.workspace = true
 
 # Time
-chrono = { workspace = true, features = ["wasmbind"] }
+chrono = {workspace = true, features = ["wasmbind"]}
 
 # Async utilities
-futures.workspace = true
 async-trait.workspace = true
+futures.workspace = true
 
 # Logging
-tracing.workspace = true
 tracing-wasm = "0.2.1"
+tracing.workspace = true
 
 # Internal crates
-message = { path = "../message", features = ["wasm"] }
+message = {path = "../message", features = ["wasm"]}
 
 [dev-dependencies]
-wasm-bindgen-test.workspace = true
 proptest.workspace = true
+wasm-bindgen-test.workspace = true
 
 [features]
-default = ["csr"]
 csr = ["leptos/csr"]
+default = ["csr"]
 hydrate = ["leptos/hydrate"]
 ssr = ["leptos/ssr", "leptos_router/ssr"]

@@ -16,235 +16,347 @@ dependencies = ["dev"]
 # ============================================================================
 
 [tasks.dev]
-description = "Start development environment (backend server)"
 dependencies = ["build-message"]
-run_task = { name = "run-server" }
+description = "Start development environment with hot-reload (backend + frontend)"
+workspace = false
+script = '''
+#!/bin/bash
+trap 'kill 0; exit' SIGINT SIGTERM
+
+echo "[dev] Starting backend (cargo watch) and frontend (trunk serve) in parallel..."
+
+# Start backend watch in background
+(cd server && cargo watch -w . -w ../message -x run) &
+
+# Start frontend watch in background
+(cd frontend && trunk serve --open) &
+
+# Wait for all background processes
+wait
+'''
 
 [tasks.run-server]
-description = "Run the backend server"
-cwd = "server"
-command = "cargo"
 args = ["run"]
+command = "cargo"
+cwd = "server"
+description = "Run the backend server"
+workspace = false
 
 [tasks.run-frontend]
-description = "Start the frontend development server with Trunk"
-cwd = "frontend"
-command = "trunk"
 args = ["serve", "--open"]
+command = "trunk"
+cwd = "frontend"
+description = "Start the frontend development server with Trunk"
+workspace = false
+
+# ============================================================================
+# Setup Tasks
+# ============================================================================
+
+[tasks.setup]
+dependencies = ["setup-trunk", "setup-wasm-pack", "setup-cargo-watch", "cov-setup", "cov-setup-rustfilt"]
+description = "Install all build dependencies"
+
+[tasks.setup-trunk]
+description = "Install Trunk for frontend builds"
+install_crate = {crate_name = "trunk", binary = "trunk", test_arg = ["--version"]}
+
+[tasks.setup-wasm-pack]
+description = "Install wasm-pack for WASM builds"
+install_crate = {crate_name = "wasm-pack", binary = "wasm-pack", test_arg = ["--version"]}
+
+[tasks.setup-cargo-watch]
+description = "Install cargo-watch for development watching"
+install_crate = {crate_name = "cargo-watch", binary = "cargo-watch", test_arg = ["watch", "--version"]}
 
 # ============================================================================
 # Build Tasks
 # ============================================================================
 
 [tasks.build]
-description = "Build all workspace members"
 dependencies = ["build-message", "build-server", "build-frontend"]
+description = "Build all workspace members"
+workspace = false
 
 [tasks.build-message]
-description = "Build the message crate"
-cwd = "message"
-command = "cargo"
 args = ["build"]
+command = "cargo"
+cwd = "message"
+description = "Build the message crate"
+workspace = false
 
 [tasks.build-server]
-description = "Build the server crate"
-cwd = "server"
-command = "cargo"
 args = ["build"]
+command = "cargo"
+cwd = "server"
+description = "Build the server crate"
+workspace = false
 
 [tasks.build-frontend]
-description = "Build the frontend crate"
-cwd = "frontend"
-command = "trunk"
 args = ["build"]
+command = "trunk"
+cwd = "frontend"
+description = "Build the frontend crate"
+workspace = false
 
 [tasks.build-release]
-description = "Build all workspace members in release mode"
 dependencies = ["build-message-release", "build-server-release", "build-frontend-release"]
+description = "Build all workspace members in release mode"
+workspace = false
 
 [tasks.build-message-release]
-description = "Build the message crate in release mode"
-cwd = "message"
-command = "cargo"
 args = ["build", "--release"]
+command = "cargo"
+cwd = "message"
+description = "Build the message crate in release mode"
+workspace = false
 
 [tasks.build-server-release]
-description = "Build the server crate in release mode"
-cwd = "server"
-command = "cargo"
 args = ["build", "--release"]
+command = "cargo"
+cwd = "server"
+description = "Build the server crate in release mode"
+workspace = false
 
 [tasks.build-frontend-release]
-description = "Build the frontend crate in release mode"
-cwd = "frontend"
-command = "trunk"
 args = ["build", "--release"]
+command = "trunk"
+cwd = "frontend"
+description = "Build the frontend crate in release mode"
+workspace = false
 
 # ============================================================================
 # Test Tasks
 # ============================================================================
 
 [tasks.test]
+dependencies = ["test-unit", "test-integration", "test-wasm"]
 description = "Run all tests (unit + integration)"
 workspace = false
-dependencies = ["test-unit", "test-integration", "test-wasm"]
 
 [tasks.test-unit]
+args = ["test", "--lib"]
+command = "cargo"
 description = "Run unit tests for all workspace members"
 workspace = false
-command = "cargo"
-args = ["test", "--lib"]
 
 [tasks.test-integration]
-description = "Run integration tests"
-workspace = false
-command = "cargo"
 args = ["test", "--test", "*"]
+command = "cargo"
+description = "Run integration tests"
 ignore_errors = true
+workspace = false
 
 [tasks.test-wasm]
+args = ["test", "--node"]
+command = "wasm-pack"
+cwd = "message"
 description = "Run WASM tests for message crate"
 workspace = false
-cwd = "message"
-command = "wasm-pack"
-args = ["test", "--node"]
 
 [tasks.test-wasm-frontend]
+args = ["test", "--node"]
+command = "wasm-pack"
+cwd = "frontend"
 description = "Run WASM tests for frontend crate"
 workspace = false
-cwd = "frontend"
-command = "wasm-pack"
-args = ["test", "--node"]
 
 # ============================================================================
 # Lint Tasks
 # ============================================================================
 
 [tasks.lint]
-description = "Run all linting checks (fmt + clippy)"
 dependencies = ["fmt-check", "clippy"]
+description = "Run all linting checks (fmt + clippy)"
 
 [tasks.fmt]
-description = "Format all code"
-command = "cargo"
 args = ["fmt", "--all"]
+command = "cargo"
+description = "Format all code"
 
 [tasks.fmt-check]
-description = "Check code formatting"
-command = "cargo"
 args = ["fmt", "--all", "--check"]
+command = "cargo"
+description = "Check code formatting"
 
 [tasks.clippy]
-description = "Run Clippy with pedantic warnings"
-command = "cargo"
 args = ["clippy", "--all-targets", "--all-features", "--", "-D", "warnings"]
+command = "cargo"
+description = "Run Clippy with pedantic warnings"
 
 # ============================================================================
 # Clean Tasks
 # ============================================================================
 
 [tasks.clean]
-description = "Clean all build artifacts"
-command = "cargo"
 args = ["clean"]
+command = "cargo"
+description = "Clean all build artifacts"
 
 [tasks.clean-frontend]
-description = "Clean frontend build artifacts"
-cwd = "frontend"
-command = "trunk"
 args = ["clean"]
+command = "trunk"
+cwd = "frontend"
+description = "Clean frontend build artifacts"
+workspace = false
 
 # ============================================================================
 # Docker Tasks
 # ============================================================================
 
 [tasks.docker]
-description = "Build Docker image"
-command = "docker"
 args = ["build", "-t", "webrtc-chat:latest", "."]
+command = "docker"
+description = "Build Docker image"
 
 [tasks.docker-compose]
-description = "Run with docker-compose"
-command = "docker-compose"
 args = ["up", "-d"]
+command = "docker-compose"
+description = "Run with docker-compose"
 
 [tasks.docker-stop]
-description = "Stop docker-compose services"
-command = "docker-compose"
 args = ["down"]
+command = "docker-compose"
+description = "Stop docker-compose services"
 
 # ============================================================================
 # WASM Tasks
 # ============================================================================
 
 [tasks.wasm-pack-message]
-description = "Build message crate as WASM package"
-cwd = "message"
-command = "wasm-pack"
 args = ["build", "--target", "web"]
+command = "wasm-pack"
+cwd = "message"
+description = "Build message crate as WASM package"
+workspace = false
 
 [tasks.wasm-pack-frontend]
-description = "Build frontend crate as WASM package"
-cwd = "frontend"
-command = "wasm-pack"
 args = ["build", "--target", "web"]
+command = "wasm-pack"
+cwd = "frontend"
+description = "Build frontend crate as WASM package"
+workspace = false
 
 # ============================================================================
 # Quality Gates
 # ============================================================================
 
 [tasks.check-all]
-description = "Run all quality gates (fmt-check + check + clippy + test)"
 dependencies = ["fmt-check", "check", "clippy", "test-unit"]
+description = "Run all quality gates (fmt-check + check + clippy + test)"
 
 [tasks.check]
-description = "Run cargo check for all workspace members"
-command = "cargo"
 args = ["check", "--all"]
+command = "cargo"
+description = "Run cargo check for all workspace members"
 
 # ============================================================================
 # Documentation
 # ============================================================================
 
 [tasks.docs]
-description = "Generate documentation"
-command = "cargo"
 args = ["doc", "--no-deps", "--open"]
+command = "cargo"
+description = "Generate documentation"
 
 [tasks.docs-all]
-description = "Generate documentation with dependencies"
-command = "cargo"
 args = ["doc", "--open"]
+command = "cargo"
+description = "Generate documentation with dependencies"
 
 # ============================================================================
 # Watch Tasks
 # ============================================================================
 
 [tasks.watch-server]
-description = "Watch and rebuild server on changes"
-cwd = "server"
+args = ["watch", "-w", ".", "-w", "../message", "-x", "run"]
 command = "cargo"
-args = ["watch", "-x", "run"]
+cwd = "server"
+description = "Watch server and message crates, rebuild on changes"
+workspace = false
 
 [tasks.watch-frontend]
-description = "Watch and rebuild frontend on changes"
-cwd = "frontend"
+args = ["serve", "--open"]
 command = "trunk"
-args = ["serve"]
+cwd = "frontend"
+description = "Watch and rebuild frontend on changes (with browser open)"
+workspace = false
 
 # ============================================================================
 # Benchmark Tasks
 # ============================================================================
 
 [tasks.bench]
-description = "Run benchmarks"
-command = "cargo"
 args = ["bench"]
+command = "cargo"
+description = "Run benchmarks"
+
+# ============================================================================
+# Coverage Tasks
+# ============================================================================
+
+[tasks.cov-setup]
+description = "Install coverage tools (cargo-llvm-cov)"
+install_crate = {crate_name = "cargo-llvm-cov", binary = "cargo-llvm-cov", test_arg = ["llvm-cov", "--version"]}
+
+[tasks.cov-setup-rustfilt]
+description = "Install rustfilt for symbol demangling in coverage reports"
+install_crate = {crate_name = "rustfilt", binary = "rustfilt", test_arg = ["--help"]}
+
+[tasks.cov]
+description = "Run tests with LLVM source-based code coverage and print text report"
+run_task = {name = ["cov-clean", "cov-run-text"]}
+workspace = false
+
+[tasks.cov-clean]
+args = ["llvm-cov", "clean"]
+command = "cargo"
+description = "Remove artifacts that cargo-llvm-cov has generated in the past"
+workspace = false
+
+[tasks.cov-run-text]
+args = ["llvm-cov", "--summary-only"]
+command = "cargo"
+description = "Run tests and display file-level coverage summary table"
+workspace = false
+
+[tasks.cov-html]
+description = "Run tests with coverage and generate HTML report in target/llvm-cov/html"
+run_task = {name = ["cov-clean", "cov-run-html"]}
+workspace = false
+
+[tasks.cov-run-html]
+args = ["llvm-cov", "--html"]
+command = "cargo"
+description = "Run tests and generate HTML coverage report"
+workspace = false
+
+[tasks.cov-lcov]
+description = "Run tests with coverage and export lcov.info"
+run_task = {name = ["cov-clean", "cov-run-lcov"]}
+workspace = false
+
+[tasks.cov-run-lcov]
+args = ["llvm-cov", "--lcov", "--output-path", "lcov.info"]
+command = "cargo"
+description = "Run tests and export coverage data in lcov format"
+workspace = false
+
+[tasks.cov-ci]
+description = "Run tests with coverage and export cobertura XML for CI"
+run_task = {name = ["cov-clean", "cov-run-ci"]}
+workspace = false
+
+[tasks.cov-run-ci]
+args = ["llvm-cov", "--cobertura", "--output-path", "coverage.xml"]
+command = "cargo"
+description = "Run tests and export coverage data in cobertura XML format"
+workspace = false
 
 # ============================================================================
 # CI Tasks
 # ============================================================================
 
 [tasks.ci]
-description = "Run all CI checks"
 dependencies = ["fmt-check", "check", "clippy", "test-unit", "build"]
+description = "Run all CI checks"

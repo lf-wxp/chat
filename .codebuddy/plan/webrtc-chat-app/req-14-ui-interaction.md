@@ -505,6 +505,28 @@
 
 ---
 
+### 14.4.5 Interaction & Focus States
+
+**User Story:** As a user relying on keyboard navigation or assistive technologies, I want clear visual indicators of my current focus and interaction state, so that I can navigate confidently.
+
+#### Acceptance Criteria
+
+1. WHEN an interactive element receives keyboard focus THEN the system SHALL:
+   - Display a highly visible focus ring (e.g., `2px solid var(--primary-color)` with a `2px` offset)
+   - Ensure the focus ring contrasts sufficiently with the background
+   - NOT rely solely on background color changes to indicate focus
+
+2. WHEN an element is in a "Dragging" state (e.g., dragging a file into the chat, or moving a PiP video) THEN the system SHALL:
+   - Display a visual drop zone indicator (e.g., dashed border, semi-transparent overlay)
+   - Change the cursor to `grabbing` or `copy`
+   - Provide visual feedback when the dragged item is over a valid drop target
+
+3. WHEN an element is in a "Selected" or "Active" state (e.g., active room in the sidebar) THEN the system SHALL:
+   - Use a distinct background color or a prominent accent border (e.g., a left border indicator)
+   - Ensure the text color maintains high contrast against the active background
+
+---
+
 ## 14.5 Gesture & Touch Interactions
 
 ### 14.5.1 Mobile Touch Gestures
@@ -622,7 +644,26 @@
 
 ---
 
-### 14.6.2 Accessibility & Reduced Motion
+### 14.6.2 Motion & Easing Tokens
+
+**User Story:** As a developer, I want standardized animation durations and easing curves, so that the application's motion feels cohesive and intentional.
+
+#### Acceptance Criteria
+
+1. WHEN defining animations THEN the system SHALL use standardized duration tokens:
+   - `--duration-fast: 150ms`: For micro-interactions (hover, active, tooltips, icon state changes)
+   - `--duration-normal: 300ms`: For standard transitions (modal open/close, dropdowns, page transitions)
+   - `--duration-slow: 500ms`: For complex layout changes or attention-grabbing animations
+
+2. WHEN defining animations THEN the system SHALL use standardized easing curve tokens:
+   - `--ease-standard: cubic-bezier(0.4, 0, 0.2, 1)`: Default easing for elements moving within the screen
+   - `--ease-in: cubic-bezier(0.4, 0, 1, 1)`: For elements exiting the screen (start slow, end fast)
+   - `--ease-out: cubic-bezier(0, 0, 0.2, 1)`: For elements entering the screen (start fast, end slow)
+   - `--ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275)`: For playful, bouncy interactions (e.g., new message arrival)
+
+---
+
+### 14.6.3 Accessibility & Reduced Motion
 
 **User Story:** As a user with motion sensitivity, I want the option to reduce or disable animations, so that I can use the application comfortably.
 
@@ -761,6 +802,83 @@
 4. WHEN rendering modals THEN the system SHALL:
    - Apply 24px padding around modal content
    - Apply 16px gap between modal elements
+
+---
+
+### 14.7.5 Shape & Elevation (Border Radius & Shadows)
+
+**User Story:** As a user, I want consistent shapes and depth cues, so that the interface feels modern and layered.
+
+#### Acceptance Criteria
+
+1. WHEN applying border-radius THEN the system SHALL use a standardized scale:
+   - **2px / 4px**: Small elements (checkboxes, small badges)
+   - **8px**: Standard components (buttons, inputs, message bubbles, image containers)
+   - **12px / 16px**: Large containers (modals, cards, floating panels)
+   - **32px / 36px / 40px**: Circular elements (avatars, icon buttons, play buttons)
+   - **9999px**: Pill-shaped elements (badges, tags)
+
+2. WHEN applying box-shadows (elevation) THEN the system SHALL use a standardized scale:
+   - **Level 1 (Subtle)**: For hovered cards, dropdown menus (`0 2px 8px rgba(0,0,0,0.08)`)
+   - **Level 2 (Medium)**: For floating action buttons, tooltips (`0 4px 16px rgba(0,0,0,0.12)`)
+   - **Level 3 (High)**: For modals, dialogs, popovers (`0 8px 32px rgba(0,0,0,0.16)`)
+   - **Dark Theme Adjustment**: Shadows in dark theme SHALL use higher opacity or subtle borders to maintain visibility.
+
+---
+
+### 14.7.6 Opacity & Blur Effects
+
+**User Story:** As a user, I want appropriate transparency and blur effects, so that background context is maintained without sacrificing readability.
+
+#### Acceptance Criteria
+
+1. WHEN applying opacity THEN the system SHALL use standardized levels:
+   - **100%**: Primary text, active icons, solid backgrounds
+   - **70-80%**: Secondary text, inactive icons
+   - **40-60%**: Decorative icons, placeholders, disabled text
+   - **50%**: Disabled buttons and interactive elements
+   - **5-10%**: Hover state background overlays
+
+2. WHEN applying background blur (backdrop-filter) THEN the system SHALL:
+   - Use `blur(4px)` to `blur(8px)` for modal overlays, floating headers, and immersive media controls
+   - Ensure fallback solid colors with opacity (e.g., `rgba(0,0,0,0.8)`) are provided for browsers that do not support `backdrop-filter`
+   - Disable blur effects when the user has "Reduce Motion" or "Reduce Transparency" enabled in system settings.
+
+---
+
+### 14.7.7 Z-Index Scale
+
+**User Story:** As a developer, I want a standardized z-index scale, so that overlapping elements (modals, tooltips, dropdowns) stack correctly without conflicts.
+
+#### Acceptance Criteria
+
+1. WHEN positioning overlapping elements THEN the system SHALL use a standardized z-index scale defined as CSS variables:
+   - `--z-base: 0`: Normal content
+   - `--z-elevated: 10`: Elevated content (cards, floating action buttons)
+   - `--z-dropdown: 100`: Dropdown menus, context menus
+   - `--z-sticky: 200`: Sticky headers, floating control bars
+   - `--z-overlay: 900`: Modal backdrops, dimming overlays
+   - `--z-modal: 1000`: Modals, dialogs, popovers
+   - `--z-tooltip: 2000`: Tooltips
+   - `--z-max: 9999`: Global notifications, incoming call full-screen alerts
+
+2. WHEN implementing new components THEN developers SHALL NOT use arbitrary z-index values (e.g., `z-index: 999`) and MUST use the predefined scale.
+
+---
+
+### 14.7.8 Semantic Colors
+
+**User Story:** As a user, I want consistent color coding for system feedback, so that I can quickly understand the status of actions and connections.
+
+#### Acceptance Criteria
+
+1. WHEN providing visual feedback THEN the system SHALL use semantic colors that meet WCAG contrast standards in both Light and Dark themes:
+   - **Success (Green)**: Used for connection established, file transfer complete, settings saved.
+   - **Warning (Yellow/Orange)**: Used for poor network quality, high microphone volume, pending invitations.
+   - **Error (Red)**: Used for connection lost, permission denied, destructive actions (kick, ban, delete).
+   - **Info (Blue)**: Used for system announcements, general tips, active states.
+
+2. WHEN applying semantic colors to text or icons THEN the system SHALL ensure sufficient contrast against the background (e.g., using a darker shade of red for text on a light background).
 
 ---
 
@@ -1200,6 +1318,104 @@
    - Time to render a new incoming message (append to bottom): < 8ms
    - Time to prepend a batch of 50 historical messages (infinite scroll): < 50ms
    - Maximum DOM node count in the message list: ≤ 200 nodes (enforced by virtual scrolling)
+
+---
+
+## 14.12 WebRTC & Media Interface Design
+
+### 14.12.1 Device & Permission States
+
+**User Story:** As a user, I want clear guidance when the app needs access to my camera and microphone, so that I can manage my privacy and troubleshoot device issues.
+
+#### Acceptance Criteria
+
+1. WHEN the application requires media permissions THEN the system SHALL:
+   - Display a "Permission Priming" UI (in-app modal or placeholder) explaining *why* access is needed before triggering the native browser permission prompt
+   - Provide a clear "Grant Access" button to trigger the native prompt
+
+2. WHEN media permissions are denied or blocked THEN the system SHALL:
+   - Display a clear error state (e.g., crossed-out camera/mic icon) in the video area
+   - Provide text instructions on how to unblock permissions via browser settings
+   - Show a "Check Again" or "Retry" button to re-evaluate permission status
+
+3. WHEN the user is testing devices (e.g., in settings or pre-call lobby) THEN the system SHALL:
+   - Display a real-time microphone volume meter (green for low/normal, yellow for high, red for clipping)
+   - Display a local camera preview with mirroring enabled by default (so the user sees themselves as in a mirror)
+   - Allow toggling the mirror effect for the local preview
+
+---
+
+### 14.12.2 Dynamic Video Grid System
+
+**User Story:** As a user in a multi-person call, I want the video layout to automatically adapt to the number of participants, so that I can see everyone clearly.
+
+#### Acceptance Criteria
+
+1. WHEN multiple participants are in a call THEN the system SHALL use an adaptive grid layout:
+   - **1-2 participants**: 1x1 or 1x2 split (filling the available space)
+   - **3-4 participants**: 2x2 grid
+   - **5-9 participants**: 3x3 grid
+   - **>9 participants**: Paginated grid or active-speaker-focused layout (1 large + others small)
+
+2. WHEN rendering video streams THEN the system SHALL:
+   - Use `object-fit: cover` for standard camera streams (cropping edges to fill the grid cell uniformly)
+   - Use `object-fit: contain` for screen sharing streams (ensuring the entire shared screen is visible without cropping)
+
+3. WHEN a participant is speaking THEN the system SHALL:
+   - Highlight their video tile with a primary color border (e.g., 2px or 4px solid border)
+   - Apply a subtle glow effect (box-shadow) to the active speaker's tile
+   - Implement a debounce delay (e.g., 500ms) before switching the active speaker highlight to prevent rapid flickering during cross-talk
+
+---
+
+### 14.12.3 Graceful Degradation UI
+
+**User Story:** As a user on a poor network connection, I want the app to adapt smoothly, so that my call doesn't completely drop.
+
+#### Acceptance Criteria
+
+1. WHEN the network quality drops significantly (bandwidth insufficient for video) THEN the system SHALL:
+   - Automatically pause incoming/outgoing video streams
+   - Display a fallback UI for affected participants (e.g., their avatar centered in the video tile)
+   - Show a semi-transparent overlay with a "Network unstable, video paused" message and a poor connection icon
+
+2. WHEN transitioning between video and fallback avatar THEN the system SHALL:
+   - Use a smooth cross-fade animation (300ms)
+   - Maintain the audio connection uninterrupted
+
+---
+
+### 14.12.4 Immersive Media Controls
+
+**User Story:** As a user in a video call, I want controls that are easy to access but don't obstruct the video content.
+
+#### Acceptance Criteria
+
+1. WHEN the user is in a fullscreen or maximized video call THEN the system SHALL:
+   - Display a floating control bar (mute, video toggle, screen share, end call) at the bottom of the screen
+   - Auto-hide the control bar after 3 seconds of mouse/touch inactivity
+   - Fade in the control bar immediately (150ms) upon mouse movement or screen tap
+
+2. WHEN displaying text or controls over video content THEN the system SHALL:
+   - Apply a black-to-transparent gradient overlay at the top (for participant names/status) and bottom (for the control bar)
+   - Ensure the gradient opacity is sufficient (e.g., 0 to 0.6) to make white text readable regardless of the video background's brightness
+
+---
+
+### 14.12.5 Screen Sharing Layouts
+
+**User Story:** As a user viewing a screen share, I want the shared content to be the primary focus while still seeing other participants.
+
+#### Acceptance Criteria
+
+1. WHEN a participant starts screen sharing THEN the system SHALL switch to Presentation Mode:
+   - The shared screen SHALL occupy the majority of the viewport (e.g., 80% width or maximized)
+   - Other participants' video tiles SHALL be shrunk and moved to a Gallery View (e.g., a vertical strip on the side or a horizontal strip at the top/bottom)
+   - The active speaker SHALL be prioritized in the visible Gallery View tiles
+
+2. WHEN the user is viewing a screen share THEN the system SHALL:
+   - Allow the user to double-click or use a control button to toggle the shared screen into true fullscreen mode
+   - Provide a "Pin" feature to lock the shared screen in focus even if someone else starts speaking
 
 ---
 

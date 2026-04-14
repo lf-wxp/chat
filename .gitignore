@@ -53,3 +53,8 @@ Thumbs.db
 
 # Docker volumes (if using local mounts)
 /docker-volumes/
+
+lcov.info
+
+dist
+logs
