@@ -13,8 +13,7 @@ use common::{
   WsStream, auth_user, create_test_server, drain_messages, recv_signaling_filtered, send_signaling,
 };
 use message::signaling::{
-  CreateRoom, JoinRoom, SignalingMessage,
-  TheaterMuteAll, TheaterTransferOwner,
+  CreateRoom, JoinRoom, SignalingMessage, TheaterMuteAll, TheaterTransferOwner,
 };
 use message::types::{RoomId, RoomType, UserId};
 use tokio::time::timeout;
@@ -119,7 +118,11 @@ async fn test_theater_mute_all_room_not_found() {
   .await
   .expect("Timed out waiting for error response");
 
-  assert_eq!(response.code.to_string(), "SIG301", "Expected SIG301 error code");
+  assert_eq!(
+    response.code.to_string(),
+    "SIG301",
+    "Expected SIG301 error code"
+  );
   assert!(
     response.message.contains("Room not found"),
     "Error message should mention room not found"
@@ -132,8 +135,7 @@ async fn test_theater_mute_all_non_owner_fails() {
   let (addr, _ws_state, user_store) = create_test_server().await;
 
   // Owner creates the room
-  let (mut ws_owner, _owner_id) =
-    auth_user(addr, &user_store, "mute_room_owner", "password").await;
+  let (mut ws_owner, _owner_id) = auth_user(addr, &user_store, "mute_room_owner", "password").await;
   let create_msg = CreateRoom {
     name: "Theater Mute Room".to_string(),
     room_type: RoomType::Theater,
@@ -167,7 +169,11 @@ async fn test_theater_mute_all_non_owner_fails() {
   let mute_all_msg = TheaterMuteAll {
     room_id: room_id.clone(),
   };
-  send_signaling(&mut ws_member, &SignalingMessage::TheaterMuteAll(mute_all_msg)).await;
+  send_signaling(
+    &mut ws_member,
+    &SignalingMessage::TheaterMuteAll(mute_all_msg),
+  )
+  .await;
 
   // Member should receive SIG302 error
   let response = timeout(Duration::from_secs(5), async {
@@ -182,7 +188,11 @@ async fn test_theater_mute_all_non_owner_fails() {
   .await
   .expect("Timed out waiting for error response");
 
-  assert_eq!(response.code.to_string(), "SIG302", "Expected SIG302 for non-owner");
+  assert_eq!(
+    response.code.to_string(),
+    "SIG302",
+    "Expected SIG302 for non-owner"
+  );
   assert!(
     response.message.to_lowercase().contains("owner"),
     "Error message should mention owner restriction"
@@ -236,7 +246,11 @@ async fn test_theater_mute_all_owner_success() {
   let mute_all_msg = TheaterMuteAll {
     room_id: room_id.clone(),
   };
-  send_signaling(&mut ws_owner, &SignalingMessage::TheaterMuteAll(mute_all_msg)).await;
+  send_signaling(
+    &mut ws_owner,
+    &SignalingMessage::TheaterMuteAll(mute_all_msg),
+  )
+  .await;
 
   // Members should receive TheaterMuteAll broadcast
   // (owner/sender is excluded from the broadcast per handler logic)
@@ -314,7 +328,11 @@ async fn test_theater_mute_all_broadcasts_to_members() {
   let mute_all_msg = TheaterMuteAll {
     room_id: room_id.clone(),
   };
-  send_signaling(&mut ws_owner, &SignalingMessage::TheaterMuteAll(mute_all_msg)).await;
+  send_signaling(
+    &mut ws_owner,
+    &SignalingMessage::TheaterMuteAll(mute_all_msg),
+  )
+  .await;
 
   // Verify each member receives the TheaterMuteAll broadcast
   for (i, ws) in [&mut ws_m1, &mut ws_m2, &mut ws_m3].iter_mut().enumerate() {
@@ -323,11 +341,7 @@ async fn test_theater_mute_all_broadcasts_to_members() {
         match recv_action_notification(ws).await {
           Some(SignalingMessage::TheaterMuteAll(mute)) => return mute,
           Some(SignalingMessage::MuteStatusChange(_)) => continue,
-          other => panic!(
-            "Member {} expected TheaterMuteAll, got: {:?}",
-            i + 1,
-            other
-          ),
+          other => panic!("Member {} expected TheaterMuteAll, got: {:?}", i + 1, other),
         }
       }
     })
@@ -335,7 +349,8 @@ async fn test_theater_mute_all_broadcasts_to_members() {
     .unwrap_or_else(|_| panic!("Timed out waiting for TheaterMuteAll on member {}", i + 1));
 
     assert_eq!(
-      msg.room_id, room_id,
+      msg.room_id,
+      room_id,
       "Member {} should receive TheaterMuteAll for correct room",
       i + 1
     );
@@ -351,8 +366,8 @@ async fn test_theater_mute_all_broadcasts_to_members() {
     Ok(Some(SignalingMessage::TheaterMuteAll(_))) => {
       panic!("Owner (sender) should NOT receive TheaterMuteAll broadcast");
     }
-    Ok(Some(_)) => {}        // Other messages are fine
-    Ok(None) | Err(_) => {}  // No message or timeout is expected - no TheaterMuteAll for sender
+    Ok(Some(_)) => {}       // Other messages are fine
+    Ok(None) | Err(_) => {} // No message or timeout is expected - no TheaterMuteAll for sender
   }
 }
 
@@ -405,7 +420,11 @@ async fn test_theater_transfer_owner_room_not_found() {
   .await
   .expect("Timed out waiting for error response");
 
-  assert_eq!(response.code.to_string(), "SIG311", "Expected SIG311 error code");
+  assert_eq!(
+    response.code.to_string(),
+    "SIG311",
+    "Expected SIG311 error code"
+  );
   assert!(
     response.message.contains("Room not found"),
     "Error message should mention room not found"
@@ -479,7 +498,11 @@ async fn test_theater_transfer_owner_non_owner_fails() {
   .await
   .expect("Timed out waiting for error response");
 
-  assert_eq!(response.code.to_string(), "SIG312", "Expected SIG312 for non-owner");
+  assert_eq!(
+    response.code.to_string(),
+    "SIG312",
+    "Expected SIG312 for non-owner"
+  );
   assert!(
     response.message.to_lowercase().contains("owner"),
     "Error message should mention owner restriction"
@@ -532,7 +555,8 @@ async fn test_theater_transfer_to_self() {
   .expect("Timed out waiting for SIG313 error response");
 
   assert_eq!(
-    response.code.to_string(), "SIG313",
+    response.code.to_string(),
+    "SIG313",
     "Expected SIG313 error code for self-transfer"
   );
   assert!(
@@ -563,8 +587,7 @@ async fn test_theater_transfer_target_not_member() {
   };
 
   // Target user is authenticated but NOT in the room
-  let (_ws_target, target_id) =
-    auth_user(addr, &user_store, "not_member_target", "password").await;
+  let (_ws_target, target_id) = auth_user(addr, &user_store, "not_member_target", "password").await;
 
   // Owner tries to transfer to a non-member
   let transfer_msg = TheaterTransferOwner {
@@ -591,7 +614,8 @@ async fn test_theater_transfer_target_not_member() {
   .expect("Timed out waiting for SIG314 error response");
 
   assert_eq!(
-    response.code.to_string(), "SIG314",
+    response.code.to_string(),
+    "SIG314",
     "Expected SIG314 error code for target not member"
   );
   assert!(
@@ -606,8 +630,7 @@ async fn test_theater_transfer_owner_success() {
   let (addr, _ws_state, user_store) = create_test_server().await;
 
   // Owner creates theater room
-  let (mut ws_owner, _owner_id) =
-auth_user(addr, &user_store, "xfer_ok_owner", "password").await;
+  let (mut ws_owner, _owner_id) = auth_user(addr, &user_store, "xfer_ok_owner", "password").await;
   let create_msg = CreateRoom {
     name: "Transfer Success Room".to_string(),
     room_type: RoomType::Theater,
@@ -622,10 +645,9 @@ auth_user(addr, &user_store, "xfer_ok_owner", "password").await;
   };
 
   // Target and another member join the room
-  let (mut ws_target, target_id) =
-auth_user(addr, &user_store, "xfer_ok_target", "password").await;
+  let (mut ws_target, target_id) = auth_user(addr, &user_store, "xfer_ok_target", "password").await;
   let (mut ws_member, _member_id) =
-auth_user(addr, &user_store, "xfer_ok_member", "password").await;
+    auth_user(addr, &user_store, "xfer_ok_member", "password").await;
 
   for ws in [&mut ws_target, &mut ws_member] {
     send_signaling(
@@ -667,23 +689,22 @@ auth_user(addr, &user_store, "xfer_ok_member", "password").await;
       loop {
         match recv_action_notification(ws).await {
           Some(SignalingMessage::TheaterTransferOwner(transfer)) => return transfer,
-          Some(
-            SignalingMessage::OwnerChanged(_) | SignalingMessage::MuteStatusChange(_),
-          ) => continue,
-          other => panic!(
-            "{} expected TheaterTransferOwner, got: {:?}",
-            label, other
-          ),
+          Some(SignalingMessage::OwnerChanged(_) | SignalingMessage::MuteStatusChange(_)) => {
+            continue;
+          }
+          other => panic!("{} expected TheaterTransferOwner, got: {:?}", label, other),
         }
       }
     })
     .await
-    .unwrap_or_else(|_| {
-      panic!("Timed out waiting for TheaterTransferOwner on {}", label)
-    });
+    .unwrap_or_else(|_| panic!("Timed out waiting for TheaterTransferOwner on {}", label));
 
     assert_eq!(msg.room_id, room_id, "{} should see correct room_id", label);
-    assert_eq!(msg.target, target_id, "{} should see target as target_id", label);
+    assert_eq!(
+      msg.target, target_id,
+      "{} should see target as target_id",
+      label
+    );
   }
 }
 
@@ -694,7 +715,7 @@ async fn test_theater_transfer_broadcasts_to_all() {
 
   // Owner creates theater room
   let (mut ws_owner, _owner_id) =
-auth_user(addr, &user_store, "bcast_xfer_owner", "password").await;
+    auth_user(addr, &user_store, "bcast_xfer_owner", "password").await;
   let create_msg = CreateRoom {
     name: "Broadcast Transfer Room".to_string(),
     room_type: RoomType::Theater,
@@ -751,30 +772,21 @@ auth_user(addr, &user_store, "bcast_xfer_owner", "password").await;
       loop {
         match recv_action_notification(ws).await {
           Some(SignalingMessage::TheaterTransferOwner(transfer)) => return transfer,
-          Some(
-            SignalingMessage::OwnerChanged(_) | SignalingMessage::MuteStatusChange(_),
-          ) => continue,
-          other => panic!(
-            "User {} expected TheaterTransferOwner, got: {:?}",
-            i, other
-          ),
+          Some(SignalingMessage::OwnerChanged(_) | SignalingMessage::MuteStatusChange(_)) => {
+            continue;
+          }
+          other => panic!("User {} expected TheaterTransferOwner, got: {:?}", i, other),
         }
       }
     })
     .await
-    .unwrap_or_else(|_| {
-      panic!("Timed out waiting for TheaterTransferOwner on user {}", i)
-    });
+    .unwrap_or_else(|_| panic!("Timed out waiting for TheaterTransferOwner on user {}", i));
 
     assert_eq!(
       msg.room_id, room_id,
       "User {} should receive TheaterTransferOwner for correct room",
       i
     );
-    assert_eq!(
-      msg.target, m1_id,
-      "User {} should see target as m1",
-      i
-    );
+    assert_eq!(msg.target, m1_id, "User {} should see target as m1", i);
   }
 }

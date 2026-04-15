@@ -261,10 +261,10 @@ graph TD
 - WHEN user first visits the app without a language preference set THEN the system SHALL detect browser language via `navigator.language`, automatically selecting the matching language (only zh-CN and en supported, other languages default to en)
 
 #### i18n Resource File Specification
-- i18n resource files SHALL be stored as JSON under `/assets/i18n/{locale}.json` (e.g., `en.json`, `zh-CN.json`)
-- i18n keys SHALL use dot-separated hierarchical naming: `{module}.{component}.{element}` (e.g., `chat.input.placeholder`, `room.create.title`, `auth.login.button`)
-- Each locale JSON file SHALL be a flat key-value map (no nested objects) for simplicity and fast lookup
-- The system SHALL load i18n resource files lazily (fetch on first use, cache in memory)
+- i18n resource files SHALL be stored as JSON under `/locales/{locale}.json` (e.g., `en.json`, `zh-CN.json`)
+- i18n keys SHALL use hierarchical naming following the pattern `{module}.{component}.{element}` (e.g., `chat.input.placeholder`, `room.create.title`, `auth.login.button`)
+- Each locale JSON file SHALL use nested objects reflecting the key hierarchy (e.g., `{"chat": {"input": {"placeholder": "..."}}}`), which is the native format required by `leptos_i18n` for compile-time type safety and IDE autocompletion
+- The system SHALL load i18n resource files at build time via `leptos_i18n`'s code generation (no runtime fetch needed); the generated Rust modules provide type-safe access to all translation keys
 - WHEN adding new UI text THEN developers SHALL add the key to both `en.json` and `zh-CN.json` simultaneously; the build process (`makers lint`) SHALL include a check that both locale files have identical key sets
 
 ### Browser Compatibility
@@ -463,7 +463,7 @@ All error responses (both frontend UI and backend signaling) SHALL use a unified
 
 - `code`: Error code from the registry
 - `message`: Default English error message (fallback for i18n)
-- `i18n_key`: Key for looking up localized message in `/assets/i18n/{locale}.json`
+- `i18n_key`: Key for looking up localized message in `/locales/{locale}.json`
 - `details`: Optional contextual information (varies by error type)
 - `timestamp`: ISO 8601 timestamp when the error occurred
 - `trace_id`: Unique identifier for tracing the error across logs (frontend + backend)

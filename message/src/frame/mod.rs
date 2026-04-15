@@ -382,7 +382,11 @@ impl ReassemblyBuffer {
     let index = usize::try_from(chunk.header.chunk_index).unwrap_or(0);
 
     // Check for duplicate
-    if self.bitmap.is_received(chunk.header.chunk_index).unwrap_or(false) {
+    if self
+      .bitmap
+      .is_received(chunk.header.chunk_index)
+      .unwrap_or(false)
+    {
       return Ok(false);
     }
 

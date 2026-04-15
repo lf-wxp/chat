@@ -1,0 +1,210 @@
+/**
+ * Sidebar
+ * Navigation sidebar component styles.
+ * Uses modern CSS: nesting, @container, :has(), @scope, clamp().
+ */
+
+/* ── Sidebar Container ── */
+.sidebar {
+  container-type: inline-size;
+  container-name: sidebar;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background-color: var(--bg-secondary, #f8fafc);
+  border-right: 1px solid var(--border-color, #e2e8f0);
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: width var(--duration-normal, 200ms) var(--ease-default, ease);
+
+  &.sidebar-collapsed {
+    width: 4rem;
+  }
+
+  /* Show search section only when sidebar is wide enough */
+  @container sidebar (max-width: 200px) {
+    .sidebar-search {
+      display: none;
+    }
+  }
+}
+
+/* ── Sidebar Header ── */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  min-height: 3.5rem;
+}
+
+.sidebar-header-title {
+  font-size: clamp(var(--font-base, 1rem), 3cqi, var(--font-lg, 1.125rem));
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--text-primary, #0f172a);
+}
+
+/* ── Sidebar Sections ── */
+.sidebar-section {
+  padding: var(--space-2, 0.5rem) 0;
+
+  /* Hide empty sections using :has() */
+  &:not(:has(.sidebar-item, .sidebar-conversation)) {
+    display: none;
+  }
+}
+
+.sidebar-section-title {
+  padding: var(--space-1, 0.25rem) var(--space-4, 1rem);
+  font-size: var(--font-xs, 0.75rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--text-tertiary, #94a3b8);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Sidebar Item (shared base properties for composes) ── */
+.sidebar-item-base {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+  padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+  color: var(--text-secondary, #475569);
+  font-size: var(--font-sm, 0.875rem);
+  cursor: pointer;
+  transition: all var(--duration-fast, 150ms) var(--ease-default, ease);
+  border-radius: var(--radius-md, 0.375rem);
+  margin: 0 var(--space-2, 0.5rem);
+}
+
+/* ── Sidebar Item ── */
+.sidebar-item {
+  composes: sidebar-item-base;
+
+  &:hover {
+    background-color: var(--bg-tertiary, #f1f5f9);
+    color: var(--text-primary, #0f172a);
+  }
+}
+
+.sidebar-item-active {
+  composes: sidebar-item-base;
+  background-color: color-mix(in oklch, var(--color-primary) 10%, transparent);
+  color: var(--color-primary, #3b82f6);
+  font-weight: var(--font-weight-medium, 500);
+
+  &:hover {
+    background-color: color-mix(in oklch, var(--color-primary) 15%, transparent);
+  }
+}
+
+.sidebar-item-icon {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: inherit;
+}
+
+/* ── Sidebar Item Badge (shared base properties for composes) ── */
+.sidebar-item-badge-base {
+  margin-left: auto;
+  font-size: var(--font-xs, 0.75rem);
+  font-weight: var(--font-weight-semibold, 600);
+  border-radius: var(--radius-full, 9999px);
+}
+
+/* ── Sidebar Item Badge ── */
+.sidebar-item-badge {
+  composes: sidebar-item-badge-base;
+  padding: var(--space-0, 0) var(--space-2, 0.5rem);
+  color: var(--text-tertiary, #94a3b8);
+}
+
+.sidebar-item-badge-unread {
+  composes: sidebar-item-badge-base;
+  background-color: var(--color-primary, #3b82f6);
+  color: #ffffff;
+  padding: var(--space-0, 0) var(--space-1, 0.25rem);
+  min-width: 1.25rem;
+  text-align: center;
+}
+
+/* ── Sidebar Conversation Item (shares base with sidebar-item) ── */
+.sidebar-conversation {
+  composes: sidebar-item-base;
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+}
+
+.sidebar-conversation-avatar {
+  flex-shrink: 0;
+}
+
+.sidebar-conversation-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0, 0);
+}
+
+.sidebar-conversation-name {
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--text-primary, #0f172a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-conversation-preview {
+  font-size: var(--font-xs, 0.75rem);
+  color: var(--text-tertiary, #94a3b8);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Pinned / Muted indicators ── */
+.sidebar-conversation-pinned::before {
+  content: "📌";
+  margin-right: var(--space-1, 0.25rem);
+}
+
+.sidebar-conversation-muted {
+  opacity: 0.6;
+}
+
+/* ── Sidebar Footer ── */
+.sidebar-footer {
+  margin-top: auto;
+  padding: var(--space-3, 0.75rem);
+  border-top: 1px solid var(--border-color, #e2e8f0);
+}
+
+/* ── Responsive: Mobile ── */
+@media (max-width: 767px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: var(--z-overlay, 300);
+    transform: translateX(-100%);
+
+    &.sidebar-open {
+      transform: translateX(0);
+      box-shadow: var(--shadow-xl);
+    }
+  }
+}
+
+/* ── @container responsive for sidebar content ── */
+@container sidebar (max-width: 180px) {
+  .sidebar-conversation-preview {
+    display: none;
+  }
+
+  .sidebar-item-badge {
+    display: none;
+  }
+}

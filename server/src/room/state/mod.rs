@@ -37,7 +37,9 @@ const MAX_ROOM_NAME_LENGTH: usize = 100;
 fn validate_room_name(name: &str) -> Result<(), RoomError> {
   // Check length
   if name.is_empty() {
-    return Err(RoomError::InvalidRoomName("name cannot be empty".to_string()));
+    return Err(RoomError::InvalidRoomName(
+      "name cannot be empty".to_string(),
+    ));
   }
   if name.len() > MAX_ROOM_NAME_LENGTH {
     return Err(RoomError::InvalidRoomName(format!(

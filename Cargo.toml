@@ -1,5 +1,5 @@
 [workspace]
-members = ["message", "server", "frontend"]
+members = ["message", "server", "frontend", "css-processor"]
 resolver = "2"
 
 [workspace.package]
@@ -12,11 +12,11 @@ version = "0.1.0"
 
 [workspace.dependencies]
 # Async runtime
-tokio = {version = "1.51.1", features = ["full"]}
+tokio = {version = "1.52.0", features = ["full"]}
 
 # Web framework
-axum = {version = "0.8.8", features = ["ws", "macros"]}
-axum-extra = {version = "0.12.5", features = ["typed-header"]}
+axum = {version = "0.8.9", features = ["ws", "macros"]}
+axum-extra = {version = "0.12.6", features = ["typed-header"]}
 tower = {version = "0.5.3", features = ["util"]}
 tower-http = {version = "0.6.8", features = ["fs", "cors", "trace"]}
 
@@ -27,7 +27,7 @@ serde_json = "1.0.149"
 
 # Frontend framework (WASM)
 leptos = "0.8.17"
-leptos_i18n = "0.6.1"
+leptos_i18n = "0.6.2"
 leptos_meta = "0.8"
 leptos_router = "0.8"
 
@@ -78,10 +78,10 @@ tokio-util = {version = "0.7.18", features = ["rt"]}
 # Testing
 criterion = "0.8.2"
 proptest = "1.11.0"
-serial_test = "3.2.0"
-tempfile = "3.20.0"
+serial_test = "3.4.0"
+tempfile = "3.27.0"
 tokio-tungstenite = "0.29.0"
-wasm-bindgen-test = "0.3.67"
+wasm-bindgen-test = "0.3.68"
 
 # Build tools
 trunk = "0.21.14"
@@ -107,7 +107,7 @@ opt-level = 3
 panic = "abort"
 strip = true
 
-[profile.release.package.frontend]
+[profile.release.package.chat-frontend]
 opt-level = "z"
 
 [profile.bench]

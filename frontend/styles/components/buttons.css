@@ -1,0 +1,137 @@
+/**
+ * Buttons
+ * Interactive button component styles.
+ * Uses modern CSS: nesting, @starting-style, clamp(), composes.
+ */
+
+/* ── Base Button (shared properties via composes) ── */
+.btn-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+  font-family: var(--font-family, system-ui, sans-serif);
+  font-size: clamp(var(--font-xs, 0.75rem), 2vw, var(--font-sm, 0.875rem));
+  font-weight: var(--font-weight-semibold, 600);
+  line-height: var(--line-height-normal, 1.5);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 0.375rem);
+  cursor: pointer;
+  transition: all var(--duration-fast, 150ms) var(--ease-default, ease);
+  user-select: none;
+  white-space: nowrap;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary, #3b82f6);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+/* ── Base Button (legacy alias, keeps backward compatibility) ── */
+.btn {
+  composes: btn-base;
+}
+
+/* ── Primary Button ── */
+.btn-primary {
+  composes: btn-base;
+  background-color: var(--color-primary, #3b82f6);
+  color: #ffffff;
+
+  &:hover {
+    background-color: var(--color-primary-hover, #2563eb);
+  }
+
+  &:active {
+    background-color: var(--color-primary-pressed, color-mix(in oklch, var(--color-primary), black 20%));
+  }
+}
+
+/* ── Secondary Button ── */
+.btn-secondary {
+  composes: btn-base;
+  background-color: var(--bg-tertiary, #f1f5f9);
+  color: var(--text-primary, #0f172a);
+  border-color: var(--border-color, #e2e8f0);
+
+  &:hover {
+    background-color: var(--bg-secondary, #f8fafc);
+    border-color: var(--border-color-hover, #cbd5e1);
+  }
+}
+
+/* ── Ghost Button ── */
+.btn-ghost {
+  composes: btn-base;
+  background-color: transparent;
+  color: var(--text-secondary, #475569);
+
+  &:hover {
+    background-color: var(--bg-tertiary, #f1f5f9);
+    color: var(--text-primary, #0f172a);
+  }
+}
+
+/* ── Danger Button ── */
+.btn-danger {
+  composes: btn-base;
+  background-color: var(--color-error, #ef4444);
+  color: #ffffff;
+
+  &:hover {
+    background-color: var(--color-error-hover, color-mix(in oklch, var(--color-error), black 12%));
+  }
+}
+
+/* ── Icon Button ── */
+.btn-icon {
+  composes: btn-base;
+  padding: var(--space-2, 0.5rem);
+}
+
+/* ── Button Sizes ── */
+.btn-sm {
+  composes: btn-base;
+  padding: var(--space-1, 0.25rem) var(--space-3, 0.75rem);
+  font-size: var(--font-xs, 0.75rem);
+}
+
+.btn-lg {
+  composes: btn-base;
+  padding: var(--space-3, 0.75rem) var(--space-6, 2rem);
+  font-size: var(--font-base, 1rem);
+}
+
+.btn-xl {
+  composes: btn-base;
+  padding: var(--space-4, 1rem) var(--space-8, 3rem);
+  font-size: var(--font-lg, 1.125rem);
+}
+
+/* ── Full-width Button ── */
+.btn-block {
+  composes: btn-base;
+  width: 100%;
+}
+
+/* ── Entry Animation (for dynamically inserted buttons) ── */
+/* @starting-style works for elements newly added to the DOM.
+   Use the `.btn-enter` modifier class when inserting buttons
+   dynamically so the transition from @starting-style takes effect. */
+.btn-enter {
+  transition: opacity var(--duration-normal, 200ms) var(--ease-default, ease),
+              transform var(--duration-normal, 200ms) var(--ease-default, ease);
+}
+
+@starting-style {
+  .btn-enter {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}

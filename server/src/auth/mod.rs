@@ -171,7 +171,8 @@ impl UserStore {
 
     // Create user
     let user_id = UserId::new();
-    let mut session = UserSession::new(user_id.clone(), username.to_string(), password_hash.clone());
+    let mut session =
+      UserSession::new(user_id.clone(), username.to_string(), password_hash.clone());
 
     // Generate session ID and store it for single-device login enforcement
     let session_id = generate_session_id();

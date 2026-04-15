@@ -1,76 +1,84 @@
 [package]
-authors.workspace = true
-description = "WebRTC Chat frontend built with Leptos and WASM"
-edition.workspace = true
-license.workspace = true
-name = "frontend"
-repository.workspace = true
-rust-version.workspace = true
-version.workspace = true
+name = "chat-frontend"
+version = "0.1.0"
+edition = "2024"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
-name = "frontend"
 
 [dependencies]
-# Leptos framework
-leptos = {workspace = true, features = ["csr"]}
-leptos_i18n = {workspace = true}
-leptos_meta = {workspace = true}
-leptos_router = {workspace = true}
+# Leptos framework (CSR + WASM)
+leptos = { version = "0.8.17", features = ["csr"] }
+leptos_meta = "0.8.6"
+leptos_router = "0.8.13"
+leptos_i18n = { version = "0.6.2", features = ["csr"] }
 
-# WASM bindings
-js-sys.workspace = true
-wasm-bindgen-futures.workspace = true
-wasm-bindgen.workspace = true
-web-sys = {workspace = true, features = [
+# Web APIs (WebRTC, IndexedDB, etc.)
+web-sys = { version = "0.3.95", features = [
   "Window",
   "Document",
   "Element",
   "HtmlElement",
-  "Storage",
-  "WebSocket",
-  "RtcPeerConnection",
-  "RtcDataChannel",
-  "RtcSessionDescription",
-  "RtcIceCandidate",
-  "MediaStream",
-  "MediaDevices",
   "Navigator",
-]}
+  "Location",
+  "Storage",
+  "MediaQueryList",
+  "MediaQueryListEvent",
+  "Performance",
+  "PerformanceEntry",
+  "PerformanceNavigation",
+  "Blob",
+  "BlobPropertyBag",
+  "Url",
+  "KeyboardEvent",
+  "RtcPeerConnection",
+  "RtcConfiguration",
+  "RtcDataChannel",
+  "RtcDataChannelInit",
+  "RtcIceCandidate",
+  "RtcSessionDescription",
+  "RtcSessionDescriptionInit",
+  "RtcStatsReport",
+  "MediaStream",
+  "MediaStreamConstraints",
+  "MediaStreamTrack",
+  "RtcRtpSender",
+  "MediaDevices",
+  "MediaDeviceInfo",
+  "DisplayMediaStreamConstraints",
+  "CssStyleDeclaration",
+] }
+js-sys = "0.3.95"
+wasm-bindgen = "0.2.118"
+wasm-bindgen-futures = "0.4.68"
 
 # Serialization
-bitcode.workspace = true
-serde.workspace = true
-serde_json.workspace = true
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
 
-# Error handling
-anyhow.workspace = true
-thiserror.workspace = true
+# Date & time
+chrono = { version = "0.4.44", features = ["wasmbind"] }
 
-# UUID
-uuid.workspace = true
+# UUID generation (js feature enables wasm-bindgen support)
+uuid = { version = "1.23.0", features = ["js", "v4"] }
 
-# Time
-chrono = {workspace = true, features = ["wasmbind"]}
+# Bitcode codec for binary WebSocket messages
+bitcode = "0.6.9"
 
-# Async utilities
-async-trait.workspace = true
-futures.workspace = true
-
-# Logging
-tracing-wasm = "0.2.1"
-tracing.workspace = true
-
-# Internal crates
-message = {path = "../message", features = ["wasm"]}
+# Shared message crate (includes signaling, datachannel, etc.)
+message = { path = "../message", features = ["wasm"] }
 
 [dev-dependencies]
-proptest.workspace = true
-wasm-bindgen-test.workspace = true
+wasm-bindgen-test = "0.3.68"
+
+[build-dependencies]
+leptos_i18n_build = { version = "0.6.2", features = ["csr"] }
+leptos_i18n_parser = "0.6.2"
+
+[package.metadata.leptos-i18n]
+default = "en"
+locales = ["en", "zh-CN"]
 
 [features]
-csr = ["leptos/csr"]
 default = ["csr"]
-hydrate = ["leptos/hydrate"]
-ssr = ["leptos/ssr", "leptos_router/ssr"]
+csr = ["leptos/csr", "leptos_i18n/csr"]

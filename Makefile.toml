@@ -16,14 +16,25 @@ dependencies = ["dev"]
 # ============================================================================
 
 [tasks.dev]
-dependencies = ["build-message"]
-description = "Start development environment with hot-reload (backend + frontend)"
+dependencies = ["build-message", "css-process"]
+description = "Start development environment with hot-reload (backend + frontend + CSS watcher)"
 workspace = false
 script = '''
 #!/bin/bash
 trap 'kill 0; exit' SIGINT SIGTERM
 
-echo "[dev] Starting backend (cargo watch) and frontend (trunk serve) in parallel..."
+echo "[dev] Starting development environment..."
+
+# Run initial CSS processing
+echo "[dev] Running initial CSS processing..."
+./target/release/css-processor frontend/styles frontend/styles-dist
+
+echo "[dev] Starting backend, frontend, and CSS watcher in parallel..."
+
+# Start CSS watcher in background (watches styles/ and rebuilds styles-dist/)
+# --dist copies processed CSS directly to Trunk's dist/styles/ for live-reload
+# without triggering a full Trunk rebuild cycle.
+./target/release/css-processor --watch --dist frontend/dist/styles frontend/styles frontend/styles-dist &
 
 # Start backend watch in background
 (cd server && cargo watch -w . -w ../message -x run) &
@@ -68,6 +79,36 @@ install_crate = {crate_name = "wasm-pack", binary = "wasm-pack", test_arg = ["--
 [tasks.setup-cargo-watch]
 description = "Install cargo-watch for development watching"
 install_crate = {crate_name = "cargo-watch", binary = "cargo-watch", test_arg = ["watch", "--version"]}
+
+# ============================================================================
+# CSS Preprocessing Tasks
+# ============================================================================
+
+[tasks.css-process]
+args = ["build", "--release", "-p", "css-processor"]
+command = "cargo"
+description = "Build the CSS preprocessor tool"
+workspace = false
+
+[tasks.css-expand]
+dependencies = ["css-process"]
+description = "Run CSS preprocessor to expand composes declarations"
+script = '''
+#!/bin/bash
+set -euo pipefail
+./target/release/css-processor frontend/styles frontend/styles-dist
+'''
+workspace = false
+
+[tasks.css-watch]
+dependencies = ["css-process"]
+description = "Watch CSS files and rebuild on changes (hot-reload)"
+script = '''
+#!/bin/bash
+set -euo pipefail
+./target/release/css-processor --watch frontend/styles frontend/styles-dist
+'''
+workspace = false
 
 # ============================================================================
 # Build Tasks
@@ -273,6 +314,16 @@ args = ["watch", "-w", ".", "-w", "../message", "-x", "run"]
 command = "cargo"
 cwd = "server"
 description = "Watch server and message crates, rebuild on changes"
+workspace = false
+
+[tasks.watch-css]
+dependencies = ["css-process"]
+description = "Watch CSS source files and rebuild styles-dist on changes"
+script = '''
+#!/bin/bash
+set -euo pipefail
+./target/release/css-processor --watch frontend/styles frontend/styles-dist
+'''
 workspace = false
 
 [tasks.watch-frontend]

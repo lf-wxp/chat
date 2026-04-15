@@ -1,0 +1,137 @@
+/**
+ * Base Styles
+ * Foundational element styles that apply globally.
+ */
+
+/* ── HTML & Body ── */
+html {
+  font-size: 16px;
+  line-height: var(--line-height-normal, 1.5);
+  background-color: var(--bg-primary, #ffffff);
+  color: var(--text-primary, #0f172a);
+  transition: background-color var(--duration-normal, 200ms) var(--ease-default, ease),
+              color var(--duration-normal, 200ms) var(--ease-default, ease);
+}
+
+body {
+  min-height: 100vh;
+  font-family: var(--font-family, system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Links ── */
+a {
+  color: var(--color-primary, #3b82f6);
+  text-decoration: none;
+  transition: color var(--duration-fast, 150ms) var(--ease-default, ease);
+
+  &:hover {
+    color: var(--color-primary-hover, #2563eb);
+  }
+}
+
+/* ── Headings (fluid typography with clamp()) ── */
+h1 {
+  font-size: clamp(var(--font-2xl, 1.5rem), 4vw, var(--font-4xl, 2.25rem));
+  line-height: var(--line-height-tight, 1.25);
+  letter-spacing: var(--letter-spacing-tight, -0.025em);
+}
+
+h2 {
+  font-size: clamp(var(--font-xl, 1.25rem), 3.5vw, var(--font-3xl, 1.875rem));
+  line-height: var(--line-height-tight, 1.25);
+}
+
+h3 {
+  font-size: clamp(var(--font-lg, 1.125rem), 3vw, var(--font-2xl, 1.5rem));
+  line-height: var(--line-height-tight, 1.25);
+}
+
+h4 {
+  font-size: var(--font-xl, 1.25rem);
+  line-height: var(--line-height-normal, 1.5);
+}
+
+h5 {
+  font-size: var(--font-lg, 1.125rem);
+  line-height: var(--line-height-normal, 1.5);
+}
+
+h6 {
+  font-size: var(--font-base, 1rem);
+  line-height: var(--line-height-normal, 1.5);
+}
+
+/* ── Paragraphs ── */
+p {
+  margin-bottom: var(--space-4, 1rem);
+  color: var(--text-secondary, #475569);
+}
+
+/* ── Code ── */
+code {
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: var(--font-sm, 0.875rem);
+  background-color: var(--bg-tertiary, #f1f5f9);
+  padding: 0.125em 0.25em;
+  border-radius: var(--radius-sm, 0.25rem);
+}
+
+pre {
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: var(--font-sm, 0.875rem);
+  background-color: var(--bg-tertiary, #f1f5f9);
+  padding: var(--space-4, 1rem);
+  border-radius: var(--radius-md, 0.375rem);
+  overflow-x: auto;
+
+  & code {
+    background: none;
+    padding: 0;
+    border-radius: 0;
+  }
+}
+
+/* ── Horizontal Rule ── */
+hr {
+  border: none;
+  border-top: 1px solid var(--border-color, #e2e8f0);
+  margin: var(--space-6, 2rem) 0;
+}
+
+/* ── Blockquote ── */
+blockquote {
+  border-left: 4px solid var(--color-primary, #3b82f6);
+  padding-left: var(--space-4, 1rem);
+  color: var(--text-secondary, #475569);
+  margin: var(--space-4, 1rem) 0;
+}
+
+/* ── Selection ── */
+/* Defined in main.css to avoid duplication */
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary, #f8fafc);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color, #e2e8f0);
+  border-radius: var(--radius-full, 9999px);
+
+  &:hover {
+    background: var(--border-color-hover, #cbd5e1);
+  }
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color, #e2e8f0) var(--bg-secondary, #f8fafc);
+}

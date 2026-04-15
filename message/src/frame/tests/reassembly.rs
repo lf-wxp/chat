@@ -1,8 +1,8 @@
 //! `ReassemblyBuffer` and `ChunkManager` tests.
 
 use super::*;
-use std::time::{Duration, Instant};
 use crate::types::MessageId;
+use std::time::{Duration, Instant};
 
 // =============================================================================
 // Reassembly Buffer Basic Tests

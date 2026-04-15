@@ -404,7 +404,7 @@ BC BC 06 06 53 49 47 30 30 33 14 49 43 45 20 63 6F 6E 6E 65 63 74 69 6F 6E 20 66
 
 **Usage Context:**
 - WHEN the server encounters an error (authentication failure, SDP negotiation timeout, ICE connection failed, etc.) THEN it SHALL send an `ErrorResponse` message to the client
-- The client SHALL use `i18n_key` to look up the localized error message in `/assets/i18n/{locale}.json`
+- The client SHALL use `i18n_key` to look up the localized error message in `/locales/{locale}.json`
 - The client SHALL display the error in the UI with an optional "Learn more" expandable section (see [requirements.md](./requirements.md#error-message-internationalization))
 - The `trace_id` SHALL be included in both client and server logs for error tracing across the full request lifecycle
 

@@ -1,0 +1,215 @@
+/**
+ * Modal
+ * Overlay dialog component styles with backdrop, animations, and accessibility.
+ * Uses modern CSS: nesting, @starting-style, CSS Anchor Positioning (for tooltips).
+ */
+
+/* ── Modal Backdrop ── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: var(--bg-overlay, rgb(0 0 0 / 0.5));
+  z-index: var(--z-overlay, 300);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4, 1rem);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--duration-normal, 200ms) var(--ease-default, ease),
+              visibility var(--duration-normal, 200ms) var(--ease-default, ease);
+
+  &.modal-backdrop-visible {
+    opacity: 1;
+    visibility: visible;
+
+    & .modal {
+      transform: scale(1) translateY(0);
+    }
+  }
+}
+
+/* ── Modal Container ── */
+.modal {
+  position: relative;
+  background-color: var(--bg-elevated, #ffffff);
+  border-radius: var(--radius-xl, 0.75rem);
+  box-shadow: var(--shadow-xl);
+  max-width: 32rem;
+  width: 100%;
+  max-height: calc(100vh - 4rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: scale(0.95) translateY(10px);
+  transition: transform var(--duration-normal, 200ms) var(--ease-bounce, cubic-bezier(0.68, -0.55, 0.265, 1.55));
+}
+
+/* ── Modal Header ── */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4, 1rem) var(--space-6, 2rem);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.modal-title {
+  font-size: var(--font-lg, 1.125rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--text-primary, #0f172a);
+}
+
+.modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-full, 9999px);
+  color: var(--text-tertiary, #94a3b8);
+  cursor: pointer;
+  transition: all var(--duration-fast, 150ms) var(--ease-default, ease);
+
+  &:hover {
+    background-color: var(--bg-tertiary, #f1f5f9);
+    color: var(--text-primary, #0f172a);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary, #3b82f6);
+    outline-offset: 2px;
+  }
+}
+
+/* ── Modal Body ── */
+.modal-body {
+  padding: var(--space-4, 1rem) var(--space-6, 2rem);
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* ── Modal Footer ── */
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3, 0.75rem);
+  padding: var(--space-4, 1rem) var(--space-6, 2rem);
+  border-top: 1px solid var(--border-color, #e2e8f0);
+}
+
+/* ── Modal Sizes ── */
+.modal-base {
+  position: relative;
+  background-color: var(--bg-elevated, #ffffff);
+  border-radius: var(--radius-xl, 0.75rem);
+  box-shadow: var(--shadow-xl);
+  width: 100%;
+  max-height: calc(100vh - 4rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: scale(0.95) translateY(10px);
+  transition: transform var(--duration-normal, 200ms) var(--ease-bounce, cubic-bezier(0.68, -0.55, 0.265, 1.55));
+}
+
+.modal {
+  composes: modal-base;
+  max-width: 32rem;
+}
+
+.modal-sm {
+  composes: modal-base;
+  max-width: 24rem;
+}
+
+.modal-lg {
+  composes: modal-base;
+  max-width: 48rem;
+}
+
+.modal-xl {
+  composes: modal-base;
+  max-width: 64rem;
+}
+
+.modal-full {
+  composes: modal-base;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 0;
+}
+
+/* ── Confirmation Dialog ── */
+.modal-confirm-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-full, 9999px);
+  margin-bottom: var(--space-4, 1rem);
+
+  &.modal-confirm-icon-danger {
+    background-color: color-mix(in oklch, var(--color-error) 12%, transparent);
+    color: var(--color-error, #ef4444);
+  }
+
+  &.modal-confirm-icon-warning {
+    background-color: color-mix(in oklch, var(--color-warning) 12%, transparent);
+    color: var(--color-warning, #f59e0b);
+  }
+}
+
+.modal-confirm-title {
+  font-size: var(--font-lg, 1.125rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--text-primary, #0f172a);
+  margin-bottom: var(--space-2, 0.5rem);
+}
+
+.modal-confirm-description {
+  font-size: var(--font-sm, 0.875rem);
+  color: var(--text-secondary, #475569);
+}
+
+/* ── Entry Animation (for dynamically inserted elements) ── */
+@starting-style {
+  .modal-backdrop-visible {
+    opacity: 0;
+  }
+
+  .modal-backdrop-visible .modal {
+    transform: scale(0.95) translateY(10px);
+  }
+}
+
+/* ── CSS Anchor Positioning for modal tooltips ── */
+@supports (anchor-name: --modal-trigger) {
+  .modal-trigger {
+    anchor-name: --modal-trigger;
+  }
+
+  .modal-tooltip {
+    position: fixed;
+    position-anchor: --modal-trigger;
+    inset-area: top;
+    margin-bottom: var(--space-2, 0.5rem);
+  }
+}
+
+/* ── Responsive: Mobile ── */
+@media (max-width: 767px) {
+  .modal {
+    max-width: 100%;
+    border-radius: var(--radius-xl, 0.75rem) var(--radius-xl, 0.75rem) 0 0;
+    max-height: 80vh;
+  }
+
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  }
+}

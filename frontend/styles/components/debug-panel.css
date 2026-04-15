@@ -1,0 +1,267 @@
+/**
+ * Debug Panel
+ * Overlay debug log viewer with filtering, search, and export.
+ * Uses modern CSS: nesting, @starting-style, @container.
+ */
+
+/* ── Debug Panel Overlay ── */
+.debug-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: var(--bg-overlay, rgb(0 0 0 / 0.5));
+  z-index: var(--z-max, 9999);
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--duration-normal, 200ms) var(--ease-default, ease),
+    visibility var(--duration-normal, 200ms) var(--ease-default, ease);
+
+  &.debug-panel-visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+
+    & .debug-panel {
+      transform: translateX(0);
+    }
+  }
+}
+
+/* ── Debug Panel Container ── */
+.debug-panel {
+  container-type: inline-size;
+  container-name: debug-panel;
+  width: min(48rem, 100vw);
+  height: 100vh;
+  background-color: var(--bg-primary, #ffffff);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateX(100%);
+  transition: transform var(--duration-normal, 200ms) var(--ease-default, ease);
+}
+
+/* ── Debug Panel Header ── */
+.debug-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  flex-shrink: 0;
+}
+
+.debug-panel-title {
+  font-size: var(--font-lg, 1.125rem);
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--text-primary, #0f172a);
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+}
+
+.debug-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+}
+
+/* ── Debug Panel Toolbar ── */
+.debug-panel-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.debug-panel-search {
+  flex: 1;
+  min-width: 12rem;
+  padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: var(--font-xs, 0.75rem);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-sm, 0.25rem);
+  background-color: var(--bg-secondary, #f8fafc);
+  color: var(--text-primary, #0f172a);
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-primary, #3b82f6);
+  }
+}
+
+/* ── Level Filter Buttons ── */
+.debug-level-filter {
+  display: flex;
+  gap: var(--space-1, 0.25rem);
+}
+
+.debug-level-btn {
+  padding: var(--space-0, 0) var(--space-2, 0.5rem);
+  font-size: var(--font-xs, 0.75rem);
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  border-radius: var(--radius-sm, 0.25rem);
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: transparent;
+  color: var(--text-secondary, #475569);
+  cursor: pointer;
+  transition: all var(--duration-fast, 150ms) var(--ease-default, ease);
+
+  &:hover {
+    background-color: var(--bg-tertiary, #f1f5f9);
+  }
+
+  &.debug-level-active {
+    background-color: var(--color-primary, #3b82f6);
+    color: #ffffff;
+    border-color: var(--color-primary, #3b82f6);
+  }
+
+  &[data-level="error"] {
+    &.debug-level-active {
+      background-color: var(--color-error, #ef4444);
+      border-color: var(--color-error, #ef4444);
+    }
+  }
+
+  &[data-level="warn"] {
+    &.debug-level-active {
+      background-color: var(--color-warning, #f59e0b);
+      border-color: var(--color-warning, #f59e0b);
+    }
+  }
+}
+
+/* ── Log List ── */
+.debug-log-list {
+  flex: 1;
+  overflow-y: auto;
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: var(--font-xs, 0.75rem);
+  line-height: 1.6;
+  padding: 0;
+}
+
+/* ── Log Entry (shared base properties for composes) ── */
+.debug-log-entry-base {
+  display: flex;
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-1, 0.25rem) var(--space-4, 1rem);
+  border-bottom: 1px solid color-mix(in oklch, var(--border-color) 50%, transparent);
+  transition: background-color var(--duration-fast, 150ms) var(--ease-default, ease);
+
+  &:hover {
+    background-color: var(--bg-secondary, #f8fafc);
+  }
+}
+
+/* ── Log Entry ── */
+.debug-log-entry {
+  composes: debug-log-entry-base;
+
+  &.debug-log-error {
+    composes: debug-log-entry-base;
+    background-color: color-mix(in oklch, var(--color-error) 5%, transparent);
+    color: var(--color-error, #ef4444);
+  }
+
+  &.debug-log-warn {
+    composes: debug-log-entry-base;
+    background-color: color-mix(in oklch, var(--color-warning) 5%, transparent);
+    color: var(--color-warning, #f59e0b);
+  }
+
+  &.debug-log-info {
+    composes: debug-log-entry-base;
+    color: var(--text-primary, #0f172a);
+  }
+
+  &.debug-log-debug {
+    composes: debug-log-entry-base;
+    color: var(--text-secondary, #475569);
+  }
+
+  &.debug-log-trace {
+    composes: debug-log-entry-base;
+    color: var(--text-tertiary, #94a3b8);
+  }
+}
+
+.debug-log-time {
+  flex-shrink: 0;
+  color: var(--text-tertiary, #94a3b8);
+  min-width: 5rem;
+}
+
+.debug-log-level {
+  flex-shrink: 0;
+  font-weight: var(--font-weight-semibold, 600);
+  min-width: 3.5rem;
+}
+
+.debug-log-module {
+  flex-shrink: 0;
+  color: var(--color-primary, #3b82f6);
+  min-width: 6rem;
+}
+
+.debug-log-message {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+/* ── Debug Panel Footer ── */
+.debug-panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+  border-top: 1px solid var(--border-color, #e2e8f0);
+  font-size: var(--font-xs, 0.75rem);
+  color: var(--text-tertiary, #94a3b8);
+  flex-shrink: 0;
+}
+
+/* ── Entry Animation (for @starting-style on visibility toggle) ── */
+/* @starting-style triggers when an element first matches a selector.
+   By targeting the .debug-panel-visible class, the transition fires
+   when the backdrop becomes visible, creating a smooth fade-in/slide-in. */
+@starting-style {
+  .debug-panel-visible.debug-panel-backdrop {
+    opacity: 0;
+  }
+
+  .debug-panel-visible.debug-panel-backdrop .debug-panel {
+    transform: translateX(100%);
+  }
+}
+
+/* ── @container responsive ── */
+@container debug-panel (max-width: 400px) {
+  .debug-log-time {
+    display: none;
+  }
+
+  .debug-log-module {
+    display: none;
+  }
+
+  .debug-panel-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ── Responsive: Mobile ── */
+@media (max-width: 767px) {
+  .debug-panel {
+    width: 100vw;
+  }
+}

@@ -1,0 +1,228 @@
+/**
+ * Toast / Notification
+ * Lightweight notification banners with auto-dismiss and stacking.
+ * Uses modern CSS: nesting, @starting-style, View Transitions.
+ */
+
+/* ── Toast Container (stacking) ── */
+.toast-container {
+  position: fixed;
+  z-index: var(--z-toast, 600);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+  pointer-events: none;
+  max-height: 100vh;
+  overflow: hidden;
+
+  &.toast-container-top {
+    top: var(--space-4, 1rem);
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  &.toast-container-bottom-right {
+    bottom: var(--space-4, 1rem);
+    right: var(--space-4, 1rem);
+    align-items: flex-end;
+  }
+
+  &.toast-container-bottom-left {
+    bottom: var(--space-4, 1rem);
+    left: var(--space-4, 1rem);
+    align-items: flex-start;
+  }
+}
+
+/* ── Toast Item ── */
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3, 0.75rem);
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  min-width: 20rem;
+  max-width: 28rem;
+  background-color: var(--bg-elevated, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-lg, 0.5rem);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--font-sm, 0.875rem);
+  color: var(--text-primary, #0f172a);
+  pointer-events: auto;
+  transform: translateX(100%);
+  opacity: 0;
+  transition: all var(--duration-normal, 200ms) var(--ease-default, ease);
+  /* Enable View Transitions for toast add/remove */
+  view-transition-name: toast;
+
+  &.toast-visible {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Direction overrides for different container positions */
+.toast-container-bottom-left .toast {
+  transform: translateX(-100%);
+
+  &.toast-visible {
+    transform: translateX(0);
+  }
+}
+
+.toast-container-top .toast {
+  transform: translateY(-100%);
+
+  &.toast-visible {
+    transform: translateY(0);
+  }
+}
+
+/* ── Toast Icon ── */
+.toast-icon {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* ── Toast Content ── */
+.toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-title {
+  font-weight: var(--font-weight-semibold, 600);
+  margin-bottom: var(--space-1, 0.25rem);
+}
+
+.toast-message {
+  color: var(--text-secondary, #475569);
+  word-break: break-word;
+}
+
+/* ── Toast Close ── */
+.toast-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-full, 9999px);
+  color: var(--text-tertiary, #94a3b8);
+  cursor: pointer;
+  transition: all var(--duration-fast, 150ms) var(--ease-default, ease);
+
+  &:hover {
+    background-color: var(--bg-tertiary, #f1f5f9);
+    color: var(--text-primary, #0f172a);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary, #3b82f6);
+    outline-offset: 2px;
+  }
+}
+
+/* ── Toast Variants (shared icon color property for composes) ── */
+.toast-variant-icon {
+  /* Base class: only provides the icon color override.
+     Each variant composes this to apply its icon color. */
+}
+
+/* ── Toast Variants ── */
+.toast-success {
+  & .toast-icon {
+    composes: toast-variant-icon;
+    color: var(--color-success, #22c55e);
+  }
+}
+
+.toast-error {
+  composes: toast-variant-icon;
+  border-color: color-mix(in oklch, var(--color-error) 30%, transparent);
+
+  & .toast-icon {
+    composes: toast-variant-icon;
+    color: var(--color-error, #ef4444);
+  }
+}
+
+.toast-warning {
+  composes: toast-variant-icon;
+  border-color: color-mix(in oklch, var(--color-warning) 30%, transparent);
+
+  & .toast-icon {
+    composes: toast-variant-icon;
+    color: var(--color-warning, #f59e0b);
+  }
+}
+
+.toast-info {
+  & .toast-icon {
+    composes: toast-variant-icon;
+    color: var(--color-info, #0ea5e9);
+  }
+}
+
+/* ── Toast Progress Bar ── */
+.toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background-color: var(--color-primary, #3b82f6);
+  border-radius: 0 0 var(--radius-lg, 0.5rem) var(--radius-lg, 0.5rem);
+  transition: width linear;
+}
+
+/* ── Toast Dark Theme Override ── */
+[data-theme="dark"] .toast {
+  background-color: var(--bg-elevated, #1e293b);
+  border-color: var(--border-color, #334155);
+}
+
+/* ── Entry Animation ── */
+@starting-style {
+  .toast-visible {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+/* ── Anchor Positioning ── */
+/* When a toast is anchored to an element (e.g., a button that
+   triggered the notification), use CSS Anchor Positioning to
+   position the toast relative to that anchor without JS math.
+   Fallback: the default fixed positioning above still applies
+   for browsers without anchor-positioning support. */
+@supports (anchor-name: --toast-anchor) {
+  .toast-anchor-trigger {
+    anchor-name: --toast-anchor;
+  }
+
+  .toast-container-anchored {
+    position: fixed;
+    position-anchor: --toast-anchor;
+    top: anchor(bottom);
+    left: anchor(center);
+    justify-self: center;
+    margin-top: var(--space-2, 0.5rem);
+  }
+}
+
+/* ── Responsive: Mobile ── */
+@media (max-width: 767px) {
+  .toast-container-bottom-right,
+  .toast-container-bottom-left {
+    left: var(--space-4, 1rem);
+    right: var(--space-4, 1rem);
+    align-items: stretch;
+  }
+
+  .toast {
+    max-width: 100%;
+    min-width: 0;
+  }
+}

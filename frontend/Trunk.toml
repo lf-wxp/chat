@@ -4,7 +4,12 @@ public_url = "/"
 target = "index.html"
 
 [watch]
-watch = ["src", "index.html", "styles"]
+# Only watch src and index.html for WASM rebuilds.
+# CSS hot-reload is handled independently by css-processor --watch --dist,
+# which copies processed files directly to dist/styles/ and the browser-side
+# polling script in index.html detects changes and reloads <link> tags
+# without a full page refresh.
+watch = ["src", "index.html"]
 
 [serve]
 addresses = ["127.0.0.1"]
@@ -14,6 +19,16 @@ port = 8080
 [tools]
 sass = "1.77"
 wasm_bindgen = "0.2.118"
+
+[[hooks]]
+# Pre-build hook: run css-processor to expand composes declarations.
+# In dev mode (cargo make dev), css-processor is pre-built and runs in watch mode
+# separately, so this hook uses --skip-build to avoid recompiling.
+# For standalone `trunk build`, it will build css-processor if needed.
+arguments = []
+command = "bash"
+command_arguments = ["css-hook.sh", "--skip-build", "--dev"]
+stage = "pre_build"
 
 [[hooks]]
 arguments = ["Frontend build complete"]

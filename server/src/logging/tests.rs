@@ -187,7 +187,10 @@ fn test_create_file_writer_with_nested_directory() {
   std::fs::create_dir_all(&nested_dir).expect("Failed to create nested dir");
 
   let result = create_file_writer(&config);
-  assert!(result.is_ok(), "create_file_writer should succeed with nested dir");
+  assert!(
+    result.is_ok(),
+    "create_file_writer should succeed with nested dir"
+  );
 }
 
 #[test]
@@ -219,7 +222,10 @@ fn test_init_creates_log_directory() {
 
   // The key assertion is that the log directory gets created
   let result = try_init(&config);
-  assert!(result.is_ok(), "try_init should succeed (or return None if already init)");
+  assert!(
+    result.is_ok(),
+    "try_init should succeed (or return None if already init)"
+  );
 
   // The main test: log directory should be created
   assert!(log_dir.exists(), "Log directory should be created");
@@ -233,7 +239,10 @@ fn test_init_stdout_mode() {
 
   // Accept either Ok(Some) or Ok(None) - global subscriber may already be set
   let result = try_init(&config);
-  assert!(result.is_ok(), "try_init with stdout should succeed or return None");
+  assert!(
+    result.is_ok(),
+    "try_init with stdout should succeed or return None"
+  );
 }
 
 #[test]
@@ -244,7 +253,10 @@ fn test_init_file_mode() {
 
   // Accept either Ok(Some) or Ok(None) - global subscriber may already be set
   let result = try_init(&config);
-  assert!(result.is_ok(), "try_init with file should succeed or return None");
+  assert!(
+    result.is_ok(),
+    "try_init with file should succeed or return None"
+  );
 }
 
 #[test]
@@ -255,7 +267,10 @@ fn test_init_both_mode() {
 
   // Accept either Ok(Some) or Ok(None) - global subscriber may already be set
   let result = try_init(&config);
-  assert!(result.is_ok(), "try_init with both should succeed or return None");
+  assert!(
+    result.is_ok(),
+    "try_init with both should succeed or return None"
+  );
 }
 
 #[test]
@@ -267,7 +282,10 @@ fn test_init_with_json_format() {
 
   // Accept either Ok(Some) or Ok(None) - global subscriber may already be set
   let result = try_init(&config);
-  assert!(result.is_ok(), "try_init with JSON format should succeed or return None");
+  assert!(
+    result.is_ok(),
+    "try_init with JSON format should succeed or return None"
+  );
 }
 
 #[test]
@@ -279,7 +297,10 @@ fn test_init_with_pretty_format() {
 
   // Accept either Ok(Some) or Ok(None) - global subscriber may already be set
   let result = try_init(&config);
-  assert!(result.is_ok(), "try_init with pretty format should succeed or return None");
+  assert!(
+    result.is_ok(),
+    "try_init with pretty format should succeed or return None"
+  );
 }
 
 // =============================================================================
@@ -295,7 +316,10 @@ fn test_log_rotation_daily() {
 
   // Accept either Ok(Some) or Ok(None) - global subscriber may already be set
   let result = try_init(&config);
-  assert!(result.is_ok(), "try_init with Daily rotation should succeed or return None");
+  assert!(
+    result.is_ok(),
+    "try_init with Daily rotation should succeed or return None"
+  );
 }
 
 #[test]
@@ -307,7 +331,10 @@ fn test_log_rotation_hourly() {
 
   // Accept either Ok(Some) or Ok(None) - global subscriber may already be set
   let result = try_init(&config);
-  assert!(result.is_ok(), "try_init with Hourly rotation should succeed or return None");
+  assert!(
+    result.is_ok(),
+    "try_init with Hourly rotation should succeed or return None"
+  );
 }
 
 #[test]
@@ -319,7 +346,10 @@ fn test_log_rotation_never() {
 
   // Accept either Ok(Some) or Ok(None) - global subscriber may already be set
   let result = try_init(&config);
-  assert!(result.is_ok(), "try_init with Never rotation should succeed or return None");
+  assert!(
+    result.is_ok(),
+    "try_init with Never rotation should succeed or return None"
+  );
 }
 
 // =============================================================================
@@ -373,7 +403,8 @@ fn test_desensitize_jwt_long_token() {
 #[test]
 fn test_desensitize_jwt_unicode_token() {
   // Token with unicode characters
-  let token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiLkvY3kvJoiLCJuYW1lIjoi5L2g5aKQIn0.dozjgNryP4J3jVmNHl0w5Nc";
+  let token =
+    "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiLkvY3kvJoiLCJuYW1lIjoi5L2g5aKQIn0.dozjgNryP4J3jVmNHl0w5Nc";
   let result = desensitize_jwt(token);
   // First 8 chars are ASCII, should be preserved
   assert!(result.starts_with("eyJhbGci"));

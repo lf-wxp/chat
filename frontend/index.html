@@ -1,16 +1,109 @@
 <!doctype html>
 <html lang="en">
 	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="theme-color" content="#3b82f6" />
+		<meta name="description" content="WebRTC Multi-User Chat Application" />
 		<title>WebRTC Chat</title>
-		<meta
-			name="description"
-			content="WebRTC-based multi-user chat application"
-		/>
-		<link data-trunk rel="css" href="styles/main.css" />
+
+		<!-- Copy preprocessed styles directory to dist (Trunk asset pipeline) -->
+		<!-- css-hook.sh runs css-processor: styles/ -> styles-dist/ (expands composes) -->
+		<link data-trunk rel="copy-dir" href="styles-dist" data-target-path="styles" />
+		<!-- CSS Stylesheet (loaded from copied directory) -->
+		<link rel="stylesheet" href="styles/main.css" />
+
+		<!-- Leptos i18n: locale detection for initial page load -->
+		<script type="text/javascript">
+			// Detect browser locale for initial load
+			(function () {
+				var stored = localStorage.getItem('locale');
+				if (stored) {
+					document.documentElement.setAttribute('lang', stored);
+					return;
+				}
+				var lang = navigator.language || navigator.languages[0] || 'en';
+				if (lang.startsWith('zh')) lang = 'zh-CN';
+				else if (lang.startsWith('en')) lang = 'en';
+				else lang = 'en'; // fallback
+				document.documentElement.setAttribute('lang', lang);
+			})();
+		</script>
+
+		<!-- Disable FOUC (Flash of Unstyled Content) -->
+		<style>
+			html {
+				visibility: hidden;
+			}
+			html[data-theme] {
+				visibility: visible;
+			}
+		</style>
 	</head>
 	<body>
-		<div id="app"></div>
+		<!-- Prevent FOUC: apply initial theme from localStorage -->
+		<script type="text/javascript">
+			(function () {
+				var theme = localStorage.getItem('theme') || 'system';
+				var isDark;
+				if (theme === 'dark') isDark = true;
+				else if (theme === 'light') isDark = false;
+				else isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+				document.documentElement.setAttribute(
+					'data-theme',
+					isDark ? 'dark' : 'light',
+				);
+			})();
+		</script>
+
+		<!-- Leptos WASM mount point -->
+		<div id="leptos"></div>
+
+		<!-- Trunk will inject WASM loader and CSS here -->
+
+		<!-- CSS Hot-Reload (dev only): polls CSS files for changes and reloads
+		     <link> tags without a full page refresh. Trunk serve sets __TRUNK_ADDRESS__
+		     which we use to detect dev mode. In production builds this script is inert. -->
+		<script type="text/javascript">
+			(function () {
+				// Only activate in dev mode (Trunk serve injects __TRUNK_ADDRESS__)
+				var isTrunkDev = document.querySelector('script[data-trunk-id]') !== null
+					|| document.querySelector('link[rel="stylesheet"][href*="styles/main.css"]') !== null;
+
+				// Simple heuristic: if we can fetch /.well-known/trunk/ws we're in dev
+				// But simpler: just check if location.port is the Trunk dev port
+				if (location.hostname !== '127.0.0.1' && location.hostname !== 'localhost') return;
+
+				var POLL_INTERVAL = 500; // ms
+				var cssLinks = document.querySelectorAll('link[rel="stylesheet"]');
+				var lastModified = {};
+
+				function checkCSS() {
+					cssLinks.forEach(function (link) {
+						var href = link.getAttribute('href');
+						if (!href) return;
+						var url = href.split('?')[0];
+
+						fetch(url, { method: 'HEAD', cache: 'no-cache' })
+							.then(function (res) {
+								var lm = res.headers.get('last-modified') || res.headers.get('etag') || '';
+								if (lastModified[url] && lastModified[url] !== lm) {
+									// CSS changed! Reload the stylesheet without page refresh
+									link.href = url + '?t=' + Date.now();
+									console.log('[css-hot-reload] Reloaded:', url);
+								}
+								lastModified[url] = lm;
+							})
+							.catch(function () {
+								// ignore fetch errors
+							});
+					});
+				}
+
+				setInterval(checkCSS, POLL_INTERVAL);
+				// Initialize lastModified on first run
+				checkCSS();
+			})();
+		</script>
 	</body>
 </html>

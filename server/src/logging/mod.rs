@@ -560,7 +560,11 @@ pub fn summarize_message(content: &str, max_len: usize) -> String {
     boundary -= 1;
   }
 
-  format!("{}... ({} bytes total)", &content[..boundary], content.len())
+  format!(
+    "{}... ({} bytes total)",
+    &content[..boundary],
+    content.len()
+  )
 }
 
 #[cfg(test)]

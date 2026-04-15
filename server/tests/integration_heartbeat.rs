@@ -220,7 +220,7 @@ async fn test_multiple_clients_timeout_independence() {
 
   // User2 keeps responding to heartbeats throughout the test
   // We need to respond multiple times during the wait period
-  
+
   // Spawn a task to keep responding to heartbeats for User2
   let handle = tokio::spawn(async move {
     for _ in 0..10 {
@@ -253,7 +253,7 @@ async fn test_multiple_clients_timeout_independence() {
     ws_state.is_connected(&user2),
     "User2 should still be connected (responded to heartbeats)"
   );
-  
+
   // Cleanup
   handle.abort();
 }

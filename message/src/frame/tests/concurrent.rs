@@ -1,9 +1,9 @@
 //! Concurrent reassembly tests.
 
 use super::*;
+use crate::types::MessageId;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use crate::types::MessageId;
 
 // =============================================================================
 // Concurrent Reassembly Tests

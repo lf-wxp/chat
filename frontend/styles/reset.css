@@ -1,0 +1,103 @@
+/**
+ * CSS Reset
+ * Minimal reset for consistent cross-browser baseline.
+ */
+
+/* Border-box model for all elements */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Prevent font size inflation */
+html {
+  -moz-text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+}
+
+/* Core body defaults */
+body {
+  min-height: 100vh;
+  line-height: var(--line-height-normal, 1.5);
+  font-family: var(--font-family, system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Remove list styles on ul/ol */
+ul,
+ol {
+  list-style: none;
+}
+
+/* Reset heading defaults */
+h1,h2,h3,h4,h5,h6 {
+  overflow-wrap: break-word;
+  font-weight: var(--font-weight-bold, 700);
+}
+
+/* Images and media responsive */
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Form elements inherit font */
+input,
+button,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+/* Remove default button styling */
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+/* Remove text area resize */
+textarea {
+  resize: vertical;
+}
+
+/* Table defaults */
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+/* Remove animations for reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Focus visible reset */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary, #3b82f6);
+  outline-offset: 2px;
+}
+
+/* Scroll behavior is defined in main.css to avoid duplication */

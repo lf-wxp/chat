@@ -826,7 +826,10 @@ fn test_danmaku_is_valid_exceeds_max_content_length() {
     video_time_ms: 0,
     timestamp_nanos: 0,
   };
-  assert!(!danmaku.is_valid(), "Content exceeding max length should be invalid");
+  assert!(
+    !danmaku.is_valid(),
+    "Content exceeding max length should be invalid"
+  );
 }
 
 #[test]
@@ -907,33 +910,51 @@ fn test_danmaku_is_valid_all_positions() {
 #[test]
 fn test_subtitle_entry_is_active_at_exact_start() {
   let entry = SubtitleEntry::new(1000, 3000, "Test".to_string());
-  assert!(entry.is_active_at(1000), "Should be active at exact start_ms");
+  assert!(
+    entry.is_active_at(1000),
+    "Should be active at exact start_ms"
+  );
 }
 
 #[test]
 fn test_subtitle_entry_is_active_at_just_before_end() {
   let entry = SubtitleEntry::new(1000, 3000, "Test".to_string());
-  assert!(entry.is_active_at(2999), "Should be active just before end_ms");
+  assert!(
+    entry.is_active_at(2999),
+    "Should be active just before end_ms"
+  );
 }
 
 #[test]
 fn test_subtitle_entry_not_active_at_exact_end() {
   let entry = SubtitleEntry::new(1000, 3000, "Test".to_string());
-  assert!(!entry.is_active_at(3000), "Should not be active at exact end_ms (exclusive)");
+  assert!(
+    !entry.is_active_at(3000),
+    "Should not be active at exact end_ms (exclusive)"
+  );
 }
 
 #[test]
 fn test_subtitle_entry_not_active_just_before_start() {
   let entry = SubtitleEntry::new(1000, 3000, "Test".to_string());
-  assert!(!entry.is_active_at(999), "Should not be active just before start_ms");
+  assert!(
+    !entry.is_active_at(999),
+    "Should not be active just before start_ms"
+  );
 }
 
 #[test]
 fn test_subtitle_entry_zero_duration() {
   let entry = SubtitleEntry::new(1000, 1000, "Instant".to_string());
   assert_eq!(entry.duration_ms(), 0, "Zero duration should return 0");
-  assert!(!entry.is_active_at(1000), "Zero duration entry should not be active at start time");
-  assert!(!entry.is_active_at(999), "Zero duration entry should not be active before start");
+  assert!(
+    !entry.is_active_at(1000),
+    "Zero duration entry should not be active at start time"
+  );
+  assert!(
+    !entry.is_active_at(999),
+    "Zero duration entry should not be active before start"
+  );
 }
 
 // =============================================================================

@@ -73,6 +73,11 @@
 
 - 文件要有合理的划分， 不要让文件过大, 要符合rust的最佳实践
 - 如果文件中测试数据过大，统一采用 #[cfg(test)] mod tests; 拆分策略
+
+## 前端组件的书写注意
+- 每个文件中只能有一个组件，多个组件不能在一个文件中
+- html的代码块中标签的缩进使用2个空格
+
 ---
 
 ## Phase 1: 公共库 (message crate + shared types)
@@ -275,7 +280,7 @@
     - 使用 View Transitions API 实现页面/视图切换动画
     - 使用 Scroll-driven Animations 实现滚动驱动效果
   - 实现主题系统（Light/Dark/System）：基于 CSS Custom Properties + `[data-theme]` 属性切换，200ms 过渡动画
-  - 实现 `leptos-i18n` 国际化框架：加载 `/assets/i18n/{locale}.json`、语言切换、浏览器语言检测
+  - 实现 `leptos-i18n` 国际化框架：加载 `/locales/{locale}.json`、语言切换、浏览器语言检测
   - 实现响应式布局框架：Desktop(≥1024px)/Tablet(768-1023px)/Mobile(<768px) 三档断点，使用 CSS Grid + Flexbox + `@container` + `@media` queries，`clamp()` 流式排版
   - 编写单元测试：Signal 状态管理、主题切换、i18n 语言切换、日志 Ring Buffer 写入/溢出/过滤
   - _需求：Req 14 (UI Interaction Design)、Req 14 Technical Implementation Notes (Native CSS Architecture)、requirements.md (Internationalization)、requirements.md (Performance - WASM bundle)、requirements.md (Observability - Frontend Logging System)_

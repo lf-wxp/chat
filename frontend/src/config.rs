@@ -1,52 +1,79 @@
-//! Frontend configuration.
+//! Application configuration.
+//!
+//! Runtime configuration loaded from Trunk environment variables
+//! and browser environment detection.
 
-/// Frontend configuration.
+/// Application configuration.
 #[derive(Debug, Clone)]
 pub struct Config {
-  /// WebSocket server URL
+  /// WebSocket URL for signaling server.
+  /// Falls back to constructing from `window.location`.
   pub ws_url: String,
-  /// API base URL
-  pub api_url: String,
-  /// Debug mode enabled
+  /// Debug mode enabled.
   pub debug: bool,
-  /// Default locale
-  pub locale: String,
+  /// Application version (embedded at build time).
+  pub version: String,
+}
+
+impl Config {
+  /// Create configuration by detecting browser environment.
+  #[must_use]
+  pub fn new() -> Self {
+    let ws_url = Self::detect_ws_url();
+    let debug = Self::detect_debug_mode();
+    let version = env!("CARGO_PKG_VERSION").to_string();
+
+    Self {
+      ws_url,
+      debug,
+      version,
+    }
+  }
+
+  /// Detect WebSocket URL.
+  ///
+  /// Uses `TRUNK_WS_URL` environment variable if set,
+  /// otherwise constructs from current browser location.
+  fn detect_ws_url() -> String {
+    // Check for build-time override via Trunk
+    option_env!("TRUNK_WS_URL").map_or_else(
+      || {
+        // Runtime fallback: construct from window.location
+        if let Some(window) = web_sys::window() {
+          let location = window.location();
+          let protocol = location.protocol().unwrap_or_default();
+          let host = location.host().unwrap_or_default();
+          let ws_protocol = if protocol == "https:" { "wss" } else { "ws" };
+          format!("{}://{}", ws_protocol, host)
+        } else {
+          "ws://localhost:8080".to_string()
+        }
+      },
+      |url| url.to_string(),
+    )
+  }
+
+  /// Detect debug mode.
+  ///
+  /// Checks `TRUNK_DEBUG` environment variable or URL query parameter.
+  fn detect_debug_mode() -> bool {
+    option_env!("TRUNK_DEBUG")
+      .map(|v| v == "true")
+      .unwrap_or_else(|| {
+        // Runtime check: look for ?debug=true in URL
+        if let Some(window) = web_sys::window() {
+          let location = window.location();
+          if let Ok(search) = location.search() {
+            return search.contains("debug=true");
+          }
+        }
+        false
+      })
+  }
 }
 
 impl Default for Config {
   fn default() -> Self {
-    Self {
-      ws_url: "ws://localhost:3000/ws".to_string(),
-      api_url: "http://localhost:3000".to_string(),
-      debug: false,
-      locale: "en".to_string(),
-    }
-  }
-}
-
-impl Config {
-  /// Create configuration from browser environment.
-  #[must_use]
-  pub fn from_browser() -> Self {
-    let mut config = Self::default();
-
-    // Check for debug mode in URL
-    if let Some(window) = web_sys::window() {
-      if let Ok(href) = window.location().href() {
-        config.debug = href.contains("debug=true");
-      }
-
-      // Check localStorage for debug mode
-      if let Ok(Some(storage)) = window.local_storage() {
-        if let Ok(Some(debug)) = storage.get_item("debug_mode") {
-          config.debug = debug == "true";
-        }
-        if let Ok(Some(locale)) = storage.get_item("locale") {
-          config.locale = locale;
-        }
-      }
-    }
-
-    config
+    Self::new()
   }
 }
