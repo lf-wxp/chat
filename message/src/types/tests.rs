@@ -513,6 +513,135 @@ fn test_member_info_json() {
 }
 
 // ===========================================================================
+// Identifier JSON Serialization Tests
+// ===========================================================================
+
+#[test]
+fn test_user_id_json() {
+  let id = UserId::new();
+  let json = serde_json::to_string(&id).expect("Failed to serialize UserId");
+  let decoded: UserId = serde_json::from_str(&json).expect("Failed to deserialize UserId");
+  assert_eq!(id, decoded);
+}
+
+#[test]
+fn test_room_id_json() {
+  let id = RoomId::new();
+  let json = serde_json::to_string(&id).expect("Failed to serialize RoomId");
+  let decoded: RoomId = serde_json::from_str(&json).expect("Failed to deserialize RoomId");
+  assert_eq!(id, decoded);
+}
+
+#[test]
+fn test_message_id_json() {
+  let id = MessageId::new();
+  let json = serde_json::to_string(&id).expect("Failed to serialize MessageId");
+  let decoded: MessageId = serde_json::from_str(&json).expect("Failed to deserialize MessageId");
+  assert_eq!(id, decoded);
+}
+
+#[test]
+fn test_transfer_id_json() {
+  let id = TransferId::new();
+  let json = serde_json::to_string(&id).expect("Failed to serialize TransferId");
+  let decoded: TransferId = serde_json::from_str(&json).expect("Failed to deserialize TransferId");
+  assert_eq!(id, decoded);
+}
+
+// ===========================================================================
+// Structs Edge Case Tests
+// ===========================================================================
+
+#[test]
+fn test_image_meta_aspect_ratio_zero_height() {
+  let meta = ImageMeta::new(
+    1920,
+    0,
+    1024,
+    "image/jpeg".to_string(),
+    "https://example.com/image.jpg".to_string(),
+  );
+  assert!(
+    (meta.aspect_ratio() - 0.0).abs() < f64::EPSILON,
+    "Aspect ratio should be 0 when height is 0"
+  );
+}
+
+#[test]
+fn test_image_meta_aspect_ratio_normal() {
+  let meta = ImageMeta::new(
+    1920,
+    1080,
+    1024,
+    "image/jpeg".to_string(),
+    "https://example.com/image.jpg".to_string(),
+  );
+  let expected = 1920.0 / 1080.0;
+  assert!((meta.aspect_ratio() - expected).abs() < 0.0001);
+}
+
+#[test]
+fn test_user_info_timestamp_methods() {
+  let user = UserInfo::new(
+    UserId::new(),
+    "testuser".to_string(),
+    "Test User".to_string(),
+  );
+  let created = user.created_at();
+  let last_seen = user.last_seen();
+  // Timestamps should be very close (within 1 second)
+  let diff = if created > last_seen {
+    created - last_seen
+  } else {
+    last_seen - created
+  };
+  assert!(diff < chrono::Duration::seconds(1));
+}
+
+#[test]
+fn test_room_info_timestamp_method() {
+  let room = RoomInfo::new(
+    RoomId::new(),
+    "Test Room".to_string(),
+    RoomType::Chat,
+    UserId::new(),
+  );
+  let created = room.created_at();
+  let now = chrono::Utc::now();
+  let diff = if now > created {
+    now - created
+  } else {
+    created - now
+  };
+  assert!(
+    diff < chrono::Duration::seconds(10),
+    "Creation time should be very recent"
+  );
+}
+
+#[test]
+fn test_member_info_timestamp_methods() {
+  let member = MemberInfo::new(UserId::new(), "Test Member".to_string(), RoomRole::Member);
+  let joined = member.joined_at();
+  let last_active = member.last_active();
+  let now = chrono::Utc::now();
+
+  let joined_diff = if now > joined {
+    now - joined
+  } else {
+    joined - now
+  };
+  let active_diff = if now > last_active {
+    now - last_active
+  } else {
+    last_active - now
+  };
+
+  assert!(joined_diff < chrono::Duration::seconds(10));
+  assert!(active_diff < chrono::Duration::seconds(10));
+}
+
+// ===========================================================================
 // Boundary value tests for max_members
 // ===========================================================================
 
@@ -820,6 +949,62 @@ fn test_room_id_from_uuid_preserves_value() {
   assert_eq!(room_id.0, specific_uuid);
 }
 
+#[test]
+fn test_room_id_as_uuid() {
+  let uuid = uuid::Uuid::new_v4();
+  let room_id = RoomId::from_uuid(uuid);
+  assert_eq!(room_id.as_uuid(), &uuid);
+}
+
+#[test]
+fn test_message_id_from_uuid_roundtrip() {
+  let uuid = uuid::Uuid::new_v4();
+  let msg_id = MessageId::from_uuid(uuid);
+  assert_eq!(msg_id.0, uuid);
+}
+
+#[test]
+fn test_message_id_as_uuid() {
+  let uuid = uuid::Uuid::new_v4();
+  let msg_id = MessageId::from_uuid(uuid);
+  assert_eq!(msg_id.as_uuid(), &uuid);
+}
+
+#[test]
+fn test_message_id_display() {
+  let msg_id = MessageId::new();
+  let display_str = msg_id.to_string();
+  assert_eq!(display_str.len(), 36);
+  assert!(display_str.contains('-'));
+}
+
+#[test]
+fn test_message_id_nil() {
+  let nil_id = MessageId::nil();
+  assert_eq!(nil_id.0, uuid::Uuid::nil());
+}
+
+#[test]
+fn test_message_id_from_uuid_preserves_value() {
+  let specific_uuid = uuid::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+  let msg_id = MessageId::from_uuid(specific_uuid);
+  assert_eq!(msg_id.as_uuid(), &specific_uuid);
+}
+
+#[test]
+fn test_transfer_id_from_uuid_roundtrip() {
+  let uuid = uuid::Uuid::new_v4();
+  let transfer_id = TransferId::from_uuid(uuid);
+  assert_eq!(transfer_id.0, uuid);
+}
+
+#[test]
+fn test_transfer_id_as_uuid() {
+  let uuid = uuid::Uuid::new_v4();
+  let transfer_id = TransferId::from_uuid(uuid);
+  assert_eq!(transfer_id.as_uuid(), &uuid);
+}
+
 // =============================================================================
 // Struct Method Tests (touch, accessors)
 // =============================================================================
@@ -940,6 +1125,13 @@ fn test_transfer_id_clone_equality() {
   assert_eq!(id, cloned);
 }
 
+#[test]
+fn test_message_id_clone_equality() {
+  let id = MessageId::new();
+  let cloned = id;
+  assert_eq!(id, cloned);
+}
+
 // =============================================================================
 // Identifier Same-UUID Equality Tests (P2-1)
 // =============================================================================
@@ -974,6 +1166,21 @@ fn test_room_id_different_uuid_inequality() {
   assert_ne!(id1, id2);
 }
 
+#[test]
+fn test_message_id_same_uuid_equality() {
+  let uuid = uuid::Uuid::new_v4();
+  let id1 = MessageId::from_uuid(uuid);
+  let id2 = MessageId::from_uuid(uuid);
+  assert_eq!(id1, id2);
+}
+
+#[test]
+fn test_message_id_different_uuid_inequality() {
+  let id1 = MessageId::new();
+  let id2 = MessageId::new();
+  assert_ne!(id1, id2);
+}
+
 // =============================================================================
 // Identifier Default Value Validation Tests (P2-1)
 // =============================================================================
@@ -998,6 +1205,15 @@ fn test_room_id_default_is_random() {
 fn test_transfer_id_default_is_random() {
   let id1 = TransferId::default();
   let id2 = TransferId::default();
+  assert_ne!(id1, id2);
+}
+
+#[test]
+fn test_message_id_default_is_random() {
+  // Default MessageId uses new() which generates a random UUID
+  let id1 = MessageId::default();
+  let id2 = MessageId::default();
+  // Two defaults should not be equal (random UUIDs)
   assert_ne!(id1, id2);
 }
 
@@ -1031,6 +1247,15 @@ fn test_transfer_id_json_roundtrip() {
   assert_eq!(transfer_id, decoded);
 }
 
+#[test]
+fn test_message_id_json_roundtrip_with_specific_uuid() {
+  let specific_uuid = uuid::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+  let msg_id = MessageId::from_uuid(specific_uuid);
+  let json = serde_json::to_string(&msg_id).expect("Failed to serialize");
+  let decoded: MessageId = serde_json::from_str(&json).expect("Failed to deserialize");
+  assert_eq!(msg_id, decoded);
+}
+
 // =============================================================================
 // Identifier Equality Transitivity Tests (P2-1)
 // =============================================================================
@@ -1053,6 +1278,17 @@ fn test_room_id_equality_transitivity() {
   let a = RoomId::from_uuid(uuid);
   let b = RoomId::from_uuid(uuid);
   let c = a.clone();
+  assert_eq!(a, b);
+  assert_eq!(b, c);
+  assert_eq!(a, c);
+}
+
+#[test]
+fn test_message_id_equality_transitivity() {
+  let uuid = uuid::Uuid::new_v4();
+  let a = MessageId::from_uuid(uuid);
+  let b = MessageId::from_uuid(uuid);
+  let c = a;
   assert_eq!(a, b);
   assert_eq!(b, c);
   assert_eq!(a, c);
@@ -1095,6 +1331,25 @@ fn test_room_id_hash_consistency() {
 
   // Clone should have same hash
   let cloned = id.clone();
+  let mut hasher3 = DefaultHasher::new();
+  cloned.hash(&mut hasher3);
+  assert_eq!(hasher1.finish(), hasher3.finish());
+}
+
+#[test]
+fn test_message_id_hash_consistency() {
+  use std::collections::hash_map::DefaultHasher;
+  use std::hash::{Hash, Hasher};
+
+  let id = MessageId::new();
+  let mut hasher1 = DefaultHasher::new();
+  let mut hasher2 = DefaultHasher::new();
+  id.hash(&mut hasher1);
+  id.hash(&mut hasher2);
+  assert_eq!(hasher1.finish(), hasher2.finish());
+
+  // Copy should have same hash
+  let cloned = id;
   let mut hasher3 = DefaultHasher::new();
   cloned.hash(&mut hasher3);
   assert_eq!(hasher1.finish(), hasher3.finish());

@@ -8,9 +8,21 @@ use leptos::prelude::*;
 use message::RoomId;
 use message::{
   UserId,
-  types::{NetworkQuality, RoomInfo, UserInfo},
+  types::{MemberInfo, NetworkQuality, RoomInfo, UserInfo, UserStatus},
 };
 use std::collections::HashMap;
+
+/// Recovery phase for the reconnect banner (P2-1 fix, Req 10.11.40).
+///
+/// Distinguishes between a simple WebSocket reconnection and a full
+/// page-refresh recovery where connections must be restored.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecoveryPhase {
+  /// WebSocket is reconnecting (network interruption).
+  Reconnecting,
+  /// Auth recovery succeeded; restoring room/peer connections.
+  RestoringConnections,
+}
 
 /// Conversation identifier.
 ///
@@ -72,6 +84,10 @@ pub struct AuthState {
   pub username: String,
   /// Nickname (display name)
   pub nickname: String,
+  /// Avatar data URI (Identicon or custom upload)
+  pub avatar: String,
+  /// Custom signature / status message (Req 10.1.6, Issue-5 fix).
+  pub signature: String,
 }
 
 /// Global application state.
@@ -91,14 +107,23 @@ pub struct AppState {
   pub connected: RwSignal<bool>,
   /// Reconnecting state (for banner display)
   pub reconnecting: RwSignal<bool>,
+  /// Recovery phase — distinguishes "Reconnecting..." from "Restoring
+  /// connections..." in the banner (P2-1 fix, Req 10.11.40).
+  pub recovery_phase: RwSignal<RecoveryPhase>,
   /// Network quality per peer
   pub network_quality: RwSignal<HashMap<UserId, NetworkQuality>>,
+  /// Room members map: room_id → member list
+  pub room_members: RwSignal<HashMap<RoomId, Vec<MemberInfo>>>,
+  /// Current user's status (Online/Busy/Away/Offline)
+  pub my_status: RwSignal<UserStatus>,
   /// Theme preference ("light" | "dark" | "system")
   pub theme: RwSignal<String>,
   /// Locale preference
   pub locale: RwSignal<String>,
   /// Debug mode enabled
   pub debug: RwSignal<bool>,
+  /// Whether the settings drawer is currently open.
+  pub settings_open: RwSignal<bool>,
 }
 
 impl AppState {
@@ -107,9 +132,13 @@ impl AppState {
   pub fn new() -> Self {
     let theme = utils::load_from_local_storage("theme").unwrap_or_else(|| "system".to_string());
     let locale = utils::load_from_local_storage("locale").unwrap_or_else(Self::detect_locale);
+    // Debug mode is enabled if EITHER localStorage has `debug_mode=true`
+    // OR the URL contains `?debug=true` (P2-3 fix). Previously the URL
+    // check was only a fallback when localStorage was absent.
     let debug = utils::load_from_local_storage("debug_mode")
       .map(|v| v == "true")
-      .unwrap_or_else(Self::detect_debug_from_url);
+      .unwrap_or(false)
+      || Self::detect_debug_from_url();
     Self {
       auth: RwSignal::new(None),
       online_users: RwSignal::new(Vec::new()),
@@ -118,10 +147,14 @@ impl AppState {
       active_conversation: RwSignal::new(None),
       connected: RwSignal::new(false),
       reconnecting: RwSignal::new(false),
+      recovery_phase: RwSignal::new(RecoveryPhase::Reconnecting),
       network_quality: RwSignal::new(HashMap::new()),
+      room_members: RwSignal::new(HashMap::new()),
+      my_status: RwSignal::new(UserStatus::Online),
       theme: RwSignal::new(theme),
       locale: RwSignal::new(locale),
       debug: RwSignal::new(debug),
+      settings_open: RwSignal::new(false),
     }
   }
 
@@ -146,7 +179,7 @@ impl AppState {
       .into_iter()
       .filter(|c| c.pinned)
       .collect();
-    pinned.sort_by(|a, b| b.pinned_ts.cmp(&a.pinned_ts));
+    pinned.sort_by_key(|c| std::cmp::Reverse(c.pinned_ts));
     pinned
   }
 
@@ -159,7 +192,7 @@ impl AppState {
       .into_iter()
       .filter(|c| !c.archived && !c.pinned)
       .collect();
-    active.sort_by(|a, b| b.last_message_ts.cmp(&a.last_message_ts));
+    active.sort_by_key(|c| std::cmp::Reverse(c.last_message_ts));
     active
   }
 
@@ -255,6 +288,26 @@ impl AppState {
     }
   }
 
+  /// Persist `active_conversation` to localStorage (Req 10.9.34).
+  fn persist_active_conversation(id: Option<&ConversationId>) {
+    match id {
+      Some(conv_id) => match serde_json::to_string(conv_id) {
+        Ok(json) => utils::save_to_local_storage("active_conversation_id", &json),
+        Err(_) => utils::remove_from_local_storage("active_conversation_id"),
+      },
+      None => utils::remove_from_local_storage("active_conversation_id"),
+    }
+  }
+
+  /// Load the previously active conversation id from localStorage.
+  fn load_active_conversation() -> Option<ConversationId> {
+    let raw = utils::load_from_local_storage("active_conversation_id")?;
+    if raw.is_empty() {
+      return None;
+    }
+    serde_json::from_str(&raw).ok()
+  }
+
   /// Detect locale from browser settings.
   fn detect_locale() -> String {
     if let Some(window) = web_sys::window()
@@ -300,6 +353,20 @@ impl Default for AppState {
 pub fn provide_app_state() -> AppState {
   let state = AppState::new();
   state.load_conversations();
+
+  // Restore the previously active conversation (Req 10.9.34). The Effect
+  // below will persist any subsequent changes automatically.
+  if let Some(id) = AppState::load_active_conversation() {
+    state.active_conversation.set(Some(id));
+  }
+
+  // Persist `active_conversation` whenever it changes.
+  let active = state.active_conversation;
+  Effect::new(move |_| {
+    let current = active.get();
+    AppState::persist_active_conversation(current.as_ref());
+  });
+
   provide_context(state);
   state
 }

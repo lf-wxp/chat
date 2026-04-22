@@ -3,13 +3,16 @@
 //! Provides the main layout structure including sidebar, chat area,
 //! and overlay components. Handles theme switching and responsive layout.
 
+use crate::auth::AuthPage;
 use crate::debug_panel::DebugPanel;
+use crate::error_handler::ErrorToastContainer;
 use crate::home_page::HomePage;
 use crate::i18n::{self, Locale};
 use crate::i18n_helpers;
 use crate::logging::use_logger_state;
 use crate::modal_manager::ModalManager;
 use crate::reconnect_banner::ReconnectBanner;
+use crate::settings_page::SettingsPage;
 use crate::sidebar::Sidebar;
 use crate::state::use_app_state;
 use crate::toast_container::ToastContainer;
@@ -103,27 +106,43 @@ pub fn App() -> impl IntoView {
     logger.set_debug_mode(debug.get());
   });
 
+  // Auth gate: show auth page when not authenticated, main app otherwise
+  let auth = app_state.auth;
+
   view! {
-    <div class="app flex h-screen overflow-hidden">
-      // Sidebar
-      <Sidebar />
+    // Global overlays sit outside the auth gate so error toasts and
+    // the reconnect banner remain visible on the login/register page
+    // (Code Quality 1 fix).
+    <ErrorToastContainer />
+    <ReconnectBanner />
 
-      // Main Content Area
-      <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
-        // Top Bar / Header
-        <TopBar />
+    <Show
+      when=move || auth.get().is_some()
+      fallback=move || view! { <AuthPage /> }
+    >
+      <div class="app flex h-screen overflow-hidden">
+        // Sidebar
+        <Sidebar />
 
-        // Chat Area / Active View
-        <div class="flex-1 overflow-y-auto">
-          <HomePage />
-        </div>
-      </main>
+        // Main Content Area
+        <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+          // Top Bar / Header
+          <TopBar />
 
-      // Overlays
-      <ToastContainer />
-      <ModalManager />
-      <ReconnectBanner />
-      <DebugPanel />
-    </div>
+          // Chat Area
+          <div class="flex-1 overflow-y-auto">
+            <HomePage />
+          </div>
+        </main>
+
+        // Settings drawer -- always mounted so its CSS transition can play
+        <SettingsPage />
+
+        // Overlays scoped to the authenticated shell
+        <ToastContainer />
+        <ModalManager />
+        <DebugPanel />
+      </div>
+    </Show>
   }
 }

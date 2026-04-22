@@ -249,7 +249,7 @@
 
 > 前端基于 Leptos 0.8+ CSR + WASM，实现所有用户交互、WebRTC 连接、DataChannel 通信、UI 渲染。
 
-- [ ] 13. 搭建前端基础框架与全局状态管理
+- [x] 13. 搭建前端基础框架与全局状态管理
   - 配置 Leptos 0.8+ CSR 项目（Trunk 构建）、WASM 优化（opt-level=z + LTO）
   - 实现全局状态管理（Leptos Signals）：
     - `auth_state: RwSignal<Option<AuthState>>`（用户认证状态）
@@ -285,16 +285,16 @@
   - 编写单元测试：Signal 状态管理、主题切换、i18n 语言切换、日志 Ring Buffer 写入/溢出/过滤
   - _需求：Req 14 (UI Interaction Design)、Req 14 Technical Implementation Notes (Native CSS Architecture)、requirements.md (Internationalization)、requirements.md (Performance - WASM bundle)、requirements.md (Observability - Frontend Logging System)_
 
-- [ ] 14. 实现 WebSocket 信令客户端与认证系统
+- [x] 14. 实现 WebSocket 信令客户端与认证系统
   - 实现 WebSocket 连接管理：二进制模式、bitcode 消息编解码（调用 message crate WASM 接口）
-  - 实现指数退避自动重连策略
+  - 实现指数退避自动重连策略（含随机抖动防止惊群效应）
   - 实现用户注册/登录 UI 与流程
   - 实现 JWT Token 持久化（localStorage）与 TokenAuth 自动恢复
   - 实现用户状态管理：在线/离线/忙碌/离开、5 分钟无操作自动切换 Away
   - 实现 `SessionInvalidated` 处理：显示提示 → 清理状态 → 跳转登录页
   - 实现全局错误处理：`ErrorResponse` 解析 → i18n 错误消息展示 → "了解更多" 展开
   - 实现 Identicon 默认头像生成（基于用户名的 SVG/Canvas 算法）
-  - 编写单元测试：WebSocket 消息编解码、Token 持久化/恢复、错误码解析
+  - 编写单元测试：重连策略（6个）、Identicon（7个）、Token 持久化/恢复、错误码解析（已在 message crate 中覆盖）
   - _需求：Req 10.1-10.2 (Auth)、Req 10.6 (Avatar)、Req 10.9 (State Persistence)、requirements.md (Error Handling)_
 
 - [ ] 15. 实现 WebRTC 连接管理与 E2EE 加密

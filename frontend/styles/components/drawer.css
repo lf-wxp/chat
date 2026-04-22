@@ -1,0 +1,243 @@
+/**
+ * Drawer
+ * Slide-in panel used for Settings and future side overlays.
+ * Pure CSS transition: opacity on the backdrop + transform on the panel.
+ * Respects prefers-reduced-motion.
+ */
+
+/* ── Backdrop ── */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal, 400);
+  background-color: var(--bg-overlay, rgb(0 0 0 / 0.5));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-normal, 200ms) var(--ease-default, ease);
+}
+
+.drawer-backdrop.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── Drawer panel ── */
+.drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: calc(var(--z-modal, 400) + 1);
+  display: flex;
+  flex-direction: column;
+  width: min(28rem, 100vw);
+  background-color: var(--bg-elevated, #ffffff);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+  transition:
+    transform var(--duration-slow, 300ms) var(--ease-default, ease),
+    visibility 0s linear var(--duration-slow, 300ms);
+  visibility: hidden;
+}
+
+.drawer.is-open {
+  visibility: visible;
+  transition:
+    transform var(--duration-slow, 300ms) var(--ease-default, ease),
+    visibility 0s linear 0s;
+}
+
+/* Variant: right-side drawer */
+.drawer-right {
+  right: 0;
+  transform: translateX(100%);
+}
+
+.drawer-right.is-open {
+  transform: translateX(0);
+}
+
+/* Variant: left-side drawer (reserved for future use) */
+.drawer-left {
+  left: 0;
+  transform: translateX(-100%);
+}
+
+.drawer-left.is-open {
+  transform: translateX(0);
+}
+
+/* Reduced motion: skip slide animation */
+@media (prefers-reduced-motion: reduce) {
+  .drawer,
+  .drawer-backdrop {
+    transition: none;
+  }
+}
+
+/* ── Drawer header ── */
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4, 1rem) var(--space-5, 1.5rem);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  flex-shrink: 0;
+}
+
+.drawer-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  font-size: var(--font-xl, 1.25rem);
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--text-primary, #0f172a);
+  margin: 0;
+}
+
+.drawer-title-icon {
+  width: 1.375rem;
+  height: 1.375rem;
+  color: var(--color-primary, #3b82f6);
+}
+
+.drawer-close {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary, #475569);
+  background: transparent;
+  border-radius: var(--radius-md, 0.375rem);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--duration-fast, 150ms) var(--ease-default, ease);
+}
+
+.drawer-close:hover {
+  background-color: var(--bg-tertiary, #f1f5f9);
+  color: var(--text-primary, #0f172a);
+}
+
+.drawer-close svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* ── Drawer body ── */
+.drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-5, 1.5rem);
+}
+
+/* ── Settings-specific layout ── */
+.settings-section {
+  margin-bottom: var(--space-6, 2rem);
+}
+
+.settings-section:last-child {
+  margin-bottom: 0;
+}
+
+.settings-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  font-size: var(--font-base, 1rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--text-primary, #0f172a);
+  margin: 0 0 var(--space-3, 0.75rem);
+}
+
+.settings-section-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--color-primary, #3b82f6);
+}
+
+.settings-row {
+  margin-bottom: var(--space-4, 1rem);
+}
+
+.settings-row:last-child {
+  margin-bottom: 0;
+}
+
+.settings-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1, 0.25rem);
+  font-size: var(--font-sm, 0.875rem);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--text-secondary, #475569);
+  margin-bottom: var(--space-2, 0.5rem);
+}
+
+.settings-label-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+/* ── Segmented button group ── */
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  background-color: var(--bg-tertiary, #f1f5f9);
+  border-radius: var(--radius-md, 0.375rem);
+  width: 100%;
+}
+
+.segmented-item {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1, 0.25rem);
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  font-size: var(--font-sm, 0.875rem);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--text-secondary, #475569);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-md, 0.375rem) - 2px);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--duration-fast, 150ms) var(--ease-default, ease);
+}
+
+.segmented-item svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.segmented-item:hover {
+  color: var(--text-primary, #0f172a);
+}
+
+.segmented-item.is-active {
+  background-color: var(--bg-elevated, #ffffff);
+  color: var(--color-primary, #3b82f6);
+  box-shadow: var(--shadow-sm);
+}
+
+.segmented-item:focus-visible {
+  outline: 2px solid var(--color-primary, #3b82f6);
+  outline-offset: 2px;
+}
+
+/* ── Logout button ── */
+.settings-logout {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+}
+
+.settings-logout svg {
+  width: 1rem;
+  height: 1rem;
+}

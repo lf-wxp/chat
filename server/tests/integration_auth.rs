@@ -78,9 +78,11 @@ async fn test_websocket_auth_valid_token() {
     SignalingMessage::AuthSuccess(AuthSuccess {
       user_id: resp_user_id,
       username,
+      nickname,
     }) => {
       assert_eq!(resp_user_id, user_id);
       assert_eq!(username, "testuser2");
+      assert_eq!(nickname, "testuser2");
     }
     SignalingMessage::AuthFailure(AuthFailure { reason }) => {
       panic!("Authentication failed: {}", reason);
@@ -265,9 +267,11 @@ async fn test_tokenauth_recovery() {
       Some(SignalingMessage::AuthSuccess(AuthSuccess {
         user_id: resp_user_id,
         username,
+        nickname,
       })) => {
         assert_eq!(resp_user_id, user_id);
         assert_eq!(username, "testuser5");
+        assert_eq!(nickname, "testuser5");
       }
       Some(SignalingMessage::AuthFailure(AuthFailure { reason })) => {
         // Token might be invalidated if login was called in between

@@ -5,7 +5,7 @@
 //!
 //! ## Features
 //!
-//! - Zero-copy ArrayBuffer ↔ `Vec<u8>` conversion
+//! - Zero-copy `ArrayBuffer` ↔ `Vec<u8>` conversion
 //! - JavaScript-friendly error handling
 //! - Frame-level encoding and decoding
 //!
@@ -48,9 +48,9 @@ use crate::frame::{MessageFrame, decode_frame, encode_frame};
 /// This performs a zero-copy conversion where possible.
 #[cfg(target_arch = "wasm32")]
 #[must_use]
-pub fn vec_to_array_buffer(vec: Vec<u8>) -> ArrayBuffer {
+pub fn vec_to_array_buffer(vec: &[u8]) -> ArrayBuffer {
   let array = Uint8Array::new_with_length(vec.len().try_into().unwrap_or(0));
-  array.copy_from(&vec);
+  array.copy_from(vec);
   array.buffer()
 }
 
@@ -74,9 +74,9 @@ pub fn uint8_array_to_vec(array: &Uint8Array) -> Vec<u8> {
 /// Convert `Vec<u8>` to JavaScript `Uint8Array`.
 #[cfg(target_arch = "wasm32")]
 #[must_use]
-pub fn vec_to_uint8_array(vec: Vec<u8>) -> Uint8Array {
+pub fn vec_to_uint8_array(vec: &[u8]) -> Uint8Array {
   let array = Uint8Array::new_with_length(vec.len().try_into().unwrap_or(0));
-  array.copy_from(&vec);
+  array.copy_from(vec);
   array
 }
 
@@ -129,7 +129,7 @@ pub fn encode_message(message_type: u8, payload: &[u8]) -> Result<Uint8Array, Js
   let frame = MessageFrame::new(message_type, payload.to_vec());
 
   encode_frame(&frame)
-    .map(vec_to_uint8_array)
+    .map(|v| vec_to_uint8_array(&v))
     .map_err(|e| JsValue::from_str(&error_to_js_string(&e)))
 }
 
@@ -139,7 +139,7 @@ pub fn encode_message(message_type: u8, payload: &[u8]) -> Result<Uint8Array, Js
 /// * `bytes` - A byte array containing the encoded frame
 ///
 /// # Returns
-/// An object with `messageType` (number) and `payload` (Uint8Array) properties.
+/// An object with `messageType` (number) and `payload` (`Uint8Array`) properties.
 ///
 /// # Errors
 /// Returns a JavaScript error if:
@@ -167,7 +167,7 @@ pub fn decode_message(bytes: &[u8]) -> Result<JsValue, JsValue> {
   )
   .map_err(|e| JsValue::from_str(&format!("Failed to set messageType: {e:?}")))?;
 
-  let payload = vec_to_uint8_array(frame.payload);
+  let payload = vec_to_uint8_array(&frame.payload);
   js_sys::Reflect::set(
     &result,
     &JsValue::from_str("payload"),
@@ -178,13 +178,13 @@ pub fn decode_message(bytes: &[u8]) -> Result<JsValue, JsValue> {
   Ok(result.into())
 }
 
-/// Encode a message from ArrayBuffer input.
+/// Encode a message from `ArrayBuffer` input.
 ///
-/// This is a convenience function that accepts an ArrayBuffer instead of a byte slice.
+/// This is a convenience function that accepts an `ArrayBuffer` instead of a byte slice.
 ///
 /// # Arguments
 /// * `message_type` - The message type discriminator byte
-/// * `buffer` - An ArrayBuffer containing the message payload
+/// * `buffer` - An `ArrayBuffer` containing the message payload
 ///
 /// # Returns
 /// A `Uint8Array` containing the complete frame.
@@ -192,25 +192,25 @@ pub fn decode_message(bytes: &[u8]) -> Result<JsValue, JsValue> {
 #[wasm_bindgen(js_name = encodeMessageFromBuffer)]
 pub fn encode_message_from_buffer(
   message_type: u8,
-  buffer: ArrayBuffer,
+  buffer: &ArrayBuffer,
 ) -> Result<Uint8Array, JsValue> {
-  let payload = array_buffer_to_vec(&buffer);
+  let payload = array_buffer_to_vec(buffer);
   encode_message(message_type, &payload)
 }
 
-/// Decode a message from ArrayBuffer input.
+/// Decode a message from `ArrayBuffer` input.
 ///
-/// This is a convenience function that accepts an ArrayBuffer instead of a byte slice.
+/// This is a convenience function that accepts an `ArrayBuffer` instead of a byte slice.
 ///
 /// # Arguments
-/// * `buffer` - An ArrayBuffer containing the encoded frame
+/// * `buffer` - An `ArrayBuffer` containing the encoded frame
 ///
 /// # Returns
 /// An object with `messageType` and `payload` properties.
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen(js_name = decodeMessageFromBuffer)]
-pub fn decode_message_from_buffer(buffer: ArrayBuffer) -> Result<JsValue, JsValue> {
-  let bytes = array_buffer_to_vec(&buffer);
+pub fn decode_message_from_buffer(buffer: &ArrayBuffer) -> Result<JsValue, JsValue> {
+  let bytes = array_buffer_to_vec(buffer);
   decode_message(&bytes)
 }
 
@@ -308,7 +308,7 @@ pub fn calculate_chunk_count(payload_len: usize) -> usize {
   if payload_len == 0 {
     return 1;
   }
-  (payload_len + crate::frame::MAX_CHUNK_SIZE - 1) / crate::frame::MAX_CHUNK_SIZE
+  payload_len.div_ceil(crate::frame::MAX_CHUNK_SIZE)
 }
 
 // =============================================================================

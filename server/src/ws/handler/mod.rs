@@ -1,12 +1,13 @@
 //! WebSocket message handler and routing.
 
+use std::fmt::Display;
 use std::sync::Arc;
 use std::time::Instant;
 
 use axum::body::Bytes;
-use axum::extract::ws::{Message, WebSocket};
+use axum::extract::ws::Message;
+use futures::Sink;
 use futures::SinkExt;
-use futures::stream::SplitSink;
 use message::UserId;
 use message::frame::decode_frame;
 use message::signaling::{
@@ -21,12 +22,16 @@ use crate::logging::{desensitize_jwt, mask_ip};
 
 /// Handle incoming WebSocket message.
 /// Returns false if the connection should be closed.
-pub async fn handle_incoming_message(
-  socket_tx: &mut SplitSink<WebSocket, Message>,
+pub async fn handle_incoming_message<S>(
+  socket_tx: &mut S,
   ws_state: &Arc<WebSocketState>,
   conn_state: &mut ConnectionState,
   msg: Message,
-) -> bool {
+) -> bool
+where
+  S: Sink<Message> + Unpin,
+  S::Error: Display,
+{
   match msg {
     Message::Binary(data) => {
       handle_binary_message(socket_tx, ws_state, conn_state, data.to_vec()).await
@@ -63,18 +68,31 @@ pub async fn handle_incoming_message(
         text_len = text.len(),
         "Unexpected text message received, closing connection"
       );
+      // Send an ErrorResponse explaining the binary-only protocol before closing.
+      let error_msg = SignalingMessage::ErrorResponse(message::ErrorResponse::new(
+        message::error::codes::SIG001,
+        "Text messages are not supported. This server uses a binary protocol (bitcode over WebSocket).",
+        "text-msg-reject",
+      ));
+      if let Ok(encoded) = encode_signaling_message(&error_msg) {
+        let _ = socket_tx.send(Message::Binary(Bytes::from(encoded))).await;
+      }
       false
     }
   }
 }
 
 /// Handle binary message using message crate protocol.
-async fn handle_binary_message(
-  socket_tx: &mut SplitSink<WebSocket, Message>,
+async fn handle_binary_message<S>(
+  socket_tx: &mut S,
   ws_state: &Arc<WebSocketState>,
   conn_state: &mut ConnectionState,
   data: Vec<u8>,
-) -> bool {
+) -> bool
+where
+  S: Sink<Message> + Unpin,
+  S::Error: Display,
+{
   // Decode frame
   let frame = match decode_frame(&data) {
     Ok(frame) => frame,
@@ -84,6 +102,15 @@ async fn handle_binary_message(
         error = %e,
         "Failed to decode frame"
       );
+      // Send an ErrorResponse so the client knows why their message was dropped.
+      let error_msg = SignalingMessage::ErrorResponse(message::ErrorResponse::new(
+        message::error::codes::SIG001,
+        format!("Failed to decode binary frame: {e}"),
+        "frame-decode-err",
+      ));
+      if let Ok(encoded) = encode_signaling_message(&error_msg) {
+        let _ = socket_tx.send(Message::Binary(Bytes::from(encoded))).await;
+      }
       return true; // Continue connection
     }
   };
@@ -98,6 +125,18 @@ async fn handle_binary_message(
         message_type = frame.message_type,
         "Failed to decode signaling message"
       );
+      // Send an ErrorResponse so the client knows why their message was dropped.
+      let error_msg = SignalingMessage::ErrorResponse(message::ErrorResponse::new(
+        message::error::codes::SIG101,
+        format!(
+          "Failed to decode signaling message (type 0x{:02X}): {e}",
+          frame.message_type
+        ),
+        "sig-decode-err",
+      ));
+      if let Ok(encoded) = encode_signaling_message(&error_msg) {
+        let _ = socket_tx.send(Message::Binary(Bytes::from(encoded))).await;
+      }
       return true; // Continue connection
     }
   };
@@ -107,12 +146,16 @@ async fn handle_binary_message(
 }
 
 /// Handle decoded signaling message.
-async fn handle_signaling_message(
-  socket_tx: &mut SplitSink<WebSocket, Message>,
+async fn handle_signaling_message<S>(
+  socket_tx: &mut S,
   ws_state: &Arc<WebSocketState>,
   conn_state: &mut ConnectionState,
   msg: SignalingMessage,
-) -> bool {
+) -> bool
+where
+  S: Sink<Message> + Unpin,
+  S::Error: Display,
+{
   match msg {
     SignalingMessage::Ping(_) => {
       // Respond with pong
@@ -210,6 +253,7 @@ async fn handle_signaling_message(
           let success_msg = SignalingMessage::AuthSuccess(AuthSuccess {
             user_id: user_id.clone(),
             username: auth_success.username,
+            nickname: auth_success.nickname,
           });
           if let Ok(encoded) = encode_signaling_message(&success_msg)
             && socket_tx
@@ -562,6 +606,12 @@ pub async fn handle_user_disconnect(ws_state: &Arc<WebSocketState>, user_id: &Us
     .user_store
     .update_status(user_id, UserStatus::Offline);
 
+  // Note: The user being disconnected is still in `connections` at this point
+  // (removed in step 6 below). The iteration skips `user_id` explicitly so
+  // the Offline status is not echoed back to the disconnecting socket.
+  // DashMap iteration provides a consistent snapshot, so concurrent
+  // connection additions/removals are handled safely.
+
   let status_change = UserStatusChange {
     user_id: user_id.clone(),
     status: UserStatus::Offline,
@@ -594,3 +644,6 @@ pub async fn handle_user_disconnect(ws_state: &Arc<WebSocketState>, user_id: &Us
   // 6. Remove connection from state (must be last)
   ws_state.remove_connection(user_id);
 }
+
+#[cfg(test)]
+mod tests;

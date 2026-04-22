@@ -61,49 +61,113 @@
 
 		<!-- Trunk will inject WASM loader and CSS here -->
 
-		<!-- CSS Hot-Reload (dev only): polls CSS files for changes and reloads
-		     <link> tags without a full page refresh. Trunk serve sets __TRUNK_ADDRESS__
-		     which we use to detect dev mode. In production builds this script is inert. -->
+		<!-- CSS_HOT_RELOAD_BEGIN -->
+		<!-- CSS Hot-Reload (dev only): subscribes to the css-processor SSE
+		     server and hot-swaps only the <link> tags whose source files
+		     actually changed. Zero polling: no network traffic when nothing
+		     changes. Active only on localhost when Trunk's live-reload WS
+		     script is present (i.e. `trunk serve`). In production builds
+		     the entire block between CSS_HOT_RELOAD_BEGIN and CSS_HOT_RELOAD_END
+		     is physically stripped from dist/index.html by strip-dev-hot-reload.sh
+		     (post_build hook), so this code never ships to users. -->
 		<script type="text/javascript">
 			(function () {
-				// Only activate in dev mode (Trunk serve injects __TRUNK_ADDRESS__)
-				var isTrunkDev = document.querySelector('script[data-trunk-id]') !== null
-					|| document.querySelector('link[rel="stylesheet"][href*="styles/main.css"]') !== null;
-
-				// Simple heuristic: if we can fetch /.well-known/trunk/ws we're in dev
-				// But simpler: just check if location.port is the Trunk dev port
 				if (location.hostname !== '127.0.0.1' && location.hostname !== 'localhost') return;
 
-				var POLL_INTERVAL = 500; // ms
-				var cssLinks = document.querySelectorAll('link[rel="stylesheet"]');
-				var lastModified = {};
+				// The css-processor SSE server (started by `cargo make dev`).
+				// Configurable via window.__CSS_HOT_RELOAD_URL__ before this script loads.
+				var SSE_URL = window.__CSS_HOT_RELOAD_URL__ || 'http://127.0.0.1:8765/events';
 
-				function checkCSS() {
-					cssLinks.forEach(function (link) {
-						var href = link.getAttribute('href');
-						if (!href) return;
-						var url = href.split('?')[0];
+				function boot() {
+					// Gate: only activate under `trunk serve` (which injects a WS client script).
+					var scripts = document.querySelectorAll('script');
+					var hasTrunkWs = false;
+					for (var i = 0; i < scripts.length; i++) {
+						if (scripts[i].textContent.indexOf('.well-known/trunk/ws') !== -1) {
+							hasTrunkWs = true;
+							break;
+						}
+					}
+					if (!hasTrunkWs) return;
 
-						fetch(url, { method: 'HEAD', cache: 'no-cache' })
-							.then(function (res) {
-								var lm = res.headers.get('last-modified') || res.headers.get('etag') || '';
-								if (lastModified[url] && lastModified[url] !== lm) {
-									// CSS changed! Reload the stylesheet without page refresh
-									link.href = url + '?t=' + Date.now();
-									console.log('[css-hot-reload] Reloaded:', url);
+					if (typeof EventSource === 'undefined') {
+						console.warn('[css-hot-reload] EventSource unsupported; hot-reload disabled');
+						return;
+					}
+
+					// Reload stylesheets: prefer precise match on changed files, but
+					// fall back to reloading all <link rel="stylesheet"> tags when
+					// no direct match is found. This handles the common case where
+					// the changed source (e.g. base.css) is only transitively
+					// composed into the entry sheet (main.css) via `composes`.
+					function reloadChanged(files) {
+						var links = document.querySelectorAll('link[rel="stylesheet"]');
+						if (!links.length) return;
+
+						var matched = [];
+						if (files && files.length) {
+							for (var i = 0; i < links.length; i++) {
+								var link = links[i];
+								var hrefRaw = link.getAttribute('href') || '';
+								var hrefPath = hrefRaw.split('?')[0];
+								for (var j = 0; j < files.length; j++) {
+									if (hrefPath === files[j] || hrefPath.indexOf(files[j]) !== -1) {
+										matched.push(link);
+										break;
+									}
 								}
-								lastModified[url] = lm;
-							})
-							.catch(function () {
-								// ignore fetch errors
-							});
-					});
+							}
+						}
+
+						var targets = matched.length ? matched : Array.prototype.slice.call(links);
+						var ts = Date.now();
+						for (var k = 0; k < targets.length; k++) {
+							var t = targets[k];
+							var base = (t.getAttribute('href') || '').split('?')[0];
+							if (base) t.href = base + '?t=' + ts;
+						}
+						console.log(
+							'[css-hot-reload] Reloaded ' + targets.length +
+							' stylesheet(s)' + (matched.length ? ' (matched)' : ' (fallback)') +
+							':', files || []
+						);
+					}
+
+					function connect() {
+						var es = new EventSource(SSE_URL);
+
+						es.addEventListener('rebuild', function (ev) {
+							var payload = { files: [] };
+							try {
+								payload = JSON.parse(ev.data);
+							} catch (e) {
+								console.warn('[css-hot-reload] Invalid rebuild payload:', ev.data);
+								return;
+							}
+							reloadChanged(payload.files || []);
+						});
+
+						es.onopen = function () {
+							console.log('[css-hot-reload] Connected to ' + SSE_URL);
+						};
+
+						es.onerror = function () {
+							// Built-in EventSource auto-reconnects respecting the server's
+							// `retry:` hint. Log quietly to avoid console spam on reload.
+							// (No action needed here.)
+						};
+					}
+
+					connect();
 				}
 
-				setInterval(checkCSS, POLL_INTERVAL);
-				// Initialize lastModified on first run
-				checkCSS();
+				if (document.readyState === 'loading') {
+					document.addEventListener('DOMContentLoaded', boot);
+				} else {
+					boot();
+				}
 			})();
 		</script>
+		<!-- CSS_HOT_RELOAD_END -->
 	</body>
 </html>

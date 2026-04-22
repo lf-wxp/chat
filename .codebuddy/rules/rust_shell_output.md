@@ -1,6 +1,9 @@
 ---
-# 注意不要修改本文头文件，如修改，CodeBuddy（内网版）将按照默认逻辑设置
-type: always
+description: 
+alwaysApply: true
+enabled: true
+updatedAt: 2026-04-16T12:36:11.849Z
+provider: 
 ---
 
 **⚠️ Rust 编译耗时注意事项**

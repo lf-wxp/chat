@@ -69,7 +69,13 @@ impl Room {
     if let Some(ref hash) = self.info.password_hash
       && let Ok(parsed_hash) = PasswordHash::new(hash)
     {
-      return Argon2::default()
+      // Use same Argon2 params as auth module for consistency
+      let argon2 = Argon2::new(
+        argon2::Algorithm::Argon2id,
+        argon2::Version::V0x13,
+        argon2::Params::new(65536, 3, 4, Some(32)).expect("valid Argon2 params"),
+      );
+      return argon2
         .verify_password(password.as_bytes(), &parsed_hash)
         .is_ok();
     }
@@ -87,9 +93,14 @@ impl Room {
             "Password must be at least 4 characters".to_string(),
           ));
         }
-        // Hash password
+        // Hash password with same Argon2 params as auth module
         let salt = SaltString::generate(&mut OsRng);
-        let hash = Argon2::default()
+        let argon2 = Argon2::new(
+          argon2::Algorithm::Argon2id,
+          argon2::Version::V0x13,
+          argon2::Params::new(65536, 3, 4, Some(32)).expect("valid Argon2 params"),
+        );
+        let hash = argon2
           .hash_password(pwd.as_bytes(), &salt)
           .map_err(|e| RoomError::InvalidPassword(format!("Failed to hash password: {}", e)))?
           .to_string();

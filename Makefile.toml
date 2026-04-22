@@ -65,8 +65,122 @@ workspace = false
 # ============================================================================
 
 [tasks.setup]
-dependencies = ["setup-trunk", "setup-wasm-pack", "setup-cargo-watch", "cov-setup", "cov-setup-rustfilt"]
+dependencies = ["setup-trunk", "setup-wasm-pack", "setup-cargo-watch", "setup-chromedriver", "cov-setup", "cov-setup-rustfilt"]
 description = "Install all build dependencies"
+
+[tasks.setup-chromedriver]
+description = "Install chromedriver matching the local Chrome version (macOS/Linux)"
+workspace = false
+script = '''
+#!/bin/bash
+set -euo pipefail
+
+# --- Detect Chrome version ---
+CHROME_VERSION=""
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  if [ -d "/Applications/Google Chrome.app" ]; then
+    CHROME_VERSION=$("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
+  fi
+elif [[ "$OSTYPE" == "linux"* ]]; then
+  if command -v google-chrome &> /dev/null; then
+    CHROME_VERSION=$(google-chrome --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
+  elif command -v google-chrome-stable &> /dev/null; then
+    CHROME_VERSION=$(google-chrome-stable --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
+  fi
+fi
+
+if [ -z "$CHROME_VERSION" ]; then
+  echo "[setup-chromedriver] ⚠️  Chrome not found; skipping chromedriver install"
+  exit 0
+fi
+echo "[setup-chromedriver] Detected Chrome version: $CHROME_VERSION"
+
+# --- Check if chromedriver already matches ---
+if command -v chromedriver &> /dev/null; then
+  EXISTING_VERSION=$(chromedriver --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' || true)
+  CHROME_MAJOR=$(echo "$CHROME_VERSION" | cut -d. -f1)
+  EXISTING_MAJOR=$(echo "$EXISTING_VERSION" | cut -d. -f1)
+  if [ "$CHROME_MAJOR" = "$EXISTING_MAJOR" ]; then
+    echo "[setup-chromedriver] ✅ chromedriver $EXISTING_VERSION already matches Chrome $CHROME_VERSION (same major)"
+    exit 0
+  fi
+  echo "[setup-chromedriver] Existing chromedriver $EXISTING_VERSION does not match Chrome $CHROME_VERSION"
+fi
+
+# --- Determine platform ---
+ARCH=$(uname -m)
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  if [ "$ARCH" = "arm64" ]; then
+    PLATFORM="mac-arm64"
+  else
+    PLATFORM="mac-x64"
+  fi
+elif [[ "$OSTYPE" == "linux"* ]]; then
+  PLATFORM="linux64"
+else
+  echo "[setup-chromedriver] ❌ Unsupported OS: $OSTYPE"
+  exit 1
+fi
+
+# --- Find the closest chromedriver version for this Chrome milestone ---
+MILESTONE=$(echo "$CHROME_VERSION" | cut -d. -f1)
+echo "[setup-chromedriver] Looking up chromedriver for milestone $MILESTONE on $PLATFORM ..."
+
+MILESTONES_JSON=$(curl -sSf "https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone-with-downloads.json")
+DRIVER_URL=$(echo "$MILESTONES_JSON" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+milestone = '$MILESTONE'
+if milestone not in data.get('milestones', {}):
+    print('', end='')
+    sys.exit(0)
+downloads = data['milestones'][milestone].get('downloads', {}).get('chromedriver', [])
+for d in downloads:
+    if d['platform'] == '$PLATFORM':
+        print(d['url'], end='')
+        break
+")
+
+if [ -z "$DRIVER_URL" ]; then
+  echo "[setup-chromedriver] ❌ No chromedriver found for milestone $MILESTONE / $PLATFORM"
+  exit 1
+fi
+
+MATCHED_VERSION=$(echo "$MILESTONES_JSON" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+print(data['milestones']['$MILESTONE']['version'], end='')
+")
+echo "[setup-chromedriver] Downloading chromedriver $MATCHED_VERSION from:"
+echo "  $DRIVER_URL"
+
+# --- Download & install ---
+TMPDIR=$(mktemp -d)
+trap 'rm -rf "$TMPDIR"' EXIT
+
+curl -sSfL "$DRIVER_URL" -o "$TMPDIR/chromedriver.zip"
+unzip -q "$TMPDIR/chromedriver.zip" -d "$TMPDIR"
+
+# The zip extracts to chromedriver-<platform>/chromedriver
+DRIVER_BIN=$(find "$TMPDIR" -name "chromedriver" -type f | head -1)
+if [ -z "$DRIVER_BIN" ]; then
+  echo "[setup-chromedriver] ❌ chromedriver binary not found in archive"
+  exit 1
+fi
+chmod +x "$DRIVER_BIN"
+
+# Install to /usr/local/bin (or ~/.local/bin for non-root)
+INSTALL_DIR="/usr/local/bin"
+if [ ! -w "$INSTALL_DIR" ]; then
+  INSTALL_DIR="$HOME/.local/bin"
+  mkdir -p "$INSTALL_DIR"
+  echo "[setup-chromedriver] Installing to $INSTALL_DIR (add to PATH if needed)"
+fi
+
+cp "$DRIVER_BIN" "$INSTALL_DIR/chromedriver"
+echo "[setup-chromedriver] ✅ chromedriver $MATCHED_VERSION installed to $INSTALL_DIR/chromedriver"
+chromedriver --version
+'''
 
 [tasks.setup-trunk]
 description = "Install Trunk for frontend builds"
@@ -171,8 +285,8 @@ workspace = false
 # ============================================================================
 
 [tasks.test]
-dependencies = ["test-unit", "test-integration", "test-wasm"]
-description = "Run all tests (unit + integration)"
+dependencies = ["test-unit", "test-integration", "test-wasm", "test-wasm-frontend"]
+description = "Run all tests (unit + integration + WASM)"
 workspace = false
 
 [tasks.test-unit]
@@ -196,11 +310,24 @@ description = "Run WASM tests for message crate"
 workspace = false
 
 [tasks.test-wasm-frontend]
-args = ["test", "--node"]
-command = "wasm-pack"
-cwd = "frontend"
-description = "Run WASM tests for frontend crate"
+description = "Run WASM integration tests for frontend crate (headless browser)"
 workspace = false
+script = '''
+#!/bin/bash
+set -euo pipefail
+cd frontend
+# Use headless browser (chrome/firefox) because these tests need
+# real Web APIs (localStorage, window.atob, etc.) that are not
+# available in Node.js. Falls back to chrome if available.
+if command -v chromedriver &> /dev/null || command -v google-chrome &> /dev/null || [ -d "/Applications/Google Chrome.app" ]; then
+  wasm-pack test --headless --chrome
+elif command -v geckodriver &> /dev/null || command -v firefox &> /dev/null; then
+  wasm-pack test --headless --firefox
+else
+  echo "[WARN] No headless browser driver found; falling back to --node (localStorage tests will be skipped)"
+  wasm-pack test --node
+fi
+'''
 
 # ============================================================================
 # Lint Tasks
@@ -399,9 +526,9 @@ run_task = {name = ["cov-clean", "cov-run-ci"]}
 workspace = false
 
 [tasks.cov-run-ci]
-args = ["llvm-cov", "--cobertura", "--output-path", "coverage.xml"]
+args = ["llvm-cov", "--cobertura", "--output-path", "coverage.xml", "--ignore-filename-regex", "frontend/"]
 command = "cargo"
-description = "Run tests and export coverage data in cobertura XML format"
+description = "Run tests and export coverage data in cobertura XML format (excludes frontend WASM crate)"
 workspace = false
 
 # ============================================================================
@@ -409,5 +536,5 @@ workspace = false
 # ============================================================================
 
 [tasks.ci]
-dependencies = ["fmt-check", "check", "clippy", "test-unit", "build"]
-description = "Run all CI checks"
+dependencies = ["fmt-check", "check", "clippy", "test-unit", "test-wasm", "test-wasm-frontend", "build"]
+description = "Run all CI checks (including WASM tests)"

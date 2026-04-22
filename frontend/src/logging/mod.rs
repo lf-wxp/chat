@@ -101,7 +101,8 @@ impl LogBuffer {
       .filter(|e| e.level <= min_level)
       .filter(|e| {
         module_filter.as_ref().is_none_or(|f| {
-          f.split(',').any(|segment| e.module.contains(segment.trim()))
+          f.split(',')
+            .any(|segment| e.module.contains(segment.trim()))
         })
       })
       .cloned()
@@ -169,8 +170,10 @@ impl LoggerState {
     // Always push to ring buffer (module filter does NOT affect storage)
     self.buffer.update(|buf| buf.push(entry.clone()));
 
-    // Console output based on mode and module filter
-    let console_level = self.console_min_level.get();
+    // Console output based on mode and module filter.
+    // Use with_untracked() since this method may be called from WebSocket
+    // callbacks or other non-reactive contexts where tracking is inappropriate.
+    let console_level = self.console_min_level.with_untracked(|l| *l);
     if level <= console_level && self.passes_module_filter(module) {
       let formatted = format!("[{}][{}] {}", entry.level, entry.module, entry.message);
       match level {
@@ -188,7 +191,10 @@ impl LoggerState {
   /// Supports comma-separated multi-module filters, e.g. `"webrtc,signaling"`.
   /// Returns `true` if no filter is set or if the module matches any filter segment.
   fn passes_module_filter(&self, module: &str) -> bool {
-    match self.module_filter.get() {
+    // Use with_untracked() since this is called from log() which may run
+    // outside reactive tracking context (e.g. WebSocket callbacks).
+    let filter = self.module_filter.with_untracked(|f| f.clone());
+    match filter {
       Some(filter) => filter
         .split(',')
         .any(|segment| module.contains(segment.trim())),

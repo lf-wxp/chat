@@ -19,6 +19,8 @@ pub struct AuthSuccess {
   pub user_id: UserId,
   /// Authenticated username.
   pub username: String,
+  /// Display nickname (may differ from username).
+  pub nickname: String,
 }
 
 /// Authentication failure response.

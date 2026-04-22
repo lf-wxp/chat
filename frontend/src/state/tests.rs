@@ -118,7 +118,7 @@ fn test_pinned_conversation_sorting_logic() {
 
   // Sort by pinned_ts descending (same logic as pinned_conversations)
   let mut pinned: Vec<_> = convs.iter().filter(|c| c.pinned).cloned().collect();
-  pinned.sort_by(|a, b| b.pinned_ts.cmp(&a.pinned_ts));
+  pinned.sort_by_key(|b| std::cmp::Reverse(b.pinned_ts));
 
   assert_eq!(pinned[0].pinned_ts, Some(2000));
   assert_eq!(pinned[1].pinned_ts, Some(1000));
@@ -139,7 +139,7 @@ fn test_active_conversation_filtering_logic() {
     .filter(|c| !c.pinned && !c.archived)
     .cloned()
     .collect();
-  active.sort_by(|a, b| b.last_message_ts.cmp(&a.last_message_ts));
+  active.sort_by_key(|b| std::cmp::Reverse(b.last_message_ts));
 
   assert_eq!(active.len(), 2);
   assert!(active[0].last_message_ts >= active[1].last_message_ts);

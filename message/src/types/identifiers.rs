@@ -60,6 +60,12 @@ impl RoomId {
   pub const fn from_uuid(uuid: Uuid) -> Self {
     Self(uuid)
   }
+
+  /// Get the inner `Uuid`.
+  #[must_use]
+  pub const fn as_uuid(&self) -> &Uuid {
+    &self.0
+  }
 }
 
 impl Default for RoomId {
@@ -125,6 +131,18 @@ impl TransferId {
   #[must_use]
   pub fn new() -> Self {
     Self(Uuid::new_v4())
+  }
+
+  /// Create a `TransferId` from a `Uuid`.
+  #[must_use]
+  pub const fn from_uuid(uuid: Uuid) -> Self {
+    Self(uuid)
+  }
+
+  /// Get the inner `Uuid`.
+  #[must_use]
+  pub const fn as_uuid(&self) -> &Uuid {
+    &self.0
   }
 }
 

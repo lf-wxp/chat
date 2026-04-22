@@ -1,9 +1,11 @@
 //! Utility functions for WebSocket message encoding/decoding.
 
+use std::fmt::Display;
+
 use axum::body::Bytes;
-use axum::extract::ws::{Message, WebSocket};
+use axum::extract::ws::Message;
+use futures::Sink;
 use futures::SinkExt;
-use futures::stream::SplitSink;
 use message::error::{ErrorCategory, ErrorCode, ErrorModule};
 use message::frame::{MessageFrame, encode_frame};
 use message::signaling::SignalingMessage;
@@ -77,12 +79,15 @@ pub fn decode_signaling_message(
 /// * `code` - The error code string (e.g., "ROM701", "SIG001").
 /// * `message` - Human-readable error message.
 /// * `i18n_key` - Optional internationalization key for client-side lookup.
-pub async fn send_error_response(
-  socket_tx: &mut SplitSink<WebSocket, Message>,
+pub async fn send_error_response<S>(
+  socket_tx: &mut S,
   code: &str,
   message: &str,
   i18n_key: Option<&str>,
-) {
+) where
+  S: Sink<Message> + Unpin,
+  S::Error: Display,
+{
   // Parse error code string to ErrorCode
   let error_code = parse_error_code(code);
 

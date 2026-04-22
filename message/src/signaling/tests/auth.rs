@@ -17,6 +17,7 @@ fn test_auth_success_roundtrip() {
   let msg = AuthSuccess {
     user_id: UserId::new(),
     username: "alice".to_string(),
+    nickname: "alice".to_string(),
   };
   let encoded = bitcode::encode(&msg);
   let decoded: AuthSuccess = bitcode::decode(&encoded).expect("Failed to decode");
@@ -113,7 +114,8 @@ fn test_discriminator_auth_messages() {
   assert_eq!(
     SignalingMessage::AuthSuccess(AuthSuccess {
       user_id: UserId::new(),
-      username: "u".into()
+      username: "u".into(),
+      nickname: "u".into(),
     })
     .discriminator(),
     AUTH_SUCCESS

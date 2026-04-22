@@ -27,18 +27,15 @@ pub fn process_all(input_dir: &Path, output_dir: &Path) -> Result<()> {
         .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
     }
 
-    let input_css =
-      fs::read_to_string(css_file).with_context(|| format!("Failed to read: {}", css_file.display()))?;
+    let input_css = fs::read_to_string(css_file)
+      .with_context(|| format!("Failed to read: {}", css_file.display()))?;
 
     let output_css = process_css(&input_css, css_file)?;
 
     fs::write(&output_path, &output_css)
       .with_context(|| format!("Failed to write: {}", output_path.display()))?;
 
-    eprintln!(
-      "[css-processor] Processed: {}",
-      relative.display()
-    );
+    eprintln!("[css-processor] Processed: {}", relative.display());
   }
 
   eprintln!(

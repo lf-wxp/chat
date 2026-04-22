@@ -12,6 +12,7 @@ fn test_signaling_message_discriminator() {
   let msg = SignalingMessage::AuthSuccess(AuthSuccess {
     user_id: UserId::new(),
     username: "alice".to_string(),
+    nickname: "alice".to_string(),
   });
   assert_eq!(msg.discriminator(), 0x01);
 
@@ -53,6 +54,7 @@ fn create_auth_session_discriminators() -> Vec<u8> {
     SignalingMessage::AuthSuccess(AuthSuccess {
       user_id: UserId::new(),
       username: String::new(),
+      nickname: String::new(),
     })
     .discriminator(),
     SignalingMessage::AuthFailure(AuthFailure {
@@ -62,6 +64,7 @@ fn create_auth_session_discriminators() -> Vec<u8> {
     SignalingMessage::UserLogout(UserLogout::default()).discriminator(),
     SignalingMessage::Ping(Ping::default()).discriminator(),
     SignalingMessage::Pong(Pong::default()).discriminator(),
+    SignalingMessage::ErrorResponse(ErrorResponse::new(SIG001, "x", "t")).discriminator(),
     SignalingMessage::SessionInvalidated(SessionInvalidated::default()).discriminator(),
     SignalingMessage::UserListUpdate(UserListUpdate { users: vec![] }).discriminator(),
     SignalingMessage::UserStatusChange(UserStatusChange {
@@ -243,6 +246,11 @@ fn create_moderation_discriminators() -> Vec<u8> {
       new_nickname: String::new(),
     })
     .discriminator(),
+    SignalingMessage::RoomAnnouncement(RoomAnnouncement {
+      room_id: RoomId::new(),
+      content: String::new(),
+    })
+    .discriminator(),
     SignalingMessage::ModerationNotification(ModerationNotification {
       room_id: RoomId::new(),
       action: ModerationAction::Kicked,
@@ -283,6 +291,7 @@ fn create_auth_session_messages() -> Vec<SignalingMessage> {
     SignalingMessage::AuthSuccess(AuthSuccess {
       user_id: UserId::new(),
       username: String::new(),
+      nickname: String::new(),
     }),
     SignalingMessage::AuthFailure(AuthFailure {
       reason: String::new(),

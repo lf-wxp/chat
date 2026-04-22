@@ -86,9 +86,14 @@ async fn test_auth_handler_timeout_protection() {
   let elapsed = start.elapsed();
 
   // Authentication should complete within reasonable time
+  // Authentication should complete within reasonable time.
+  // Note: Argon2id with memory=64MB, time=3, parallelism=4 is intentionally
+  // slow for security. The 2-second threshold accounts for debug builds
+  // where Argon2 runs on a single thread without optimizations.
   assert!(
-    elapsed < std::time::Duration::from_millis(100),
-    "Authentication should be fast"
+    elapsed < std::time::Duration::from_secs(2),
+    "Authentication should complete within reasonable time, took {:?}",
+    elapsed
   );
 }
 

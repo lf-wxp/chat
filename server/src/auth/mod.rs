@@ -161,9 +161,13 @@ impl UserStore {
       return Err(anyhow!("Password must be at least 8 characters"));
     }
 
-    // Hash password with Argon2
+    // Hash password with Argon2 (parameters per requirements: memory=64MB, time=3, parallelism=4, output=32)
     let salt = SaltString::generate(&mut OsRng);
-    let argon2 = Argon2::default();
+    let argon2 = Argon2::new(
+      argon2::Algorithm::Argon2id,
+      argon2::Version::V0x13,
+      argon2::Params::new(65536, 3, 4, Some(32)).expect("valid Argon2 params"),
+    );
     let password_hash = argon2
       .hash_password(password.as_bytes(), &salt)
       .map_err(|e| anyhow!("Failed to hash password: {}", e))?
@@ -217,7 +221,12 @@ impl UserStore {
     let parsed_hash = PasswordHash::new(&session.password_hash)
       .map_err(|e| anyhow!("Invalid password hash: {}", e))?;
 
-    Argon2::default()
+    let argon2 = Argon2::new(
+      argon2::Algorithm::Argon2id,
+      argon2::Version::V0x13,
+      argon2::Params::new(65536, 3, 4, Some(32)).expect("valid Argon2 params"),
+    );
+    argon2
       .verify_password(password.as_bytes(), &parsed_hash)
       .map_err(|_| anyhow!("Invalid credentials"))?;
 
@@ -309,15 +318,26 @@ impl UserStore {
       session.last_seen = Utc::now();
     }
 
+    // W1 fix: Include the user's current nickname in AuthSuccess so that
+    // clients can update their display name when it has changed on another
+    // device (e.g. via a nickname-change API in a future task).
+    let nickname = self
+      .users
+      .get(&user_id)
+      .map(|s| s.nickname.clone())
+      .unwrap_or_else(|| claims.username.clone());
+
     debug!(
       user_id = %user_id,
       username = %claims.username,
+      nickname = %nickname,
       "Token authentication successful"
     );
 
     Ok(AuthSuccess {
       user_id,
       username: claims.username,
+      nickname,
     })
   }
 
@@ -422,6 +442,8 @@ fn generate_session_id() -> String {
   OsRng.fill_bytes(&mut bytes);
   base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
 }
+
+pub mod handlers;
 
 #[cfg(test)]
 mod tests;

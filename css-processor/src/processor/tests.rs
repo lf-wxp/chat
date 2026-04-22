@@ -24,12 +24,24 @@ fn test_expand_simple_composes() {
   assert!(!output.contains("composes:"), "composes should be removed");
 
   // Should contain the inlined declarations from btn-base inside btn-primary
-  assert!(output.contains("display: inline-flex;"), "Should inline display from btn-base");
-  assert!(output.contains("padding: 8px 16px;"), "Should inline padding from btn-base");
-  assert!(output.contains("border-radius: 4px;"), "Should inline border-radius from btn-base");
+  assert!(
+    output.contains("display: inline-flex;"),
+    "Should inline display from btn-base"
+  );
+  assert!(
+    output.contains("padding: 8px 16px;"),
+    "Should inline padding from btn-base"
+  );
+  assert!(
+    output.contains("border-radius: 4px;"),
+    "Should inline border-radius from btn-base"
+  );
 
   // Should still contain btn-primary's own declarations
-  assert!(output.contains("background: blue;"), "Should keep own background");
+  assert!(
+    output.contains("background: blue;"),
+    "Should keep own background"
+  );
   assert!(output.contains("color: white;"), "Should keep own color");
 }
 

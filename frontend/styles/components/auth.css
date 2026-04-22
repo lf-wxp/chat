@@ -1,0 +1,111 @@
+/**
+ * Authentication page styles.
+ * Covers login/register forms and the auth page layout.
+ */
+
+/* ── Auth Page ── */
+.auth-page {
+  min-height: 100vh;
+  background-color: var(--bg-secondary, #f8fafc);
+}
+
+/* ── Auth Card ── */
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  background-color: var(--bg-primary, #ffffff);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: var(--shadow-lg, 0 10px 15px -3px rgb(0 0 0 / 0.1));
+  overflow: hidden;
+}
+
+.auth-card-header {
+  padding: var(--space-6, 24px) var(--space-6, 24px) 0;
+  text-align: center;
+}
+
+.auth-card-title {
+  font-size: var(--text-xl, 20px);
+  font-weight: var(--font-bold, 700);
+  color: var(--text-primary, #0f172a);
+  margin: 0;
+}
+
+.auth-card-body {
+  padding: var(--space-6, 24px);
+}
+
+.auth-card-footer {
+  padding: var(--space-4, 16px) var(--space-6, 24px) var(--space-6, 24px);
+  text-align: center;
+  border-top: 1px solid var(--border-primary, #e2e8f0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2, 8px);
+}
+
+/* ── Auth Form ── */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 16px);
+}
+
+.auth-form-title {
+  font-size: var(--text-lg, 18px);
+  font-weight: var(--font-semibold, 600);
+  color: var(--text-primary, #0f172a);
+  text-align: center;
+  margin: 0;
+}
+
+.auth-form-error {
+  padding: var(--space-3, 12px);
+  background-color: color-mix(in oklch, var(--color-error, #ef4444) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--color-error, #ef4444) 30%, transparent);
+  border-radius: var(--radius-md, 8px);
+  color: var(--color-error, #ef4444);
+  font-size: var(--text-sm, 14px);
+}
+
+/* ── Auth Switch ── */
+.auth-switch-text {
+  font-size: var(--text-sm, 14px);
+  color: var(--text-secondary, #64748b);
+}
+
+.auth-card-footer .btn-link {
+  font-size: var(--text-sm, 14px);
+  color: var(--color-primary, #3b82f6);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+
+  &:hover {
+    color: color-mix(in oklch, var(--color-primary, #3b82f6) 80%, black);
+  }
+}
+
+/* ── Form Field ── */
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+
+  & label {
+    font-size: var(--text-sm, 14px);
+    font-weight: var(--font-medium, 500);
+    color: var(--text-secondary, #64748b);
+  }
+}
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .auth-card {
+    margin: var(--space-4, 16px);
+    max-width: none;
+  }
+}

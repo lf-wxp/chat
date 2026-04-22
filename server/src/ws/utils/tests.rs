@@ -140,6 +140,7 @@ fn test_encode_decode_roundtrip_auth_success() {
   let msg = SignalingMessage::AuthSuccess(message::signaling::AuthSuccess {
     user_id: message::UserId::new(),
     username: "testuser".to_string(),
+    nickname: "testuser".to_string(),
   });
   let encoded = encode_signaling_message(&msg).unwrap();
   let frame = decode_frame(&encoded).unwrap();

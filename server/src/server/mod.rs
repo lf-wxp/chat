@@ -4,13 +4,15 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::Router;
-use axum::routing::get;
+use axum::routing::{get, post};
 use tokio_util::sync::CancellationToken;
+use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
 use crate::auth::UserStore;
+use crate::auth::handlers;
 use crate::config::Config;
 use crate::ws::{WebSocketState, ws_handler};
 
@@ -37,25 +39,38 @@ impl Server {
   /// This creates the shared state (UserStore, WebSocketState) and
   /// constructs the Axum router with:
   /// - `/ws` WebSocket upgrade route
+  /// - `/api/register` and `/api/login` HTTP auth endpoints
   /// - Static file serving as fallback
+  /// - CORS support for local development
   /// - Request tracing layer
   pub fn build_router(&self) -> (Router, Arc<WebSocketState>) {
     // Create shared user store for authentication
     let user_store = UserStore::new(&self.config);
 
     // Create shared WebSocket state
-    let ws_state = Arc::new(WebSocketState::new(self.config.clone(), user_store));
+    let ws_state = Arc::new(WebSocketState::new(self.config.clone(), user_store.clone()));
+
+    // CORS layer for local development (Trunk dev server → Axum API)
+    let cors = CorsLayer::new()
+      .allow_origin(Any)
+      .allow_methods(Any)
+      .allow_headers(Any);
 
     // Build the application router
     let app = Router::new()
       // WebSocket route
       .route("/ws", get(ws_handler))
+      // HTTP auth endpoints
+      .route("/api/register", post(handlers::register))
+      .route("/api/login", post(handlers::login))
       // Shared state
       .with_state(ws_state.clone())
       // Static file serving for frontend
       .fallback_service(
         ServeDir::new(&self.config.static_dir).append_index_html_on_directories(true),
       )
+      // CORS (must be before trace layer)
+      .layer(cors)
       // Request tracing
       .layer(TraceLayer::new_for_http());
 

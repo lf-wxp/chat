@@ -1,36 +1,53 @@
 /**
  * Sidebar
- * Navigation sidebar component styles.
- * Uses modern CSS: nesting, @container, :has(), @scope, clamp().
+ * Always-visible navigation rail. Uses container queries to collapse to
+ * an icon-only rail at narrow viewports, and a flex layout to pin the
+ * footer (settings button) to the bottom.
  */
 
 /* ── Sidebar Container ── */
 .sidebar {
   container-type: inline-size;
   container-name: sidebar;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  width: 100%;
+  width: 16rem;
   height: 100%;
   background-color: var(--bg-secondary, #f8fafc);
   border-right: 1px solid var(--border-color, #e2e8f0);
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   transition: width var(--duration-normal, 200ms) var(--ease-default, ease);
+}
 
-  &.sidebar-collapsed {
-    width: 4rem;
+/* Narrow viewports -- collapse to an icon-only rail. */
+@media (max-width: 767px) {
+  .sidebar {
+    width: 3.5rem;
   }
 
-  /* Show search section only when sidebar is wide enough */
-  @container sidebar (max-width: 200px) {
-    .sidebar-search {
-      display: none;
-    }
+  .sidebar .sidebar-brand-title,
+  .sidebar .sidebar-search,
+  .sidebar .sidebar-section-title,
+  .sidebar .sidebar-conversation-info,
+  .sidebar .sidebar-conversation-preview,
+  .sidebar .sidebar-item-badge,
+  .sidebar .sidebar-footer-label {
+    display: none;
+  }
+
+  .sidebar .sidebar-header,
+  .sidebar .sidebar-footer {
+    justify-content: center;
+  }
+
+  .sidebar .sidebar-footer-btn {
+    justify-content: center;
+    padding: var(--space-2, 0.5rem);
   }
 }
 
-/* ── Sidebar Header ── */
+/* ── Header ── */
 .sidebar-header {
   display: flex;
   align-items: center;
@@ -40,17 +57,80 @@
   min-height: 3.5rem;
 }
 
-.sidebar-header-title {
-  font-size: clamp(var(--font-base, 1rem), 3cqi, var(--font-lg, 1.125rem));
-  font-weight: var(--font-weight-bold, 700);
-  color: var(--text-primary, #0f172a);
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  min-width: 0;
 }
 
-/* ── Sidebar Sections ── */
+.sidebar-brand-icon {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--color-primary, #3b82f6);
+}
+
+.sidebar-brand-title {
+  font-size: var(--font-base, 1rem);
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--text-primary, #0f172a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Search ── */
+.sidebar-search {
+  position: relative;
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+}
+
+.sidebar-search-icon {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--space-3, 0.75rem) + var(--space-2, 0.5rem));
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  color: var(--text-tertiary, #94a3b8);
+  pointer-events: none;
+}
+
+.sidebar-search-input {
+  width: 100%;
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem) var(--space-2, 0.5rem) 2rem;
+  font-size: var(--font-sm, 0.875rem);
+  color: var(--text-primary, #0f172a);
+  background-color: var(--bg-primary, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-md, 0.375rem);
+  transition: border-color var(--duration-fast, 150ms) var(--ease-default, ease);
+}
+
+.sidebar-search-input::placeholder {
+  color: var(--text-tertiary, #94a3b8);
+}
+
+.sidebar-search-input:focus-visible {
+  outline: none;
+  border-color: var(--color-primary, #3b82f6);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-primary) 20%, transparent);
+}
+
+/* ── Scrollable middle region ── */
+.sidebar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ── Sections ── */
 .sidebar-section {
   padding: var(--space-2, 0.5rem) 0;
 
-  /* Hide empty sections using :has() */
+  /* Hide empty sections via :has() */
   &:not(:has(.sidebar-item, .sidebar-conversation)) {
     display: none;
   }
@@ -65,7 +145,7 @@
   letter-spacing: 0.05em;
 }
 
-/* ── Sidebar Item (shared base properties for composes) ── */
+/* ── Sidebar item (shared base) ── */
 .sidebar-item-base {
   display: flex;
   align-items: center;
@@ -79,7 +159,6 @@
   margin: 0 var(--space-2, 0.5rem);
 }
 
-/* ── Sidebar Item ── */
 .sidebar-item {
   composes: sidebar-item-base;
 
@@ -107,7 +186,7 @@
   color: inherit;
 }
 
-/* ── Sidebar Item Badge (shared base properties for composes) ── */
+/* ── Badge ── */
 .sidebar-item-badge-base {
   margin-left: auto;
   font-size: var(--font-xs, 0.75rem);
@@ -115,7 +194,6 @@
   border-radius: var(--radius-full, 9999px);
 }
 
-/* ── Sidebar Item Badge ── */
 .sidebar-item-badge {
   composes: sidebar-item-badge-base;
   padding: var(--space-0, 0) var(--space-2, 0.5rem);
@@ -131,7 +209,7 @@
   text-align: center;
 }
 
-/* ── Sidebar Conversation Item (shares base with sidebar-item) ── */
+/* ── Conversation item ── */
 .sidebar-conversation {
   composes: sidebar-item-base;
   padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
@@ -165,7 +243,6 @@
   white-space: nowrap;
 }
 
-/* ── Pinned / Muted indicators ── */
 .sidebar-conversation-pinned::before {
   content: "📌";
   margin-right: var(--space-1, 0.25rem);
@@ -175,36 +252,48 @@
   opacity: 0.6;
 }
 
-/* ── Sidebar Footer ── */
+/* ── Footer (pinned to bottom) ── */
 .sidebar-footer {
   margin-top: auto;
-  padding: var(--space-3, 0.75rem);
+  padding: var(--space-2, 0.5rem);
   border-top: 1px solid var(--border-color, #e2e8f0);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 0.25rem);
 }
 
-/* ── Responsive: Mobile ── */
-@media (max-width: 767px) {
-  .sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: var(--z-overlay, 300);
-    transform: translateX(-100%);
-
-    &.sidebar-open {
-      transform: translateX(0);
-      box-shadow: var(--shadow-xl);
-    }
-  }
+.sidebar-footer-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+  width: 100%;
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md, 0.375rem);
+  color: var(--text-secondary, #475569);
+  font-size: var(--font-sm, 0.875rem);
+  font-weight: var(--font-weight-medium, 500);
+  cursor: pointer;
+  transition: all var(--duration-fast, 150ms) var(--ease-default, ease);
 }
 
-/* ── @container responsive for sidebar content ── */
-@container sidebar (max-width: 180px) {
-  .sidebar-conversation-preview {
-    display: none;
-  }
+.sidebar-footer-btn:hover {
+  background-color: var(--bg-tertiary, #f1f5f9);
+  color: var(--text-primary, #0f172a);
+}
 
-  .sidebar-item-badge {
-    display: none;
-  }
+.sidebar-footer-btn:focus-visible {
+  outline: 2px solid var(--color-primary, #3b82f6);
+  outline-offset: 2px;
+}
+
+.sidebar-footer-icon {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.sidebar-footer-label {
+  white-space: nowrap;
 }

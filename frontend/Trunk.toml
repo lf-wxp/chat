@@ -16,6 +16,16 @@ addresses = ["127.0.0.1"]
 open = false
 port = 8080
 
+# Proxy API and WebSocket requests to the backend server (port 3000)
+[[proxy]]
+backend = "http://127.0.0.1:3000/api/"
+rewrite = "/api/"
+
+[[proxy]]
+backend = "http://127.0.0.1:3000/ws"
+rewrite = "/ws"
+ws = true
+
 [tools]
 sass = "1.77"
 wasm_bindgen = "0.2.118"
@@ -31,6 +41,11 @@ command_arguments = ["css-hook.sh", "--skip-build", "--dev"]
 stage = "pre_build"
 
 [[hooks]]
-arguments = ["Frontend build complete"]
-command = "echo"
+# Post-build hook: in release builds, physically strip the CSS hot-reload
+# <script> block (delimited by CSS_HOT_RELOAD_BEGIN/END sentinels) from
+# dist/index.html so that zero dev-only JS ships to production. In debug
+# builds the script is a no-op.
+arguments = []
+command = "bash"
+command_arguments = ["strip-dev-hot-reload.sh"]
 stage = "post_build"

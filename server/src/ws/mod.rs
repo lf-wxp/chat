@@ -149,6 +149,12 @@ impl WebSocketState {
     self.connections.len()
   }
 
+  /// Get a reference to the user store.
+  #[must_use]
+  pub fn user_store(&self) -> &UserStore {
+    &self.user_store
+  }
+
   /// Send a message to a specific user.
   pub async fn send_to(&self, user_id: &UserId, data: Vec<u8>) -> bool {
     if let Some(sender) = self.get_sender(user_id) {
@@ -277,7 +283,9 @@ pub async fn ws_handler(
     "WebSocket connection request"
   );
 
-  ws.on_upgrade(move |socket| handle_socket(socket, ws_state, remote_addr))
+  ws.max_frame_size(ws_state.config.max_message_size)
+    .max_message_size(ws_state.config.max_message_size)
+    .on_upgrade(move |socket| handle_socket(socket, ws_state, remote_addr))
 }
 
 /// Handle WebSocket connection.

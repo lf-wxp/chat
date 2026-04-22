@@ -22,8 +22,12 @@
 @import url("./components/avatar.css") layer(components);
 @import url("./components/chat-messages.css") layer(components);
 @import url("./components/sidebar.css") layer(components);
+@import url("./components/top-bar.css") layer(components);
+@import url("./components/drawer.css") layer(components);
 @import url("./components/modal.css") layer(components);
 @import url("./components/toast.css") layer(components);
+@import url("./components/auth.css") layer(components);
+@import url("./components/error-toast.css") layer(components);
 @import url("./components/debug-panel.css") layer(components);
 
 /* ── Layer: Utilities ── */
@@ -87,3 +91,4 @@ html {
   outline: 2px solid var(--color-primary, #3b82f6);
   outline-offset: 2px;
 }
+

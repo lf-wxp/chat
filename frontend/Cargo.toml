@@ -13,8 +13,37 @@ leptos_meta = "0.8.6"
 leptos_router = "0.8.13"
 leptos_i18n = { version = "0.6.2", features = ["csr"] }
 
+# Icon library
+leptos_icons = "0.7.1"
+icondata = "0.7.0"
+
+js-sys = "0.3.95"
+wasm-bindgen = "0.2.118"
+wasm-bindgen-futures = "0.4.68"
+
+# Serialization
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+
+# Date & time
+chrono = { version = "0.4.44", features = ["wasmbind"] }
+
+# Base64 decoding (JWT payload) — replaces window.atob() for correct UTF-8 handling
+base64 = "0.22"
+
+# UUID generation (js feature enables wasm-bindgen support)
+uuid = { version = "1.23.0", features = ["js", "v4"] }
+
+# Bitcode codec for binary WebSocket messages
+bitcode = "0.6.9"
+
+# Shared message crate (includes signaling, datachannel, etc.)
+message = { path = "../message", features = ["wasm"] }
+
 # Web APIs (WebRTC, IndexedDB, etc.)
-web-sys = { version = "0.3.95", features = [
+[dependencies.web-sys]
+version = "0.3.95"
+features = [
   "Window",
   "Document",
   "Element",
@@ -31,14 +60,35 @@ web-sys = { version = "0.3.95", features = [
   "BlobPropertyBag",
   "Url",
   "KeyboardEvent",
+  # WebSocket & Signaling
+  "WebSocket",
+  "BinaryType",
+  "CloseEvent",
+  "MessageEvent",
+  "ErrorEvent",
+  "Event",
+  "DomException",
+  # HTTP Fetch API
+  "Request",
+  "RequestInit",
+  "RequestMode",
+  "Response",
+  "Headers",
+  # WebRTC
   "RtcPeerConnection",
   "RtcConfiguration",
   "RtcDataChannel",
   "RtcDataChannelInit",
+  "RtcDataChannelType",
   "RtcIceCandidate",
+  "RtcIceCandidateInit",
+  "RtcIceServer",
   "RtcSessionDescription",
   "RtcSessionDescriptionInit",
+  "RtcPeerConnectionIceEvent",
+  "RtcDataChannelEvent",
   "RtcStatsReport",
+  "RtcSdpType",
   "MediaStream",
   "MediaStreamConstraints",
   "MediaStreamTrack",
@@ -47,26 +97,20 @@ web-sys = { version = "0.3.95", features = [
   "MediaDeviceInfo",
   "DisplayMediaStreamConstraints",
   "CssStyleDeclaration",
-] }
-js-sys = "0.3.95"
-wasm-bindgen = "0.2.118"
-wasm-bindgen-futures = "0.4.68"
-
-# Serialization
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.149"
-
-# Date & time
-chrono = { version = "0.4.44", features = ["wasmbind"] }
-
-# UUID generation (js feature enables wasm-bindgen support)
-uuid = { version = "1.23.0", features = ["js", "v4"] }
-
-# Bitcode codec for binary WebSocket messages
-bitcode = "0.6.9"
-
-# Shared message crate (includes signaling, datachannel, etc.)
-message = { path = "../message", features = ["wasm"] }
+  # Web Crypto API
+  "Crypto",
+  "CryptoKey",
+  "SubtleCrypto",
+  "Algorithm",
+  "AesKeyGenParams",
+  "AesGcmParams",
+  "EcKeyGenParams",
+  "EcdhKeyDeriveParams",
+  "HkdfParams",
+  # Additional WebRTC features needed for methods
+  "RtcDataChannelState",
+  "console",
+]
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.68"

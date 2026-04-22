@@ -93,11 +93,11 @@ fn test_array_buffer_conversion() {
   let data = vec![1, 2, 3, 4, 5];
 
   // Vec -> Uint8Array
-  let uint8 = vec_to_uint8_array(data.clone());
+  let uint8 = vec_to_uint8_array(&data);
   assert_eq!(uint8.to_vec(), data);
 
   // Vec -> ArrayBuffer
-  let buffer = vec_to_array_buffer(data.clone());
+  let buffer = vec_to_array_buffer(&data);
   let uint8_from_buffer = Uint8Array::new(&buffer);
   assert_eq!(uint8_from_buffer.to_vec(), data);
 
@@ -202,6 +202,7 @@ fn test_wasm_auth_success_roundtrip() {
   let msg = AuthSuccess {
     user_id: UserId::new(),
     username: "wasm_user".to_string(),
+    nickname: "wasm_user".to_string(),
   };
   roundtrip_signaling(0x01, &msg);
 }
@@ -260,7 +261,7 @@ fn test_wasm_user_status_change_roundtrip() {
     status: UserStatus::Busy,
     signature: Some("In a meeting".to_string()),
   };
-  roundtrip_signaling(0x09, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::USER_STATUS_CHANGE, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -272,7 +273,7 @@ fn test_wasm_connection_invite_roundtrip() {
     to: UserId::new(),
     note: Some("WASM invite".to_string()),
   };
-  roundtrip_signaling(0x10, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::CONNECTION_INVITE, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -283,7 +284,7 @@ fn test_wasm_invite_accepted_roundtrip() {
     from: UserId::new(),
     to: UserId::new(),
   };
-  roundtrip_signaling(0x11, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::INVITE_ACCEPTED, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -294,7 +295,7 @@ fn test_wasm_invite_declined_roundtrip() {
     from: UserId::new(),
     to: UserId::new(),
   };
-  roundtrip_signaling(0x12, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::INVITE_DECLINED, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -305,7 +306,7 @@ fn test_wasm_invite_timeout_roundtrip() {
     from: UserId::new(),
     to: UserId::new(),
   };
-  roundtrip_signaling(0x13, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::INVITE_TIMEOUT, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -316,7 +317,7 @@ fn test_wasm_multi_invite_roundtrip() {
     from: UserId::new(),
     targets: vec![UserId::new(), UserId::new()],
   };
-  roundtrip_signaling(0x14, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::MULTI_INVITE, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -328,7 +329,7 @@ fn test_wasm_sdp_offer_roundtrip() {
     to: UserId::new(),
     sdp: "v=0\r\no=- 456 1 IN IP4 0.0.0.0\r\n".to_string(),
   };
-  roundtrip_signaling(0x30, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::SDP_OFFER, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -340,7 +341,7 @@ fn test_wasm_sdp_answer_roundtrip() {
     to: UserId::new(),
     sdp: "v=0\r\no=- 789 1 IN IP4 0.0.0.0\r\n".to_string(),
   };
-  roundtrip_signaling(0x31, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::SDP_ANSWER, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -352,7 +353,7 @@ fn test_wasm_ice_candidate_roundtrip() {
     to: UserId::new(),
     candidate: "candidate:1 1 udp 2130706431 192.168.1.1 5000 typ host".to_string(),
   };
-  roundtrip_signaling(0x32, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::ICE_CANDIDATE, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -363,7 +364,7 @@ fn test_wasm_peer_established_roundtrip() {
     from: UserId::new(),
     to: UserId::new(),
   };
-  roundtrip_signaling(0x33, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::PEER_ESTABLISHED, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -374,7 +375,7 @@ fn test_wasm_peer_closed_roundtrip() {
     from: UserId::new(),
     to: UserId::new(),
   };
-  roundtrip_signaling(0x34, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::PEER_CLOSED, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -387,7 +388,7 @@ fn test_wasm_create_room_roundtrip() {
     password: None,
     max_participants: 8,
   };
-  roundtrip_signaling(0x40, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::CREATE_ROOM, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -398,7 +399,7 @@ fn test_wasm_join_room_roundtrip() {
     room_id: RoomId::new(),
     password: None,
   };
-  roundtrip_signaling(0x41, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::JOIN_ROOM, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -408,7 +409,7 @@ fn test_wasm_leave_room_roundtrip() {
   let msg = LeaveRoom {
     room_id: RoomId::new(),
   };
-  roundtrip_signaling(0x42, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::LEAVE_ROOM, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -419,7 +420,7 @@ fn test_wasm_call_invite_roundtrip() {
     room_id: RoomId::new(),
     media_type: MediaType::Video,
   };
-  roundtrip_signaling(0x70, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::CALL_INVITE, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -429,7 +430,7 @@ fn test_wasm_call_accept_roundtrip() {
   let msg = CallAccept {
     room_id: RoomId::new(),
   };
-  roundtrip_signaling(0x71, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::CALL_ACCEPT, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -439,7 +440,7 @@ fn test_wasm_call_decline_roundtrip() {
   let msg = CallDecline {
     room_id: RoomId::new(),
   };
-  roundtrip_signaling(0x72, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::CALL_DECLINE, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -449,7 +450,7 @@ fn test_wasm_call_end_roundtrip() {
   let msg = CallEnd {
     room_id: RoomId::new(),
   };
-  roundtrip_signaling(0x73, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::CALL_END, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -461,7 +462,7 @@ fn test_wasm_mute_member_roundtrip() {
     target: UserId::new(),
     duration_secs: Some(300),
   };
-  roundtrip_signaling(0x75, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::MUTE_MEMBER, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -472,7 +473,7 @@ fn test_wasm_unmute_member_roundtrip() {
     room_id: RoomId::new(),
     target: UserId::new(),
   };
-  roundtrip_signaling(0x76, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::UNMUTE_MEMBER, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -483,7 +484,7 @@ fn test_wasm_ban_member_roundtrip() {
     room_id: RoomId::new(),
     target: UserId::new(),
   };
-  roundtrip_signaling(0x77, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::BAN_MEMBER, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -494,7 +495,7 @@ fn test_wasm_unban_member_roundtrip() {
     room_id: RoomId::new(),
     target: UserId::new(),
   };
-  roundtrip_signaling(0x78, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::UNBAN_MEMBER, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -505,7 +506,7 @@ fn test_wasm_promote_admin_roundtrip() {
     room_id: RoomId::new(),
     target: UserId::new(),
   };
-  roundtrip_signaling(0x79, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::PROMOTE_ADMIN, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -516,7 +517,7 @@ fn test_wasm_demote_admin_roundtrip() {
     room_id: RoomId::new(),
     target: UserId::new(),
   };
-  roundtrip_signaling(0x7A, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::DEMOTE_ADMIN, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -527,7 +528,7 @@ fn test_wasm_nickname_change_roundtrip() {
     user_id: UserId::new(),
     new_nickname: "WASM Nick".to_string(),
   };
-  roundtrip_signaling(0x7B, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::NICKNAME_CHANGE, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -538,7 +539,7 @@ fn test_wasm_room_announcement_roundtrip() {
     room_id: RoomId::new(),
     content: "WASM announcement!".to_string(),
   };
-  roundtrip_signaling(0x7C, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::ROOM_ANNOUNCEMENT, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -552,7 +553,10 @@ fn test_wasm_moderation_notification_roundtrip() {
     reason: Some("WASM spam".to_string()),
     duration_secs: Some(60),
   };
-  roundtrip_signaling(0x7D, &msg);
+  roundtrip_signaling(
+    crate::signaling::discriminator::MODERATION_NOTIFICATION,
+    &msg,
+  );
 }
 
 #[wasm_bindgen_test]
@@ -562,7 +566,7 @@ fn test_wasm_theater_mute_all_roundtrip() {
   let msg = TheaterMuteAll {
     room_id: RoomId::new(),
   };
-  roundtrip_signaling(0x60, &msg);
+  roundtrip_signaling(crate::signaling::discriminator::THEATER_MUTE_ALL, &msg);
 }
 
 #[wasm_bindgen_test]
@@ -573,7 +577,10 @@ fn test_wasm_theater_transfer_owner_roundtrip() {
     room_id: RoomId::new(),
     target: UserId::new(),
   };
-  roundtrip_signaling(0x61, &msg);
+  roundtrip_signaling(
+    crate::signaling::discriminator::THEATER_TRANSFER_OWNER,
+    &msg,
+  );
 }
 
 #[wasm_bindgen_test]
@@ -1120,7 +1127,7 @@ fn test_error_to_js_string_discriminator_zero() {
 fn test_array_buffer_empty_conversion() {
   // Empty Vec -> ArrayBuffer -> Vec roundtrip
   let data: Vec<u8> = vec![];
-  let buffer = vec_to_array_buffer(data.clone());
+  let buffer = vec_to_array_buffer(&data);
   let result = array_buffer_to_vec(&buffer);
   assert_eq!(result, data);
   assert!(result.is_empty());
@@ -1130,7 +1137,7 @@ fn test_array_buffer_empty_conversion() {
 fn test_uint8_array_empty_conversion() {
   // Empty Vec -> Uint8Array -> Vec roundtrip
   let data: Vec<u8> = vec![];
-  let uint8 = vec_to_uint8_array(data.clone());
+  let uint8 = vec_to_uint8_array(&data);
   let result = uint8_array_to_vec(&uint8);
   assert_eq!(result, data);
   assert!(result.is_empty());
@@ -1140,7 +1147,7 @@ fn test_uint8_array_empty_conversion() {
 fn test_array_buffer_large_data_conversion() {
   // Large data (1MB) roundtrip through ArrayBuffer
   let data: Vec<u8> = (0..=255).cycle().take(1_000_000).collect();
-  let buffer = vec_to_array_buffer(data.clone());
+  let buffer = vec_to_array_buffer(&data);
   let result = array_buffer_to_vec(&buffer);
   assert_eq!(result.len(), data.len());
   assert_eq!(result, data);
@@ -1149,8 +1156,8 @@ fn test_array_buffer_large_data_conversion() {
 #[wasm_bindgen_test]
 fn test_encode_from_buffer_empty_payload() {
   // Empty ArrayBuffer should fail encoding (same as empty slice)
-  let empty_buffer = vec_to_array_buffer(vec![]);
-  let result = encode_message_from_buffer(0x01, empty_buffer);
+  let empty_buffer = vec_to_array_buffer(&[]);
+  let result = encode_message_from_buffer(0x01, &empty_buffer);
   assert!(result.is_err());
   let err_msg = result.unwrap_err().as_string().unwrap();
   assert!(
@@ -1162,24 +1169,24 @@ fn test_encode_from_buffer_empty_payload() {
 #[wasm_bindgen_test]
 fn test_decode_from_buffer_invalid_magic() {
   // ArrayBuffer with invalid magic number
-  let bad_frame = vec_to_array_buffer(vec![0xAA, 0xBB, 0x01, 0xFF]);
-  let result = decode_message_from_buffer(bad_frame);
+  let bad_frame = vec_to_array_buffer(&[0xAA, 0xBB, 0x01, 0xFF]);
+  let result = decode_message_from_buffer(&bad_frame);
   assert!(result.is_err());
 }
 
 #[wasm_bindgen_test]
 fn test_decode_from_buffer_too_short() {
   // ArrayBuffer too short for a valid frame
-  let short_buffer = vec_to_array_buffer(vec![0xBC]);
-  let result = decode_message_from_buffer(short_buffer);
+  let short_buffer = vec_to_array_buffer(&[0xBC]);
+  let result = decode_message_from_buffer(&short_buffer);
   assert!(result.is_err());
 }
 
 #[wasm_bindgen_test]
 fn test_decode_from_buffer_empty() {
   // Empty ArrayBuffer
-  let empty_buffer = vec_to_array_buffer(vec![]);
-  let result = decode_message_from_buffer(empty_buffer);
+  let empty_buffer = vec_to_array_buffer(&[]);
+  let result = decode_message_from_buffer(&empty_buffer);
   assert!(result.is_err());
 }
 
@@ -1187,11 +1194,11 @@ fn test_decode_from_buffer_empty() {
 fn test_encode_decode_from_buffer_roundtrip() {
   // Valid encode → decode roundtrip through ArrayBuffer API
   let payload = vec![10, 20, 30, 40, 50];
-  let payload_buffer = vec_to_array_buffer(payload.clone());
-  let encoded = encode_message_from_buffer(0x05, payload_buffer).expect("Failed to encode");
+  let payload_buffer = vec_to_array_buffer(&payload);
+  let encoded = encode_message_from_buffer(0x05, &payload_buffer).expect("Failed to encode");
 
   let encoded_buffer = encoded.buffer();
-  let decoded = decode_message_from_buffer(encoded_buffer).expect("Failed to decode");
+  let decoded = decode_message_from_buffer(&encoded_buffer).expect("Failed to decode");
 
   let obj = js_sys::Object::from(decoded);
   let msg_type = js_sys::Reflect::get(&obj, &JsValue::from_str("messageType"))

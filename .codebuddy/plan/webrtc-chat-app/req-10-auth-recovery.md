@@ -63,6 +63,16 @@
 
 25. WHEN a user registers successfully THEN the system SHALL auto-generate a default avatar based on the username (using Identicon / initial letter avatar algorithm, generating SVG/Canvas image on the client), no manual upload needed
 26. WHEN a user modifies their avatar in personal settings THEN the system SHALL support uploading from local (JPEG/PNG/WebP, max 128KB), cropping to square after upload and generating Base64 encoding stored in localStorage; **Avatar exchange uses lazy loading strategy**: WHEN WebRTC DataChannel is established THEN the system SHALL first exchange basic user info (username, avatar SHA-256 hash), the peer SHALL check local cache (IndexedDB) for avatar data matching that hash; IF local cache hits THEN use cached avatar directly without requesting transfer; IF local cache misses THEN the peer SHALL request full avatar data via DataChannel, the sender SHALL transfer the avatar asynchronously (not blocking the first message send/receive)
+
+> **Implementation Deviation — Identicon Hash Algorithm (Task 14)**
+>
+> The default identicon generator (`frontend/src/identicon.rs`) uses **FNV-1a** (dual-hash variant) instead of the SHA-256 suggested above. This is a deliberate trade-off:
+>
+> - **WASM bundle size**: Adding a SHA-256 crate (e.g. `sha2`) would increase the compiled WASM binary by ~15–30 KB. FNV-1a is implemented in ~10 lines with zero dependency overhead.
+> - **Collision risk is acceptable**: The identicon grid is only 5×5 (15 independent bits for the left half) with an 18-entry color palette. Even a cryptographic hash would produce visually similar identicons at scale. FNV-1a provides sufficient distribution for this use case.
+> - **Avatar exchange still uses SHA-256**: When DataChannel-based avatar exchange is implemented (Req 10.6.26), the avatar *content* hash for cache validation will use SHA-256 as specified. The FNV-1a deviation only affects the *identicon generation* step, not the avatar exchange protocol.
+>
+> If cryptographic uniqueness becomes a requirement (e.g. avatar fingerprint verification), `identicon.rs::simple_hash` should be replaced with `sha2::Sha256`. See the module-level doc comment in `frontend/src/identicon.rs` for details.
 27. WHEN a user modifies their status signature in personal settings THEN the system SHALL broadcast the signature synchronously to all online users (via signaling server)
 28. WHEN a user closes their camera during a video call THEN the system SHALL display their avatar as a placeholder in that user's video area
 
