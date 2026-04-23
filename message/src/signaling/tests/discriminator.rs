@@ -117,11 +117,11 @@ fn create_peer_connection_discriminators() -> Vec<u8> {
       sdp: String::new(),
     })
     .discriminator(),
-    SignalingMessage::IceCandidate(IceCandidate {
-      from: UserId::new(),
-      to: UserId::new(),
-      candidate: String::new(),
-    })
+    SignalingMessage::IceCandidate(IceCandidate::new(
+      UserId::new(),
+      UserId::new(),
+      String::new(),
+    ))
     .discriminator(),
     SignalingMessage::PeerEstablished(PeerEstablished {
       from: UserId::new(),
@@ -343,11 +343,11 @@ fn create_peer_connection_messages() -> Vec<SignalingMessage> {
       to: UserId::new(),
       sdp: String::new(),
     }),
-    SignalingMessage::IceCandidate(IceCandidate {
-      from: UserId::new(),
-      to: UserId::new(),
-      candidate: String::new(),
-    }),
+    SignalingMessage::IceCandidate(IceCandidate::new(
+      UserId::new(),
+      UserId::new(),
+      String::new(),
+    )),
     SignalingMessage::PeerEstablished(PeerEstablished {
       from: UserId::new(),
       to: UserId::new(),

@@ -66,17 +66,25 @@ fn test_data_channel_state_from_unknown_defaults_to_closed() {
   assert_eq!(DataChannelState::from("OPEN"), DataChannelState::Closed);
 }
 
-// ── PeerEncryptionKeys tests ──
+// ── PeerEncryptionStatus tests ──
 
 #[test]
-fn test_peer_encryption_keys_clone() {
-  let keys = PeerEncryptionKeys {
-    aes_key: vec![0u8; 32],
-    key_id: 1,
+fn test_peer_encryption_status_default_is_unestablished() {
+  let status = PeerEncryptionStatus::default();
+  assert!(!status.established);
+  assert!(!status.handshake_timed_out);
+  assert_eq!(status.key_id, 0);
+}
+
+#[test]
+fn test_peer_encryption_status_is_copy() {
+  let status = PeerEncryptionStatus {
+    key_id: 3,
+    established: true,
+    handshake_timed_out: false,
   };
-  let cloned = keys.clone();
-  assert_eq!(cloned.aes_key.len(), 32);
-  assert_eq!(cloned.key_id, 1);
+  let copy = status;
+  assert_eq!(status, copy);
 }
 
 // ── PeerState tests ──
@@ -88,7 +96,8 @@ fn test_peer_state_new_defaults() {
   assert_eq!(state.user_id, user_id);
   assert_eq!(state.connection_state, PeerConnectionState::Connecting);
   assert!(state.data_channel_state.is_none());
-  assert!(state.encryption_keys.is_none());
+  assert!(!state.encryption.established);
+  assert_eq!(state.encryption.key_id, 0);
   assert!(state.is_initiator);
 }
 
@@ -258,22 +267,119 @@ fn test_webrtc_state_update_data_channel_state() {
 }
 
 #[test]
-fn test_webrtc_state_set_encryption_keys() {
+fn test_webrtc_state_mark_encryption_established() {
   let mut state = WebRtcState::new();
   let user_id = UserId::new();
   state.add_peer(user_id.clone(), true);
 
-  let keys = PeerEncryptionKeys {
-    aes_key: vec![42u8; 32],
-    key_id: 7,
-  };
-  state.set_encryption_keys(&user_id, keys);
+  // Before marking: no key established.
+  let peer = state.get_peer(&user_id).unwrap();
+  assert!(!peer.encryption.established);
+  assert_eq!(peer.encryption.key_id, 0);
+
+  state.mark_encryption_established(&user_id);
 
   let peer = state.get_peer(&user_id).unwrap();
-  assert!(peer.encryption_keys.is_some());
-  let stored_keys = peer.encryption_keys.as_ref().unwrap();
-  assert_eq!(stored_keys.key_id, 7);
-  assert_eq!(stored_keys.aes_key.len(), 32);
+  assert!(peer.encryption.established);
+  assert_eq!(peer.encryption.key_id, 1);
+
+  // Second call acts as key rotation: key_id increments, still established.
+  state.mark_encryption_established(&user_id);
+  let peer = state.get_peer(&user_id).unwrap();
+  assert!(peer.encryption.established);
+  assert_eq!(peer.encryption.key_id, 2);
+}
+
+#[test]
+fn test_webrtc_state_mark_encryption_established_nonexistent() {
+  let mut state = WebRtcState::new();
+  let user_id = UserId::new();
+  // Should not panic when peer does not exist.
+  state.mark_encryption_established(&user_id);
+  assert!(state.get_peer(&user_id).is_none());
+}
+
+#[test]
+fn test_webrtc_state_clear_encryption() {
+  let mut state = WebRtcState::new();
+  let user_id = UserId::new();
+  state.add_peer(user_id.clone(), true);
+  state.mark_encryption_established(&user_id);
+  assert!(state.get_peer(&user_id).unwrap().encryption.established);
+
+  state.clear_encryption(&user_id);
+  let peer = state.get_peer(&user_id).unwrap();
+  assert!(!peer.encryption.established);
+  assert!(!peer.encryption.handshake_timed_out);
+  // key_id is preserved so replay protection does not rewind.
+  assert_eq!(peer.encryption.key_id, 1);
+}
+
+#[test]
+fn test_webrtc_state_mark_encryption_timed_out_sets_flag() {
+  let mut state = WebRtcState::new();
+  let user_id = UserId::new();
+  state.add_peer(user_id.clone(), true);
+
+  state.mark_encryption_timed_out(&user_id);
+  let peer = state.get_peer(&user_id).unwrap();
+  assert!(peer.encryption.handshake_timed_out);
+  assert!(!peer.encryption.established);
+  // key_id unchanged: timeout is not a successful handshake.
+  assert_eq!(peer.encryption.key_id, 0);
+}
+
+#[test]
+fn test_webrtc_state_mark_encryption_timed_out_nonexistent() {
+  let mut state = WebRtcState::new();
+  let user_id = UserId::new();
+  // Should not panic when peer does not exist.
+  state.mark_encryption_timed_out(&user_id);
+  assert!(state.get_peer(&user_id).is_none());
+}
+
+#[test]
+fn test_webrtc_state_mark_encryption_established_clears_timeout_flag() {
+  let mut state = WebRtcState::new();
+  let user_id = UserId::new();
+  state.add_peer(user_id.clone(), true);
+
+  // First attempt times out.
+  state.mark_encryption_timed_out(&user_id);
+  assert!(
+    state
+      .get_peer(&user_id)
+      .unwrap()
+      .encryption
+      .handshake_timed_out
+  );
+
+  // A subsequent successful handshake must clear the timeout flag.
+  state.mark_encryption_established(&user_id);
+  let peer = state.get_peer(&user_id).unwrap();
+  assert!(peer.encryption.established);
+  assert!(!peer.encryption.handshake_timed_out);
+  assert_eq!(peer.encryption.key_id, 1);
+}
+
+#[test]
+fn test_webrtc_state_clear_encryption_clears_timeout_flag() {
+  let mut state = WebRtcState::new();
+  let user_id = UserId::new();
+  state.add_peer(user_id.clone(), true);
+  state.mark_encryption_timed_out(&user_id);
+  assert!(
+    state
+      .get_peer(&user_id)
+      .unwrap()
+      .encryption
+      .handshake_timed_out
+  );
+
+  state.clear_encryption(&user_id);
+  let peer = state.get_peer(&user_id).unwrap();
+  assert!(!peer.encryption.handshake_timed_out);
+  assert!(!peer.encryption.established);
 }
 
 #[test]

@@ -56,6 +56,23 @@ pub const CHT501: ErrorCode = ErrorCode::new(ErrorModule::Cht, ErrorCategory::Se
 pub const CHT502: ErrorCode = ErrorCode::new(ErrorModule::Cht, ErrorCategory::Security, 2);
 
 // ============================================================================
+// Error Code Constants - End-to-End Encryption (E2E)
+// ============================================================================
+
+/// No crypto state for peer (key not initialized)
+pub const E2E501: ErrorCode = ErrorCode::new(ErrorModule::E2e, ErrorCategory::Security, 1);
+/// Shared key not yet established with peer
+pub const E2E502: ErrorCode = ErrorCode::new(ErrorModule::E2e, ErrorCategory::Security, 2);
+/// Peer connection not found
+pub const E2E503: ErrorCode = ErrorCode::new(ErrorModule::E2e, ErrorCategory::Client, 1);
+/// `DataChannel` not available for peer
+pub const E2E504: ErrorCode = ErrorCode::new(ErrorModule::E2e, ErrorCategory::Client, 2);
+/// Mesh peer limit reached
+pub const E2E505: ErrorCode = ErrorCode::new(ErrorModule::E2e, ErrorCategory::Client, 3);
+/// Already connected to peer
+pub const E2E506: ErrorCode = ErrorCode::new(ErrorModule::E2e, ErrorCategory::Client, 4);
+
+// ============================================================================
 // Error Code Constants - Audio/Video (AV)
 // ============================================================================
 

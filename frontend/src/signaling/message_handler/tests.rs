@@ -106,17 +106,53 @@ fn test_sdp_answer_message() {
 fn test_ice_candidate_message() {
   let from = UserId::new();
   let to = UserId::new();
-  let msg = SignalingMessage::IceCandidate(IceCandidate {
-    from: from.clone(),
-    to: to.clone(),
-    candidate: "candidate:1 1 udp 2122260223 ...".to_string(),
-  });
+  let msg = SignalingMessage::IceCandidate(IceCandidate::new(
+    from.clone(),
+    to.clone(),
+    "candidate:1 1 udp 2122260223 ...".to_string(),
+  ));
   match &msg {
     SignalingMessage::IceCandidate(cand) => {
       assert!(cand.candidate.starts_with("candidate:"));
     }
     _ => panic!("Expected IceCandidate"),
   }
+}
+
+/// Regression test for P0-3 fix: verify IceCandidate carries sdp_mid and
+/// sdp_m_line_index so that `handle_signaling_message` passes them to
+/// `handle_incoming_ice_candidate` instead of hard-coding `"0"` / `0`.
+#[test]
+fn test_ice_candidate_custom_sdp_fields() {
+  let from = UserId::new();
+  let to = UserId::new();
+  let mut cand = IceCandidate::new(
+    from.clone(),
+    to.clone(),
+    "candidate:1 1 udp 2122260223 ...".to_string(),
+  );
+  cand.sdp_mid = "audio".to_string();
+  cand.sdp_m_line_index = Some(2);
+
+  let msg = SignalingMessage::IceCandidate(cand);
+  match &msg {
+    SignalingMessage::IceCandidate(c) => {
+      assert_eq!(c.sdp_mid, "audio");
+      assert_eq!(c.sdp_m_line_index, Some(2));
+    }
+    _ => panic!("Expected IceCandidate"),
+  }
+}
+
+/// Verify IceCandidate defaults (DataChannel-only single media section).
+#[test]
+fn test_ice_candidate_default_fields() {
+  let from = UserId::new();
+  let to = UserId::new();
+  let cand = IceCandidate::new(from, to, "candidate:1".to_string());
+
+  assert_eq!(cand.sdp_mid, "0");
+  assert_eq!(cand.sdp_m_line_index, Some(0));
 }
 
 #[test]

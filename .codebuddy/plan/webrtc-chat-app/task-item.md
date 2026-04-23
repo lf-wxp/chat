@@ -297,7 +297,7 @@
   - 编写单元测试：重连策略（6个）、Identicon（7个）、Token 持久化/恢复、错误码解析（已在 message crate 中覆盖）
   - _需求：Req 10.1-10.2 (Auth)、Req 10.6 (Avatar)、Req 10.9 (State Persistence)、requirements.md (Error Handling)_
 
-- [ ] 15. 实现 WebRTC 连接管理与 E2EE 加密
+- [x] 15. 实现 WebRTC 连接管理与 E2EE 加密
   - 实现 `RTCPeerConnection` 创建与管理：ICE 配置（STUN/TURN）、SDP Offer/Answer 交换
   - 实现 DataChannel 创建与管理：二进制模式（`binaryType = "arraybuffer"`）、消息编解码
   - 实现 Mesh 拓扑连接管理：多 Peer 并发连接、连接状态追踪

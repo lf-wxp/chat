@@ -6,12 +6,18 @@
 
 use js_sys::{Array, Reflect};
 use message::UserId;
+use std::cell::RefCell;
+use std::rc::Rc;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 use web_sys::{RtcConfiguration, RtcDataChannel, RtcIceServer, RtcPeerConnection};
 
 use super::data_channel::PeerDataChannel;
 use super::types::PeerConnectionState;
+
+type IceCandidateClosure = Closure<dyn FnMut(web_sys::RtcPeerConnectionIceEvent)>;
+type EventClosure = Closure<dyn FnMut(web_sys::Event)>;
+type DataChannelClosure = Closure<dyn FnMut(web_sys::RtcDataChannelEvent)>;
 
 /// Manages a single RTCPeerConnection with its DataChannel.
 #[derive(Debug, Clone)]
@@ -20,10 +26,25 @@ pub struct PeerConnection {
   pc: JsValue,
   /// The peer's user ID.
   peer_id: UserId,
+  /// Unique identifier for this PeerConnection instance (P1-16 fix).
+  ///
+  /// Used to detect stale `onconnectionstatechange` callbacks from a
+  /// previously-replaced connection. When `handle_incoming_offer` closes
+  /// an old PC and creates a new one for the same `peer_id`, the old PC's
+  /// callback may still fire asynchronously. By comparing the callback's
+  /// captured `id` with the current connection's `id`, we can skip the
+  /// stale callback and avoid erroneously closing the new connection.
+  id: Rc<uuid::Uuid>,
   /// The DataChannel (if established).
   data_channel: Option<PeerDataChannel>,
   /// Whether we are the initiator (offer sender).
   is_initiator: bool,
+  /// Stored ICE candidate closure to prevent memory leak (P1-4 fix).
+  on_ice_candidate: Rc<RefCell<Option<IceCandidateClosure>>>,
+  /// Stored connection state change closure to prevent memory leak (P1-4 fix).
+  on_connection_state_change: Rc<RefCell<Option<EventClosure>>>,
+  /// Stored DataChannel incoming closure to prevent memory leak (P1-4 fix).
+  on_data_channel: Rc<RefCell<Option<DataChannelClosure>>>,
 }
 
 impl PeerConnection {
@@ -56,8 +77,12 @@ impl PeerConnection {
     Ok(Self {
       pc: JsValue::from(pc),
       peer_id,
+      id: Rc::new(uuid::Uuid::new_v4()),
       data_channel: None,
       is_initiator,
+      on_ice_candidate: Rc::new(RefCell::new(None)),
+      on_connection_state_change: Rc::new(RefCell::new(None)),
+      on_data_channel: Rc::new(RefCell::new(None)),
     })
   }
 
@@ -136,7 +161,7 @@ impl PeerConnection {
 
     let candidate_init = web_sys::RtcIceCandidateInit::new(&candidate.candidate);
     candidate_init.set_sdp_mid(Some(&candidate.sdp_mid));
-    candidate_init.set_sdp_m_line_index(Some(candidate.sdp_m_line_index));
+    candidate_init.set_sdp_m_line_index(candidate.sdp_m_line_index);
 
     wasm_bindgen_futures::JsFuture::from(
       pc.add_ice_candidate_with_opt_rtc_ice_candidate_init(Some(&candidate_init)),
@@ -167,14 +192,14 @@ impl PeerConnection {
         let data = IceCandidateData {
           candidate: candidate.candidate(),
           sdp_mid: candidate.sdp_mid().unwrap_or_default(),
-          sdp_m_line_index: candidate.sdp_m_line_index().unwrap_or(0),
+          sdp_m_line_index: candidate.sdp_m_line_index(),
         };
         callback(data);
       }
-    }) as Box<dyn Fn(web_sys::RtcPeerConnectionIceEvent)>);
+    }) as Box<dyn FnMut(web_sys::RtcPeerConnectionIceEvent)>);
 
     pc.set_onicecandidate(Some(closure.as_ref().unchecked_ref()));
-    closure.forget();
+    *self.on_ice_candidate.borrow_mut() = Some(closure);
   }
 
   /// Set up connection state change handler.
@@ -200,10 +225,10 @@ impl PeerConnection {
         .unwrap_or_else(|| "closed".to_string());
       let peer_state = PeerConnectionState::from(state_str.as_str());
       callback(peer_state);
-    }) as Box<dyn Fn(web_sys::Event)>);
+    }) as Box<dyn FnMut(web_sys::Event)>);
 
     pc.set_onconnectionstatechange(Some(closure.as_ref().unchecked_ref()));
-    closure.forget();
+    *self.on_connection_state_change.borrow_mut() = Some(closure);
   }
 
   /// Set up incoming DataChannel handler (for non-initiator).
@@ -224,10 +249,10 @@ impl PeerConnection {
     let closure = Closure::wrap(Box::new(move |event: web_sys::RtcDataChannelEvent| {
       let channel = event.channel();
       callback(channel);
-    }) as Box<dyn Fn(web_sys::RtcDataChannelEvent)>);
+    }) as Box<dyn FnMut(web_sys::RtcDataChannelEvent)>);
 
     pc.set_ondatachannel(Some(closure.as_ref().unchecked_ref()));
-    closure.forget();
+    *self.on_data_channel.borrow_mut() = Some(closure);
   }
 
   /// Create the DataChannel (initiator only).
@@ -269,11 +294,40 @@ impl PeerConnection {
     self.is_initiator
   }
 
+  /// Get the unique instance identifier (P1-16 fix).
+  ///
+  /// Used to detect stale `onconnectionstatechange` callbacks from a
+  /// previously-replaced connection for the same `peer_id`.
+  #[must_use]
+  pub fn instance_id(&self) -> uuid::Uuid {
+    *self.id
+  }
+
   /// Close the connection.
-  pub fn close(&self) {
+  ///
+  /// Clears all JS event handlers and drops the stored closures to prevent
+  /// memory leaks (P1-4 fix). Also clears the `data_channel` field so that
+  /// subsequent `close()` calls on a replaced connection are no-ops (P1-18
+  /// fix).
+  pub fn close(&mut self) {
     if let Ok(pc) = self.get_pc() {
+      pc.set_onicecandidate(None);
+      pc.set_onconnectionstatechange(None);
+      pc.set_ondatachannel(None);
       pc.close();
     }
+
+    // Drop closures to prevent memory leaks
+    *self.on_ice_candidate.borrow_mut() = None;
+    *self.on_connection_state_change.borrow_mut() = None;
+    *self.on_data_channel.borrow_mut() = None;
+
+    // Close DataChannel and release its closures, then clear the field
+    // so stale callbacks cannot reference a closed channel (P1-18).
+    if let Some(ref dc) = self.data_channel {
+      dc.close();
+    }
+    self.data_channel = None;
   }
 
   /// Get the underlying `RtcPeerConnection` (cloned `JsValue`).
@@ -366,8 +420,8 @@ pub struct IceCandidateData {
   pub candidate: String,
   /// The SDP media stream identification tag.
   pub sdp_mid: String,
-  /// The SDP media line index.
-  pub sdp_m_line_index: u16,
+  /// The SDP media line index (may be `None` per WebRTC spec).
+  pub sdp_m_line_index: Option<u16>,
 }
 
 // ── Tests ──

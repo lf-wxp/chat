@@ -38,6 +38,15 @@ impl Default for UserId {
   }
 }
 
+/// Deterministic conversion from `u64` — used by tests that need stable,
+/// reproducible peer ids. The low 64 bits of the inner UUID encode `n`,
+/// the high 64 bits are zero, so distinct `n` values yield distinct ids.
+impl From<u64> for UserId {
+  fn from(n: u64) -> Self {
+    Self(Uuid::from_u64_pair(0, n))
+  }
+}
+
 impl fmt::Display for UserId {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", self.0)

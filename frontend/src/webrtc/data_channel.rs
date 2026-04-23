@@ -5,9 +5,14 @@
 
 use js_sys::{ArrayBuffer, Uint8Array};
 use message::datachannel::DataChannelMessage;
+use std::cell::RefCell;
+use std::rc::Rc;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 use web_sys::{RtcDataChannel, RtcDataChannelState};
+
+type MessageClosure = Closure<dyn FnMut(web_sys::MessageEvent)>;
+type EventClosure = Closure<dyn FnMut(web_sys::Event)>;
 
 /// Wrapper around `RtcDataChannel` with message encoding/decoding.
 #[derive(Debug, Clone)]
@@ -18,6 +23,12 @@ pub struct PeerDataChannel {
   peer_id: message::UserId,
   /// Whether we created this channel (initiator).
   is_initiator: bool,
+  /// Stored message handler closure to prevent memory leak (P1-4 fix).
+  on_message: Rc<RefCell<Option<MessageClosure>>>,
+  /// Stored open handler closure to prevent memory leak (P1-4 fix).
+  on_open: Rc<RefCell<Option<EventClosure>>>,
+  /// Stored close handler closure to prevent memory leak (P1-4 fix).
+  on_close: Rc<RefCell<Option<EventClosure>>>,
 }
 
 impl PeerDataChannel {
@@ -27,6 +38,9 @@ impl PeerDataChannel {
       channel: JsValue::from(channel),
       peer_id,
       is_initiator,
+      on_message: Rc::new(RefCell::new(None)),
+      on_open: Rc::new(RefCell::new(None)),
+      on_close: Rc::new(RefCell::new(None)),
     }
   }
 
@@ -52,6 +66,9 @@ impl PeerDataChannel {
       channel: JsValue::from(channel),
       peer_id,
       is_initiator: true,
+      on_message: Rc::new(RefCell::new(None)),
+      on_open: Rc::new(RefCell::new(None)),
+      on_close: Rc::new(RefCell::new(None)),
     })
   }
 
@@ -175,10 +192,10 @@ impl PeerDataChannel {
           &format!("[datachannel] Received text (unexpected): {}", text).into(),
         );
       }
-    }) as Box<dyn Fn(web_sys::MessageEvent)>);
+    }) as Box<dyn FnMut(web_sys::MessageEvent)>);
 
     channel.set_onmessage(Some(closure.as_ref().unchecked_ref()));
-    closure.forget();
+    *self.on_message.borrow_mut() = Some(closure);
   }
 
   /// Set up open handler.
@@ -196,10 +213,10 @@ impl PeerDataChannel {
 
     let closure = Closure::wrap(Box::new(move |_event: web_sys::Event| {
       callback();
-    }) as Box<dyn Fn(web_sys::Event)>);
+    }) as Box<dyn FnMut(web_sys::Event)>);
 
     channel.set_onopen(Some(closure.as_ref().unchecked_ref()));
-    closure.forget();
+    *self.on_open.borrow_mut() = Some(closure);
   }
 
   /// Set up close handler.
@@ -217,10 +234,22 @@ impl PeerDataChannel {
 
     let closure = Closure::wrap(Box::new(move |_event: web_sys::Event| {
       callback();
-    }) as Box<dyn Fn(web_sys::Event)>);
+    }) as Box<dyn FnMut(web_sys::Event)>);
 
     channel.set_onclose(Some(closure.as_ref().unchecked_ref()));
-    closure.forget();
+    *self.on_close.borrow_mut() = Some(closure);
+  }
+
+  /// Clear all event handlers and drop closures to prevent memory leaks (P1-4 fix).
+  pub fn close(&self) {
+    if let Ok(ch) = self.get_channel() {
+      ch.set_onmessage(None);
+      ch.set_onopen(None);
+      ch.set_onclose(None);
+    }
+    *self.on_message.borrow_mut() = None;
+    *self.on_open.borrow_mut() = None;
+    *self.on_close.borrow_mut() = None;
   }
 
   /// Get the DataChannel state.

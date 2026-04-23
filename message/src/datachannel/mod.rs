@@ -282,8 +282,11 @@ pub struct MessageReaction {
 /// ECDH public key for key exchange.
 #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
 pub struct EcdhKeyExchange {
-  /// Sender's ECDH public key (X25519, 32 bytes).
-  pub public_key: [u8; 32],
+  /// Sender's ECDH public key (P-256 raw uncompressed point, 65 bytes).
+  ///
+  /// Uses variable-length `Vec<u8>` to accommodate the raw EC point format
+  /// (1 prefix byte + 32 X bytes + 32 Y bytes = 65 bytes for P-256).
+  pub public_key: Vec<u8>,
   /// Key exchange timestamp in nanoseconds.
   pub timestamp_nanos: u64,
 }

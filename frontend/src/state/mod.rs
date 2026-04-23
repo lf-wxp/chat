@@ -4,6 +4,7 @@
 //! All state is provided via context and accessed throughout the app.
 
 use crate::utils;
+use crate::webrtc::WebRtcState;
 use leptos::prelude::*;
 use message::RoomId;
 use message::{
@@ -124,6 +125,8 @@ pub struct AppState {
   pub debug: RwSignal<bool>,
   /// Whether the settings drawer is currently open.
   pub settings_open: RwSignal<bool>,
+  /// WebRTC peer connection and encryption state.
+  pub webrtc_state: RwSignal<WebRtcState>,
 }
 
 impl AppState {
@@ -155,6 +158,7 @@ impl AppState {
       locale: RwSignal::new(locale),
       debug: RwSignal::new(debug),
       settings_open: RwSignal::new(false),
+      webrtc_state: RwSignal::new(WebRtcState::new()),
     }
   }
 

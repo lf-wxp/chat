@@ -202,8 +202,14 @@ pub fn handle_signaling_message(
       ));
       delegate_to_webrtc(move |manager| {
         let cand = candidate.candidate.clone();
+        let sdp_mid = candidate.sdp_mid.clone();
+        let sdp_m_line_index = candidate.sdp_m_line_index;
         let peer_id = candidate.from.clone();
-        async move { manager.handle_incoming_ice_candidate(peer_id, &cand).await }
+        async move {
+          manager
+            .handle_incoming_ice_candidate(peer_id, &cand, &sdp_mid, sdp_m_line_index)
+            .await
+        }
       });
     }
 
@@ -326,7 +332,7 @@ pub fn handle_signaling_message(
 /// auth flow).
 fn delegate_to_webrtc<Fut>(make_op: impl FnOnce(crate::webrtc::WebRtcManager) -> Fut + 'static)
 where
-  Fut: std::future::Future<Output = Result<(), String>> + 'static,
+  Fut: std::future::Future<Output = Result<(), crate::webrtc::WebRtcError>> + 'static,
 {
   let Some(manager) = crate::webrtc::try_use_webrtc_manager() else {
     log_debug("[signaling] WebRtcManager not initialized, skipping delegation");

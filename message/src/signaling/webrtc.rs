@@ -36,6 +36,43 @@ pub struct IceCandidate {
   pub to: UserId,
   /// ICE candidate string.
   pub candidate: String,
+  /// SDP media stream identification tag.
+  ///
+  /// Defaults to `"0"` for DataChannel-only connections (single media section).
+  /// Present for forward-compatibility with audio/video streams.
+  #[serde(default = "default_sdp_mid")]
+  pub sdp_mid: String,
+  /// SDP media line index.
+  ///
+  /// May be `None` per the WebRTC spec when `sdpMid` is present.
+  /// Defaults to `Some(0)` for DataChannel-only connections.
+  #[serde(default = "default_sdp_m_line_index")]
+  pub sdp_m_line_index: Option<u16>,
+}
+
+fn default_sdp_mid() -> String {
+  "0".to_string()
+}
+
+#[allow(clippy::unnecessary_wraps)]
+const fn default_sdp_m_line_index() -> Option<u16> {
+  Some(0)
+}
+
+impl IceCandidate {
+  /// Create a new `IceCandidate` with default `sdp_mid` and `sdp_m_line_index`.
+  ///
+  /// Defaults are suitable for DataChannel-only connections (single media section).
+  #[must_use]
+  pub fn new(from: UserId, to: UserId, candidate: String) -> Self {
+    Self {
+      from,
+      to,
+      candidate,
+      sdp_mid: default_sdp_mid(),
+      sdp_m_line_index: default_sdp_m_line_index(),
+    }
+  }
 }
 
 /// `PeerConnection` established notification.

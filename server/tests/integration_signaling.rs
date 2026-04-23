@@ -233,11 +233,11 @@ async fn test_ice_candidate_forwarding() {
   sleep(Duration::from_millis(100)).await;
 
   // User1 sends ICE Candidate to User2
-  let candidate = IceCandidate {
-    from: user1.clone(),
-    to: user2.clone(),
-    candidate: "candidate:1 1 UDP 2122260223 192.168.1.1 54321 typ host".to_string(),
-  };
+  let candidate = IceCandidate::new(
+    user1.clone(),
+    user2.clone(),
+    "candidate:1 1 UDP 2122260223 192.168.1.1 54321 typ host".to_string(),
+  );
   send_signaling(&mut ws1, &SignalingMessage::IceCandidate(candidate)).await;
 
   // User2 should receive the ICE Candidate
@@ -270,11 +270,7 @@ async fn test_multiple_ice_candidates() {
   ];
 
   for cand_str in candidates.iter() {
-    let candidate = IceCandidate {
-      from: user1.clone(),
-      to: user2.clone(),
-      candidate: cand_str.to_string(),
-    };
+    let candidate = IceCandidate::new(user1.clone(), user2.clone(), cand_str.to_string());
     send_signaling(&mut ws1, &SignalingMessage::IceCandidate(candidate)).await;
     sleep(Duration::from_millis(10)).await;
   }
@@ -582,11 +578,11 @@ async fn test_complete_sdp_negotiation() {
   ));
 
   // Step 3: Both exchange ICE candidates
-  let ice1 = IceCandidate {
-    from: offerer_id.clone(),
-    to: answerer_id.clone(),
-    candidate: "candidate:1 1 UDP 2122260223 192.168.1.1 54321 typ host".to_string(),
-  };
+  let ice1 = IceCandidate::new(
+    offerer_id.clone(),
+    answerer_id.clone(),
+    "candidate:1 1 UDP 2122260223 192.168.1.1 54321 typ host".to_string(),
+  );
   send_signaling(&mut ws_offerer, &SignalingMessage::IceCandidate(ice1)).await;
 
   let received_ice = recv_signaling(&mut ws_answerer).await;
@@ -737,11 +733,11 @@ async fn test_ice_before_answer() {
   establish_peers(&mut ws1, &mut ws2, &user1, &user2).await;
 
   // Send ICE candidate before SDP exchange completes
-  let ice = IceCandidate {
-    from: user1.clone(),
-    to: user2.clone(),
-    candidate: "candidate:early 1 UDP 2122260223 192.168.1.1 54321 typ host".to_string(),
-  };
+  let ice = IceCandidate::new(
+    user1.clone(),
+    user2.clone(),
+    "candidate:early 1 UDP 2122260223 192.168.1.1 54321 typ host".to_string(),
+  );
   send_signaling(&mut ws1, &SignalingMessage::IceCandidate(ice)).await;
 
   // User2 should still receive the ICE candidate
@@ -1066,11 +1062,11 @@ async fn test_sdp_renegotiation_media_change() {
   let _ = recv_signaling(&mut ws1).await;
 
   // Exchange ICE candidates
-  let ice1 = IceCandidate {
-    from: user1.clone(),
-    to: user2.clone(),
-    candidate: "candidate:1 1 UDP 2122260223 192.168.1.1 5000 typ host".to_string(),
-  };
+  let ice1 = IceCandidate::new(
+    user1.clone(),
+    user2.clone(),
+    "candidate:1 1 UDP 2122260223 192.168.1.1 5000 typ host".to_string(),
+  );
   send_signaling(&mut ws1, &SignalingMessage::IceCandidate(ice1)).await;
   let _ = recv_signaling(&mut ws2).await;
 
@@ -1158,11 +1154,11 @@ async fn test_sdp_renegotiation_ice_restart() {
   }
 
   // New ICE candidates after restart
-  let new_ice = IceCandidate {
-    from: user1.clone(),
-    to: user2.clone(),
-    candidate: "candidate:new 1 UDP 2122260223 192.168.2.1 6000 typ host".to_string(),
-  };
+  let new_ice = IceCandidate::new(
+    user1.clone(),
+    user2.clone(),
+    "candidate:new 1 UDP 2122260223 192.168.2.1 6000 typ host".to_string(),
+  );
   send_signaling(&mut ws1, &SignalingMessage::IceCandidate(new_ice)).await;
 
   let received = recv_signaling(&mut ws2).await;
@@ -1204,14 +1200,14 @@ async fn test_ice_candidate_trickle_timing() {
   // Simulate trickle ICE - candidates arrive one by one with delays
   for i in 0..3 {
     sleep(Duration::from_millis(50)).await;
-    let ice = IceCandidate {
-      from: user1.clone(),
-      to: user2.clone(),
-      candidate: format!(
+    let ice = IceCandidate::new(
+      user1.clone(),
+      user2.clone(),
+      format!(
         "candidate:{} 1 UDP 2122260223 192.168.1.{} 700{} typ host",
         i, i, i
       ),
-    };
+    );
     send_signaling(&mut ws1, &SignalingMessage::IceCandidate(ice)).await;
   }
 
@@ -1261,11 +1257,7 @@ async fn test_ice_candidate_ordering() {
   ];
 
   for (cand_str, _) in candidates.iter() {
-    let ice = IceCandidate {
-      from: user1.clone(),
-      to: user2.clone(),
-      candidate: cand_str.to_string(),
-    };
+    let ice = IceCandidate::new(user1.clone(), user2.clone(), cand_str.to_string());
     send_signaling(&mut ws1, &SignalingMessage::IceCandidate(ice)).await;
     sleep(Duration::from_millis(10)).await;
   }
@@ -1534,11 +1526,7 @@ async fn test_multiple_large_ice_candidates() {
       "candidate:{} 1 UDP 2122260223 192.168.1.{} 900{} typ host generation 0 ufrag abc network-id 1 network-cost 10",
       i, i, i
     );
-    let ice = IceCandidate {
-      from: user1.clone(),
-      to: user2.clone(),
-      candidate,
-    };
+    let ice = IceCandidate::new(user1.clone(), user2.clone(), candidate);
     send_signaling(&mut ws1, &SignalingMessage::IceCandidate(ice)).await;
   }
 
@@ -1832,11 +1820,11 @@ async fn test_ice_after_peer_closed() {
   let _ = recv_signaling(&mut ws2).await;
 
   // User1 sends ICE candidate (late, after close)
-  let late_ice = IceCandidate {
-    from: user1.clone(),
-    to: user2.clone(),
-    candidate: "candidate:late 1 UDP 2122260223 192.168.1.1 9999 typ host".to_string(),
-  };
+  let late_ice = IceCandidate::new(
+    user1.clone(),
+    user2.clone(),
+    "candidate:late 1 UDP 2122260223 192.168.1.1 9999 typ host".to_string(),
+  );
   send_signaling(&mut ws1, &SignalingMessage::IceCandidate(late_ice)).await;
 
   // Should not crash - ICE candidate is forwarded

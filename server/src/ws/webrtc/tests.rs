@@ -105,11 +105,7 @@ fn test_ice_candidate_sender_mismatch() {
   let user2 = UserId::new();
   let user3 = UserId::new();
 
-  let candidate = IceCandidate {
-    from: user1.clone(),
-    to: user2.clone(),
-    candidate: "candidate:...".to_string(),
-  };
+  let candidate = IceCandidate::new(user1.clone(), user2.clone(), "candidate:...".to_string());
 
   // If authenticated as user3, candidate from user1 should fail validation
   assert_ne!(candidate.from, user3);

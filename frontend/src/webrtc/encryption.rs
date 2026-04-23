@@ -9,22 +9,67 @@ use message::UserId;
 use wasm_bindgen::prelude::*;
 
 /// Key size for AES-256 (32 bytes).
-const AES_KEY_SIZE: u32 = 256;
+pub const AES_KEY_SIZE: u32 = 256;
 
 /// AES-GCM nonce size (12 bytes).
-const GCM_NONCE_SIZE: usize = 12;
+pub const GCM_NONCE_SIZE: usize = 12;
+
+/// Type-safe wrapper around a Web Crypto `CryptoKey` value (P1-7).
+///
+/// The Web Crypto API returns `CryptoKey` instances as opaque `JsValue`
+/// handles; the raw key material is not extractable from JS and is never
+/// exposed to Rust. Historically `PeerCrypto` stored these as bare
+/// `JsValue`s, which meant:
+///
+/// * every call site had to re-run `dyn_ref::<CryptoKey>()` and handle the
+///   `None` branch, duplicating error messages;
+/// * nothing at the type level prevented passing an arbitrary `JsValue`
+///   (e.g. a plain JS object from `Reflect::get`) where a `CryptoKey` was
+///   expected — the mistake would only surface at runtime as an opaque
+///   DOMException from Web Crypto.
+///
+/// `CryptoKeyValue` closes both gaps: its single constructor validates the
+/// underlying JS value once, and downstream accessors return a typed
+/// `&web_sys::CryptoKey` reference with no further checks.
+///
+/// The type is intentionally `pub(crate)` — callers outside the `webrtc`
+/// module have no reason to hold raw crypto key handles.
+#[derive(Debug, Clone)]
+pub(crate) struct CryptoKeyValue(JsValue);
+
+impl CryptoKeyValue {
+  /// Validate a `JsValue` is actually a Web Crypto `CryptoKey` and wrap it.
+  ///
+  /// # Errors
+  /// Returns an error string if `value` is not a `CryptoKey` instance.
+  fn from_js(value: JsValue) -> Result<Self, String> {
+    if value.dyn_ref::<web_sys::CryptoKey>().is_none() {
+      return Err("Expected a CryptoKey value".to_string());
+    }
+    Ok(Self(value))
+  }
+
+  /// Borrow the underlying `CryptoKey`.
+  ///
+  /// Safe because the only constructor (`from_js`) verifies the dynamic
+  /// type, so `unchecked_ref` never observes a non-`CryptoKey` value.
+  fn as_crypto_key(&self) -> &web_sys::CryptoKey {
+    self.0.unchecked_ref()
+  }
+}
 
 /// Manages ECDH key exchange and AES-256-GCM encryption for a peer.
 #[derive(Debug, Clone)]
 pub struct PeerCrypto {
   /// The peer's user ID.
   pub peer_id: UserId,
-  /// Our ECDH private key (CryptoKey, stored as JsValue).
-  private_key: JsValue,
-  /// Our ECDH public key (CryptoKey, stored as JsValue).
-  public_key: JsValue,
-  /// The shared secret (AES-256 key derived from ECDH).
-  shared_key: Option<JsValue>,
+  /// Our ECDH private key (validated `CryptoKey` wrapper).
+  private_key: CryptoKeyValue,
+  /// Our ECDH public key (validated `CryptoKey` wrapper).
+  public_key: CryptoKeyValue,
+  /// The shared AES-256-GCM key derived from ECDH, or `None` until the
+  /// peer's public key has been imported.
+  shared_key: Option<CryptoKeyValue>,
   /// Key ID for rotation support.
   key_id: u32,
 }
@@ -64,14 +109,18 @@ impl PeerCrypto {
 
     Ok(Self {
       peer_id,
-      private_key,
-      public_key,
+      private_key: CryptoKeyValue::from_js(private_key)?,
+      public_key: CryptoKeyValue::from_js(public_key)?,
       shared_key: None,
       key_id: 0,
     })
   }
 
-  /// Export the public key in SPKI format (for sending to peer).
+  /// Export the public key in raw format (uncompressed EC point, 65 bytes for P-256).
+  ///
+  /// Uses the "raw" format instead of "spki" to keep the key compact
+  /// (65 bytes vs ~91 bytes for SPKI). The raw format contains just the
+  /// uncompressed point: `[0x04, X(32 bytes), Y(32 bytes)]`.
   ///
   /// # Errors
   /// Returns an error if the export fails.
@@ -82,14 +131,9 @@ impl PeerCrypto {
       .map_err(|_| "Crypto not available".to_string())?;
     let subtle = crypto.subtle();
 
-    let key = self
-      .public_key
-      .dyn_ref::<web_sys::CryptoKey>()
-      .ok_or("Invalid public key")?;
-
     let array_buffer = wasm_bindgen_futures::JsFuture::from(
       subtle
-        .export_key("spki", key)
+        .export_key("raw", self.public_key.as_crypto_key())
         .map_err(|e| format!("Failed to call export_key: {:?}", e))?,
     )
     .await
@@ -100,6 +144,8 @@ impl PeerCrypto {
   }
 
   /// Import a peer's public key (received via EcdhKeyExchange message).
+  ///
+  /// Expects the key in raw format (uncompressed EC point, 65 bytes for P-256).
   ///
   /// # Errors
   /// Returns an error if the import fails.
@@ -112,21 +158,25 @@ impl PeerCrypto {
 
     let algo = Self::ecdh_algorithm()?;
     let key_buffer = Uint8Array::from(key_data).buffer();
+    // Web Crypto spec requires ECDH *public* keys to be imported with an
+    // empty `keyUsages` array — only the matching private key carries the
+    // `deriveKey`/`deriveBits` usages. Passing any non-empty list here
+    // triggers `SyntaxError: Cannot create a key using the specified key
+    // usages.` in every browser implementation.
     let usages = Array::new();
-    usages.push(&"deriveKey".into());
-    usages.push(&"deriveBits".into());
 
     let algo_obj: &js_sys::Object = algo.dyn_ref().ok_or("ECDH algorithm is not an Object")?;
 
     let public_key = wasm_bindgen_futures::JsFuture::from(
       subtle
-        .import_key_with_object("spki", &key_buffer, algo_obj, false, &usages)
+        .import_key_with_object("raw", &key_buffer, algo_obj, false, &usages)
         .map_err(|e| format!("Failed to call import_key: {:?}", e))?,
     )
     .await
     .map_err(|e| format!("Failed to import peer public key: {:?}", e))?;
 
-    self.derive_shared_key(&subtle, &public_key).await?;
+    let peer_public = CryptoKeyValue::from_js(public_key)?;
+    self.derive_shared_key(&subtle, &peer_public).await?;
     Ok(())
   }
 
@@ -134,31 +184,36 @@ impl PeerCrypto {
   async fn derive_shared_key(
     &mut self,
     subtle: &web_sys::SubtleCrypto,
-    peer_public_key: &JsValue,
+    peer_public_key: &CryptoKeyValue,
   ) -> Result<(), String> {
-    let private_key = self
-      .private_key
-      .dyn_ref::<web_sys::CryptoKey>()
-      .ok_or("Invalid private key")?;
-
     // Derive bits using ECDH
-    let algo = Self::ecdh_derive_algorithm_from_js(peer_public_key)?;
+    let algo = Self::ecdh_derive_algorithm_from_key(peer_public_key)?;
     let algo_obj: &js_sys::Object = algo
       .dyn_ref()
       .ok_or("ECDH derive algorithm is not an Object")?;
 
     let raw_secret = wasm_bindgen_futures::JsFuture::from(
       subtle
-        .derive_bits_with_object(algo_obj, private_key, AES_KEY_SIZE)
+        .derive_bits_with_object(algo_obj, self.private_key.as_crypto_key(), AES_KEY_SIZE)
         .map_err(|e| format!("Failed to call derive_bits: {:?}", e))?,
     )
     .await
     .map_err(|e| format!("Failed to derive shared secret: {:?}", e))?;
 
+    // Verify ECDH P-256 shared secret length before HKDF (P1-15 fix).
+    // All spec-compliant browsers return 32 bytes (256 bits) for P-256.
+    let raw_bytes = Uint8Array::new(&raw_secret);
+    if raw_bytes.length() != 32 {
+      return Err(format!(
+        "ECDH shared secret must be 32 bytes for P-256, got {}",
+        raw_bytes.length()
+      ));
+    }
+
     // Derive AES-256 key from raw secret
     let aes_key = Self::derive_aes_key(subtle, &raw_secret).await?;
 
-    self.shared_key = Some(aes_key);
+    self.shared_key = Some(CryptoKeyValue::from_js(aes_key)?);
     self.key_id += 1;
 
     web_sys::console::log_1(
@@ -167,41 +222,87 @@ impl PeerCrypto {
     Ok(())
   }
 
-  /// Derive AES-256 key from ECDH raw secret.
+  /// Derive AES-256 key from ECDH raw secret using HKDF-SHA256.
   ///
-  /// Uses HKDF-like derivation: hash+truncate the raw secret to 32 bytes,
-  /// then import as an AES-GCM key.
+  /// Uses the Web Crypto API's `deriveKey` with HKDF to properly derive
+  /// an AES-256-GCM key from the ECDH shared secret. This follows
+  /// cryptographic best practices (RFC 5869) for key separation.
   async fn derive_aes_key(
     subtle: &web_sys::SubtleCrypto,
     raw_secret: &JsValue,
   ) -> Result<JsValue, String> {
-    // Convert raw secret to bytes, ensure exactly 32 bytes
+    // Import the raw ECDH secret as key material for HKDF
     let raw_bytes = Uint8Array::new(raw_secret);
-    let mut key_material = raw_bytes.to_vec();
-    if key_material.len() < 32 {
-      key_material.resize(32, 0);
-    }
-    key_material.truncate(32);
+    let key_material_buffer = raw_bytes.buffer();
 
-    let key_buffer = Uint8Array::from(&key_material[..]).buffer();
-    let usages = Array::new();
-    usages.push(&"encrypt".into());
-    usages.push(&"decrypt".into());
-
-    // Use Algorithm dictionary for import
-    let algo_dict = js_sys::Object::new();
-    js_sys::Reflect::set(&algo_dict, &"name".into(), &"AES-GCM".into())
+    let import_algo = js_sys::Object::new();
+    js_sys::Reflect::set(&import_algo, &"name".into(), &"HKDF".into())
       .map_err(|_| "Failed to set algorithm name")?;
-    js_sys::Reflect::set(&algo_dict, &"length".into(), &JsValue::from(256))
-      .map_err(|_| "Failed to set algorithm length")?;
+
+    let import_usages = Array::new();
+    import_usages.push(&"deriveKey".into());
+
+    let hkdf_key = wasm_bindgen_futures::JsFuture::from(
+      subtle
+        .import_key_with_object(
+          "raw",
+          &key_material_buffer,
+          &import_algo,
+          false,
+          &import_usages,
+        )
+        .map_err(|e| format!("Failed to call import_key for HKDF: {:?}", e))?,
+    )
+    .await
+    .map_err(|e| format!("Failed to import HKDF key material: {:?}", e))?;
+
+    // Set up HKDF parameters: SHA-256 with salt and info
+    let hkdf_algo = js_sys::Object::new();
+    js_sys::Reflect::set(&hkdf_algo, &"name".into(), &"HKDF".into())
+      .map_err(|_| "Failed to set HKDF name")?;
+    js_sys::Reflect::set(&hkdf_algo, &"hash".into(), &"SHA-256".into())
+      .map_err(|_| "Failed to set HKDF hash")?;
+
+    // Salt: fixed application-specific value for E2EE chat key derivation.
+    // A fixed salt is acceptable here because the ECDH shared secret is
+    // already unique per peer pair.
+    let salt = Uint8Array::from(b"webrtc-e2ee-chat-hkdf-salt-v1".as_slice());
+    js_sys::Reflect::set(&hkdf_algo, &"salt".into(), &salt.buffer())
+      .map_err(|_| "Failed to set HKDF salt")?;
+
+    // Info: application-specific context string for key separation
+    let info = Uint8Array::from(b"AES-256-GCM".as_slice());
+    js_sys::Reflect::set(&hkdf_algo, &"info".into(), &info.buffer())
+      .map_err(|_| "Failed to set HKDF info")?;
+
+    // Derive AES-256-GCM key
+    let aes_algo = js_sys::Object::new();
+    js_sys::Reflect::set(&aes_algo, &"name".into(), &"AES-GCM".into())
+      .map_err(|_| "Failed to set AES algorithm name")?;
+    js_sys::Reflect::set(&aes_algo, &"length".into(), &JsValue::from(256))
+      .map_err(|_| "Failed to set AES algorithm length")?;
+
+    let derive_usages = Array::new();
+    derive_usages.push(&"encrypt".into());
+    derive_usages.push(&"decrypt".into());
+
+    let hkdf_crypto_key: web_sys::CryptoKey = hkdf_key
+      .dyn_into()
+      .map_err(|_| "HKDF key is not a CryptoKey")?;
 
     let aes_key = wasm_bindgen_futures::JsFuture::from(
       subtle
-        .import_key_with_object("raw", &key_buffer, &algo_dict, false, &usages)
-        .map_err(|e| format!("Failed to call import_key: {:?}", e))?,
+        .derive_key_with_object_and_object(
+          &hkdf_algo,
+          &hkdf_crypto_key,
+          &aes_algo,
+          false,
+          &derive_usages,
+        )
+        .map_err(|e| format!("Failed to call deriveKey: {:?}", e))?,
     )
     .await
-    .map_err(|e| format!("Failed to import AES key: {:?}", e))?;
+    .map_err(|e| format!("HKDF key derivation failed: {:?}", e))?;
 
     Ok(aes_key)
   }
@@ -235,16 +336,16 @@ impl PeerCrypto {
     )
     .map_err(|_| "Failed to set IV")?;
 
-    let key = shared_key
-      .dyn_ref::<web_sys::CryptoKey>()
-      .ok_or("Invalid shared key")?;
-
     let plaintext_buffer = Uint8Array::from(plaintext).buffer();
     let subtle = crypto.subtle();
 
     let encrypted = wasm_bindgen_futures::JsFuture::from(
       subtle
-        .encrypt_with_object_and_buffer_source(&algo_dict, key, &plaintext_buffer)
+        .encrypt_with_object_and_buffer_source(
+          &algo_dict,
+          shared_key.as_crypto_key(),
+          &plaintext_buffer,
+        )
         .map_err(|e| format!("Failed to call encrypt: {:?}", e))?,
     )
     .await
@@ -290,16 +391,12 @@ impl PeerCrypto {
     js_sys::Reflect::set(&algo_dict, &"iv".into(), &Uint8Array::from(nonce).buffer())
       .map_err(|_| "Failed to set IV")?;
 
-    let key = shared_key
-      .dyn_ref::<web_sys::CryptoKey>()
-      .ok_or("Invalid shared key")?;
-
     let ct_buffer = Uint8Array::from(ct).buffer();
     let subtle = crypto.subtle();
 
     let decrypted = wasm_bindgen_futures::JsFuture::from(
       subtle
-        .decrypt_with_object_and_buffer_source(&algo_dict, key, &ct_buffer)
+        .decrypt_with_object_and_buffer_source(&algo_dict, shared_key.as_crypto_key(), &ct_buffer)
         .map_err(|e| format!("Failed to call decrypt: {:?}", e))?,
     )
     .await
@@ -346,40 +443,14 @@ impl PeerCrypto {
     Ok(JsValue::from(algo_dict))
   }
 
-  /// Create ECDH key derivation algorithm object from a JsValue peer public key.
-  fn ecdh_derive_algorithm_from_js(public_key: &JsValue) -> Result<JsValue, String> {
-    let pk = public_key
-      .dyn_ref::<web_sys::CryptoKey>()
-      .ok_or("Peer public key is not a CryptoKey")?;
-    let algo = web_sys::EcdhKeyDeriveParams::new("ECDH", pk);
+  /// Create ECDH key derivation algorithm object from a validated peer
+  /// public key. The `CryptoKeyValue` wrapper guarantees the underlying
+  /// value is a `CryptoKey`, so this helper no longer needs to perform
+  /// its own `dyn_ref` check (P1-7).
+  fn ecdh_derive_algorithm_from_key(public_key: &CryptoKeyValue) -> Result<JsValue, String> {
+    let algo = web_sys::EcdhKeyDeriveParams::new("ECDH", public_key.as_crypto_key());
     Ok(JsValue::from(algo))
   }
-}
-
-/// Serialize ECDH public key for transmission via signaling channel.
-///
-/// The key is encoded as: `[key_id (4 bytes, big-endian)] + [spki_der_bytes]`
-#[must_use]
-pub fn serialize_ecdh_key(key_id: u32, key_data: &[u8]) -> Vec<u8> {
-  let mut result = Vec::with_capacity(4 + key_data.len());
-  result.extend_from_slice(&key_id.to_be_bytes());
-  result.extend_from_slice(key_data);
-  result
-}
-
-/// Deserialize ECDH public key from signaling message.
-///
-/// Returns (key_id, key_data).
-///
-/// # Errors
-/// Returns an error if the data is too short.
-pub fn deserialize_ecdh_key(data: &[u8]) -> Result<(u32, Vec<u8>), String> {
-  if data.len() < 4 {
-    return Err("ECDH key data too short".to_string());
-  }
-  let key_id = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
-  let key_data = data[4..].to_vec();
-  Ok((key_id, key_data))
 }
 
 // ── Tests ──
@@ -389,27 +460,179 @@ mod tests {
   use super::*;
 
   #[test]
-  fn test_serialize_deserialize_ecdh_key() {
-    let key_id = 42u32;
-    let key_data = vec![1, 2, 3, 4, 5];
-
-    let serialized = serialize_ecdh_key(key_id, &key_data);
-    let (deserialized_id, deserialized_data) = deserialize_ecdh_key(&serialized).unwrap();
-
-    assert_eq!(key_id, deserialized_id);
-    assert_eq!(key_data, deserialized_data);
-  }
-
-  #[test]
-  fn test_deserialize_ecdh_key_too_short() {
-    let data = vec![1, 2, 3]; // Only 3 bytes, need at least 4
-    let result = deserialize_ecdh_key(&data);
-    assert!(result.is_err());
-  }
-
-  #[test]
   fn test_nonce_size() {
     // Verify GCM_NONCE_SIZE is 12 (NIST recommendation)
     assert_eq!(GCM_NONCE_SIZE, 12);
+  }
+}
+
+// ── WASM-only crypto tests (require Web Crypto API) ──
+
+#[cfg(all(test, target_arch = "wasm32"))]
+mod wasm_tests {
+  use super::*;
+  use wasm_bindgen_test::*;
+
+  wasm_bindgen_test_configure!(run_in_browser);
+
+  /// `PeerCrypto::new()` should generate an ECDH P-256 key pair and
+  /// `has_shared_key()` should return false until a peer key is imported.
+  #[wasm_bindgen_test]
+  async fn test_ecdh_key_generation() {
+    let crypto = PeerCrypto::new(UserId::from(1u64)).await.unwrap();
+    assert!(
+      !crypto.has_shared_key(),
+      "Shared key should not be established yet"
+    );
+    assert_eq!(crypto.key_id(), 0);
+  }
+
+  /// The exported public key must be a 65-byte raw uncompressed EC point.
+  #[wasm_bindgen_test]
+  async fn test_export_public_key_length() {
+    let crypto = PeerCrypto::new(UserId::from(1u64)).await.unwrap();
+    let pk = crypto.export_public_key().await.unwrap();
+    assert_eq!(
+      pk.len(),
+      65,
+      "P-256 raw uncompressed public key should be 65 bytes"
+    );
+    assert_eq!(
+      pk[0], 0x04,
+      "First byte should be 0x04 (uncompressed point marker)"
+    );
+  }
+
+  /// Two `PeerCrypto` instances should successfully derive a shared key
+  /// after exchanging public keys.
+  #[wasm_bindgen_test]
+  async fn test_shared_key_establishment() {
+    let mut alice = PeerCrypto::new(UserId::from(1u64)).await.unwrap();
+    let mut bob = PeerCrypto::new(UserId::from(2u64)).await.unwrap();
+
+    let alice_pk = alice.export_public_key().await.unwrap();
+    let bob_pk = bob.export_public_key().await.unwrap();
+
+    alice.import_peer_public_key(&bob_pk).await.unwrap();
+    bob.import_peer_public_key(&alice_pk).await.unwrap();
+
+    assert!(
+      alice.has_shared_key(),
+      "Alice should have shared key after import"
+    );
+    assert!(
+      bob.has_shared_key(),
+      "Bob should have shared key after import"
+    );
+    assert_eq!(alice.key_id(), 1);
+    assert_eq!(bob.key_id(), 1);
+  }
+
+  /// AES-256-GCM encrypt/decrypt round-trip: decrypting the ciphertext
+  /// must recover the original plaintext.
+  #[wasm_bindgen_test]
+  async fn test_encrypt_decrypt_roundtrip() {
+    let mut alice = PeerCrypto::new(UserId::from(1u64)).await.unwrap();
+    let mut bob = PeerCrypto::new(UserId::from(2u64)).await.unwrap();
+
+    let alice_pk = alice.export_public_key().await.unwrap();
+    let bob_pk = bob.export_public_key().await.unwrap();
+
+    alice.import_peer_public_key(&bob_pk).await.unwrap();
+    bob.import_peer_public_key(&alice_pk).await.unwrap();
+
+    let plaintext = b"Hello, secure WebRTC world!";
+    let ciphertext = alice.encrypt(plaintext).await.unwrap();
+
+    // Ciphertext must contain nonce + encrypted data
+    assert!(ciphertext.len() > GCM_NONCE_SIZE);
+
+    let decrypted = bob.decrypt(&ciphertext).await.unwrap();
+    assert_eq!(decrypted, plaintext.as_slice());
+  }
+
+  /// Decrypting without an established shared key must return an error.
+  #[wasm_bindgen_test]
+  async fn test_decrypt_without_shared_key_fails() {
+    let crypto = PeerCrypto::new(UserId::from(1u64)).await.unwrap();
+    let dummy = vec![0u8; GCM_NONCE_SIZE + 16];
+    let result = crypto.decrypt(&dummy).await;
+    assert!(result.is_err(), "Decryption should fail without shared key");
+  }
+
+  /// Tampering with a single ciphertext byte must cause decryption to
+  /// fail because AES-GCM verifies the authentication tag.
+  #[wasm_bindgen_test]
+  async fn test_decrypt_tampered_ciphertext_fails() {
+    let mut alice = PeerCrypto::new(UserId::from(1u64)).await.unwrap();
+    let mut bob = PeerCrypto::new(UserId::from(2u64)).await.unwrap();
+
+    let alice_pk = alice.export_public_key().await.unwrap();
+    let bob_pk = bob.export_public_key().await.unwrap();
+
+    alice.import_peer_public_key(&bob_pk).await.unwrap();
+    bob.import_peer_public_key(&alice_pk).await.unwrap();
+
+    let plaintext = b"Tamper-proof message";
+    let mut ciphertext = alice.encrypt(plaintext).await.unwrap();
+
+    // Tamper with the ciphertext (skip nonce, modify first encrypted byte)
+    let idx = GCM_NONCE_SIZE + 1;
+    ciphertext[idx] = ciphertext[idx].wrapping_add(1);
+
+    let result = bob.decrypt(&ciphertext).await;
+    assert!(
+      result.is_err(),
+      "Decryption should fail on tampered ciphertext"
+    );
+  }
+
+  /// After a full key exchange, both `PeerCrypto` instances must derive
+  /// the same shared key, verified by cross encrypt/decrypt.
+  #[wasm_bindgen_test]
+  async fn test_cross_encrypt_decrypt() {
+    let mut alice = PeerCrypto::new(UserId::from(1u64)).await.unwrap();
+    let mut bob = PeerCrypto::new(UserId::from(2u64)).await.unwrap();
+
+    let alice_pk = alice.export_public_key().await.unwrap();
+    let bob_pk = bob.export_public_key().await.unwrap();
+
+    alice.import_peer_public_key(&bob_pk).await.unwrap();
+    bob.import_peer_public_key(&alice_pk).await.unwrap();
+
+    // Alice encrypts, Bob decrypts
+    let msg1 = b"Alice -> Bob";
+    let ct1 = alice.encrypt(msg1).await.unwrap();
+    assert_eq!(bob.decrypt(&ct1).await.unwrap(), msg1.as_slice());
+
+    // Bob encrypts, Alice decrypts
+    let msg2 = b"Bob -> Alice";
+    let ct2 = bob.encrypt(msg2).await.unwrap();
+    assert_eq!(alice.decrypt(&ct2).await.unwrap(), msg2.as_slice());
+  }
+
+  /// Ciphertext layout check: the first `GCM_NONCE_SIZE` bytes are the
+  /// nonce, and each encryption must produce a fresh nonce.
+  #[wasm_bindgen_test]
+  async fn test_nonce_uniqueness() {
+    let mut alice = PeerCrypto::new(UserId::from(1u64)).await.unwrap();
+    let mut bob = PeerCrypto::new(UserId::from(2u64)).await.unwrap();
+
+    alice
+      .import_peer_public_key(&bob.export_public_key().await.unwrap())
+      .await
+      .unwrap();
+    bob
+      .import_peer_public_key(&alice.export_public_key().await.unwrap())
+      .await
+      .unwrap();
+
+    let plaintext = b"test";
+    let ct1 = alice.encrypt(plaintext).await.unwrap();
+    let ct2 = alice.encrypt(plaintext).await.unwrap();
+
+    let nonce1 = &ct1[..GCM_NONCE_SIZE];
+    let nonce2 = &ct2[..GCM_NONCE_SIZE];
+    assert_ne!(nonce1, nonce2, "Nonces should be unique across encryptions");
   }
 }

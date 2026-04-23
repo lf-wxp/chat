@@ -16,11 +16,11 @@ fn test_sdp_offer_roundtrip() {
 
 #[test]
 fn test_ice_candidate_roundtrip() {
-  let msg = IceCandidate {
-    from: UserId::new(),
-    to: UserId::new(),
-    candidate: "candidate:1 1 UDP 2122260223 192.168.1.1 54321 typ host".to_string(),
-  };
+  let msg = IceCandidate::new(
+    UserId::new(),
+    UserId::new(),
+    "candidate:1 1 UDP 2122260223 192.168.1.1 54321 typ host".to_string(),
+  );
   let encoded = bitcode::encode(&msg);
   let decoded: IceCandidate = bitcode::decode(&encoded).expect("Failed to decode");
   assert_eq!(msg, decoded);
@@ -116,12 +116,7 @@ fn test_discriminator_webrtc_messages() {
     SDP_ANSWER
   );
   assert_eq!(
-    SignalingMessage::IceCandidate(IceCandidate {
-      from: uid1,
-      to: uid2,
-      candidate: "c".into()
-    })
-    .discriminator(),
+    SignalingMessage::IceCandidate(IceCandidate::new(uid1, uid2, "c".into())).discriminator(),
     ICE_CANDIDATE
   );
 }

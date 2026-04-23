@@ -146,7 +146,7 @@ fn test_message_reaction_roundtrip() {
 #[test]
 fn test_ecdh_key_exchange_roundtrip() {
   let msg = EcdhKeyExchange {
-    public_key: [0xAB; 32],
+    public_key: vec![0xAB; 65], // P-256 raw format: 65 bytes
     timestamp_nanos: 1_000_000_000,
   };
   test_bitcode_roundtrip(&msg);
@@ -521,7 +521,7 @@ fn test_discriminator_encryption_and_avatar() {
 
   assert_eq!(
     DataChannelMessage::EcdhKeyExchange(EcdhKeyExchange {
-      public_key: [0u8; 32],
+      public_key: vec![0u8; 65],
       timestamp_nanos: 0,
     })
     .discriminator(),
@@ -705,7 +705,7 @@ fn create_message_status_discriminators() -> Vec<u8> {
 fn create_user_avatar_discriminators() -> Vec<u8> {
   vec![
     DataChannelMessage::EcdhKeyExchange(EcdhKeyExchange {
-      public_key: [0u8; 32],
+      public_key: vec![0u8; 65],
       timestamp_nanos: 0,
     })
     .discriminator(),

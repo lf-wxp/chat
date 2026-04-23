@@ -175,3 +175,98 @@ where
     _holder: holder,
   })
 }
+
+/// Shared cell that holds the `setInterval` closure so the timer code
+/// can drop it in [`IntervalHandle::cancel`]. Distinct from
+/// [`TimeoutClosureCell`] because interval closures live as long as the
+/// handle rather than self-dropping after a single tick.
+type IntervalClosureCell =
+  std::rc::Rc<std::cell::RefCell<Option<wasm_bindgen::closure::Closure<dyn Fn()>>>>;
+
+/// Handle returned by [`set_interval`] so callers can stop the periodic
+/// timer. Dropping the handle also stops the timer (RAII) because it
+/// clears the retained JS closure.
+pub struct IntervalHandle {
+  id: i32,
+  // Retained so the closure survives until `cancel()` is called or the
+  // handle is dropped. Unlike one-shot timeouts, the closure is not
+  // self-dropping; ownership is solely through this holder.
+  _holder: IntervalClosureCell,
+}
+
+impl std::fmt::Debug for IntervalHandle {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_struct("IntervalHandle")
+      .field("id", &self.id)
+      .finish()
+  }
+}
+
+// SAFETY: See `TimeoutHandle` / `wasm_send_sync!` — single-threaded WASM.
+crate::wasm_send_sync!(IntervalHandle);
+
+impl IntervalHandle {
+  /// Cancel the periodic timer immediately and drop the retained
+  /// closure so the WASM heap memory is reclaimed. Safe no-op if the
+  /// handle has already been cancelled.
+  pub fn cancel(self) {
+    if let Some(window) = web_sys::window() {
+      window.clear_interval_with_handle(self.id);
+    }
+    self._holder.borrow_mut().take();
+  }
+}
+
+impl Drop for IntervalHandle {
+  /// Stop the timer when the handle is dropped without an explicit
+  /// `cancel()`. Keeping this RAII behaviour keeps call sites honest:
+  /// callers that want the timer to outlive the current scope must
+  /// `mem::forget` the handle or store it somewhere persistent.
+  fn drop(&mut self) {
+    if let Some(window) = web_sys::window() {
+      window.clear_interval_with_handle(self.id);
+    }
+    self._holder.borrow_mut().take();
+  }
+}
+
+/// Schedule a repeating JS `setInterval` callback.
+///
+/// The closure is stored in an `Rc<RefCell<Option<Closure>>>` so
+/// dropping the returned [`IntervalHandle`] reclaims the WASM heap
+/// memory instead of leaking via `Closure::forget()`.
+///
+/// # Arguments
+/// * `interval_ms` – period in milliseconds (clamped to `i32::MAX`).
+/// * `callback` – a `Fn` closure executed on every tick.
+///
+/// Returns `None` if `window` or the `setInterval` call is unavailable
+/// (e.g. in non-browser test environments).
+#[must_use]
+pub fn set_interval<F>(interval_ms: i32, callback: F) -> Option<IntervalHandle>
+where
+  F: Fn() + 'static,
+{
+  use std::cell::RefCell;
+  use std::rc::Rc;
+  use wasm_bindgen::JsCast;
+  use wasm_bindgen::closure::Closure;
+
+  let window = web_sys::window()?;
+
+  let holder: IntervalClosureCell = Rc::new(RefCell::new(None));
+  let closure = Closure::wrap(Box::new(callback) as Box<dyn Fn()>);
+
+  let id = window
+    .set_interval_with_callback_and_timeout_and_arguments_0(
+      closure.as_ref().unchecked_ref::<js_sys::Function>(),
+      interval_ms,
+    )
+    .ok()?;
+
+  *holder.borrow_mut() = Some(closure);
+  Some(IntervalHandle {
+    id,
+    _holder: holder,
+  })
+}

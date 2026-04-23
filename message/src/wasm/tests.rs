@@ -348,11 +348,11 @@ fn test_wasm_sdp_answer_roundtrip() {
 fn test_wasm_ice_candidate_roundtrip() {
   use crate::signaling::IceCandidate;
   use crate::types::UserId;
-  let msg = IceCandidate {
-    from: UserId::new(),
-    to: UserId::new(),
-    candidate: "candidate:1 1 udp 2130706431 192.168.1.1 5000 typ host".to_string(),
-  };
+  let msg = IceCandidate::new(
+    UserId::new(),
+    UserId::new(),
+    "candidate:1 1 udp 2130706431 192.168.1.1 5000 typ host".to_string(),
+  );
   roundtrip_signaling(crate::signaling::discriminator::ICE_CANDIDATE, &msg);
 }
 
@@ -784,7 +784,7 @@ fn test_wasm_datachannel_message_reaction_roundtrip() {
 fn test_wasm_datachannel_ecdh_key_exchange_roundtrip() {
   use crate::datachannel::EcdhKeyExchange;
   let msg = EcdhKeyExchange {
-    public_key: [42u8; 32],
+    public_key: vec![42u8; 65], // P-256 raw format: 65 bytes
     timestamp_nanos: 1_000_000_000,
   };
   roundtrip_datachannel(0xA0, &msg);

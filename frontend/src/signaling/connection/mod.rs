@@ -235,6 +235,28 @@ impl SignalingClient {
     self.app_state.connected.set(false);
   }
 
+  /// Tear down every active WebRTC PeerConnection when the WebSocket
+  /// has gone away (P1-12, Req 1.5).
+  ///
+  /// Called from both explicit teardown paths (`disconnect`,
+  /// `handle_auth_failure`, `handle_session_invalidated`) via the
+  /// `onclose` event handler, and from the passive drop path where the
+  /// browser reports `onclose` after a network failure or server
+  /// restart. The implementation is intentionally tolerant of missing
+  /// context: if the WebRtcManager has not been provided yet (e.g. the
+  /// signalling client was started before `provide_webrtc_manager`),
+  /// the call is a no-op.
+  ///
+  /// Idempotent: `logout()` already invokes `close_all` *before* the
+  /// WebSocket is closed (so `PeerClosed` signalling can still be
+  /// delivered per Req 10.9.35a-c). The second call from the `onclose`
+  /// handler is a no-op because the connection map is already empty.
+  pub(super) fn cleanup_webrtc_on_disconnect(&self) {
+    if let Some(webrtc_mgr) = crate::webrtc::try_use_webrtc_manager() {
+      webrtc_mgr.close_all();
+    }
+  }
+
   /// Encode a signaling message into a JS `Uint8Array` ready for WebSocket send.
   ///
   /// This centralises the bitcode + frame serialisation so callers (e.g.
@@ -378,7 +400,13 @@ impl SignalingClient {
   }
 
   /// Send an ICE candidate via signaling server (for WebRTC connection).
-  pub fn send_sdp_ice_candidate(&self, peer_id: UserId, candidate: &str) -> Result<(), String> {
+  pub fn send_sdp_ice_candidate(
+    &self,
+    peer_id: UserId,
+    candidate: &str,
+    sdp_mid: &str,
+    sdp_m_line_index: Option<u16>,
+  ) -> Result<(), String> {
     let my_id = self
       .current_user_id()
       .ok_or("Cannot send IceCandidate: not authenticated")?;
@@ -386,6 +414,8 @@ impl SignalingClient {
       from: my_id,
       to: peer_id,
       candidate: candidate.to_string(),
+      sdp_mid: sdp_mid.to_string(),
+      sdp_m_line_index,
     });
     self.send(&msg)
   }

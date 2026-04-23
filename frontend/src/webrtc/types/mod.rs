@@ -1,14 +1,10 @@
 //! WebRTC connection types.
 //!
 //! Defines types for managing RTCPeerConnection state, DataChannel state,
-//! and encryption keys.
+//! and encryption status.
 
 use message::UserId;
 use std::collections::HashMap;
-
-/// Unique identifier for a WebRTC peer connection.
-#[allow(dead_code)]
-pub type PeerId = UserId;
 
 /// Connection state for a peer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,15 +59,33 @@ impl From<&str> for DataChannelState {
   }
 }
 
-/// Stores the encryption keys for a peer-to-peer connection.
+/// Tracks the E2EE key-exchange status of a peer, without storing the
+/// raw key material.
 ///
-/// Uses ECDH P-256 for key exchange and AES-256-GCM for encryption.
-#[derive(Debug, Clone)]
-pub struct PeerEncryptionKeys {
-  /// The AES-256 key derived from ECDH exchange (32 bytes).
-  pub aes_key: Vec<u8>,
-  /// The key ID for key rotation support.
+/// The actual AES-256-GCM key is a non-extractable `CryptoKey` owned by
+/// `PeerCrypto` in `webrtc::encryption`. Exposing raw key bytes would
+/// defeat the purpose of using the Web Crypto API, so this type only
+/// mirrors whether a shared key has been established and tracks the
+/// logical key-id for future key-rotation support.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct PeerEncryptionStatus {
+  /// Logical key-id for rotation support. Starts at 0 and is incremented
+  /// every time a fresh ECDH exchange is performed for the peer.
   pub key_id: u32,
+  /// True once an ECDH shared key has been derived and imported as an
+  /// AES-256-GCM key for this peer.
+  pub established: bool,
+  /// True when the most recent ECDH handshake attempt timed out before
+  /// the peer responded with its public key (P2-2). UI layers observe
+  /// this flag to surface a "key exchange failed" indicator. Cleared
+  /// automatically by `mark_encryption_established` (successful handshake
+  /// supersedes a prior timeout) and by `clear_encryption`.
+  pub handshake_timed_out: bool,
+}
+
+impl PeerEncryptionStatus {
+  // Intentionally no `new()` — use `PeerEncryptionStatus::default()` or
+  // explicit field construction to avoid diverging init paths (P2-13 fix).
 }
 
 /// Tracks all WebRTC state for a single peer.
@@ -83,8 +97,8 @@ pub struct PeerState {
   pub connection_state: PeerConnectionState,
   /// DataChannel state (if established).
   pub data_channel_state: Option<DataChannelState>,
-  /// Encryption keys (if ECDH exchange completed).
-  pub encryption_keys: Option<PeerEncryptionKeys>,
+  /// E2EE key-exchange status (mirrors `PeerCrypto` readiness).
+  pub encryption: PeerEncryptionStatus,
   /// Whether we are the initiator (offer sender).
   pub is_initiator: bool,
 }
@@ -96,7 +110,7 @@ impl PeerState {
       user_id,
       connection_state: PeerConnectionState::Connecting,
       data_channel_state: None,
-      encryption_keys: None,
+      encryption: PeerEncryptionStatus::default(),
       is_initiator,
     }
   }
@@ -158,10 +172,46 @@ impl WebRtcState {
     }
   }
 
-  /// Set encryption keys for a peer.
-  pub fn set_encryption_keys(&mut self, user_id: &UserId, keys: PeerEncryptionKeys) {
+  /// Mark the E2EE key exchange as established for a peer and bump the
+  /// logical `key_id`. Called after `PeerCrypto` has successfully derived
+  /// and imported the AES-256-GCM shared key.
+  ///
+  /// Also clears any prior `handshake_timed_out` flag — a successful
+  /// handshake supersedes an earlier timeout observation (P2-2).
+  pub fn mark_encryption_established(&mut self, user_id: &UserId) {
     if let Some(peer) = self.peers.get_mut(user_id) {
-      peer.encryption_keys = Some(keys);
+      peer.encryption.key_id = peer.encryption.key_id.wrapping_add(1);
+      peer.encryption.established = true;
+      peer.encryption.handshake_timed_out = false;
+    }
+  }
+
+  /// Mark that the most recent ECDH handshake attempt with the peer has
+  /// timed out (P2-2). Leaves `key_id` unchanged so a subsequent
+  /// successful handshake increments monotonically.
+  pub fn mark_encryption_timed_out(&mut self, user_id: &UserId) {
+    if let Some(peer) = self.peers.get_mut(user_id) {
+      peer.encryption.established = false;
+      peer.encryption.handshake_timed_out = true;
+    }
+  }
+
+  /// Reset the E2EE status for a peer (used on disconnect / key rotation).
+  pub fn clear_encryption(&mut self, user_id: &UserId) {
+    if let Some(peer) = self.peers.get_mut(user_id) {
+      peer.encryption.established = false;
+      peer.encryption.handshake_timed_out = false;
+    }
+  }
+
+  /// Clear only the `handshake_timed_out` flag for a peer.
+  ///
+  /// Called when a DataChannel opens and a pending ECDH key is successfully
+  /// sent, so the UI no longer shows a timeout even if the handshake
+  /// completed after the timer expired (P2-18).
+  pub fn clear_encryption_timeout(&mut self, user_id: &UserId) {
+    if let Some(peer) = self.peers.get_mut(user_id) {
+      peer.encryption.handshake_timed_out = false;
     }
   }
 

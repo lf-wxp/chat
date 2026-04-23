@@ -37,6 +37,11 @@ uuid = { version = "1.23.0", features = ["js", "v4"] }
 # Bitcode codec for binary WebSocket messages
 bitcode = "0.6.9"
 
+# Async utilities (join_all for concurrent broadcast). Frontend is WASM, so
+# we disable futures' default `executor`/`thread-pool` features to avoid
+# pulling in std thread-based code paths.
+futures = { version = "0.3.32", default-features = false, features = ["std", "async-await"] }
+
 # Shared message crate (includes signaling, datachannel, etc.)
 message = { path = "../message", features = ["wasm"] }
 
