@@ -258,7 +258,9 @@ impl SignalingClient {
     // the recovery phase to "Restoring connections..." now that auth has
     // succeeded, so the banner text changes from "Reconnecting..." to
     // "Restoring connections..." (Req 10.11.40).
-    if self.app_state.reconnecting.get() {
+    // Use get_untracked because this runs inside a WebSocket callback
+    // (outside a Leptos reactive tracking context).
+    if self.app_state.reconnecting.get_untracked() {
       self
         .app_state
         .recovery_phase

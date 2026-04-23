@@ -308,7 +308,7 @@
   - 编写 WASM 测试：Web Crypto API ECDH 密钥交换、AES-256-GCM 加解密
   - _需求：Req 1 (Signaling)、Req 5 (E2EE)、Req 10.3 (Connection Recovery)_
 
-- [ ] 16. 实现聊天系统核心功能
+- [x] 16. 实现聊天系统核心功能
   - 实现文本消息发送/接收：Markdown 渲染（粗体/斜体/代码块/链接）、URL 自动检测、XSS 过滤
   - 实现消息状态管理：发送中 → 已发送 → 已送达 → 已读 → 发送失败，重发按钮
   - 实现消息 ACK 机制：`MessageAck` 发送/接收、未确认消息队列（IndexedDB 持久化）

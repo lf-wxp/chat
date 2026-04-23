@@ -115,6 +115,34 @@ features = [
   # Additional WebRTC features needed for methods
   "RtcDataChannelState",
   "console",
+  # Chat UI (Task 16)
+  "HtmlTextAreaElement",
+  "HtmlInputElement",
+  "HtmlAudioElement",
+  "HtmlMediaElement",
+  "HtmlImageElement",
+  "HtmlCanvasElement",
+  "CanvasRenderingContext2d",
+  "ImageData",
+  "ScrollIntoViewOptions",
+  "ScrollBehavior",
+  "ScrollLogicalPosition",
+  "Clipboard",
+  "DataTransfer",
+  "DataTransferItem",
+  "DataTransferItemList",
+  "File",
+  "FileList",
+  "FileReader",
+  "ClipboardEvent",
+  "DragEvent",
+  "InputEvent",
+  "FocusEvent",
+  "PointerEvent",
+  "MouseEvent",
+  # Cache API (sticker asset caching, Task 16 P8)
+  "Cache",
+  "CacheStorage",
 ]
 
 [dev-dependencies]

@@ -5,6 +5,7 @@
 
 pub mod app;
 pub mod auth;
+pub mod chat;
 pub mod chat_view;
 pub mod config;
 pub mod debug_log_entry;
@@ -78,6 +79,13 @@ pub fn init() {
     // Initialize WebRTC manager and provide via context
     let webrtc_manager = webrtc::provide_webrtc_manager(app_state);
     webrtc_manager.set_signaling_client(signaling);
+
+    // Initialize chat manager (Task 16) and cross-link with WebRTC so
+    // outbound chat traffic reaches the DataChannel and inbound
+    // DataChannel chat messages land in the reactive chat state.
+    let chat_manager = chat::provide_chat_manager();
+    chat_manager.set_webrtc(webrtc_manager.clone());
+    webrtc_manager.set_chat_manager(chat_manager);
 
     // Attempt to recover auth state from localStorage
     auth::try_recover_auth(app_state);

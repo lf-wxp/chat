@@ -168,6 +168,10 @@ pub struct WebRtcManager {
   app_state: AppState,
   /// Reference to signaling client (stored to avoid context lookups).
   signaling: Rc<RefCell<Option<SignalingClient>>>,
+  /// Reference to the chat manager used for inbound chat routing
+  /// (Task 16). `None` until `set_chat_manager` is called during
+  /// bootstrap.
+  chat_manager: Rc<RefCell<Option<crate::chat::ChatManager>>>,
   inner: Rc<RefCell<InnerManager>>,
 }
 
@@ -211,6 +215,7 @@ impl WebRtcManager {
     Self {
       app_state,
       signaling: Rc::new(RefCell::new(None)),
+      chat_manager: Rc::new(RefCell::new(None)),
       inner: Rc::new(RefCell::new(InnerManager {
         connections: HashMap::new(),
         crypto: HashMap::new(),
@@ -227,6 +232,27 @@ impl WebRtcManager {
   /// This must be called before any peer connection operations.
   pub fn set_signaling_client(&self, client: SignalingClient) {
     *self.signaling.borrow_mut() = Some(client);
+  }
+
+  /// Attach the chat manager used for inbound chat-message routing
+  /// (Task 16). Must be called once during bootstrap, after both the
+  /// WebRTC manager and the chat manager have been constructed.
+  pub fn set_chat_manager(&self, chat: crate::chat::ChatManager) {
+    *self.chat_manager.borrow_mut() = Some(chat);
+  }
+
+  /// Best-effort peer nickname lookup. Falls back to the user id when
+  /// the peer has not appeared in the online-users list yet (e.g. they
+  /// joined after our last roster update).
+  fn lookup_peer_nickname(&self, peer: &UserId) -> String {
+    self
+      .app_state
+      .online_users
+      .get_untracked()
+      .iter()
+      .find(|u| &u.user_id == peer)
+      .map(|u| u.nickname.clone())
+      .unwrap_or_else(|| peer.to_string())
   }
 
   /// Get the signaling client reference.
@@ -928,16 +954,39 @@ impl WebRtcManager {
           }
         });
       }
-      DataChannelMessage::ChatText(ref chat) => {
-        web_sys::console::log_1(
-          &format!(
-            "[webrtc] Chat message from peer {} ({} bytes)",
-            peer_id,
-            chat.content.len()
-          )
-          .into(),
+      DataChannelMessage::ChatText(_)
+      | DataChannelMessage::ChatSticker(_)
+      | DataChannelMessage::ChatVoice(_)
+      | DataChannelMessage::ChatImage(_)
+      | DataChannelMessage::ForwardMessage(_)
+      | DataChannelMessage::MessageAck(_)
+      | DataChannelMessage::MessageRevoke(_)
+      | DataChannelMessage::MessageRead(_)
+      | DataChannelMessage::MessageReaction(_)
+      | DataChannelMessage::TypingIndicator(_) => {
+        // Task 16: forward to ChatManager via the inbound router.
+        let chat = self.chat_manager.borrow().clone();
+        let Some(chat) = chat else {
+          web_sys::console::warn_1(
+            &format!(
+              "[webrtc] Chat-class DataChannel message (type=0x{:02X}) dropped — no ChatManager attached",
+              msg.discriminator()
+            )
+            .into(),
+          );
+          return;
+        };
+        let peer_name = self.lookup_peer_nickname(&peer_id);
+        let local_nick = self.app_state.auth.get_untracked().map(|a| a.nickname);
+        let conv = crate::state::ConversationId::Direct(peer_id.clone());
+        crate::chat::routing::dispatch_incoming(
+          &chat,
+          peer_id,
+          peer_name,
+          local_nick.as_deref(),
+          conv,
+          msg,
         );
-        // TODO(task-16): Deliver to chat UI
       }
       _ => {
         // P2-7 (Review Round 3 guard): intentionally log ONLY the

@@ -21,6 +21,7 @@
 @import url("./components/inputs.css") layer(components);
 @import url("./components/avatar.css") layer(components);
 @import url("./components/chat-messages.css") layer(components);
+@import url("./components/chat-view.css") layer(components);
 @import url("./components/sidebar.css") layer(components);
 @import url("./components/top-bar.css") layer(components);
 @import url("./components/drawer.css") layer(components);
