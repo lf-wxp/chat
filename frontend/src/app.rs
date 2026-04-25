@@ -3,20 +3,14 @@
 //! Provides the main layout structure including sidebar, chat area,
 //! and overlay components. Handles theme switching and responsive layout.
 
-use crate::auth::AuthPage;
-use crate::debug_panel::DebugPanel;
-use crate::error_handler::ErrorToastContainer;
-use crate::home_page::HomePage;
+use crate::components::{
+  AuthPage, DebugPanel, ErrorToastContainer, HomePage, ModalManager, ReconnectBanner, SettingsPage,
+  Sidebar, ToastContainer, TopBar,
+};
 use crate::i18n::{self, Locale};
 use crate::i18n_helpers;
 use crate::logging::use_logger_state;
-use crate::modal_manager::ModalManager;
-use crate::reconnect_banner::ReconnectBanner;
-use crate::settings_page::SettingsPage;
-use crate::sidebar::Sidebar;
 use crate::state::use_app_state;
-use crate::toast_container::ToastContainer;
-use crate::top_bar::TopBar;
 use crate::utils;
 use leptos::prelude::*;
 use wasm_bindgen::prelude::*;

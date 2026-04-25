@@ -160,6 +160,10 @@ fn nanos_now() -> u64 {
 ///
 /// The `target_user` argument is the local user id — used to detect
 /// `@mentions` that target this session.
+///
+/// Note: Chat payloads are deduplicated by `message_id` — if a message
+/// is already known (in memory or persisted) we still send an ACK but
+/// skip adding it again (Req 11.3.4).
 pub fn dispatch_incoming(
   mgr: &ChatManager,
   peer: UserId,
@@ -175,6 +179,11 @@ pub fn dispatch_incoming(
       reply_to,
       timestamp_nanos,
     }) => {
+      // Deduplication check (Req 11.3.4).
+      if mgr.is_message_known(&message_id) {
+        ack(mgr, peer, message_id, AckStatus::Received);
+        return;
+      }
       let mentions_me = target_user_nick.is_some_and(|nick| {
         let tokens = crate::chat::mention::extract(&content);
         crate::chat::mention::mentions(&tokens, nick)
@@ -200,6 +209,11 @@ pub fn dispatch_incoming(
       reply_to,
       timestamp_nanos,
     }) => {
+      // Deduplication check (Req 11.3.4).
+      if mgr.is_message_known(&message_id) {
+        ack(mgr, peer, message_id, AckStatus::Received);
+        return;
+      }
       let reply = resolve_reply_snippet(mgr, &conv, reply_to);
       let ui = build_inbound(
         message_id,
@@ -225,6 +239,11 @@ pub fn dispatch_incoming(
       reply_to,
       timestamp_nanos,
     }) => {
+      // Deduplication check (Req 11.3.4).
+      if mgr.is_message_known(&message_id) {
+        ack(mgr, peer, message_id, AckStatus::Received);
+        return;
+      }
       let object_url = bytes_to_data_url("audio/ogg", &audio_data);
       let reply = resolve_reply_snippet(mgr, &conv, reply_to);
       let ui = build_inbound(
@@ -253,6 +272,11 @@ pub fn dispatch_incoming(
       reply_to,
       timestamp_nanos,
     }) => {
+      // Deduplication check (Req 11.3.4).
+      if mgr.is_message_known(&message_id) {
+        ack(mgr, peer, message_id, AckStatus::Received);
+        return;
+      }
       let object_url = bytes_to_data_url("image/jpeg", &image_data);
       let thumbnail_url = if thumbnail.is_empty() {
         object_url.clone()
@@ -285,6 +309,11 @@ pub fn dispatch_incoming(
       content,
       timestamp_nanos,
     }) => {
+      // Deduplication check (Req 11.3.4).
+      if mgr.is_message_known(&message_id) {
+        ack(mgr, peer, message_id, AckStatus::Received);
+        return;
+      }
       let ui = build_inbound(
         message_id,
         peer.clone(),
@@ -331,34 +360,5 @@ pub fn dispatch_incoming(
   }
 }
 
-// ── Tests ──
-
 #[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn base64_matches_reference_vectors() {
-    assert_eq!(base64_encode(b""), "");
-    assert_eq!(base64_encode(b"f"), "Zg==");
-    assert_eq!(base64_encode(b"fo"), "Zm8=");
-    assert_eq!(base64_encode(b"foo"), "Zm9v");
-    assert_eq!(base64_encode(b"foob"), "Zm9vYg==");
-    assert_eq!(base64_encode(b"fooba"), "Zm9vYmE=");
-    assert_eq!(base64_encode(b"foobar"), "Zm9vYmFy");
-  }
-
-  #[test]
-  fn data_url_preserves_mime_and_payload() {
-    let url = bytes_to_data_url("image/png", &[1, 2, 3]);
-    assert!(url.starts_with("data:image/png;base64,"));
-    assert!(url.ends_with("AQID"));
-  }
-
-  #[test]
-  fn nanos_to_ms_rounds_down() {
-    assert_eq!(nanos_to_ms(1_500_000), 1);
-    assert_eq!(nanos_to_ms(0), 0);
-    assert_eq!(nanos_to_ms(1_999_999), 1);
-  }
-}
+mod tests;

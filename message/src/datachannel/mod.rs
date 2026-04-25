@@ -476,6 +476,31 @@ impl DataChannelMessage {
       Self::SubtitleClear(_) => discriminator::SUBTITLE_CLEAR,
     }
   }
+
+  /// Returns `true` when the payload is small enough to persist as JSON
+  /// in the ACK queue without significant storage bloat. Large binary
+  /// payloads (images, voice, file chunks, avatar data) return `false`
+  /// so callers can skip JSON serialisation and mark them as
+  /// "manual resend required" after page refresh (V4 optimisation).
+  #[must_use]
+  pub const fn is_lightweight(&self) -> bool {
+    matches!(
+      self,
+      Self::ChatText(_)
+        | Self::ChatSticker(_)
+        | Self::ForwardMessage(_)
+        | Self::MessageAck(_)
+        | Self::MessageRevoke(_)
+        | Self::TypingIndicator(_)
+        | Self::MessageRead(_)
+        | Self::MessageReaction(_)
+        | Self::EcdhKeyExchange(_)
+        | Self::AvatarRequest(_)
+        | Self::Danmaku(_)
+        | Self::PlaybackProgress(_)
+        | Self::SubtitleClear(_)
+    )
+  }
 }
 
 // =============================================================================

@@ -143,6 +143,28 @@ features = [
   # Cache API (sticker asset caching, Task 16 P8)
   "Cache",
   "CacheStorage",
+  # IndexedDB (Task 17 — message persistence)
+  "IdbFactory",
+  "IdbDatabase",
+  "IdbOpenDbRequest",
+  "IdbRequest",
+  "IdbRequestReadyState",
+  "IdbTransaction",
+  "IdbTransactionMode",
+  "IdbObjectStore",
+  "IdbObjectStoreParameters",
+  "IdbIndex",
+  "IdbIndexParameters",
+  "IdbVersionChangeEvent",
+  "IdbKeyRange",
+  "IdbCursor",
+  "IdbCursorDirection",
+  "IdbCursorWithValue",
+  "StorageManager",
+  "StorageEstimate",
+  "ResizeObserver",
+  "ResizeObserverEntry",
+  "DomRectReadOnly",
 ]
 
 [dev-dependencies]

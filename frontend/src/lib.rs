@@ -6,23 +6,15 @@
 pub mod app;
 pub mod auth;
 pub mod chat;
-pub mod chat_view;
+pub mod components;
 pub mod config;
-pub mod debug_log_entry;
-pub mod debug_panel;
 pub mod error_handler;
-pub mod home_page;
 pub mod i18n_helpers;
 pub mod identicon;
 pub mod logging;
-pub mod modal_manager;
-pub mod reconnect_banner;
-pub mod settings_page;
-pub mod sidebar;
+pub mod persistence;
 pub mod signaling;
 pub mod state;
-pub mod toast_container;
-pub mod top_bar;
 pub mod user_status;
 pub mod utils;
 pub mod webrtc;
@@ -85,7 +77,24 @@ pub fn init() {
     // DataChannel chat messages land in the reactive chat state.
     let chat_manager = chat::provide_chat_manager();
     chat_manager.set_webrtc(webrtc_manager.clone());
-    webrtc_manager.set_chat_manager(chat_manager);
+    webrtc_manager.set_chat_manager(chat_manager.clone());
+
+    // Initialize persistence manager (Task 17) and attach to the chat
+    // manager so messages are saved to / loaded from IndexedDB.
+    let pm = persistence::provide_persistence_manager();
+    chat_manager.set_persistence(pm);
+
+    // Run a maintenance tick (retention sweep + index rebuild) every
+    // 60 seconds.
+    {
+      let cm = chat_manager.clone();
+      let _maintenance = crate::utils::set_interval(60_000, move || {
+        cm.run_maintenance();
+      });
+      // Leak the handle intentionally — the interval lives for the
+      // entire application lifetime.
+      std::mem::forget(_maintenance);
+    }
 
     // Attempt to recover auth state from localStorage
     auth::try_recover_auth(app_state);

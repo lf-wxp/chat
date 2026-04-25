@@ -5,6 +5,7 @@
 //! (e.g. `decode_jwt_payload`) are covered by integration tests.
 
 use super::*;
+use message::UserId;
 
 // ── AuthResult tests ──
 

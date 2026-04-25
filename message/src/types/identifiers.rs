@@ -6,6 +6,7 @@
 use bitcode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::str::FromStr;
 use uuid::Uuid;
 
 /// Unique identifier for a user.
@@ -53,6 +54,14 @@ impl fmt::Display for UserId {
   }
 }
 
+impl FromStr for UserId {
+  type Err = uuid::Error;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    Uuid::parse_str(s).map(Self)
+  }
+}
+
 /// Unique identifier for a room.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Encode, Decode)]
 pub struct RoomId(pub Uuid);
@@ -86,6 +95,14 @@ impl Default for RoomId {
 impl fmt::Display for RoomId {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", self.0)
+  }
+}
+
+impl FromStr for RoomId {
+  type Err = uuid::Error;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    Uuid::parse_str(s).map(Self)
   }
 }
 
@@ -128,6 +145,14 @@ impl Default for MessageId {
 impl fmt::Display for MessageId {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", self.0)
+  }
+}
+
+impl FromStr for MessageId {
+  type Err = uuid::Error;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    Uuid::parse_str(s).map(Self)
   }
 }
 

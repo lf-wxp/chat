@@ -30,6 +30,12 @@
   /* Fallback for browsers without subgrid support */
   gap: var(--space-1, 0.25rem);
 
+  /* Rendering optimisation for off-screen rows in non-virtualised
+     mode (< VIRTUAL_THRESHOLD messages).  Virtual-scroll removes
+     off-screen rows from the DOM entirely, so this is a no-op there. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 60px;
+
   &.message-row-outgoing {
     align-items: flex-end;
   }
@@ -237,6 +243,26 @@
   white-space: nowrap;
 }
 
+/* ── Beginning of Conversation Divider (Req 14.11.3.3) ── */
+.message-beginning-divider {
+  display: flex;
+  align-items: center;
+  padding: var(--space-3, 0.75rem) 0;
+}
+
+.message-beginning-divider-line {
+  flex: 1;
+  height: 1px;
+  background-color: var(--border-color, #e2e8f0);
+}
+
+.message-beginning-divider-label {
+  padding: 0 var(--space-3, 0.75rem);
+  font-size: var(--font-xs, 0.75rem);
+  color: var(--text-tertiary, #94a3b8);
+  white-space: nowrap;
+}
+
 /* ── New Messages Badge ── */
 .new-messages-badge {
   position: sticky;
@@ -301,4 +327,61 @@
   .message-sender {
     flex-wrap: wrap;
   }
+}
+
+/* ── Skeleton Loading Placeholder (Task 17 infinite scroll) ── */
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.message-skeleton {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3, 0.75rem);
+  padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+.skeleton-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full, 9999px);
+  background: linear-gradient(
+    90deg,
+    var(--bg-tertiary, #f1f5f9) 25%,
+    var(--bg-secondary, #f8fafc) 50%,
+    var(--bg-tertiary, #f1f5f9) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.skeleton-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 0.25rem);
+}
+
+.skeleton-line {
+  height: 12px;
+  border-radius: var(--radius-sm, 0.25rem);
+  background: linear-gradient(
+    90deg,
+    var(--bg-tertiary, #f1f5f9) 25%,
+    var(--bg-secondary, #f8fafc) 50%,
+    var(--bg-tertiary, #f1f5f9) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+.skeleton-line-long {
+  width: 80%;
+}
+
+.skeleton-line-short {
+  width: 50%;
 }

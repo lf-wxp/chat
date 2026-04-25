@@ -75,6 +75,23 @@ fn preview_forwarded_includes_tag_and_body() {
 }
 
 #[test]
+fn now_ms_to_nanos_converts_correctly() {
+  use super::manager::now_ms_to_nanos;
+  assert_eq!(now_ms_to_nanos(1_000), 1_000_000_000);
+  assert_eq!(now_ms_to_nanos(0), 0);
+  // Negative values saturate to 0.
+  assert_eq!(now_ms_to_nanos(-1), 0);
+}
+
+#[test]
+fn now_ms_to_nanos_handles_large_values() {
+  use super::manager::now_ms_to_nanos;
+  // Typical timestamp: 1_700_000_000_000 ms -> 1_700_000_000_000_000_000 ns
+  let result = now_ms_to_nanos(1_700_000_000_000);
+  assert_eq!(result, 1_700_000_000_000_000_000);
+}
+
+#[test]
 fn status_css_classes_are_unique() {
   use std::collections::HashSet;
   let classes: HashSet<&'static str> = [
@@ -327,5 +344,83 @@ mod wasm {
         .get_untracked()
         .is_empty()
     );
+  }
+
+  // ── Persistence bridge tests (T2) ──
+
+  #[wasm_bindgen_test]
+  fn is_message_known_returns_false_for_unknown_id() {
+    let (_app, manager, _me, _peer) = setup();
+    let id = MessageId::new();
+    assert!(!manager.is_message_known(&id));
+  }
+
+  #[wasm_bindgen_test]
+  fn is_message_known_returns_true_after_push_outgoing() {
+    let (_app, manager, _me, peer) = setup();
+    let conv = ConversationId::Direct(peer);
+    let id = manager
+      .send_text(conv, "test".to_string(), None)
+      .expect("send succeeded");
+    assert!(manager.is_message_known(&id));
+  }
+
+  #[wasm_bindgen_test]
+  fn has_conversation_returns_false_before_any_interaction() {
+    let (_app, manager, _me, peer) = setup();
+    let conv = ConversationId::Direct(peer);
+    assert!(!manager.has_conversation(&conv));
+  }
+
+  #[wasm_bindgen_test]
+  fn has_conversation_returns_true_after_conversation_state() {
+    let (_app, manager, _me, peer) = setup();
+    let conv = ConversationId::Direct(peer);
+    let _ = manager.conversation_state(&conv);
+    assert!(manager.has_conversation(&conv));
+  }
+
+  #[wasm_bindgen_test]
+  fn mark_failed_updates_message_status() {
+    let (_app, manager, _me, peer) = setup();
+    let conv = ConversationId::Direct(peer);
+    let id = manager
+      .send_text(conv.clone(), "test".to_string(), None)
+      .expect("send succeeded");
+    manager.mark_failed(id);
+    let msgs = manager.conversation_state(&conv).messages.get_untracked();
+    let m = msgs.iter().find(|m| m.id == id).unwrap();
+    assert_eq!(m.status, MessageStatus::Failed);
+  }
+
+  #[wasm_bindgen_test]
+  fn set_persistence_without_webrtc_does_not_panic() {
+    let (_app, manager, _me, _peer) = setup();
+    // set_persistence should not panic even without a WebRTC manager.
+    let pm = crate::persistence::PersistenceManager::default();
+    manager.set_persistence(pm);
+    assert!(manager.get_persistence().is_some());
+  }
+
+  #[wasm_bindgen_test]
+  fn load_history_noop_when_messages_exist() {
+    let (_app, manager, _me, peer) = setup();
+    let conv = ConversationId::Direct(peer);
+    // Push a message first so load_history is a no-op.
+    let _ = manager.send_text(conv.clone(), "existing".to_string(), None);
+    let pm = crate::persistence::PersistenceManager::default();
+    manager.set_persistence(pm);
+    // load_history should not overwrite existing messages.
+    manager.load_history(conv.clone());
+    let msgs = manager.conversation_state(&conv).messages.get_untracked();
+    assert_eq!(msgs.len(), 1);
+    assert!(matches!(&msgs[0].content, MessageContent::Text(t) if t == "existing"));
+  }
+
+  #[wasm_bindgen_test]
+  fn resend_returns_false_for_unknown_message() {
+    let (_app, manager, _me, _peer) = setup();
+    let id = MessageId::new();
+    assert!(!manager.resend(id));
   }
 }
