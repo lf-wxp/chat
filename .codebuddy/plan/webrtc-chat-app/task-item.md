@@ -65,7 +65,7 @@
 >
 > - Cargo 在编译时会获取 `target/` 目录下的文件锁，**同一时间只能运行一个 cargo 命令**
 > - 如果前一个 cargo 命令尚未结束就启动下一个，后者会阻塞等待锁释放，或直接报错
-> - 因此三项门禁检查**必须严格按顺序串行执行**：`cargo check` → `cargo clippy` → `cargo test`
+> - 因此三项门禁检查**必须严格按顺序串行执行**：`cargo make check` → `cargo make clippy` → `cargo make test`
 > - 每一步必须确认**标记文件已生成**（即命令已完成）后，才能启动下一步
 > - 执行前务必 `rm -f` 清理上一轮的临时文件和标记文件，避免误读旧结果
 
@@ -332,7 +332,7 @@
   - 编写 WASM 测试：IndexedDB 消息读写、消息编解码
   - _需求：Req 2 (Chat System)、Req 11.3 (Message ACK)、Req 14.11 (Message List Scrolling Behavior)_
 
-- [ ] 17. 实现消息持久化与离线支持
+- [x] 17. 实现消息持久化与离线支持
   - 实现 IndexedDB 存储层：消息表（含 Reaction 数据）、头像缓存表、搜索索引表、置顶会话表
   - 实现消息历史加载与虚拟滚动（Req 14.11.2 + 14.11.3）：
     - Virtual Scrolling：>100 条消息激活虚拟滚动，仅渲染可视区域 + overscan buffer（上下各 3 条），DOM 节点回收
@@ -349,7 +349,7 @@
   - 编写 WASM 测试：IndexedDB CRUD、搜索性能（10000 条消息 < 500ms）、去重逻辑、虚拟滚动高度计算
   - _需求：Req 11 (Persistence)、Req 7.6 (Message Search)、Req 14.11.2 (Virtual Scrolling)、Req 14.11.3 (Infinite Scroll)_
 
-- [ ] 18. 实现音视频通话与屏幕共享
+- [x] 18. 实现音视频通话与屏幕共享
   - 实现通话发起/接受/拒绝/结束流程（`CallInvite`/`CallAccept`/`CallDecline`/`CallEnd`）
   - 实现 Mesh 拓扑视频通话：Grid Layout 自适应布局、参与者视频流管理
   - 实现音视频模式切换：语音 ↔ 视频无缝切换（不重建连接）

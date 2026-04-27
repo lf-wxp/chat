@@ -1,0 +1,411 @@
+/**
+ * Call UI (Task 18).
+ *
+ * Scoped styles for the call overlay: the active-call view, the video
+ * grid with auto-adapting column count, video tiles (including the
+ * screen-share hero variant), the control bar, the incoming-call modal,
+ * the refresh-recovery prompt, and the per-peer network-quality icon.
+ */
+
+/* ── Active call container ── */
+.call-view {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(15, 23, 42, 0.96);
+  color: #f8fafc;
+}
+
+.call-view__header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.call-view__status {
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background-color: rgba(248, 250, 252, 0.08);
+}
+
+/* ── Video grid ── */
+.video-grid {
+  flex: 1;
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  min-height: 0;
+  grid-auto-rows: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.video-grid[data-count="1"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.video-grid[data-count="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.video-grid[data-count="3"],
+.video-grid[data-count="4"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.video-grid[data-count="5"],
+.video-grid[data-count="6"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.video-grid[data-count="7"],
+.video-grid[data-count="8"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* ── Video tile ── */
+.video-tile {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background-color: #0f172a;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow 120ms ease;
+  /* Fallback aspect ratio so tiles keep a sensible shape even when
+     the `<video>` element is hidden (camera off) and the parent grid
+     cell has no explicit row height. The `--hero` override below
+     widens this to 16/9 when a screen-share is active. */
+  aspect-ratio: 4 / 3;
+  min-height: 120px;
+}
+
+.video-tile--hero {
+  grid-column: 1 / -1;
+  aspect-ratio: 16 / 9;
+}
+
+.video-tile--speaking {
+  box-shadow: 0 0 0 3px #22c55e, 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+.video-tile--local .video-tile__video {
+  transform: scaleX(-1);
+}
+
+.video-tile__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background-color: #0f172a;
+}
+
+/* ── Identicon placeholder shown when no media stream is bound ── */
+.video-tile__placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #0f172a;
+  /* Sit above the empty <video> element so the placeholder shows
+     through. The footer (z-index implicit on later siblings) still
+     overlays correctly. */
+  z-index: 1;
+}
+
+.video-tile__avatar {
+  width: clamp(64px, 30%, 160px);
+  height: auto;
+  aspect-ratio: 1 / 1;
+  border-radius: 999px;
+  background-color: rgba(248, 250, 252, 0.08);
+  padding: 0.5rem;
+}
+
+.video-tile--no-stream .video-tile__video {
+  /* Hide the empty video element so the placeholder background shows
+     through unbroken; the element itself stays in the DOM so a future
+     stream attachment lights up immediately without remount. */
+  visibility: hidden;
+}
+
+.video-tile__meta {
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+  background-color: rgba(15, 23, 42, 0.6);
+  color: #f8fafc;
+  font-size: 0.75rem;
+  pointer-events: none;
+}
+
+.video-tile__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 12rem;
+}
+
+/* ── Remote-peer status icons (Req 3.5 / 7.1 / 10.5.24) ── */
+.video-tile__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  font-size: 0.875rem;
+  border-radius: 999px;
+  background-color: rgba(15, 23, 42, 0.7);
+  color: #f8fafc;
+  flex-shrink: 0;
+}
+
+.video-tile__icon--muted {
+  background-color: rgba(220, 38, 38, 0.75);
+}
+
+.video-tile__icon--camera-off {
+  background-color: rgba(100, 116, 139, 0.75);
+}
+
+.video-tile__status {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  background-color: rgba(15, 23, 42, 0.65);
+  color: #fef9c3;
+}
+
+.video-tile__status--reconnecting {
+  background-color: rgba(245, 158, 11, 0.85);
+  color: #0f172a;
+  animation: video-tile-spin 1.4s linear infinite;
+}
+
+@keyframes video-tile-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.video-tile--reconnecting {
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.6);
+}
+
+/* ── Control bar ── */
+.call-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background-color: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(8px);
+}
+
+.call-controls__duration {
+  margin-right: auto;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background-color: rgba(248, 250, 252, 0.1);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+}
+
+.call-controls__btn {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  border: none;
+  background-color: rgba(248, 250, 252, 0.14);
+  color: #f8fafc;
+  font-size: 1.125rem;
+  cursor: pointer;
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+
+.call-controls__btn:hover {
+  background-color: rgba(248, 250, 252, 0.24);
+}
+
+.call-controls__btn:active {
+  transform: scale(0.94);
+}
+
+.call-controls__btn.is-off {
+  background-color: rgba(248, 113, 113, 0.35);
+}
+
+.call-controls__btn.is-on {
+  background-color: rgba(59, 130, 246, 0.5);
+}
+
+.call-controls__btn--danger {
+  background-color: #dc2626;
+}
+
+.call-controls__btn--danger:hover {
+  background-color: #b91c1c;
+}
+
+/* ── Incoming call & recovery modals ── */
+.call-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.call-modal {
+  width: min(90vw, 24rem);
+  padding: 1.5rem;
+  border-radius: 1rem;
+  background-color: var(--bg-primary, #ffffff);
+  color: var(--text-primary, #0f172a);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.call-modal__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.call-modal__caller {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.call-modal__meta {
+  margin: 0;
+  color: var(--text-secondary, #475569);
+  font-size: 0.875rem;
+}
+
+.call-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* ── Network indicator (4-bar) ── */
+.network-indicator {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+  pointer-events: auto;
+}
+
+.network-indicator__bar {
+  width: 3px;
+  border-radius: 1px;
+  background-color: rgba(248, 250, 252, 0.25);
+  transition: background-color 120ms ease;
+}
+
+.network-indicator__bar:nth-child(1) {
+  height: 25%;
+}
+
+.network-indicator__bar:nth-child(2) {
+  height: 50%;
+}
+
+.network-indicator__bar:nth-child(3) {
+  height: 75%;
+}
+
+.network-indicator__bar:nth-child(4) {
+  height: 100%;
+}
+
+.network-indicator__bar.is-active {
+  background-color: #22c55e;
+}
+
+/* M1 fix: when no quality sample has been collected yet, render the
+   indicator in a muted state so users do not interpret the default
+   "Good" classification as a real reading. */
+.network-indicator--unknown .network-indicator__bar {
+  background-color: rgba(148, 163, 184, 0.25);
+}
+
+/* ── Responsive: mobile (<768px) ── */
+@media (max-width: 767px) {
+  .video-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .video-grid[data-count="2"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .video-grid[data-count="3"],
+  .video-grid[data-count="4"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* 5+ participants: force 2-col on mobile for readability */
+  .video-grid[data-count="5"],
+  .video-grid[data-count="6"],
+  .video-grid[data-count="7"],
+  .video-grid[data-count="8"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .video-tile--hero {
+    aspect-ratio: 4 / 3;
+  }
+
+  .call-controls {
+    gap: 0.375rem;
+    padding: 0.5rem;
+  }
+
+  .call-controls__btn {
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: 1rem;
+  }
+
+  .call-controls__duration {
+    font-size: 0.75rem;
+    padding: 0.125rem 0.5rem;
+  }
+
+  .call-modal {
+    width: min(95vw, 20rem);
+    padding: 1rem;
+  }
+
+  .video-tile__name {
+    max-width: 6rem;
+  }
+}

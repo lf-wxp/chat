@@ -177,6 +177,21 @@ impl ErrorToastManager {
     self.push_simple_toast(code, i18n_key, message);
   }
 
+  /// Show an informational (non-error) message in the same toast
+  /// surface used for errors.
+  ///
+  /// Semantically equivalent to [`Self::show_error_message_with_key`]
+  /// today — the toast component currently renders both variants
+  /// identically — but exposed as a separate method so call sites
+  /// advertise intent and so future styling work can introduce a
+  /// distinct info variant without touching callers.
+  ///
+  /// Used by the call subsystem to surface the "call duration" summary
+  /// when an active call ends (Req 7.5).
+  pub fn show_info_message_with_key(&self, code: &str, i18n_key: &str, message: &str) {
+    self.push_simple_toast(code, i18n_key, message);
+  }
+
   /// Internal helper used by `show_error_message*` variants.
   fn push_simple_toast(&self, code: &str, i18n_key: &str, message: &str) {
     let toast = ErrorToast {

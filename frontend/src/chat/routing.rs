@@ -356,7 +356,13 @@ pub fn dispatch_incoming(
     | DataChannelMessage::Danmaku(_)
     | DataChannelMessage::PlaybackProgress(_)
     | DataChannelMessage::SubtitleData(_)
-    | DataChannelMessage::SubtitleClear(_) => {}
+    | DataChannelMessage::SubtitleClear(_)
+    // Call-status broadcasts (Req 3.5 / 7.1 / 10.5.24) are routed to
+    // the call subsystem in `WebRtcManager::dispatch_data_channel_message`
+    // and never reach this chat router. Listed explicitly here so the
+    // exhaustiveness check enforces the contract.
+    | DataChannelMessage::MediaStateUpdate(_)
+    | DataChannelMessage::ReconnectingState(_) => {}
   }
 }
 

@@ -223,25 +223,39 @@ pub fn handle_signaling_message(
     SignalingMessage::ActivePeersList(list) => {
       log_debug(&format!("ActivePeersList: {} peers", list.peers.len()));
       // Trigger connection recovery for each active peer
-      recover_active_peers(list.peers, app_state);
+      recover_active_peers(list.peers, app_state, error_toast);
     }
 
     // ── Call Signaling (task-18: audio/video call implementation) ──
     SignalingMessage::CallInvite(invite) => {
-      log_debug(&format!("CallInvite for room {}", invite.room_id));
-      // TODO(task-18): Show incoming call UI
+      log_debug(&format!(
+        "CallInvite for room {} from {}",
+        invite.room_id, invite.from
+      ));
+      if let Some(mgr) = crate::call::try_use_call_manager() {
+        // The server rewrites `CallInvite::from` with the authenticated
+        // sender id (see `server::ws::call::handle_call_invite`), so we
+        // can pass the message straight through without any heuristics.
+        mgr.on_incoming_invite(invite);
+      }
     }
     SignalingMessage::CallAccept(accept) => {
       log_debug(&format!("CallAccept for room {}", accept.room_id));
-      // TODO(task-18): Start call media
+      if let Some(mgr) = crate::call::try_use_call_manager() {
+        mgr.on_call_accepted(accept);
+      }
     }
     SignalingMessage::CallDecline(decline) => {
       log_debug(&format!("CallDecline for room {}", decline.room_id));
-      // TODO(task-18): Hide call UI
+      if let Some(mgr) = crate::call::try_use_call_manager() {
+        mgr.on_call_declined(decline);
+      }
     }
     SignalingMessage::CallEnd(end) => {
       log_debug(&format!("CallEnd for room {}", end.room_id));
-      // TODO(task-18): End call and clean up media
+      if let Some(mgr) = crate::call::try_use_call_manager() {
+        mgr.on_call_ended(end);
+      }
     }
 
     // ── Theater Signaling (task-19: theater mode implementation) ──
@@ -362,7 +376,15 @@ where
 /// The `app_state` parameter is passed explicitly so that WebSocket callbacks
 /// (which run outside the Leptos reactive owner) can access it without calling
 /// `use_context` / `expect_context` (which would panic) (Review-P0 fix).
-fn recover_active_peers(peers: Vec<message::UserId>, app_state: AppState) {
+///
+/// `error_toast` is also passed in so we can surface a "video call is at
+/// capacity" notice when a recovery attempt is rejected by the mesh limit
+/// (Req 3.10 — P1 Bug-6 fix).
+fn recover_active_peers(
+  peers: Vec<message::UserId>,
+  app_state: AppState,
+  error_toast: crate::error_handler::ErrorToastManager,
+) {
   use std::cell::Cell;
   use std::rc::Rc;
 
@@ -436,10 +458,20 @@ fn recover_active_peers(peers: Vec<message::UserId>, app_state: AppState) {
         let pid = peer_id.clone();
         let rem = Rc::clone(&remaining);
         let res = Rc::clone(&resolve_fn);
+        // `ErrorToastManager` is `Copy`, so we can simply rebind.
+        let toast = error_toast;
 
         wasm_bindgen_futures::spawn_local(async move {
           if let Err(e) = mgr.connect_to_peer(pid).await {
             web_sys::console::warn_1(&format!("[webrtc] Recovery connection failed: {}", e).into());
+            // Surface mesh-capacity rejections to the user (Req 3.10).
+            if e.is_mesh_limit() {
+              toast.show_error_message_with_key(
+                "AV404",
+                "call.full_capacity",
+                "Video call is at capacity (max 8 participants).",
+              );
+            }
           }
           let left = rem.get().saturating_sub(1);
           rem.set(left);

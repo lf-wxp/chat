@@ -107,6 +107,21 @@ fn test_network_quality_from_metrics_poor() {
 }
 
 #[test]
+fn test_network_quality_fair_upper_loss_bound_is_poor() {
+  // Req 3.8b: Fair requires loss < 8 %; loss == 8 % must classify as Poor.
+  assert_eq!(
+    NetworkQuality::from_metrics(300, 8.0),
+    NetworkQuality::Poor,
+    "loss == 8 % must be Poor (boundary is exclusive on the upper end)"
+  );
+  assert_eq!(
+    NetworkQuality::from_metrics(300, 7.99),
+    NetworkQuality::Fair,
+    "loss just under 8 % must still be Fair"
+  );
+}
+
+#[test]
 fn test_network_quality_recommended_video_quality() {
   assert_eq!(
     NetworkQuality::Excellent.recommended_video_quality(),

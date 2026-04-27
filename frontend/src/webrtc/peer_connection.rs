@@ -10,7 +10,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
-use web_sys::{RtcConfiguration, RtcDataChannel, RtcIceServer, RtcPeerConnection};
+use web_sys::{
+  MediaStream, MediaStreamTrack, RtcConfiguration, RtcDataChannel, RtcIceServer, RtcPeerConnection,
+  RtcRtpSender, RtcTrackEvent,
+};
 
 use super::data_channel::PeerDataChannel;
 use super::types::PeerConnectionState;
@@ -18,6 +21,8 @@ use super::types::PeerConnectionState;
 type IceCandidateClosure = Closure<dyn FnMut(web_sys::RtcPeerConnectionIceEvent)>;
 type EventClosure = Closure<dyn FnMut(web_sys::Event)>;
 type DataChannelClosure = Closure<dyn FnMut(web_sys::RtcDataChannelEvent)>;
+type TrackClosure = Closure<dyn FnMut(RtcTrackEvent)>;
+type NegotiationNeededClosure = Closure<dyn FnMut(web_sys::Event)>;
 
 /// Manages a single RTCPeerConnection with its DataChannel.
 #[derive(Debug, Clone)]
@@ -45,6 +50,20 @@ pub struct PeerConnection {
   on_connection_state_change: Rc<RefCell<Option<EventClosure>>>,
   /// Stored DataChannel incoming closure to prevent memory leak (P1-4 fix).
   on_data_channel: Rc<RefCell<Option<DataChannelClosure>>>,
+  /// Stored `ontrack` closure (call subsystem — remote media stream
+  /// arrival). Retained in `Rc<RefCell<...>>` so it survives across
+  /// clones and is dropped together with the connection.
+  on_track: Rc<RefCell<Option<TrackClosure>>>,
+  /// Stored `onnegotiationneeded` closure. Fires whenever the local
+  /// side adds/removes/replaces a track that requires renegotiation
+  /// (e.g. the call subsystem publishing a `MediaStream` mid-session).
+  /// Only the initiator of this connection is expected to act on the
+  /// event; the receiver-side closure is a no-op to avoid glare.
+  on_negotiation_needed: Rc<RefCell<Option<NegotiationNeededClosure>>>,
+  /// `RtcRtpSender`s created via [`Self::publish_local_stream`], stored
+  /// so we can detach them (`remove_track`) without re-negotiating when
+  /// the call ends.
+  local_senders: Rc<RefCell<Vec<RtcRtpSender>>>,
 }
 
 impl PeerConnection {
@@ -83,6 +102,9 @@ impl PeerConnection {
       on_ice_candidate: Rc::new(RefCell::new(None)),
       on_connection_state_change: Rc::new(RefCell::new(None)),
       on_data_channel: Rc::new(RefCell::new(None)),
+      on_track: Rc::new(RefCell::new(None)),
+      on_negotiation_needed: Rc::new(RefCell::new(None)),
+      local_senders: Rc::new(RefCell::new(Vec::new())),
     })
   }
 
@@ -303,6 +325,204 @@ impl PeerConnection {
     *self.id
   }
 
+  /// Publish the tracks of a local capture `MediaStream` on this peer
+  /// connection (call subsystem — Req 3.1/3.3/3.4).
+  ///
+  /// Each track is added via `addTrack` with the stream as the
+  /// associated stream, so the remote side receives a coherent stream
+  /// object on its `ontrack` callback. The resulting `RtcRtpSender`s
+  /// are retained so [`Self::unpublish_local_media`] can detach them.
+  ///
+  /// Calling this while tracks are already published first detaches
+  /// the previous senders so we do not double-publish on mode switches.
+  ///
+  /// # Errors
+  /// Returns `Err` if the browser rejects `addTrack` (e.g. the track
+  /// has already ended or the peer connection is closed).
+  pub fn publish_local_stream(&self, stream: &MediaStream) -> Result<(), String> {
+    self.unpublish_local_media();
+    let pc = self.get_pc()?;
+    let tracks = stream.get_tracks();
+    let streams = Array::of1(stream);
+    let mut senders = self.local_senders.borrow_mut();
+    for i in 0..tracks.length() {
+      let Some(track) = tracks.get(i).dyn_ref::<MediaStreamTrack>().cloned() else {
+        continue;
+      };
+      let sender = pc.add_track(&track, stream, &streams);
+      senders.push(sender);
+    }
+    Ok(())
+  }
+
+  /// Remove every previously-published local track from this peer
+  /// connection without closing the connection.
+  ///
+  /// Used when the call ends or when the local capture is torn down
+  /// (e.g. user revoked camera permission).
+  pub fn unpublish_local_media(&self) {
+    let Ok(pc) = self.get_pc() else {
+      self.local_senders.borrow_mut().clear();
+      return;
+    };
+    let mut senders = self.local_senders.borrow_mut();
+    for sender in senders.drain(..) {
+      pc.remove_track(&sender);
+    }
+  }
+
+  /// Replace a currently-published track of a given `kind` ("audio" or
+  /// "video") with a new track, without renegotiation. Falls back to
+  /// `add_track` when no matching sender exists yet.
+  ///
+  /// Returns whether a track was replaced or newly added.
+  ///
+  /// # Errors
+  /// Returns `Err` if `replaceTrack` rejects.
+  pub async fn replace_local_track(
+    &self,
+    new_track: &MediaStreamTrack,
+    stream: &MediaStream,
+  ) -> Result<(), String> {
+    let pc = self.get_pc()?;
+    let target_kind = new_track.kind();
+
+    let existing = {
+      let senders = self.local_senders.borrow();
+      senders.iter().find_map(|s| {
+        let sender_track = s.track();
+        match sender_track {
+          Some(t) if t.kind() == target_kind => Some(s.clone()),
+          _ => None,
+        }
+      })
+    };
+
+    if let Some(sender) = existing {
+      let promise = sender.replace_track(Some(new_track));
+      wasm_bindgen_futures::JsFuture::from(promise)
+        .await
+        .map_err(|e| format!("replaceTrack rejected: {e:?}"))?;
+      Ok(())
+    } else {
+      let streams = Array::of1(stream);
+      let sender = pc.add_track(new_track, stream, &streams);
+      self.local_senders.borrow_mut().push(sender);
+      Ok(())
+    }
+  }
+
+  /// Clear the published track of a given `kind` ("audio" or "video") by
+  /// calling `sender.replaceTrack(null)`. The sender is kept so the
+  /// track can be re-added later without triggering renegotiation.
+  ///
+  /// Unlike [`Self::unpublish_local_media`] (which calls `removeTrack`
+  /// and therefore fires `onnegotiationneeded`), this method leaves the
+  /// transceiver in place. Used by `toggle_camera(false)` (Req 3.6 /
+  /// 7.1 — remote side must show placeholder, not last frame).
+  ///
+  /// No-op when no sender of the given kind exists.
+  ///
+  /// # Errors
+  /// Returns `Err` if `replaceTrack(null)` rejects.
+  pub async fn clear_local_track_of_kind(&self, kind: &str) -> Result<(), String> {
+    let existing = {
+      let senders = self.local_senders.borrow();
+      senders.iter().find_map(|s| {
+        let sender_track = s.track();
+        match sender_track {
+          Some(t) if t.kind() == kind => Some(s.clone()),
+          _ => None,
+        }
+      })
+    };
+    let Some(sender) = existing else {
+      return Ok(());
+    };
+    let promise = sender.replace_track(None);
+    wasm_bindgen_futures::JsFuture::from(promise)
+      .await
+      .map_err(|e| format!("replaceTrack(null) rejected: {e:?}"))?;
+    Ok(())
+  }
+
+  /// Register an `ontrack` callback (call subsystem — remote stream
+  /// arrival). The callback is invoked once per media stream with the
+  /// first stream in the event's `streams` array.
+  pub fn set_on_track<F>(&self, callback: F)
+  where
+    F: Fn(MediaStream) + 'static,
+  {
+    let pc = match self.get_pc() {
+      Ok(p) => p,
+      Err(e) => {
+        web_sys::console::error_1(&format!("[webrtc] Failed to set ontrack: {}", e).into());
+        return;
+      }
+    };
+
+    let closure = Closure::wrap(Box::new(move |event: RtcTrackEvent| {
+      let streams = event.streams();
+      if streams.length() == 0 {
+        return;
+      }
+      if let Some(stream) = streams.get(0).dyn_ref::<MediaStream>().cloned() {
+        callback(stream);
+      }
+    }) as Box<dyn FnMut(RtcTrackEvent)>);
+
+    pc.set_ontrack(Some(closure.as_ref().unchecked_ref()));
+    *self.on_track.borrow_mut() = Some(closure);
+  }
+
+  /// Register an `onnegotiationneeded` callback. The callback is fired
+  /// by the browser whenever a track is added/removed/replaced and a
+  /// new SDP offer/answer round-trip is required to apply the change.
+  ///
+  /// The callback receives no arguments — callers should re-invoke
+  /// [`Self::create_offer`] (and forward the resulting SDP through the
+  /// signaling layer) when they want to act on the event.
+  pub fn set_on_negotiation_needed<F>(&self, callback: F)
+  where
+    F: Fn() + 'static,
+  {
+    let pc = match self.get_pc() {
+      Ok(p) => p,
+      Err(e) => {
+        web_sys::console::error_1(
+          &format!("[webrtc] Failed to set onnegotiationneeded: {}", e).into(),
+        );
+        return;
+      }
+    };
+
+    let closure = Closure::wrap(Box::new(move |_event: web_sys::Event| {
+      callback();
+    }) as Box<dyn FnMut(web_sys::Event)>);
+
+    pc.set_onnegotiationneeded(Some(closure.as_ref().unchecked_ref()));
+    *self.on_negotiation_needed.borrow_mut() = Some(closure);
+  }
+
+  /// Invoke `RTCPeerConnection.getStats()` and return the raw report.
+  ///
+  /// The report is returned as a `JsValue` since `RtcStatsReport` is a
+  /// `Map` with dynamic entry types; callers use `js_sys::Object::entries`
+  /// to walk it in Rust. Kept here (rather than in the call subsystem)
+  /// because the connection object lives behind a private `RefCell` and
+  /// we do not want to leak references.
+  ///
+  /// # Errors
+  /// Returns `Err` if the underlying connection is closed or the
+  /// browser rejects the call.
+  pub async fn get_stats(&self) -> Result<JsValue, String> {
+    let pc = self.get_pc()?;
+    let promise = pc.get_stats();
+    wasm_bindgen_futures::JsFuture::from(promise)
+      .await
+      .map_err(|e| format!("getStats rejected: {e:?}"))
+  }
+
   /// Close the connection.
   ///
   /// Clears all JS event handlers and drops the stored closures to prevent
@@ -314,6 +534,14 @@ impl PeerConnection {
       pc.set_onicecandidate(None);
       pc.set_onconnectionstatechange(None);
       pc.set_ondatachannel(None);
+      pc.set_ontrack(None);
+      pc.set_onnegotiationneeded(None);
+      // Detach local media senders before closing the connection so
+      // the browser releases capture tracks promptly.
+      let mut senders = self.local_senders.borrow_mut();
+      for sender in senders.drain(..) {
+        pc.remove_track(&sender);
+      }
       pc.close();
     }
 
@@ -321,6 +549,8 @@ impl PeerConnection {
     *self.on_ice_candidate.borrow_mut() = None;
     *self.on_connection_state_change.borrow_mut() = None;
     *self.on_data_channel.borrow_mut() = None;
+    *self.on_track.borrow_mut() = None;
+    *self.on_negotiation_needed.borrow_mut() = None;
 
     // Close DataChannel and release its closures, then clear the field
     // so stale callbacks cannot reference a closed channel (P1-18).

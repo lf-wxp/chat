@@ -5,6 +5,7 @@
 //! needing to know the internal file layout.
 
 mod auth;
+mod call;
 mod chat_view;
 mod debug;
 mod error_toast;
@@ -17,6 +18,7 @@ mod toast_container;
 mod top_bar;
 
 pub use auth::AuthPage;
+pub use call::CallOverlay;
 pub use chat_view::ChatView;
 pub use debug::DebugPanel;
 pub use error_toast::ErrorToastContainer;

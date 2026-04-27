@@ -230,6 +230,20 @@ impl Drop for IntervalHandle {
   }
 }
 
+/// Format a total-seconds duration as `HH:MM:SS` (or `MM:SS` below one
+/// hour).
+#[must_use]
+pub fn format_duration(total: u64) -> String {
+  let hours = total / 3_600;
+  let minutes = (total % 3_600) / 60;
+  let seconds = total % 60;
+  if hours > 0 {
+    format!("{hours:02}:{minutes:02}:{seconds:02}")
+  } else {
+    format!("{minutes:02}:{seconds:02}")
+  }
+}
+
 /// Schedule a repeating JS `setInterval` callback.
 ///
 /// The closure is stored in an `Rc<RefCell<Option<Closure>>>` so

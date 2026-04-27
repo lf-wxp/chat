@@ -69,6 +69,19 @@ pub mod discriminator {
   pub const SUBTITLE_DATA: u8 = 0xB2;
   /// Subtitle clear type.
   pub const SUBTITLE_CLEAR: u8 = 0xB3;
+
+  // Call-side status broadcasts (0xC0-0xC1)
+  /// Local media state broadcast (mic / camera / screen-share flags).
+  /// Delivered to every call participant whenever a local toggle fires,
+  /// so remote `VideoTile`s can render muted / camera-off icons without
+  /// waiting for a heuristic on the incoming RTP track (Req 3.5 / 7.1).
+  pub const MEDIA_STATE_UPDATE: u8 = 0xC0;
+  /// Peer-side reconnecting status broadcast. Sent when the sender
+  /// observes its `RTCPeerConnectionState` leaving `Connected` and
+  /// again when it recovers, so the remote UI can show a "reconnecting"
+  /// hint without relying on server-observed WebSocket state
+  /// (Req 10.5.24).
+  pub const RECONNECTING_STATE: u8 = 0xC1;
 }
 
 // =============================================================================
@@ -381,6 +394,35 @@ pub struct SubtitleClear {
 }
 
 // =============================================================================
+// Call Status Broadcasts (Req 3.5 / 7.1 / 10.5.24)
+// =============================================================================
+
+/// Local media state broadcast. Sent whenever a toggle fires on the
+/// sender so remote call participants can render muted / camera-off /
+/// screen-sharing icons without waiting for heuristics on the incoming
+/// RTP tracks (Req 3.5 / 7.1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
+pub struct MediaStateUpdate {
+  /// Whether the microphone track is enabled on the sender.
+  pub mic_enabled: bool,
+  /// Whether the camera track is enabled on the sender.
+  pub camera_enabled: bool,
+  /// Whether the sender is currently sharing their screen.
+  pub screen_sharing: bool,
+}
+
+/// Peer-side reconnecting status. Sent by a call participant when its
+/// `RTCPeerConnectionState` leaves `Connected` (with `reconnecting =
+/// true`) and again once it recovers (`reconnecting = false`). Lets
+/// the remote UI render an "other participant is reconnecting" hint
+/// during transient network flaps (Req 10.5.24).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
+pub struct ReconnectingState {
+  /// Whether the sender is currently attempting to reconnect.
+  pub reconnecting: bool,
+}
+
+// =============================================================================
 // Unified DataChannel Message Enum
 // =============================================================================
 
@@ -442,6 +484,12 @@ pub enum DataChannelMessage {
   SubtitleData(SubtitleData),
   /// Subtitle clear.
   SubtitleClear(SubtitleClear),
+
+  // Call Status Broadcasts
+  /// Local media state (mic / camera / screen-share) broadcast.
+  MediaStateUpdate(MediaStateUpdate),
+  /// Peer-side reconnecting status broadcast.
+  ReconnectingState(ReconnectingState),
 }
 
 impl DataChannelMessage {
@@ -474,6 +522,9 @@ impl DataChannelMessage {
       Self::PlaybackProgress(_) => discriminator::PLAYBACK_PROGRESS,
       Self::SubtitleData(_) => discriminator::SUBTITLE_DATA,
       Self::SubtitleClear(_) => discriminator::SUBTITLE_CLEAR,
+
+      Self::MediaStateUpdate(_) => discriminator::MEDIA_STATE_UPDATE,
+      Self::ReconnectingState(_) => discriminator::RECONNECTING_STATE,
     }
   }
 
@@ -499,6 +550,8 @@ impl DataChannelMessage {
         | Self::Danmaku(_)
         | Self::PlaybackProgress(_)
         | Self::SubtitleClear(_)
+        | Self::MediaStateUpdate(_)
+        | Self::ReconnectingState(_)
     )
   }
 }

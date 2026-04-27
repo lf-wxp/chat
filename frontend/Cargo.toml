@@ -101,7 +101,23 @@ features = [
   "MediaDevices",
   "MediaDeviceInfo",
   "DisplayMediaStreamConstraints",
+  "MediaTrackConstraints",
+  "ConstrainDoubleRange",
+  "ConstrainDomStringParameters",
+  "HtmlVideoElement",
   "CssStyleDeclaration",
+  # Web Audio (call VAD, Req 7.3)
+  "AudioContext",
+  "AudioContextOptions",
+  "AnalyserNode",
+  "AudioNode",
+  "AudioDestinationNode",
+  "AudioParam",
+  "MediaStreamAudioSourceNode",
+  # RtcRtpReceiver & transceiver API (Req 3: seamless audio/video switch)
+  "RtcRtpReceiver",
+  "RtcRtpTransceiver",
+  "RtcTrackEvent",
   # Web Crypto API
   "Crypto",
   "CryptoKey",
@@ -114,6 +130,7 @@ features = [
   "HkdfParams",
   # Additional WebRTC features needed for methods
   "RtcDataChannelState",
+  "RtcSignalingState",
   "console",
   # Chat UI (Task 16)
   "HtmlTextAreaElement",
@@ -165,6 +182,11 @@ features = [
   "ResizeObserver",
   "ResizeObserverEntry",
   "DomRectReadOnly",
+  # Browser Notification API (Req 7.4 — incoming-call OS notification)
+  "Notification",
+  "NotificationOptions",
+  "NotificationPermission",
+  "VisibilityState",
 ]
 
 [dev-dependencies]

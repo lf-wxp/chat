@@ -302,3 +302,68 @@ fn test_batch_timeout_constant() {
   const BATCH_TIMEOUT_MS: i32 = 15_000;
   assert_eq!(BATCH_TIMEOUT_MS, 15_000);
 }
+
+// ── Call signaling variant tests (Task 18) ──
+
+#[test]
+fn test_call_invite_carries_from_field() {
+  use message::signaling::CallInvite;
+  use message::types::MediaType;
+  let from = UserId::new();
+  let room_id = message::RoomId::new();
+  let msg = SignalingMessage::CallInvite(CallInvite {
+    from: from.clone(),
+    room_id: room_id.clone(),
+    media_type: MediaType::Video,
+  });
+  match msg {
+    SignalingMessage::CallInvite(parsed) => {
+      assert_eq!(parsed.from, from);
+      assert_eq!(parsed.room_id, room_id);
+      assert_eq!(parsed.media_type, MediaType::Video);
+    }
+    _ => panic!("Expected CallInvite"),
+  }
+}
+
+#[test]
+fn test_call_accept_carries_from_field() {
+  use message::signaling::CallAccept;
+  let from = UserId::new();
+  let msg = SignalingMessage::CallAccept(CallAccept {
+    from: from.clone(),
+    room_id: message::RoomId::new(),
+  });
+  match msg {
+    SignalingMessage::CallAccept(parsed) => assert_eq!(parsed.from, from),
+    _ => panic!("Expected CallAccept"),
+  }
+}
+
+#[test]
+fn test_call_decline_carries_from_field() {
+  use message::signaling::CallDecline;
+  let from = UserId::new();
+  let msg = SignalingMessage::CallDecline(CallDecline {
+    from: from.clone(),
+    room_id: message::RoomId::new(),
+  });
+  match msg {
+    SignalingMessage::CallDecline(parsed) => assert_eq!(parsed.from, from),
+    _ => panic!("Expected CallDecline"),
+  }
+}
+
+#[test]
+fn test_call_end_carries_from_field() {
+  use message::signaling::CallEnd;
+  let from = UserId::new();
+  let msg = SignalingMessage::CallEnd(CallEnd {
+    from: from.clone(),
+    room_id: message::RoomId::new(),
+  });
+  match msg {
+    SignalingMessage::CallEnd(parsed) => assert_eq!(parsed.from, from),
+    _ => panic!("Expected CallEnd"),
+  }
+}

@@ -174,12 +174,19 @@ impl fmt::Display for NetworkQuality {
 
 impl NetworkQuality {
   /// Classify network quality based on RTT and packet loss.
+  ///
+  /// Thresholds match Req 3.8b exactly:
+  ///
+  /// * **Excellent**: RTT < 100 ms AND loss < 1 %
+  /// * **Good**:      RTT < 200 ms AND loss < 3 %
+  /// * **Fair**:      RTT < 400 ms AND loss < 8 %
+  /// * **Poor**:      otherwise
   #[must_use]
   pub fn from_metrics(rtt_ms: u64, packet_loss_percent: f64) -> Self {
     match (rtt_ms, packet_loss_percent) {
       (rtt, loss) if rtt < 100 && loss < 1.0 => Self::Excellent,
       (rtt, loss) if rtt < 200 && loss < 3.0 => Self::Good,
-      (rtt, loss) if rtt < 400 && loss < 10.0 => Self::Fair,
+      (rtt, loss) if rtt < 400 && loss < 8.0 => Self::Fair,
       _ => Self::Poor,
     }
   }

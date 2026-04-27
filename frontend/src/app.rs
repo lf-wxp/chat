@@ -4,8 +4,8 @@
 //! and overlay components. Handles theme switching and responsive layout.
 
 use crate::components::{
-  AuthPage, DebugPanel, ErrorToastContainer, HomePage, ModalManager, ReconnectBanner, SettingsPage,
-  Sidebar, ToastContainer, TopBar,
+  AuthPage, CallOverlay, DebugPanel, ErrorToastContainer, HomePage, ModalManager, ReconnectBanner,
+  SettingsPage, Sidebar, ToastContainer, TopBar,
 };
 use crate::i18n::{self, Locale};
 use crate::i18n_helpers;
@@ -135,6 +135,7 @@ pub fn App() -> impl IntoView {
         // Overlays scoped to the authenticated shell
         <ToastContainer />
         <ModalManager />
+        <CallOverlay />
         <DebugPanel />
       </div>
     </Show>

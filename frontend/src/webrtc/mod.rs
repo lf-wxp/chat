@@ -32,6 +32,7 @@ use message::error::{ErrorCategory, ErrorCode, ErrorModule};
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
+use wasm_bindgen::JsValue;
 
 /// Structured error for WebRTC operations (P1-10 fix).
 ///
@@ -90,6 +91,14 @@ impl WebRtcError {
       "Maximum peer limit reached",
       None,
     )
+  }
+
+  /// Whether this error represents a mesh-capacity rejection. Used by
+  /// the call subsystem to surface a "video call is at capacity" toast
+  /// (Req 3.10 — P1 Bug-6 fix).
+  #[must_use]
+  pub fn is_mesh_limit(&self) -> bool {
+    self.code == ErrorCode::new(ErrorModule::E2e, ErrorCategory::Client, 3)
   }
 
   /// Convenience: already connected.
@@ -159,6 +168,35 @@ struct PendingEcdh {
   started_at_ms: f64,
 }
 
+/// Callback invoked when a remote media stream arrives on any peer
+/// connection. Routed to the call subsystem to update the participant
+/// tile grid (Req 3.1/3.2).
+type RemoteTrackHandler = Rc<dyn Fn(UserId, web_sys::MediaStream)>;
+
+/// Callback invoked when a peer connection closes (normally, ICE
+/// failed, or replaced). Routed to the call subsystem so it can drop
+/// the peer from the participant grid and decide whether the call has
+/// ended (last remaining peer hung up — `CallEndReason::AllPeersLeft`).
+type PeerClosedHandler = Rc<dyn Fn(UserId)>;
+
+/// Callback invoked when a peer connection transitions to `Connected`.
+/// Routed to the call subsystem so mid-call arrivals (e.g. after a
+/// refresh recovery) receive the current local capture stream via
+/// `publish_local_stream_to` (Task 18 — P2-3 fix).
+type PeerConnectedHandler = Rc<dyn Fn(UserId)>;
+
+/// Callback invoked when a remote peer broadcasts its local media
+/// state (mic / camera / screen-share flags) via
+/// [`message::datachannel::MediaStateUpdate`]. Routed to the call
+/// subsystem so remote video tiles can render icons (Req 3.5 / 7.1).
+type MediaStateUpdateHandler = Rc<dyn Fn(UserId, message::datachannel::MediaStateUpdate)>;
+
+/// Callback invoked when a remote peer broadcasts its reconnecting
+/// status via [`message::datachannel::ReconnectingState`]. Routed to
+/// the call subsystem so the UI can hint that the peer is recovering
+/// from a transient network blip (Req 10.5.24).
+type ReconnectingStateHandler = Rc<dyn Fn(UserId, message::datachannel::ReconnectingState)>;
+
 /// Main WebRTC manager that orchestrates all peer connections.
 ///
 /// Uses `Rc<RefCell<>>` for single-threaded WASM compatibility.
@@ -172,6 +210,23 @@ pub struct WebRtcManager {
   /// (Task 16). `None` until `set_chat_manager` is called during
   /// bootstrap.
   chat_manager: Rc<RefCell<Option<crate::chat::ChatManager>>>,
+  /// Callback invoked when a remote media stream arrives (Task 18 —
+  /// wired by `CallManager` at bootstrap so ontrack events flow into
+  /// the call participant grid).
+  on_remote_track: Rc<RefCell<Option<RemoteTrackHandler>>>,
+  /// Callback invoked when a peer connection closes (Task 18 —
+  /// drives `CallEndReason::AllPeersLeft` detection).
+  on_peer_closed: Rc<RefCell<Option<PeerClosedHandler>>>,
+  /// Callback invoked when a peer connection becomes `Connected`
+  /// (Task 18 — gives the call subsystem a chance to publish the
+  /// current local media stream to the new peer).
+  on_peer_connected: Rc<RefCell<Option<PeerConnectedHandler>>>,
+  /// Callback invoked when a remote peer broadcasts a
+  /// [`message::datachannel::MediaStateUpdate`] (Req 3.5 / 7.1).
+  on_media_state_update: Rc<RefCell<Option<MediaStateUpdateHandler>>>,
+  /// Callback invoked when a remote peer broadcasts a
+  /// [`message::datachannel::ReconnectingState`] (Req 10.5.24).
+  on_reconnecting_state: Rc<RefCell<Option<ReconnectingStateHandler>>>,
   inner: Rc<RefCell<InnerManager>>,
 }
 
@@ -216,6 +271,11 @@ impl WebRtcManager {
       app_state,
       signaling: Rc::new(RefCell::new(None)),
       chat_manager: Rc::new(RefCell::new(None)),
+      on_remote_track: Rc::new(RefCell::new(None)),
+      on_peer_closed: Rc::new(RefCell::new(None)),
+      on_peer_connected: Rc::new(RefCell::new(None)),
+      on_media_state_update: Rc::new(RefCell::new(None)),
+      on_reconnecting_state: Rc::new(RefCell::new(None)),
       inner: Rc::new(RefCell::new(InnerManager {
         connections: HashMap::new(),
         crypto: HashMap::new(),
@@ -239,6 +299,138 @@ impl WebRtcManager {
   /// WebRTC manager and the chat manager have been constructed.
   pub fn set_chat_manager(&self, chat: crate::chat::ChatManager) {
     *self.chat_manager.borrow_mut() = Some(chat);
+  }
+
+  /// Register a callback for remote media-stream arrivals (Task 18).
+  ///
+  /// Called by the call subsystem at bootstrap. When any peer
+  /// connection fires `ontrack`, the provided closure is invoked with
+  /// the peer's user id and the arriving `MediaStream`.
+  pub fn set_on_remote_track<F>(&self, callback: F)
+  where
+    F: Fn(UserId, web_sys::MediaStream) + 'static,
+  {
+    *self.on_remote_track.borrow_mut() = Some(Rc::new(callback));
+  }
+
+  /// Register a callback for peer-closed events (Task 18). Fires from
+  /// `handle_connection_state_change` whenever a peer connection
+  /// transitions to `Failed` or `Closed`. The call subsystem uses this
+  /// to drop the peer from the participant grid and detect when the
+  /// last remote left (`CallEndReason::AllPeersLeft`).
+  pub fn set_on_peer_closed<F>(&self, callback: F)
+  where
+    F: Fn(UserId) + 'static,
+  {
+    *self.on_peer_closed.borrow_mut() = Some(Rc::new(callback));
+  }
+
+  /// Register a callback for peer-connected events (Task 18). Fires
+  /// from `handle_connection_state_change` when a peer transitions to
+  /// `Connected`. The call subsystem uses this to publish the active
+  /// call's local capture stream to newly-arrived peers.
+  pub fn set_on_peer_connected<F>(&self, callback: F)
+  where
+    F: Fn(UserId) + 'static,
+  {
+    *self.on_peer_connected.borrow_mut() = Some(Rc::new(callback));
+  }
+
+  /// Register a callback for remote `MediaStateUpdate` broadcasts
+  /// (Req 3.5 / 7.1). The call subsystem uses this to update its
+  /// per-peer `RemoteParticipant.media_state` so tile icons stay in
+  /// sync with the remote user's toggles.
+  pub fn set_on_media_state_update<F>(&self, callback: F)
+  where
+    F: Fn(UserId, message::datachannel::MediaStateUpdate) + 'static,
+  {
+    *self.on_media_state_update.borrow_mut() = Some(Rc::new(callback));
+  }
+
+  /// Register a callback for remote `ReconnectingState` broadcasts
+  /// (Req 10.5.24). The call subsystem uses this to show a
+  /// "reconnecting" hint on the affected participant's tile.
+  pub fn set_on_reconnecting_state<F>(&self, callback: F)
+  where
+    F: Fn(UserId, message::datachannel::ReconnectingState) + 'static,
+  {
+    *self.on_reconnecting_state.borrow_mut() = Some(Rc::new(callback));
+  }
+
+  /// Install the configured remote-track handler on a freshly-created
+  /// [`PeerConnection`] so the call subsystem sees arriving streams.
+  /// No-op when no handler has been registered yet.
+  fn wire_remote_track_handler(&self, pc: &PeerConnection, peer_id: UserId) {
+    let Some(handler) = self.on_remote_track.borrow().clone() else {
+      return;
+    };
+    let handler = handler.clone();
+    pc.set_on_track(move |stream| {
+      handler(peer_id.clone(), stream);
+    });
+  }
+
+  /// Install an `onnegotiationneeded` handler that re-runs the SDP
+  /// offer/answer round-trip whenever a track is added/removed on the
+  /// initiator side (Task 18 — P0 Bug-4 fix). Only the initiator wires
+  /// up the actual offer logic; the receiver side relies on the
+  /// initiator to drive renegotiation, which avoids classic glare.
+  ///
+  /// The handler is **debounced via the `signalingState` check**: if a
+  /// previous offer is still in progress (`signalingState != stable`)
+  /// the renegotiation is skipped — the browser will fire
+  /// `onnegotiationneeded` again once the state returns to stable.
+  fn wire_renegotiation_handler(&self, pc: &PeerConnection, peer_id: UserId) {
+    if !pc.is_initiator() {
+      return;
+    }
+    let manager = self.clone();
+    let pc_clone = pc.clone();
+    pc.set_on_negotiation_needed(move || {
+      // Skip if we are mid-negotiation already.
+      if let Ok(rtc_pc) = pc_clone.get_rtc_pc()
+        && rtc_pc.signaling_state() != web_sys::RtcSignalingState::Stable
+      {
+        web_sys::console::log_1(&"[webrtc] Skipping renegotiation: signaling not stable".into());
+        return;
+      }
+      let manager = manager.clone();
+      let peer_id = peer_id.clone();
+      let pc_for_async = pc_clone.clone();
+      wasm_bindgen_futures::spawn_local(async move {
+        match pc_for_async.create_offer().await {
+          Ok(sdp) => {
+            if let Some(sig) = manager.get_signaling()
+              && let Err(e) = sig.send_sdp_offer(&peer_id, &sdp)
+            {
+              web_sys::console::warn_1(
+                &format!("[webrtc] Renegotiation send_sdp_offer failed: {e}").into(),
+              );
+            }
+          }
+          Err(e) => {
+            web_sys::console::warn_1(
+              &format!("[webrtc] Renegotiation create_offer failed: {e}").into(),
+            );
+          }
+        }
+      });
+    });
+  }
+
+  /// Publish a single peer's tracks, used on mid-call peer-joins so
+  /// late arrivals receive the already-active call's media (Task 18).
+  ///
+  /// Safely no-ops when no tracks are being published yet.
+  pub fn publish_local_stream_to(&self, peer_id: &UserId, stream: &web_sys::MediaStream) {
+    let Some(pc) = self.inner.borrow().connections.get(peer_id).cloned() else {
+      return;
+    };
+    if let Err(e) = pc.publish_local_stream(stream) {
+      web_sys::console::warn_1(
+        &format!("[webrtc] Failed to publish local stream to {peer_id}: {e}").into(),
+      );
+    }
   }
 
   /// Best-effort peer nickname lookup. Falls back to the user id when
@@ -328,6 +520,15 @@ impl WebRtcManager {
       pc.set_on_connection_state_change(move |state| {
         manager.handle_connection_state_change(state_peer_id.clone(), state, instance_id);
       });
+
+      // Wire the call-subsystem remote-track handler (Task 18). This
+      // is a no-op before the call subsystem registers its callback.
+      self.wire_remote_track_handler(&pc, peer_id.clone());
+
+      // Wire SDP renegotiation triggered by `addTrack`/`removeTrack`
+      // (Task 18 — P0 Bug-4 fix). Only initiators install the actual
+      // re-offer logic to avoid glare.
+      self.wire_renegotiation_handler(&pc, peer_id.clone());
 
       // Create DataChannel (initiator side)
       pc.create_data_channel().map_err(|e| {
@@ -435,12 +636,64 @@ impl WebRtcManager {
   /// (e.g., from a previous session that hasn't been cleaned up yet during
   /// page refresh recovery), close it before accepting the new offer.
   ///
-  /// 1. Closes any existing connection for the peer
-  /// 2. Creates RTCPeerConnection
-  /// 3. Sets up DataChannel handler
-  /// 4. Handles offer and creates answer
-  /// 5. Sends SdpAnswer via signaling
+  /// **Renegotiation fast path** (P0 Bug-4 fix): if a connection already
+  /// exists for this peer and is currently `stable`, treat the offer as
+  /// a mid-session renegotiation (e.g. the initiator added a media
+  /// track for a call) and apply it in-place via `setRemoteDescription`
+  /// followed by `createAnswer`, instead of tearing down the live
+  /// PeerConnection. Tearing it down would drop the DataChannel, the
+  /// established E2EE keys, and any in-flight media tracks.
+  ///
+  /// 1. Detects renegotiation vs. fresh connect
+  /// 2. (Fresh) Closes any existing connection for the peer
+  /// 3. (Fresh) Creates RTCPeerConnection
+  /// 4. (Fresh) Sets up DataChannel handler
+  /// 5. Handles offer and creates answer
+  /// 6. Sends SdpAnswer via signaling
   pub async fn handle_incoming_offer(&self, peer_id: UserId, sdp: &str) -> Result<(), WebRtcError> {
+    // Fast path: in-place renegotiation when an existing connection is
+    // healthy enough to accept a new SDP without rebuild. We check for
+    // both the connection and a stable signaling state under the same
+    // borrow to avoid TOCTOU.
+    let renegotiation_pc = {
+      let inner = self.inner.borrow();
+      inner.connections.get(&peer_id).and_then(|pc| {
+        let stable = pc
+          .get_rtc_pc()
+          .ok()
+          .map(|rtc| rtc.signaling_state() == web_sys::RtcSignalingState::Stable)
+          .unwrap_or(false);
+        if stable { Some(pc.clone()) } else { None }
+      })
+    };
+
+    if let Some(pc) = renegotiation_pc {
+      web_sys::console::log_1(
+        &format!(
+          "[webrtc] In-place renegotiation for peer {} (offer accepted on stable PC)",
+          peer_id
+        )
+        .into(),
+      );
+      let answer_sdp = pc.handle_offer(sdp).await.map_err(|e| {
+        WebRtcError::new(
+          ErrorCode::new(ErrorModule::Sig, ErrorCategory::Network, 2),
+          format!("Failed to handle renegotiation offer: {}", e),
+          Some(peer_id.clone()),
+        )
+      })?;
+      if let Some(sig) = self.get_signaling() {
+        sig.send_sdp_answer(&peer_id, &answer_sdp).map_err(|e| {
+          WebRtcError::new(
+            ErrorCode::new(ErrorModule::Sig, ErrorCategory::Network, 2),
+            format!("Failed to send renegotiation SDP answer: {}", e),
+            Some(peer_id.clone()),
+          )
+        })?;
+      }
+      return Ok(());
+    }
+
     // P2-9 fix: atomically replace any existing connection within a single
     // `borrow_mut`. The previous implementation called `is_connected()`
     // (borrow) immediately followed by `close_connection()` (borrow_mut),
@@ -516,6 +769,15 @@ impl WebRtcManager {
       pc.set_on_connection_state_change(move |state| {
         manager.handle_connection_state_change(state_peer_id.clone(), state, instance_id);
       });
+
+      // Wire the call-subsystem remote-track handler (Task 18). See
+      // `connect_to_peer` for the initiator-side equivalent.
+      self.wire_remote_track_handler(&pc, peer_id.clone());
+
+      // Wire renegotiation handler too — even though receivers do not
+      // act on the event, installing the closure keeps the API
+      // symmetrical and protects against future role-flip refactors.
+      self.wire_renegotiation_handler(&pc, peer_id.clone());
 
       // Set up incoming DataChannel handler
       let manager_dc = self.clone();
@@ -988,6 +1250,20 @@ impl WebRtcManager {
           msg,
         );
       }
+      DataChannelMessage::MediaStateUpdate(update) => {
+        // Req 3.5 / 7.1 — forward to the call subsystem so participant
+        // tiles can render muted / camera-off / screen-sharing icons.
+        if let Some(handler) = self.on_media_state_update.borrow().clone() {
+          handler(peer_id, update);
+        }
+      }
+      DataChannelMessage::ReconnectingState(state) => {
+        // Req 10.5.24 — forward to the call subsystem so the remote
+        // participant tile can show a "reconnecting" hint.
+        if let Some(handler) = self.on_reconnecting_state.borrow().clone() {
+          handler(peer_id, state);
+        }
+      }
       _ => {
         // P2-7 (Review Round 3 guard): intentionally log ONLY the
         // discriminator byte here, never the payload. Unknown
@@ -1044,6 +1320,38 @@ impl WebRtcManager {
         Some(peer_id.clone()),
       )
     })
+  }
+
+  /// Fan out a non-chat DataChannel message (e.g. `MediaStateUpdate`,
+  /// `ReconnectingState`) to every peer with an open DataChannel.
+  ///
+  /// Does **not** perform ECDH encryption because these payloads carry
+  /// no sensitive content; adding encryption overhead would also block
+  /// on the Web Crypto promise from a synchronous call site. Per-peer
+  /// send failures are logged but do not abort the sweep (Req 3.5 /
+  /// 7.1 / 10.5.24).
+  pub fn broadcast_data_channel_message(&self, msg: &message::datachannel::DataChannelMessage) {
+    let connections: Vec<(UserId, PeerConnection)> = self
+      .inner
+      .borrow()
+      .connections
+      .iter()
+      .map(|(k, v)| (k.clone(), v.clone()))
+      .collect();
+    for (peer_id, pc) in connections {
+      let Some(dc) = pc.get_data_channel() else {
+        continue;
+      };
+      if let Err(e) = dc.send_message(msg) {
+        web_sys::console::warn_1(
+          &format!(
+            "[webrtc] broadcast_data_channel_message to {peer_id} (type=0x{:02X}) failed: {e}",
+            msg.discriminator()
+          )
+          .into(),
+        );
+      }
+    }
   }
 
   /// Close a peer connection.
@@ -1117,10 +1425,170 @@ impl WebRtcManager {
     self.inner.borrow().connections.len()
   }
 
+  /// Snapshot of the currently-connected peer ids.
+  ///
+  /// Used by the call subsystem to iterate over peers when publishing
+  /// a local capture stream or polling per-peer network quality. The
+  /// result is a plain `Vec` so callers do not hold a borrow across
+  /// async boundaries.
+  #[must_use]
+  pub fn peer_ids(&self) -> Vec<UserId> {
+    self.inner.borrow().connections.keys().cloned().collect()
+  }
+
+  /// Publish a local capture `MediaStream` on every currently-connected
+  /// peer (Task 18 — call subsystem entry point for
+  /// `getUserMedia` / `getDisplayMedia` streams).
+  ///
+  /// On every peer connection this calls `addTrack` for each track in
+  /// the stream. When the same call is issued again (e.g. the user
+  /// toggled screen share off and we are restoring the camera stream)
+  /// the previously-published tracks are removed first to avoid
+  /// duplicates.
+  ///
+  /// This method does **not** trigger renegotiation here — the caller
+  /// is expected to be inside an existing WebRTC session that already
+  /// performed SDP exchange for DataChannel setup. The browser will
+  /// notify the remote via `onnegotiationneeded`, and the existing
+  /// signaling flow picks it up from there.
+  pub fn publish_local_stream(&self, stream: &web_sys::MediaStream) {
+    let connections: Vec<PeerConnection> =
+      self.inner.borrow().connections.values().cloned().collect();
+    for pc in &connections {
+      if let Err(e) = pc.publish_local_stream(stream) {
+        web_sys::console::warn_1(
+          &format!(
+            "[webrtc] Failed to publish local stream to {}: {}",
+            pc.peer_id(),
+            e
+          )
+          .into(),
+        );
+      }
+    }
+  }
+
+  /// Remove every previously-published local track on every peer
+  /// connection. Used when the call ends or the user revokes media
+  /// permission mid-call.
+  pub fn unpublish_local_media(&self) {
+    let connections: Vec<PeerConnection> =
+      self.inner.borrow().connections.values().cloned().collect();
+    for pc in &connections {
+      pc.unpublish_local_media();
+    }
+  }
+
+  /// Replace the published track of a given kind on every peer
+  /// connection (used for seamless audio↔video mode switches without
+  /// re-negotiation — Req 7.1 / 7.2).
+  ///
+  /// # Errors
+  /// Returns `Err` with the first peer id and message that failed.
+  pub async fn replace_local_track(
+    &self,
+    new_track: &web_sys::MediaStreamTrack,
+    stream: &web_sys::MediaStream,
+  ) -> Result<(), String> {
+    let connections: Vec<PeerConnection> =
+      self.inner.borrow().connections.values().cloned().collect();
+    for pc in &connections {
+      pc.replace_local_track(new_track, stream)
+        .await
+        .map_err(|e| format!("{}: {}", pc.peer_id(), e))?;
+    }
+    Ok(())
+  }
+
+  /// Clear the published track of a given kind on every peer connection
+  /// by calling `sender.replaceTrack(null)`. Used by `toggle_camera(false)`
+  /// to ensure remote sides render the avatar placeholder instead of a
+  /// frozen last frame (Req 3.6 / 7.1 — P1-New-1 fix).
+  ///
+  /// Per-peer failures are logged but do not abort the sweep.
+  pub async fn clear_local_track_of_kind(&self, kind: &str) {
+    let connections: Vec<PeerConnection> =
+      self.inner.borrow().connections.values().cloned().collect();
+    for pc in &connections {
+      if let Err(e) = pc.clear_local_track_of_kind(kind).await {
+        web_sys::console::warn_1(
+          &format!(
+            "[webrtc] clear_local_track_of_kind({kind}) on {}: {e}",
+            pc.peer_id()
+          )
+          .into(),
+        );
+      }
+    }
+  }
+
+  /// Capture a `getStats()` sample from every live peer connection.
+  ///
+  /// Returns the raw report keyed by peer id. The call subsystem is
+  /// responsible for walking each report via `js_sys::Object::entries`
+  /// and extracting the RTT / packet-loss / bandwidth fields it cares
+  /// about. Keeping the extraction out of this method avoids pulling
+  /// stats-schema knowledge into the generic WebRTC layer.
+  #[must_use]
+  pub async fn collect_stats(&self) -> Vec<(UserId, JsValue)> {
+    /// Maximum number of concurrent in-flight `getStats()` promises
+    /// per sweep. Keeps the main thread responsive on low-end devices
+    /// when the mesh is at capacity (P2-New-4 fix).
+    ///
+    /// The sweep walks `connections.chunks(STATS_CONCURRENCY)` and
+    /// `join_all` the promises inside each chunk. On the single-threaded
+    /// WASM runtime `join_all` is cooperative — the browser schedules
+    /// the three `getStats()` promises together and resolves them as
+    /// microtasks — so each chunk completes in roughly one network
+    /// round-trip rather than three. An 8-peer mesh therefore finishes
+    /// in ~3 sweep rounds (3 + 3 + 2) instead of the 8 sequential
+    /// awaits the original implementation performed.
+    const STATS_CONCURRENCY: usize = 3;
+
+    let connections: Vec<(UserId, PeerConnection)> = self
+      .inner
+      .borrow()
+      .connections
+      .iter()
+      .map(|(k, v)| (k.clone(), v.clone()))
+      .collect();
+
+    let mut out = Vec::with_capacity(connections.len());
+    for chunk in connections.chunks(STATS_CONCURRENCY) {
+      let futures: Vec<_> = chunk
+        .iter()
+        .map(|(peer_id, pc)| {
+          let peer_id = peer_id.clone();
+          let pc = pc.clone();
+          async move { (peer_id, pc.get_stats().await) }
+        })
+        .collect();
+      let results = futures::future::join_all(futures).await;
+      for (peer_id, result) in results {
+        match result {
+          Ok(report) => out.push((peer_id, report)),
+          Err(e) => {
+            web_sys::console::warn_1(&format!("[webrtc] getStats failed: {}", e).into());
+          }
+        }
+      }
+    }
+    out
+  }
+
   /// Check if connected to a specific peer.
   #[must_use]
   pub fn is_connected(&self, peer_id: &UserId) -> bool {
     self.inner.borrow().connections.contains_key(peer_id)
+  }
+
+  /// Return a snapshot of all peer ids that currently have an active
+  /// connection. Used by the call subsystem's refresh-recovery path to
+  /// iterate peers without leaking internal `HashMap` / `RefCell`
+  /// references (P2-New-3 fix).
+  #[must_use]
+  pub fn connected_peers(&self) -> Vec<UserId> {
+    self.inner.borrow().connections.keys().cloned().collect()
   }
 
   /// Handle connection state changes (P1-16 fix: stale callback guard).
@@ -1179,6 +1647,36 @@ impl WebRtcManager {
         if let Some(sig) = self.get_signaling() {
           let _ = sig.send_peer_established(&peer_id);
         }
+        // Req 10.5.24 — if we just recovered from a Disconnected state,
+        // broadcast `reconnecting=false` so peers can clear the
+        // "reconnecting" hint in their UI. Broadcasting unconditionally
+        // on every Connected edge is fine: the initial Connected edge
+        // is a no-op for remotes that have never seen a true value.
+        self.broadcast_data_channel_message(
+          &message::datachannel::DataChannelMessage::ReconnectingState(
+            message::datachannel::ReconnectingState {
+              reconnecting: false,
+            },
+          ),
+        );
+        // Let the call subsystem publish its local capture stream to
+        // mid-call arrivals (Task 18 — P2-3 fix). Invoked outside any
+        // inner borrow so the callback can safely call back into the
+        // manager.
+        if let Some(handler) = self.on_peer_connected.borrow().clone() {
+          handler(peer_id.clone());
+        }
+      }
+      PeerConnectionState::Disconnected => {
+        // Req 10.5.24 — transient ICE flap. Notify peers so their UI
+        // can show a "reconnecting" hint. We do NOT tear down the
+        // connection here because browsers typically recover on their
+        // own; `Failed` handles the terminal case.
+        self.broadcast_data_channel_message(
+          &message::datachannel::DataChannelMessage::ReconnectingState(
+            message::datachannel::ReconnectingState { reconnecting: true },
+          ),
+        );
       }
       PeerConnectionState::Failed | PeerConnectionState::Closed => {
         // Notify server and clean up
@@ -1186,6 +1684,13 @@ impl WebRtcManager {
           let _ = sig.send_peer_closed(peer_id.clone());
         }
         self.close_connection(&peer_id);
+        // Notify the call subsystem so it can drop the participant
+        // from the grid and detect "all peers left" (Task 18 — P1
+        // Bug-5 fix). We invoke the handler outside any inner borrow
+        // (close_connection above already released them).
+        if let Some(handler) = self.on_peer_closed.borrow().clone() {
+          handler(peer_id.clone());
+        }
       }
       _ => {}
     }

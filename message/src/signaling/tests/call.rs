@@ -5,6 +5,7 @@ use super::*;
 #[test]
 fn test_call_invite_roundtrip() {
   let msg = CallInvite {
+    from: UserId::new(),
     room_id: RoomId::new(),
     media_type: MediaType::Video,
   };
@@ -16,6 +17,7 @@ fn test_call_invite_roundtrip() {
 #[test]
 fn test_call_accept_roundtrip() {
   let msg = CallAccept {
+    from: UserId::new(),
     room_id: RoomId::new(),
   };
   let encoded = bitcode::encode(&msg);
@@ -26,6 +28,7 @@ fn test_call_accept_roundtrip() {
 #[test]
 fn test_call_decline_roundtrip() {
   let msg = CallDecline {
+    from: UserId::new(),
     room_id: RoomId::new(),
   };
   let encoded = bitcode::encode(&msg);
@@ -36,6 +39,7 @@ fn test_call_decline_roundtrip() {
 #[test]
 fn test_call_end_roundtrip() {
   let msg = CallEnd {
+    from: UserId::new(),
     room_id: RoomId::new(),
   };
   let encoded = bitcode::encode(&msg);
@@ -46,6 +50,7 @@ fn test_call_end_roundtrip() {
 #[test]
 fn test_signaling_message_call_accept_roundtrip() {
   let msg = SignalingMessage::CallAccept(CallAccept {
+    from: UserId::new(),
     room_id: RoomId::new(),
   });
   let encoded = bitcode::encode(&msg);
@@ -56,6 +61,7 @@ fn test_signaling_message_call_accept_roundtrip() {
 #[test]
 fn test_signaling_message_call_decline_roundtrip() {
   let msg = SignalingMessage::CallDecline(CallDecline {
+    from: UserId::new(),
     room_id: RoomId::new(),
   });
   let encoded = bitcode::encode(&msg);
@@ -66,6 +72,7 @@ fn test_signaling_message_call_decline_roundtrip() {
 #[test]
 fn test_signaling_message_call_end_roundtrip() {
   let msg = SignalingMessage::CallEnd(CallEnd {
+    from: UserId::new(),
     room_id: RoomId::new(),
   });
   let encoded = bitcode::encode(&msg);
@@ -74,10 +81,25 @@ fn test_signaling_message_call_end_roundtrip() {
 }
 
 #[test]
+fn test_call_invite_from_field_preserved() {
+  let from = UserId::new();
+  let msg = CallInvite {
+    from: from.clone(),
+    room_id: RoomId::new(),
+    media_type: MediaType::Audio,
+  };
+  let encoded = bitcode::encode(&msg);
+  let decoded: CallInvite = bitcode::decode(&encoded).expect("Failed to decode");
+  assert_eq!(decoded.from, from);
+}
+
+#[test]
 fn test_discriminator_call_messages() {
+  let from = UserId::new();
   let rid = RoomId::new();
   assert_eq!(
     SignalingMessage::CallInvite(CallInvite {
+      from: from.clone(),
       room_id: rid.clone(),
       media_type: MediaType::Audio
     })
@@ -86,6 +108,7 @@ fn test_discriminator_call_messages() {
   );
   assert_eq!(
     SignalingMessage::CallAccept(CallAccept {
+      from: from.clone(),
       room_id: rid.clone()
     })
     .discriminator(),
@@ -93,13 +116,14 @@ fn test_discriminator_call_messages() {
   );
   assert_eq!(
     SignalingMessage::CallDecline(CallDecline {
+      from: from.clone(),
       room_id: rid.clone()
     })
     .discriminator(),
     CALL_DECLINE
   );
   assert_eq!(
-    SignalingMessage::CallEnd(CallEnd { room_id: rid }).discriminator(),
+    SignalingMessage::CallEnd(CallEnd { from, room_id: rid }).discriminator(),
     CALL_END
   );
 }

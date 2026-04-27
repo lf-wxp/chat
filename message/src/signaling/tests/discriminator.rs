@@ -179,19 +179,23 @@ fn create_room_management_discriminators() -> Vec<u8> {
 fn create_call_theater_discriminators() -> Vec<u8> {
   vec![
     SignalingMessage::CallInvite(CallInvite {
+      from: UserId::new(),
       room_id: RoomId::new(),
       media_type: MediaType::Audio,
     })
     .discriminator(),
     SignalingMessage::CallAccept(CallAccept {
+      from: UserId::new(),
       room_id: RoomId::new(),
     })
     .discriminator(),
     SignalingMessage::CallDecline(CallDecline {
+      from: UserId::new(),
       room_id: RoomId::new(),
     })
     .discriminator(),
     SignalingMessage::CallEnd(CallEnd {
+      from: UserId::new(),
       room_id: RoomId::new(),
     })
     .discriminator(),
@@ -436,16 +440,20 @@ fn create_room_management_messages() -> Vec<SignalingMessage> {
 fn create_call_theater_messages() -> Vec<SignalingMessage> {
   vec![
     SignalingMessage::CallInvite(CallInvite {
+      from: UserId::new(),
       room_id: RoomId::new(),
       media_type: MediaType::Audio,
     }),
     SignalingMessage::CallAccept(CallAccept {
+      from: UserId::new(),
       room_id: RoomId::new(),
     }),
     SignalingMessage::CallDecline(CallDecline {
+      from: UserId::new(),
       room_id: RoomId::new(),
     }),
     SignalingMessage::CallEnd(CallEnd {
+      from: UserId::new(),
       room_id: RoomId::new(),
     }),
     SignalingMessage::TheaterMuteAll(TheaterMuteAll {

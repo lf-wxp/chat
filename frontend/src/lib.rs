@@ -5,6 +5,7 @@
 
 pub mod app;
 pub mod auth;
+pub mod call;
 pub mod chat;
 pub mod components;
 pub mod config;
@@ -70,7 +71,7 @@ pub fn init() {
 
     // Initialize WebRTC manager and provide via context
     let webrtc_manager = webrtc::provide_webrtc_manager(app_state);
-    webrtc_manager.set_signaling_client(signaling);
+    webrtc_manager.set_signaling_client(signaling.clone());
 
     // Initialize chat manager (Task 16) and cross-link with WebRTC so
     // outbound chat traffic reaches the DataChannel and inbound
@@ -83,6 +84,13 @@ pub fn init() {
     // manager so messages are saved to / loaded from IndexedDB.
     let pm = persistence::provide_persistence_manager();
     chat_manager.set_persistence(pm);
+
+    // Initialize call manager (Task 18). Wire signaling + WebRTC so
+    // CallInvite/Accept/Decline/End flow through the signaling client
+    // and media-track add/replace flows through the WebRTC mesh.
+    let call_manager = call::provide_call_manager(app_state);
+    call_manager.set_signaling(signaling);
+    call_manager.set_webrtc(webrtc_manager);
 
     // Run a maintenance tick (retention sweep + index rebuild) every
     // 60 seconds.

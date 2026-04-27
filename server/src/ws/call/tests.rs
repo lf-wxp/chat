@@ -12,6 +12,7 @@ fn test_call_invite_room_not_found() {
   let room_id = message::RoomId::new();
 
   let _call_invite = CallInvite {
+    from: UserId::new(),
     room_id: room_id.clone(),
     media_type: message::types::MediaType::Audio,
   };
@@ -39,6 +40,7 @@ fn test_call_invite_user_not_member() {
     .unwrap();
 
   let _call_invite = CallInvite {
+    from: non_member_id.clone(),
     room_id: room_id.clone(),
     media_type: message::types::MediaType::Audio,
   };
@@ -84,6 +86,7 @@ fn test_call_invite_member_success() {
 
   // Call invite should be valid
   let call_invite = CallInvite {
+    from: member_id.clone(),
     room_id: room_id.clone(),
     media_type: message::types::MediaType::Audio,
   };
@@ -93,9 +96,11 @@ fn test_call_invite_member_success() {
 #[test]
 fn test_call_invite_media_types() {
   let room_id = message::RoomId::new();
+  let from = UserId::new();
 
   // Audio call
   let audio_invite = CallInvite {
+    from: from.clone(),
     room_id: room_id.clone(),
     media_type: message::types::MediaType::Audio,
   };
@@ -103,6 +108,7 @@ fn test_call_invite_media_types() {
 
   // Video call
   let video_invite = CallInvite {
+    from: from.clone(),
     room_id: room_id.clone(),
     media_type: message::types::MediaType::Video,
   };
@@ -110,6 +116,7 @@ fn test_call_invite_media_types() {
 
   // Screen share
   let screen_invite = CallInvite {
+    from,
     room_id: room_id.clone(),
     media_type: message::types::MediaType::ScreenShare,
   };
@@ -128,6 +135,7 @@ fn test_call_accept_room_not_found() {
   let room_id = message::RoomId::new();
 
   let _call_accept = CallAccept {
+    from: UserId::new(),
     room_id: room_id.clone(),
   };
 
@@ -154,6 +162,7 @@ fn test_call_accept_user_not_member() {
     .unwrap();
 
   let _call_accept = CallAccept {
+    from: non_member_id.clone(),
     room_id: room_id.clone(),
   };
 
@@ -195,6 +204,7 @@ fn test_call_accept_member_success() {
 
   // Call accept should be valid
   let call_accept = CallAccept {
+    from: member_id.clone(),
     room_id: room_id.clone(),
   };
   assert_eq!(call_accept.room_id, room_id);
@@ -209,6 +219,7 @@ fn test_call_decline_room_not_found() {
   let room_id = message::RoomId::new();
 
   let _call_decline = CallDecline {
+    from: UserId::new(),
     room_id: room_id.clone(),
   };
 
@@ -245,6 +256,7 @@ fn test_call_decline_member_success() {
 
   // Call decline should be valid
   let call_decline = CallDecline {
+    from: member_id.clone(),
     room_id: room_id.clone(),
   };
   assert_eq!(call_decline.room_id, room_id);
@@ -259,6 +271,7 @@ fn test_call_end_room_not_found() {
   let room_id = message::RoomId::new();
 
   let _call_end = CallEnd {
+    from: UserId::new(),
     room_id: room_id.clone(),
   };
 
@@ -295,6 +308,7 @@ fn test_call_end_member_success() {
 
   // Call end should be valid
   let call_end = CallEnd {
+    from: member_id.clone(),
     room_id: room_id.clone(),
   };
   assert_eq!(call_end.room_id, room_id);

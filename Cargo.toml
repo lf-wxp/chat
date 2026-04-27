@@ -77,7 +77,6 @@ tokio-util = {version = "0.7.18", features = ["rt"]}
 
 # Testing
 criterion = "0.8.2"
-proptest = "1.11.0"
 serial_test = "3.4.0"
 tempfile = "3.27.0"
 tokio-tungstenite = "0.29.0"

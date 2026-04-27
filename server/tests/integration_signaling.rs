@@ -410,12 +410,13 @@ async fn test_active_peers_list_recovery() {
   }
 }
 
-/// Test: Call invitation flow — verifies the callee receives the CallInvite.
+/// Test: Call invitation flow — verifies the callee receives the CallInvite
+/// and that the server overwrites `from` with the authenticated caller id.
 #[tokio::test]
 async fn test_call_invite_flow() {
   let (addr, _ws_state, user_store) = create_test_server().await;
 
-  let (mut ws_caller, _caller_id) = auth_user(addr, &user_store, "caller", "password").await;
+  let (mut ws_caller, caller_id) = auth_user(addr, &user_store, "caller", "password").await;
   let (mut ws_callee, _callee_id) = auth_user(addr, &user_store, "callee", "password").await;
 
   sleep(Duration::from_millis(100)).await;
@@ -424,19 +425,25 @@ async fn test_call_invite_flow() {
   let room_id =
     create_room_with_two_users(&mut ws_caller, &mut ws_callee, "Call Invite Room").await;
 
-  // Caller sends CallInvite
+  // Caller sends CallInvite (with a placeholder `from` to prove the server
+  // overwrites it with the authenticated user id).
   let call_invite = CallInvite {
+    from: message::UserId::new(),
     room_id: room_id.clone(),
     media_type: MediaType::Video,
   };
   send_signaling(&mut ws_caller, &SignalingMessage::CallInvite(call_invite)).await;
 
-  // Callee should receive the CallInvite
+  // Callee should receive the CallInvite with `from` rewritten to the caller.
   let received = recv_call_signaling(&mut ws_callee).await;
   match received {
     Some(SignalingMessage::CallInvite(invite)) => {
       assert_eq!(invite.room_id, room_id);
       assert_eq!(invite.media_type, MediaType::Video);
+      assert_eq!(
+        invite.from, caller_id,
+        "Server must rewrite `from` to the authenticated caller id"
+      );
     }
     other => panic!("Expected CallInvite, got: {:?}", other),
   }
@@ -448,7 +455,7 @@ async fn test_call_accept_flow() {
   let (addr, _ws_state, user_store) = create_test_server().await;
 
   let (mut ws_caller, _caller_id) = auth_user(addr, &user_store, "accept_caller", "password").await;
-  let (mut ws_callee, _callee_id) = auth_user(addr, &user_store, "accept_callee", "password").await;
+  let (mut ws_callee, callee_id) = auth_user(addr, &user_store, "accept_callee", "password").await;
 
   sleep(Duration::from_millis(100)).await;
 
@@ -458,6 +465,7 @@ async fn test_call_accept_flow() {
 
   // Callee sends CallAccept
   let call_accept = CallAccept {
+    from: message::UserId::new(),
     room_id: room_id.clone(),
   };
   send_signaling(&mut ws_callee, &SignalingMessage::CallAccept(call_accept)).await;
@@ -467,6 +475,7 @@ async fn test_call_accept_flow() {
   match received {
     Some(SignalingMessage::CallAccept(accept)) => {
       assert_eq!(accept.room_id, room_id);
+      assert_eq!(accept.from, callee_id);
     }
     other => panic!("Expected CallAccept, got: {:?}", other),
   }
@@ -479,8 +488,7 @@ async fn test_call_decline_flow() {
 
   let (mut ws_caller, _caller_id) =
     auth_user(addr, &user_store, "decline_caller", "password").await;
-  let (mut ws_callee, _callee_id) =
-    auth_user(addr, &user_store, "decline_callee", "password").await;
+  let (mut ws_callee, callee_id) = auth_user(addr, &user_store, "decline_callee", "password").await;
 
   sleep(Duration::from_millis(100)).await;
 
@@ -490,6 +498,7 @@ async fn test_call_decline_flow() {
 
   // Callee sends CallDecline
   let call_decline = CallDecline {
+    from: message::UserId::new(),
     room_id: room_id.clone(),
   };
   send_signaling(&mut ws_callee, &SignalingMessage::CallDecline(call_decline)).await;
@@ -499,6 +508,7 @@ async fn test_call_decline_flow() {
   match received {
     Some(SignalingMessage::CallDecline(decline)) => {
       assert_eq!(decline.room_id, room_id);
+      assert_eq!(decline.from, callee_id);
     }
     other => panic!("Expected CallDecline, got: {:?}", other),
   }
@@ -509,7 +519,7 @@ async fn test_call_decline_flow() {
 async fn test_call_end_flow() {
   let (addr, _ws_state, user_store) = create_test_server().await;
 
-  let (mut ws_caller, _caller_id) = auth_user(addr, &user_store, "end_caller", "password").await;
+  let (mut ws_caller, caller_id) = auth_user(addr, &user_store, "end_caller", "password").await;
   let (mut ws_callee, _callee_id) = auth_user(addr, &user_store, "end_callee", "password").await;
 
   sleep(Duration::from_millis(100)).await;
@@ -519,6 +529,7 @@ async fn test_call_end_flow() {
 
   // Caller sends CallEnd
   let call_end = CallEnd {
+    from: message::UserId::new(),
     room_id: room_id.clone(),
   };
   send_signaling(&mut ws_caller, &SignalingMessage::CallEnd(call_end)).await;
@@ -528,6 +539,7 @@ async fn test_call_end_flow() {
   match received {
     Some(SignalingMessage::CallEnd(end)) => {
       assert_eq!(end.room_id, room_id);
+      assert_eq!(end.from, caller_id);
     }
     other => panic!("Expected CallEnd, got: {:?}", other),
   }
