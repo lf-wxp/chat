@@ -362,6 +362,17 @@ fn content_view(msg: &ChatMessage, self_nickname: Memo<String>, cbs: BubbleCallb
       }
       .into_any()
     }
+    MessageContent::File(file) => {
+      use crate::components::chat_view::file_card::FileCard;
+      let file = file.clone();
+      let message_id = msg.id;
+      let outgoing = msg.outgoing;
+      let sender_name = msg.sender_name.clone();
+      view! {
+        <FileCard file=file message_id=message_id outgoing=outgoing sender_name=sender_name />
+      }
+      .into_any()
+    }
     MessageContent::Forwarded {
       original_sender,
       content,

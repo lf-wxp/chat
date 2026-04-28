@@ -10,8 +10,8 @@
 //! browser's origin sandbox.
 
 use crate::chat::models::{
-  ChatMessage, ImageRef, MessageContent, MessageStatus, ReactionEntry, ReplySnippet, StickerRef,
-  VoiceClip,
+  ChatMessage, FileRef, ImageRef, MessageContent, MessageStatus, ReactionEntry, ReplySnippet,
+  StickerRef, VoiceClip,
 };
 use crate::state::ConversationId;
 use message::{MessageId, RoomId, UserId};
@@ -188,6 +188,25 @@ pub enum ContentRecord {
     /// Original content text.
     text: String,
   },
+  /// File attachment reference (Task 19 / Req 6). Stored metadata
+  /// only — the actual bytes live on the `FileTransferManager` at
+  /// runtime and are re-requested after a page refresh via the
+  /// transfer resume protocol.
+  File {
+    /// Display filename.
+    filename: String,
+    /// File size in bytes.
+    size: u64,
+    /// MIME type.
+    mime_type: String,
+    /// Transfer id (UUID string).
+    transfer_id: String,
+    /// Pre-computed dangerous-extension flag captured at send time.
+    dangerous: bool,
+    /// SHA-256 digest of the full file as a lowercase hex string.
+    #[serde(default)]
+    file_hash: String,
+  },
   /// Placeholder shown after a successful revoke.
   Revoked,
 }
@@ -271,6 +290,14 @@ pub fn to_record(msg: &ChatMessage, conv: &ConversationId) -> MessageRecord {
         original_sender: original_sender.to_string(),
         text: content.clone(),
       },
+      MessageContent::File(file) => ContentRecord::File {
+        filename: file.filename.clone(),
+        size: file.size,
+        mime_type: file.mime_type.clone(),
+        transfer_id: file.transfer_id.to_string(),
+        dangerous: file.dangerous,
+        file_hash: hex::encode(file.file_hash),
+      },
       MessageContent::Revoked => ContentRecord::Revoked,
     },
   }
@@ -321,6 +348,24 @@ pub fn from_record(rec: &MessageRecord) -> Option<ChatMessage> {
       original_sender: original_sender.parse().ok()?,
       content: text.clone(),
     },
+    ContentRecord::File {
+      filename,
+      size,
+      mime_type,
+      transfer_id,
+      dangerous,
+      file_hash,
+    } => MessageContent::File(FileRef {
+      filename: filename.clone(),
+      size: *size,
+      mime_type: mime_type.clone(),
+      transfer_id: transfer_id.parse().ok()?,
+      dangerous: *dangerous,
+      file_hash: hex::decode(file_hash)
+        .ok()
+        .and_then(|v| v.try_into().ok())
+        .unwrap_or([0u8; 32]),
+    }),
     ContentRecord::Revoked => MessageContent::Revoked,
   };
   let reply_to = rec.reply_to.as_ref().and_then(|r| {

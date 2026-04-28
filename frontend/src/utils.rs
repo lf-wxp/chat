@@ -230,18 +230,29 @@ impl Drop for IntervalHandle {
   }
 }
 
-/// Format a total-seconds duration as `HH:MM:SS` (or `MM:SS` below one
-/// hour).
+/// Format a total-seconds duration as a human-friendly string.
+///
+/// Examples:
+///   45 s → "45s"
+///   125 s → "2m 5s"
+///   3600 s → "1h"
+///   3665 s → "1h 1m 5s"
 #[must_use]
 pub fn format_duration(total: u64) -> String {
   let hours = total / 3_600;
   let minutes = (total % 3_600) / 60;
   let seconds = total % 60;
+  let mut parts: Vec<String> = Vec::new();
   if hours > 0 {
-    format!("{hours:02}:{minutes:02}:{seconds:02}")
-  } else {
-    format!("{minutes:02}:{seconds:02}")
+    parts.push(format!("{hours}h"));
   }
+  if minutes > 0 {
+    parts.push(format!("{minutes}m"));
+  }
+  if seconds > 0 || parts.is_empty() {
+    parts.push(format!("{seconds}s"));
+  }
+  parts.join(" ")
 }
 
 /// Schedule a repeating JS `setInterval` callback.

@@ -10,6 +10,7 @@ pub mod chat;
 pub mod components;
 pub mod config;
 pub mod error_handler;
+pub mod file_transfer;
 pub mod i18n_helpers;
 pub mod identicon;
 pub mod logging;
@@ -90,7 +91,14 @@ pub fn init() {
     // and media-track add/replace flows through the WebRTC mesh.
     let call_manager = call::provide_call_manager(app_state);
     call_manager.set_signaling(signaling);
-    call_manager.set_webrtc(webrtc_manager);
+    call_manager.set_webrtc(webrtc_manager.clone());
+
+    // Initialize file-transfer manager (Task 19) and link it to the
+    // WebRTC mesh so outbound chunks reach their peers and inbound
+    // FileMetadata / FileChunk frames find a registered handler.
+    let file_manager = file_transfer::provide_file_transfer_manager();
+    file_manager.set_webrtc(webrtc_manager.clone());
+    webrtc_manager.set_file_transfer_manager(file_manager);
 
     // Run a maintenance tick (retention sweep + index rebuild) every
     // 60 seconds.

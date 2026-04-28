@@ -14,10 +14,10 @@ mod validation;
 // Re-export all necessary types for test submodules
 pub(super) use super::{
   AckStatus, AvatarData, AvatarRequest, ChatImage, ChatSticker, ChatText, ChatVoice, Danmaku,
-  DanmakuPosition, DataChannelMessage, EcdhKeyExchange, FileChunk, FileMetadata, ForwardMessage,
-  MediaStateUpdate, MessageAck, MessageReaction, MessageRead, MessageRevoke, PlaybackProgress,
-  ReactionAction, ReconnectingState, SubtitleClear, SubtitleData, SubtitleEntry, TypingIndicator,
-  discriminator,
+  DanmakuPosition, DataChannelMessage, EcdhKeyExchange, FileChunk, FileMetadata, FileResumeRequest,
+  ForwardMessage, MediaStateUpdate, MessageAck, MessageReaction, MessageRead, MessageRevoke,
+  PlaybackProgress, ReactionAction, ReconnectingState, SubtitleClear, SubtitleData, SubtitleEntry,
+  TypingIndicator, discriminator,
 };
 
 pub(super) use crate::types::{MessageId, RoomId, TransferId, UserId};

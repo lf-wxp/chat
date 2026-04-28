@@ -56,6 +56,40 @@ fn test_aes_key_size() {
   assert_eq!(encryption::AES_KEY_SIZE, 256);
 }
 
+// ── Task 19.1 envelope protocol tests ──
+
+/// The envelope marker byte must not collide with any value returned
+/// by `DataChannelMessage::discriminator()`. Otherwise the receive
+/// path could mis-route a plaintext frame as an encrypted envelope
+/// (or vice versa), opening a downgrade / parsing hazard.
+#[test]
+fn encrypted_marker_disjoint_from_every_discriminator() {
+  use crate::webrtc::data_channel::ENCRYPTED_MARKER;
+
+  let samples = [
+    DataChannelMessage::ChatText(ChatText {
+      message_id: message::MessageId(uuid::Uuid::new_v4()),
+      content: "m".into(),
+      reply_to: None,
+      timestamp_nanos: 0,
+    })
+    .discriminator(),
+    DataChannelMessage::EcdhKeyExchange(message::datachannel::EcdhKeyExchange {
+      public_key: vec![0u8; 65],
+      timestamp_nanos: 0,
+    })
+    .discriminator(),
+  ];
+  for d in samples {
+    assert_ne!(
+      d, ENCRYPTED_MARKER,
+      "discriminator 0x{d:02X} collides with ENCRYPTED_MARKER"
+    );
+  }
+  // 0xFE sits above the 0xC3 ceiling used by current message kinds.
+  const { assert!(crate::webrtc::data_channel::ENCRYPTED_MARKER > 0xC3) };
+}
+
 // ── WebRtcManager construction tests (WASM only) ──
 
 #[cfg(target_arch = "wasm32")]

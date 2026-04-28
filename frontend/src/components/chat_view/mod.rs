@@ -22,6 +22,9 @@
 //! * [`typing_indicator::TypingIndicator`] — inline typing strip.
 //! * [`helpers`] — pure formatting / mention rendering helpers.
 
+pub mod dialog;
+pub mod file_card;
+pub mod file_picker;
 pub mod forward_modal;
 pub mod helpers;
 pub mod image_picker;

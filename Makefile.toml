@@ -334,8 +334,8 @@ fi
 # ============================================================================
 
 [tasks.lint]
-dependencies = ["fmt-check", "clippy"]
-description = "Run all linting checks (fmt + clippy)"
+dependencies = ["fmt-check", "clippy", "i18n-check"]
+description = "Run all linting checks (fmt + clippy + i18n key completeness)"
 
 [tasks.fmt]
 args = ["fmt", "--all"]
@@ -351,6 +351,48 @@ description = "Check code formatting"
 args = ["clippy", "--all-targets", "--all-features", "--", "-D", "warnings"]
 command = "cargo"
 description = "Run Clippy with pedantic warnings"
+
+# P2-10: Verify that both locale files have identical key sets.
+[tasks.i18n-check]
+description = "Check i18n locale files have identical key sets"
+workspace = false
+script = '''
+#!/usr/bin/env python3
+"""Verify that en.json and zh-CN.json have the same key structure."""
+import json
+import sys
+
+def get_keys(obj, prefix=""):
+    keys = set()
+    for k, v in obj.items():
+        full = f"{prefix}.{k}" if prefix else k
+        if isinstance(v, dict):
+            keys |= get_keys(v, full)
+        else:
+            keys.add(full)
+    return keys
+
+with open("frontend/locales/en.json") as f:
+    en_keys = get_keys(json.load(f))
+with open("frontend/locales/zh-CN.json") as f:
+    zh_keys = get_keys(json.load(f))
+
+missing_in_zh = en_keys - zh_keys
+missing_in_en = zh_keys - en_keys
+
+if missing_in_zh or missing_in_en:
+    if missing_in_zh:
+        print(f"Keys in en.json missing from zh-CN.json:")
+        for k in sorted(missing_in_zh):
+            print(f"  - {k}")
+    if missing_in_en:
+        print(f"Keys in zh-CN.json missing from en.json:")
+        for k in sorted(missing_in_en):
+            print(f"  - {k}")
+    sys.exit(1)
+else:
+    print("i18n key check passed: en.json and zh-CN.json have identical key sets.")
+'''
 
 # ============================================================================
 # Clean Tasks
@@ -410,8 +452,8 @@ workspace = false
 # ============================================================================
 
 [tasks.check-all]
-dependencies = ["fmt-check", "check", "clippy", "test-unit"]
-description = "Run all quality gates (fmt-check + check + clippy + test)"
+dependencies = ["fmt-check", "check", "clippy", "i18n-check", "test-unit"]
+description = "Run all quality gates (fmt-check + check + clippy + i18n-check + test)"
 
 [tasks.check]
 args = ["check", "--all"]

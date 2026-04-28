@@ -157,7 +157,7 @@ impl FromStr for MessageId {
 }
 
 /// Unique identifier for a file transfer.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Encode, Decode)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Encode, Decode)]
 pub struct TransferId(pub Uuid);
 
 impl TransferId {
@@ -189,5 +189,13 @@ impl Default for TransferId {
 impl fmt::Display for TransferId {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", self.0)
+  }
+}
+
+impl FromStr for TransferId {
+  type Err = uuid::Error;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    Uuid::parse_str(s).map(Self)
   }
 }

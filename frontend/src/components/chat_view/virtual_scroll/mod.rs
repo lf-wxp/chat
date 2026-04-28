@@ -77,6 +77,11 @@ const VOICE_BUBBLE_H: f64 = 60.0;
 /// Height (px) for a revoked-message placeholder.
 const REVOKED_BUBBLE_H: f64 = 48.0;
 
+/// Height (px) for a file-attachment bubble (filename + size line +
+/// progress bar + download button). Aligns with the `.message-file`
+/// card defined in `chat-messages.css`.
+const FILE_BUBBLE_H: f64 = 96.0;
+
 /// Estimated row height (px) per content type.
 ///
 /// Height values aligned with requirements (task-item.md):
@@ -99,6 +104,7 @@ pub fn estimate_height(msg: &ChatMessage) -> f64 {
     }
     MessageContent::Sticker(_) => STICKER_BUBBLE_H,
     MessageContent::Voice(_) => VOICE_BUBBLE_H,
+    MessageContent::File(_) => FILE_BUBBLE_H,
     MessageContent::Forwarded { content, .. } => {
       let char_count = content.chars().count();
       let lines = (char_count as f64 / CHARS_PER_LINE as f64).ceil().max(1.0);

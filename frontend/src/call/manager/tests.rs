@@ -177,16 +177,16 @@ fn end_reason_keys_cover_every_variant() {
 
 #[test]
 fn format_duration_renders_minutes_for_short_calls() {
-  assert_eq!(format_duration(0), "00:00");
-  assert_eq!(format_duration(45), "00:45");
-  assert_eq!(format_duration(125), "02:05");
+  assert_eq!(format_duration(0), "0s");
+  assert_eq!(format_duration(45), "45s");
+  assert_eq!(format_duration(125), "2m 5s");
 }
 
 #[test]
 fn format_duration_renders_hours_for_long_calls() {
-  assert_eq!(format_duration(3_600), "01:00:00");
-  assert_eq!(format_duration(3_661), "01:01:01");
-  assert_eq!(format_duration(36_000), "10:00:00");
+  assert_eq!(format_duration(3_600), "1h");
+  assert_eq!(format_duration(3_661), "1h 1m 1s");
+  assert_eq!(format_duration(36_000), "10h");
 }
 
 // ── Lifecycle state-machine tests ───────────────────────────────

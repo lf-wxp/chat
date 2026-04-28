@@ -9,9 +9,13 @@
 //! - `PeerDataChannel` wraps RTCDataChannel with message encoding
 //! - `PeerCrypto` handles ECDH key exchange and AES-256-GCM encryption
 
-mod data_channel;
+mod broadcast;
+mod crypto_ops;
+pub(crate) mod data_channel;
 mod encryption;
+mod handshake;
 mod peer_connection;
+mod raw_frame;
 mod types;
 
 #[cfg(test)]
@@ -149,7 +153,19 @@ const MAX_MESH_PEERS: usize = 8;
 /// entry and surface a `handshake_timed_out` flag through the reactive
 /// UI state. Kept short enough to surface stuck handshakes but long
 /// enough that a healthy ICE + DataChannel open round-trip easily fits.
-const ECDH_EXCHANGE_TIMEOUT_MS: f64 = 10_000.0;
+pub(super) const ECDH_EXCHANGE_TIMEOUT_MS: f64 = 10_000.0;
+
+/// Maximum number of control-frame broadcast messages queued per peer
+/// while the ECDH handshake is in flight (Task 19.1 C-1 fix).
+///
+/// `broadcast_data_channel_message` buffers frames that cannot be
+/// encrypted yet so they can be flushed as soon as the shared key is
+/// derived. Capped to stop a pathological handshake hang from blowing
+/// the heap — control frames are coalesced by the latest-state
+/// semantics of `MediaStateUpdate` / `ReconnectingState`, so 16 slots
+/// leaves plenty of headroom for every realistic burst while still
+/// bounding memory use.
+const PENDING_BROADCAST_LIMIT: usize = 16;
 
 /// A pending ECDH public key that has been generated locally but not yet
 /// flushed over the DataChannel (which only opens after ICE completes).
@@ -158,14 +174,14 @@ const ECDH_EXCHANGE_TIMEOUT_MS: f64 = 10_000.0;
 /// time and used by [`WebRtcManager::prune_expired_ecdh`] to evict
 /// entries whose peer never responded within `ECDH_EXCHANGE_TIMEOUT_MS`.
 #[derive(Debug, Clone)]
-struct PendingEcdh {
+pub(super) struct PendingEcdh {
   /// Raw P-256 public key bytes (65 bytes, uncompressed point).
-  public_key: Vec<u8>,
+  pub(super) public_key: Vec<u8>,
   /// Wall-clock timestamp in milliseconds since Unix epoch, captured
   /// when the pending entry was inserted. Used purely for timeout
   /// detection — monotonic time is not needed because we only compare
   /// to `Date::now()` at prune time, and JS's clock is the same source.
-  started_at_ms: f64,
+  pub(super) started_at_ms: f64,
 }
 
 /// Callback invoked when a remote media stream arrives on any peer
@@ -210,6 +226,10 @@ pub struct WebRtcManager {
   /// (Task 16). `None` until `set_chat_manager` is called during
   /// bootstrap.
   chat_manager: Rc<RefCell<Option<crate::chat::ChatManager>>>,
+  /// Reference to the file-transfer manager used for inbound file
+  /// routing (Task 19). `None` until `set_file_transfer_manager` is
+  /// called during bootstrap.
+  file_manager: Rc<RefCell<Option<crate::file_transfer::FileTransferManager>>>,
   /// Callback invoked when a remote media stream arrives (Task 18 —
   /// wired by `CallManager` at bootstrap so ontrack events flow into
   /// the call participant grid).
@@ -230,29 +250,43 @@ pub struct WebRtcManager {
   inner: Rc<RefCell<InnerManager>>,
 }
 
-struct InnerManager {
+pub(super) struct InnerManager {
   /// All peer connections, keyed by user ID.
-  connections: HashMap<UserId, PeerConnection>,
+  pub(super) connections: HashMap<UserId, PeerConnection>,
   /// All crypto instances, keyed by user ID.
-  crypto: HashMap<UserId, PeerCrypto>,
+  pub(super) crypto: HashMap<UserId, PeerCrypto>,
   /// ICE server configuration.
-  ice_servers: Vec<IceServerConfig>,
+  pub(super) ice_servers: Vec<IceServerConfig>,
   /// Pending ECDH public keys awaiting DataChannel open (P2-2: tracks
   /// the start timestamp so [`WebRtcManager::prune_expired_ecdh`] can
   /// evict entries whose peer never completed the handshake).
-  pending_ecdh_keys: HashMap<UserId, PendingEcdh>,
+  pub(super) pending_ecdh_keys: HashMap<UserId, PendingEcdh>,
+  /// Control-frame broadcast messages queued per peer while the ECDH
+  /// handshake is still in flight (Task 19.1 C-1 fix).
+  ///
+  /// `broadcast_data_channel_message` enqueues instead of silently
+  /// dropping when `has_encryption_key` returns `false`, so critical
+  /// control frames such as `ReconnectingState` or `MediaStateUpdate`
+  /// survive a cold-start race. The queue is drained automatically
+  /// by [`WebRtcManager::handle_ecdh_key`] as soon as the shared
+  /// AES-GCM key is derived.
+  ///
+  /// Bounded at [`PENDING_BROADCAST_LIMIT`] per peer to stop a
+  /// pathological handshake hang from blowing the heap.
+  pub(super) pending_broadcast:
+    HashMap<UserId, std::collections::VecDeque<message::datachannel::DataChannelMessage>>,
   /// Number of in-flight connection attempts (P1-6 fix).
   ///
   /// Counts concurrent `connect_to_peer` / `handle_incoming_offer` calls
   /// that have passed the mesh limit check but not yet stored their
   /// connection. Used atomically with `borrow_mut` to prevent races
   /// that could exceed `MAX_MESH_PEERS`.
-  in_flight: Rc<Cell<usize>>,
+  pub(super) in_flight: Rc<Cell<usize>>,
   /// Periodic `setInterval` handle that drives
   /// [`WebRtcManager::prune_expired_ecdh`] (P1-11 fix). Retained so the
   /// closure is not GC'd and so `Drop` on the manager cancels the timer.
   /// `None` in non-browser contexts (e.g. native unit tests).
-  prune_interval: Option<crate::utils::IntervalHandle>,
+  pub(super) prune_interval: Option<crate::utils::IntervalHandle>,
 }
 
 /// RAII guard that decrements the in-flight connection counter on drop (P1-6 fix).
@@ -271,6 +305,7 @@ impl WebRtcManager {
       app_state,
       signaling: Rc::new(RefCell::new(None)),
       chat_manager: Rc::new(RefCell::new(None)),
+      file_manager: Rc::new(RefCell::new(None)),
       on_remote_track: Rc::new(RefCell::new(None)),
       on_peer_closed: Rc::new(RefCell::new(None)),
       on_peer_connected: Rc::new(RefCell::new(None)),
@@ -281,6 +316,7 @@ impl WebRtcManager {
         crypto: HashMap::new(),
         ice_servers: Self::default_ice_servers(),
         pending_ecdh_keys: HashMap::new(),
+        pending_broadcast: HashMap::new(),
         in_flight: Rc::new(Cell::new(0)),
         prune_interval: None,
       })),
@@ -299,6 +335,14 @@ impl WebRtcManager {
   /// WebRTC manager and the chat manager have been constructed.
   pub fn set_chat_manager(&self, chat: crate::chat::ChatManager) {
     *self.chat_manager.borrow_mut() = Some(chat);
+  }
+
+  /// Attach the file-transfer manager used for inbound file routing
+  /// (Task 19). Must be called once during bootstrap, after both the
+  /// WebRTC manager and the file-transfer manager have been
+  /// constructed.
+  pub fn set_file_transfer_manager(&self, fm: crate::file_transfer::FileTransferManager) {
+    *self.file_manager.borrow_mut() = Some(fm);
   }
 
   /// Register a callback for remote media-stream arrivals (Task 18).
@@ -436,7 +480,7 @@ impl WebRtcManager {
   /// Best-effort peer nickname lookup. Falls back to the user id when
   /// the peer has not appeared in the online-users list yet (e.g. they
   /// joined after our last roster update).
-  fn lookup_peer_nickname(&self, peer: &UserId) -> String {
+  pub(super) fn lookup_peer_nickname(&self, peer: &UserId) -> String {
     self
       .app_state
       .online_users
@@ -550,11 +594,13 @@ impl WebRtcManager {
         manager_dc_open.handle_data_channel_open(dc_open_peer_id.clone());
       });
 
-      // Set up DataChannel message handler
+      // Task 19.1 — route raw frames through the envelope-aware
+      // dispatcher so encrypted application frames can be decrypted
+      // before being handed to `handle_data_channel_message`.
       let manager_dc_msg = self.clone();
       let dc_msg_peer_id = peer_id.clone();
-      dc.set_on_message(move |msg| {
-        manager_dc_msg.handle_data_channel_message(dc_msg_peer_id.clone(), msg);
+      dc.set_on_raw_message(move |bytes| {
+        manager_dc_msg.handle_data_channel_raw_frame(dc_msg_peer_id.clone(), bytes);
       });
     }
 
@@ -794,11 +840,12 @@ impl WebRtcManager {
             manager_open.handle_data_channel_open(open_peer_id.clone());
           });
 
-          // Set up message handler for incoming messages
+          // Task 19.1 — raw-frame dispatcher (see callee-side setup
+          // in `connect_to_peer`).
           let manager_msg = manager_dc.clone();
           let msg_peer_id = dc_peer_id.clone();
-          dc.set_on_message(move |msg| {
-            manager_msg.handle_data_channel_message(msg_peer_id.clone(), msg);
+          dc.set_on_raw_message(move |bytes| {
+            manager_msg.handle_data_channel_raw_frame(msg_peer_id.clone(), bytes);
           });
 
           // Store the DataChannel on the peer connection
@@ -985,306 +1032,6 @@ impl WebRtcManager {
     Ok(())
   }
 
-  /// Handle an incoming ECDH public key (received over DataChannel or signaling).
-  ///
-  /// The `key_data` parameter contains the raw public key bytes (P-256 raw
-  /// format, 65 bytes) received directly from the `EcdhKeyExchange` message.
-  pub async fn handle_ecdh_key(&self, peer_id: UserId, key_data: &[u8]) -> Result<(), WebRtcError> {
-    let public_key = key_data;
-
-    // Check if we already have crypto for this peer (scoped borrow)
-    let has_existing = self.inner.borrow().crypto.contains_key(&peer_id);
-
-    if has_existing {
-      // Re-keying: remove, update, and re-insert to avoid holding borrow across await
-      let mut crypto = self
-        .inner
-        .borrow_mut()
-        .crypto
-        .remove(&peer_id)
-        .ok_or_else(|| {
-          WebRtcError::new(
-            ErrorCode::new(ErrorModule::E2e, ErrorCategory::Security, 1),
-            "Crypto removed concurrently for peer",
-            Some(peer_id.clone()),
-          )
-        })?;
-
-      crypto
-        .import_peer_public_key(public_key)
-        .await
-        .map_err(|e| {
-          WebRtcError::new(
-            ErrorCode::new(ErrorModule::E2e, ErrorCategory::Security, 1),
-            format!("Failed to import peer public key: {}", e),
-            Some(peer_id.clone()),
-          )
-        })?;
-
-      self
-        .inner
-        .borrow_mut()
-        .crypto
-        .insert(peer_id.clone(), crypto);
-    } else {
-      // First time: create crypto and import peer's public key (all async, no borrow held)
-      let mut crypto = PeerCrypto::new(peer_id.clone()).await.map_err(|e| {
-        WebRtcError::new(
-          ErrorCode::new(ErrorModule::E2e, ErrorCategory::Security, 1),
-          format!("Failed to create PeerCrypto: {}", e),
-          Some(peer_id.clone()),
-        )
-      })?;
-
-      crypto
-        .import_peer_public_key(public_key)
-        .await
-        .map_err(|e| {
-          WebRtcError::new(
-            ErrorCode::new(ErrorModule::E2e, ErrorCategory::Security, 1),
-            format!("Failed to import peer public key: {}", e),
-            Some(peer_id.clone()),
-          )
-        })?;
-
-      // Send our public key back
-      let our_public_key = crypto.export_public_key().await.map_err(|e| {
-        WebRtcError::new(
-          ErrorCode::new(ErrorModule::E2e, ErrorCategory::Security, 1),
-          format!("Failed to export public key: {}", e),
-          Some(peer_id.clone()),
-        )
-      })?;
-
-      self
-        .inner
-        .borrow_mut()
-        .crypto
-        .insert(peer_id.clone(), crypto);
-
-      // Send our ECDH key back via DataChannel (if channel is open)
-      self.send_datachannel_ecdh_key_direct(peer_id.clone(), &our_public_key);
-    }
-
-    // P1-8 fix: mirror the key-exchange completion into the reactive UI
-    // state. The raw key material stays inside `PeerCrypto` as a
-    // non-extractable CryptoKey; we only expose the established flag and
-    // a logical key_id counter for future rotation support.
-    self
-      .app_state
-      .webrtc_state
-      .update(|s| s.mark_encryption_established(&peer_id));
-
-    web_sys::console::log_1(
-      &format!("[webrtc] Completed ECDH exchange with peer {}", peer_id).into(),
-    );
-
-    Ok(())
-  }
-
-  /// Send a raw ECDH public key over DataChannel to a peer.
-  ///
-  /// The `public_key` is in raw P-256 format (65 bytes, uncompressed point).
-  ///
-  /// P2-11 (Review Round 4): both call sites (`handle_data_channel_open`
-  /// and `handle_ecdh_key`) only reach this helper after the DataChannel
-  /// has entered the `Open` state, so the "DC not open" branch should
-  /// be unreachable in practice. Rather than silently dropping the key,
-  /// we now:
-  ///
-  /// 1. `debug_assert!` in debug builds so regressions surface in tests.
-  /// 2. In release builds, re-buffer the key into `pending_ecdh_keys`
-  ///    so the eventual `DataChannel.onopen` callback flushes it. This
-  ///    keeps the handshake eventually-consistent even if a future
-  ///    refactor changes the call order.
-  fn send_datachannel_ecdh_key_direct(&self, peer_id: UserId, public_key: &[u8]) {
-    use message::datachannel::{DataChannelMessage, EcdhKeyExchange};
-    use web_sys::RtcDataChannelState;
-
-    let inner = self.inner.borrow();
-    let Some(pc) = inner.connections.get(&peer_id) else {
-      // No connection at all — nothing we can do here; callers log the
-      // missing-peer case when they first look the peer up.
-      return;
-    };
-
-    let Some(dc) = pc.get_data_channel() else {
-      // DataChannel not yet created. Drop the borrow before mutating
-      // `pending_ecdh_keys` to avoid a nested borrow.
-      drop(inner);
-      debug_assert!(
-        false,
-        "send_datachannel_ecdh_key_direct invoked before DataChannel exists for peer {}",
-        peer_id
-      );
-      self.buffer_pending_ecdh_key(peer_id, public_key.to_vec());
-      return;
-    };
-
-    if dc.ready_state() != RtcDataChannelState::Open {
-      // DataChannel exists but not yet Open. Same safety net as above.
-      drop(inner);
-      debug_assert!(
-        false,
-        "send_datachannel_ecdh_key_direct invoked while DataChannel is not Open for peer {}",
-        peer_id
-      );
-      self.buffer_pending_ecdh_key(peer_id, public_key.to_vec());
-      return;
-    }
-
-    let msg = DataChannelMessage::EcdhKeyExchange(EcdhKeyExchange {
-      public_key: public_key.to_vec(),
-      timestamp_nanos: chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0) as u64,
-    });
-    if let Err(e) = dc.send_message(&msg) {
-      web_sys::console::warn_1(&format!("[webrtc] Failed to send ECDH key: {}", e).into());
-    } else {
-      web_sys::console::log_1(&format!("[webrtc] Sent ECDH key to peer {}", peer_id).into());
-    }
-  }
-
-  /// Buffer an ECDH public key into `pending_ecdh_keys` so
-  /// [`WebRtcManager::handle_data_channel_open`] flushes it once the
-  /// DataChannel transitions to the `Open` state. Used as the release-
-  /// build fallback in [`WebRtcManager::send_datachannel_ecdh_key_direct`]
-  /// when the DataChannel is unexpectedly not open.
-  fn buffer_pending_ecdh_key(&self, peer_id: UserId, public_key: Vec<u8>) {
-    let mut inner = self.inner.borrow_mut();
-    inner.pending_ecdh_keys.insert(
-      peer_id,
-      PendingEcdh {
-        public_key,
-        started_at_ms: js_sys::Date::now(),
-      },
-    );
-  }
-
-  /// Handle DataChannel open event for a peer.
-  ///
-  /// Sends any pending ECDH key and updates peer state.
-  fn handle_data_channel_open(&self, peer_id: UserId) {
-    web_sys::console::log_1(&format!("[webrtc] DataChannel opened for peer {}", peer_id).into());
-
-    // Send pending ECDH key if available
-    let key_data = {
-      let mut inner = self.inner.borrow_mut();
-      inner
-        .pending_ecdh_keys
-        .remove(&peer_id)
-        .map(|p| p.public_key)
-    };
-
-    if let Some(key_data) = key_data {
-      self.send_datachannel_ecdh_key_direct(peer_id.clone(), &key_data);
-    }
-
-    // Always clear any prior timeout flag when the DataChannel opens,
-    // regardless of whether a pending key was found. A stale
-    // `handshake_timed_out` flag from a previous failed attempt should
-    // not persist now that the channel is open (P2-21).
-    self
-      .app_state
-      .webrtc_state
-      .update(|state| state.clear_encryption_timeout(&peer_id));
-
-    // Update app state: mark data channel as open
-    self
-      .app_state
-      .webrtc_state
-      .update(|state| state.update_data_channel_state(&peer_id, DataChannelState::Open));
-  }
-
-  /// Handle incoming DataChannel message from a peer.
-  fn handle_data_channel_message(
-    &self,
-    peer_id: UserId,
-    msg: message::datachannel::DataChannelMessage,
-  ) {
-    use message::datachannel::DataChannelMessage;
-
-    match msg {
-      DataChannelMessage::EcdhKeyExchange(exchange) => {
-        web_sys::console::log_1(
-          &format!("[webrtc] Received ECDH key from peer {}", peer_id).into(),
-        );
-        // Handle the ECDH key exchange asynchronously
-        let manager = self.clone();
-        wasm_bindgen_futures::spawn_local(async move {
-          if let Err(e) = manager.handle_ecdh_key(peer_id, &exchange.public_key).await {
-            web_sys::console::error_1(&format!("[webrtc] ECDH key handling failed: {}", e).into());
-          }
-        });
-      }
-      DataChannelMessage::ChatText(_)
-      | DataChannelMessage::ChatSticker(_)
-      | DataChannelMessage::ChatVoice(_)
-      | DataChannelMessage::ChatImage(_)
-      | DataChannelMessage::ForwardMessage(_)
-      | DataChannelMessage::MessageAck(_)
-      | DataChannelMessage::MessageRevoke(_)
-      | DataChannelMessage::MessageRead(_)
-      | DataChannelMessage::MessageReaction(_)
-      | DataChannelMessage::TypingIndicator(_) => {
-        // Task 16: forward to ChatManager via the inbound router.
-        let chat = self.chat_manager.borrow().clone();
-        let Some(chat) = chat else {
-          web_sys::console::warn_1(
-            &format!(
-              "[webrtc] Chat-class DataChannel message (type=0x{:02X}) dropped — no ChatManager attached",
-              msg.discriminator()
-            )
-            .into(),
-          );
-          return;
-        };
-        let peer_name = self.lookup_peer_nickname(&peer_id);
-        let local_nick = self.app_state.auth.get_untracked().map(|a| a.nickname);
-        let conv = crate::state::ConversationId::Direct(peer_id.clone());
-        crate::chat::routing::dispatch_incoming(
-          &chat,
-          peer_id,
-          peer_name,
-          local_nick.as_deref(),
-          conv,
-          msg,
-        );
-      }
-      DataChannelMessage::MediaStateUpdate(update) => {
-        // Req 3.5 / 7.1 — forward to the call subsystem so participant
-        // tiles can render muted / camera-off / screen-sharing icons.
-        if let Some(handler) = self.on_media_state_update.borrow().clone() {
-          handler(peer_id, update);
-        }
-      }
-      DataChannelMessage::ReconnectingState(state) => {
-        // Req 10.5.24 — forward to the call subsystem so the remote
-        // participant tile can show a "reconnecting" hint.
-        if let Some(handler) = self.on_reconnecting_state.borrow().clone() {
-          handler(peer_id, state);
-        }
-      }
-      _ => {
-        // P2-7 (Review Round 3 guard): intentionally log ONLY the
-        // discriminator byte here, never the payload. Unknown
-        // DataChannel messages may be future variants that carry
-        // ciphertext or other sensitive material; printing their
-        // bytes to the browser console would leak them to anyone
-        // inspecting the tab. If a new variant needs richer logging,
-        // add an explicit arm above this one so the payload shape is
-        // reviewed case-by-case.
-        web_sys::console::log_1(
-          &format!(
-            "[webrtc] DataChannel message from peer {} (type=0x{:02X})",
-            peer_id,
-            msg.discriminator()
-          )
-          .into(),
-        );
-      }
-    }
-  }
-
   /// Store a DataChannel on an existing peer connection.
   fn setup_data_channel(&self, peer_id: UserId, dc: PeerDataChannel) {
     let mut inner = self.inner.borrow_mut();
@@ -1293,7 +1040,16 @@ impl WebRtcManager {
     }
   }
 
-  /// Send a DataChannel message to a peer.
+  /// Send a **plaintext** DataChannel message to a peer.
+  ///
+  /// # ⚠️ Restricted usage (Task 19.1)
+  ///
+  /// This API bypasses application-layer E2EE and should only be used
+  /// for ECDH bootstrap (`EcdhKeyExchange`), which cannot be encrypted
+  /// because the shared key has not been derived yet. For every other
+  /// `DataChannelMessage` kind, callers **must** use
+  /// [`send_encrypted_data_channel_message`] instead — the receive path
+  /// drops any non-ECDH plaintext frame as a downgrade-attack guard.
   pub fn send_message(
     &self,
     peer_id: UserId,
@@ -1320,38 +1076,6 @@ impl WebRtcManager {
         Some(peer_id.clone()),
       )
     })
-  }
-
-  /// Fan out a non-chat DataChannel message (e.g. `MediaStateUpdate`,
-  /// `ReconnectingState`) to every peer with an open DataChannel.
-  ///
-  /// Does **not** perform ECDH encryption because these payloads carry
-  /// no sensitive content; adding encryption overhead would also block
-  /// on the Web Crypto promise from a synchronous call site. Per-peer
-  /// send failures are logged but do not abort the sweep (Req 3.5 /
-  /// 7.1 / 10.5.24).
-  pub fn broadcast_data_channel_message(&self, msg: &message::datachannel::DataChannelMessage) {
-    let connections: Vec<(UserId, PeerConnection)> = self
-      .inner
-      .borrow()
-      .connections
-      .iter()
-      .map(|(k, v)| (k.clone(), v.clone()))
-      .collect();
-    for (peer_id, pc) in connections {
-      let Some(dc) = pc.get_data_channel() else {
-        continue;
-      };
-      if let Err(e) = dc.send_message(msg) {
-        web_sys::console::warn_1(
-          &format!(
-            "[webrtc] broadcast_data_channel_message to {peer_id} (type=0x{:02X}) failed: {e}",
-            msg.discriminator()
-          )
-          .into(),
-        );
-      }
-    }
   }
 
   /// Close a peer connection.
@@ -1395,6 +1119,10 @@ impl WebRtcManager {
 
     inner.crypto.remove(peer_id);
     inner.pending_ecdh_keys.remove(peer_id);
+    // Task 19.1 C-1 — discard any queued control frames so a peer
+    // that drops out mid-handshake cannot leak memory via
+    // `pending_broadcast`.
+    inner.pending_broadcast.remove(peer_id);
 
     had_connection
   }
@@ -1411,6 +1139,7 @@ impl WebRtcManager {
     inner.connections.clear();
     inner.crypto.clear();
     inner.pending_ecdh_keys.clear();
+    inner.pending_broadcast.clear();
 
     // Update app state
     drop(inner);
@@ -1582,6 +1311,19 @@ impl WebRtcManager {
     self.inner.borrow().connections.contains_key(peer_id)
   }
 
+  /// Get the current `bufferedAmount` of a peer's DataChannel.
+  ///
+  /// Returns `None` if the peer is not connected or has no
+  /// DataChannel. Used by the file-transfer subsystem for flow
+  /// control (Req 6.4).
+  #[must_use]
+  pub fn buffered_amount(&self, peer_id: &UserId) -> Option<u32> {
+    let inner = self.inner.borrow();
+    let pc = inner.connections.get(peer_id)?;
+    let dc = pc.get_data_channel()?;
+    dc.buffered_amount()
+  }
+
   /// Return a snapshot of all peer ids that currently have an active
   /// connection. Used by the call subsystem's refresh-recovery path to
   /// iterate peers without leaking internal `HashMap` / `RefCell`
@@ -1666,6 +1408,13 @@ impl WebRtcManager {
         if let Some(handler) = self.on_peer_connected.borrow().clone() {
           handler(peer_id.clone());
         }
+        // Req 6.6 — after a reconnection, check if any inbound
+        // transfer from this peer was paused and send a resume
+        // request for the missing chunks so the transfer can
+        // continue without user intervention.
+        if let Some(file_mgr) = self.file_manager.borrow().clone() {
+          file_mgr.try_resume_inbound_from_peer(&peer_id);
+        }
       }
       PeerConnectionState::Disconnected => {
         // Req 10.5.24 — transient ICE flap. Notify peers so their UI
@@ -1677,6 +1426,12 @@ impl WebRtcManager {
             message::datachannel::ReconnectingState { reconnecting: true },
           ),
         );
+        // Req 6.6 / P1-1 — pause any in-flight inbound file transfers
+        // from this peer so they can be automatically resumed when the
+        // connection recovers (or when the peer reconnects later).
+        if let Some(file_mgr) = self.file_manager.borrow().clone() {
+          file_mgr.pause_inbound_transfers(&peer_id);
+        }
       }
       PeerConnectionState::Failed | PeerConnectionState::Closed => {
         // Notify server and clean up
@@ -1684,6 +1439,11 @@ impl WebRtcManager {
           let _ = sig.send_peer_closed(peer_id.clone());
         }
         self.close_connection(&peer_id);
+        // Req 6.6 / P1-1 — pause inbound file transfers from this peer
+        // so they can be resumed if/when the peer reconnects.
+        if let Some(file_mgr) = self.file_manager.borrow().clone() {
+          file_mgr.pause_inbound_transfers(&peer_id);
+        }
         // Notify the call subsystem so it can drop the participant
         // from the grid and detect "all peers left" (Task 18 — P1
         // Bug-5 fix). We invoke the handler outside any inner borrow
@@ -1699,228 +1459,6 @@ impl WebRtcManager {
   /// Get default ICE servers (Google STUN).
   fn default_ice_servers() -> Vec<IceServerConfig> {
     vec![IceServerConfig::stun("stun:stun.l.google.com:19302")]
-  }
-
-  /// Send an encrypted message to a peer.
-  ///
-  /// Encrypts the plaintext using the peer's established shared key
-  /// and sends it over the DataChannel as raw binary data.
-  ///
-  /// # Errors
-  /// Returns an error if no shared key exists, the DataChannel is not open,
-  /// or encryption/send fails.
-  pub async fn send_encrypted_message(
-    &self,
-    peer_id: UserId,
-    plaintext: &[u8],
-  ) -> Result<(), WebRtcError> {
-    // Scope borrow to extract crypto
-    let crypto = {
-      let inner = self.inner.borrow();
-      inner
-        .crypto
-        .get(&peer_id)
-        .ok_or_else(|| WebRtcError::no_crypto(peer_id.clone()))?
-        .clone()
-    };
-
-    if !crypto.has_shared_key() {
-      return Err(WebRtcError::no_shared_key(peer_id.clone()));
-    }
-
-    let encrypted = crypto.encrypt(plaintext).await.map_err(|e| {
-      WebRtcError::new(
-        ErrorCode::new(ErrorModule::Cht, ErrorCategory::Security, 1),
-        format!("Encryption failed: {}", e),
-        Some(peer_id.clone()),
-      )
-    })?;
-
-    // Extract DataChannel (clone to avoid holding RefCell borrow across send).
-    let dc = {
-      let inner = self.inner.borrow();
-      let pc = inner
-        .connections
-        .get(&peer_id)
-        .ok_or_else(|| WebRtcError::peer_not_found(peer_id.clone()))?;
-
-      pc.get_data_channel().cloned().ok_or_else(|| {
-        WebRtcError::new(
-          ErrorCode::new(ErrorModule::E2e, ErrorCategory::Client, 2),
-          "No DataChannel for peer",
-          Some(peer_id.clone()),
-        )
-      })?
-    };
-
-    dc.send_raw(&encrypted).map_err(|e| {
-      WebRtcError::new(
-        ErrorCode::new(ErrorModule::Cht, ErrorCategory::Network, 1),
-        format!("DataChannel send failed: {}", e),
-        Some(peer_id.clone()),
-      )
-    })
-  }
-
-  /// Broadcast an encrypted message to all peers with established keys.
-  ///
-  /// Encrypts the plaintext individually for each peer and sends it over
-  /// their respective DataChannels. Partial failures are collected in
-  /// [`BroadcastResult::failed_peers`] so callers (e.g. chat UI) can
-  /// display per-peer delivery status (P1-17 fix).
-  ///
-  /// # Errors
-  /// Returns an error if no peers have encryption keys.
-  ///
-  /// # Returns
-  /// [`BroadcastResult`] with the count of successful sends and per-peer
-  /// failure details.
-  pub async fn broadcast_encrypted_message(
-    &self,
-    plaintext: &[u8],
-  ) -> Result<BroadcastResult, WebRtcError> {
-    let peers = self.encrypted_peers();
-    if peers.is_empty() {
-      return Err(WebRtcError::new(
-        ErrorCode::new(ErrorModule::E2e, ErrorCategory::Client, 5),
-        "No peers with established encryption keys",
-        None,
-      ));
-    }
-
-    // P1-9 fix: fan out encryption + send across all peers concurrently.
-    // Each peer gets its own pairwise-encrypted copy (Req 5.2.10); independent
-    // futures let JS event-loop interleave AES-GCM and `send()` per peer
-    // instead of awaiting them sequentially.
-    let futures = peers
-      .iter()
-      .map(|peer_id| self.send_encrypted_message(peer_id.clone(), plaintext));
-    let results = futures::future::join_all(futures).await;
-
-    let mut sent = 0;
-    let mut failed_peers = Vec::new();
-    for (idx, result) in results.into_iter().enumerate() {
-      match result {
-        Ok(()) => sent += 1,
-        Err(e) => {
-          web_sys::console::warn_1(&format!("[webrtc] Broadcast to peer failed: {e}").into());
-          failed_peers.push((peers[idx].clone(), e));
-        }
-      }
-    }
-    Ok(BroadcastResult { sent, failed_peers })
-  }
-
-  /// Receive and decrypt a message from a peer.
-  ///
-  /// Decrypts ciphertext using the peer's established shared key.
-  ///
-  /// # Errors
-  /// Returns an error if no shared key exists or decryption fails.
-  pub async fn receive_encrypted_message(
-    &self,
-    peer_id: UserId,
-    ciphertext: &[u8],
-  ) -> Result<Vec<u8>, WebRtcError> {
-    // Scope borrow to extract crypto
-    let crypto = {
-      let inner = self.inner.borrow();
-      inner
-        .crypto
-        .get(&peer_id)
-        .ok_or_else(|| WebRtcError::no_crypto(peer_id.clone()))?
-        .clone()
-    };
-
-    if !crypto.has_shared_key() {
-      return Err(WebRtcError::no_shared_key(peer_id.clone()));
-    }
-
-    crypto.decrypt(ciphertext).await.map_err(|e| {
-      WebRtcError::new(
-        ErrorCode::new(ErrorModule::Cht, ErrorCategory::Security, 2),
-        format!("Decryption failed: {}", e),
-        Some(peer_id.clone()),
-      )
-    })
-  }
-
-  /// Check if a peer has an established shared encryption key.
-  #[must_use]
-  pub fn has_encryption_key(&self, peer_id: &UserId) -> bool {
-    self
-      .inner
-      .borrow()
-      .crypto
-      .get(peer_id)
-      .is_some_and(|c| c.has_shared_key())
-  }
-
-  /// Get the list of peers with established encryption keys.
-  #[must_use]
-  pub fn encrypted_peers(&self) -> Vec<UserId> {
-    self
-      .inner
-      .borrow()
-      .crypto
-      .iter()
-      .filter(|(_, c)| c.has_shared_key())
-      .map(|(id, _)| id.clone())
-      .collect()
-  }
-
-  /// Prune pending ECDH entries whose peer has not responded within
-  /// [`ECDH_EXCHANGE_TIMEOUT_MS`] (P2-2).
-  ///
-  /// Wired up to a periodic `setInterval` in [`provide_webrtc_manager`]
-  /// (P1-11 fix) so expired handshakes surface a `handshake_timed_out`
-  /// flag on the reactive UI state without requiring callers to drive
-  /// the timer themselves. The method remains public and idempotent so
-  /// tests can exercise pruning deterministically.
-  ///
-  /// For each expired entry this method:
-  ///
-  /// 1. Removes the entry from `pending_ecdh_keys` so pruning can only
-  ///    fire once per handshake attempt.
-  /// 2. Calls `mark_encryption_timed_out` on `app_state.webrtc_state`
-  ///    *outside* the RefCell borrow, letting UI layers surface a
-  ///    "key exchange failed" indicator.
-  ///
-  /// Returns the list of peer IDs that were pruned, so callers can log
-  /// or trigger any follow-up actions (e.g. retry via signaling).
-  pub fn prune_expired_ecdh(&self) -> Vec<UserId> {
-    let now = js_sys::Date::now();
-    let expired: Vec<UserId> = {
-      let mut inner = self.inner.borrow_mut();
-      let to_remove: Vec<UserId> = inner
-        .pending_ecdh_keys
-        .iter()
-        .filter(|(_, pending)| now - pending.started_at_ms >= ECDH_EXCHANGE_TIMEOUT_MS)
-        .map(|(id, _)| id.clone())
-        .collect();
-      for peer_id in &to_remove {
-        inner.pending_ecdh_keys.remove(peer_id);
-      }
-      to_remove
-    };
-
-    // Update reactive UI state outside the RefCell borrow so signal
-    // subscribers cannot observe a partially-mutated InnerManager.
-    for peer_id in &expired {
-      self
-        .app_state
-        .webrtc_state
-        .update(|s| s.mark_encryption_timed_out(peer_id));
-      web_sys::console::warn_1(
-        &format!(
-          "[webrtc] ECDH handshake with peer {} timed out after {}ms",
-          peer_id, ECDH_EXCHANGE_TIMEOUT_MS as u64
-        )
-        .into(),
-      );
-    }
-
-    expired
   }
 }
 
@@ -1979,4 +1517,52 @@ pub fn use_webrtc_manager() -> WebRtcManager {
 #[must_use]
 pub fn try_use_webrtc_manager() -> Option<WebRtcManager> {
   use_context::<WebRtcManager>()
+}
+
+/// Build the UI placeholder `ChatMessage` that represents an inbound
+/// file transfer (Task 19). The transfer's live progress is hung off
+/// the `FileTransferManager`; the placeholder only carries the
+/// immutable metadata the chat bubble needs.
+pub(super) fn build_file_placeholder(
+  app_state: &AppState,
+  peer_id: &UserId,
+  meta: &message::datachannel::FileMetadata,
+) -> crate::chat::ChatMessage {
+  use crate::chat::models::{ChatMessage, FileRef, MessageContent, MessageStatus};
+  use std::collections::BTreeMap;
+
+  let sender_name = app_state
+    .online_users
+    .get_untracked()
+    .iter()
+    .find(|u| &u.user_id == peer_id)
+    .map(|u| u.nickname.clone())
+    .unwrap_or_else(|| peer_id.to_string());
+
+  let dangerous = crate::file_transfer::types::is_dangerous_name(&meta.filename);
+
+  let ts_ms = i64::try_from(meta.timestamp_nanos / 1_000_000)
+    .unwrap_or_else(|_| chrono::Utc::now().timestamp_millis());
+
+  ChatMessage {
+    id: meta.message_id,
+    sender: peer_id.clone(),
+    sender_name,
+    content: MessageContent::File(FileRef {
+      filename: meta.filename.clone(),
+      size: meta.size,
+      mime_type: meta.mime_type.clone(),
+      transfer_id: meta.transfer_id,
+      dangerous,
+      file_hash: meta.file_hash,
+    }),
+    timestamp_ms: ts_ms,
+    outgoing: false,
+    status: MessageStatus::Received,
+    reply_to: None,
+    read_by: Vec::new(),
+    reactions: BTreeMap::new(),
+    mentions_me: false,
+    counted_unread: false,
+  }
 }

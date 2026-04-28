@@ -28,11 +28,15 @@ pub mod discriminator {
   /// Image chat message type.
   pub const CHAT_IMAGE: u8 = 0x83;
 
-  // File Transfer (0x84-0x85)
+  // File Transfer (0x84-0x86)
   /// File chunk message type.
   pub const FILE_CHUNK: u8 = 0x84;
   /// File metadata message type.
   pub const FILE_METADATA: u8 = 0x85;
+  /// File resume request type — receiver asks the sender to replay a
+  /// set of missing chunks after reconnect or hash failure (Req 6.6 /
+  /// Req 6.5a).
+  pub const FILE_RESUME_REQUEST: u8 = 0x86;
 
   // Message Control (0x90-0x93)
   /// Message acknowledgment type.
@@ -193,6 +197,31 @@ pub struct FileMetadata {
   /// Reply-to message ID (optional).
   pub reply_to: Option<MessageId>,
   /// Sender timestamp in nanoseconds since Unix epoch.
+  pub timestamp_nanos: u64,
+  /// Room ID when the file is shared inside a room conversation. `None`
+  /// for 1:1 chats. Lets the receiver route the inbound file card to
+  /// the correct conversation even when the wire frame is delivered
+  /// peer-to-peer (Req 2.3 / Req 6.10).
+  pub room_id: Option<RoomId>,
+}
+
+/// Receiver-initiated resume request.
+///
+/// Emitted either after a `PeerConnection` re-established (Req 6.6) or
+/// after the receiver detected a SHA-256 mismatch (Req 6.5a) and wants
+/// the sender to replay the missing chunks. `missing_chunks` is
+/// deliberately a plain `Vec<u32>` rather than a bitmap so the sender
+/// can iterate in order without decoding helper state; for typical
+/// resume scenarios the vector holds a handful of indices at most.
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
+pub struct FileResumeRequest {
+  /// Transfer ID this request targets.
+  pub transfer_id: TransferId,
+  /// Chunk indices the sender should replay. An empty list means "no
+  /// chunks missing" (used as a keep-alive / ack); a full `0..total`
+  /// list asks for a full retransmit after a hash mismatch.
+  pub missing_chunks: Vec<u32>,
+  /// Receiver timestamp in nanoseconds since Unix epoch.
   pub timestamp_nanos: u64,
 }
 
@@ -448,6 +477,8 @@ pub enum DataChannelMessage {
   FileChunk(FileChunk),
   /// File metadata.
   FileMetadata(FileMetadata),
+  /// File resume request (receiver → sender).
+  FileResumeRequest(FileResumeRequest),
 
   // Message Control
   /// Message acknowledgment.
@@ -504,6 +535,7 @@ impl DataChannelMessage {
 
       Self::FileChunk(_) => discriminator::FILE_CHUNK,
       Self::FileMetadata(_) => discriminator::FILE_METADATA,
+      Self::FileResumeRequest(_) => discriminator::FILE_RESUME_REQUEST,
 
       Self::MessageAck(_) => discriminator::MESSAGE_ACK,
       Self::MessageRevoke(_) => discriminator::MESSAGE_REVOKE,
@@ -552,6 +584,7 @@ impl DataChannelMessage {
         | Self::SubtitleClear(_)
         | Self::MediaStateUpdate(_)
         | Self::ReconnectingState(_)
+        | Self::FileResumeRequest(_)
     )
   }
 }

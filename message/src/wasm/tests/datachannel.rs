@@ -74,6 +74,7 @@ fn test_wasm_datachannel_file_metadata_roundtrip() {
     chunk_size: 65_536,
     reply_to: None,
     timestamp_nanos: 1_000_000_000,
+    room_id: None,
   };
   roundtrip_datachannel(0x85, &msg);
 }

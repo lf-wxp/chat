@@ -73,13 +73,11 @@ impl ChatManager {
             message_ids: ids,
             timestamp_nanos: now_ms_to_nanos(now),
           });
-          let bytes = bitcode::encode(&payload);
-          let mut framed = Vec::with_capacity(1 + bytes.len());
-          framed.push(payload.discriminator());
-          framed.extend_from_slice(&bytes);
           let mgr = mgr.clone();
           wasm_bindgen_futures::spawn_local(async move {
-            let _ = mgr.send_encrypted_message(peer, &framed).await;
+            let _ = mgr
+              .send_encrypted_data_channel_message(peer, &payload)
+              .await;
           });
         }
       }

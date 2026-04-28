@@ -324,6 +324,7 @@ fn test_file_metadata_zero_size() {
     chunk_size: 0,
     reply_to: None,
     timestamp_nanos: 0,
+    room_id: None,
   };
   test_bitcode_roundtrip(&msg);
 }

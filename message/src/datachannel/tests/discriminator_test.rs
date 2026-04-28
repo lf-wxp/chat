@@ -39,6 +39,7 @@ fn test_datachannel_message_discriminator() {
       chunk_size: 0,
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
     })
     .discriminator(),
     0x85
@@ -149,6 +150,7 @@ fn test_discriminator_file_transfer() {
       chunk_size: 0,
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
     })
     .discriminator(),
     discriminator::FILE_METADATA
@@ -358,6 +360,7 @@ fn create_file_transfer_discriminators() -> Vec<u8> {
       chunk_size: 0,
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
     })
     .discriminator(),
   ]

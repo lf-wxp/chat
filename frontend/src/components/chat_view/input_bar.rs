@@ -36,6 +36,8 @@ pub struct InputOverlays {
   pub voice: RwSignal<bool>,
   /// Image picker overlay visible.
   pub image: RwSignal<bool>,
+  /// File picker overlay visible (Task 19).
+  pub file: RwSignal<bool>,
 }
 
 /// Chat input bar component.
@@ -184,6 +186,15 @@ pub fn InputBar(
           on:click=move |_| overlays.image.update(|v| *v = !*v)
         >
           "🖼"
+        </button>
+
+        <button
+          type="button"
+          class="chat-input-btn"
+          aria-label=move || t_string!(i18n, file.send_file)
+          on:click=move |_| overlays.file.update(|v| *v = !*v)
+        >
+          "📎"
         </button>
 
         <button

@@ -83,6 +83,10 @@ pub enum MessageContent {
   Voice(VoiceClip),
   /// Inline image reference (object URL + dimensions).
   Image(ImageRef),
+  /// File attachment (download card with progress / hash / danger
+  /// badge). Emitted when a `FileMetadata` frame arrives and the
+  /// file-transfer subsystem has registered the transfer (Req 6).
+  File(FileRef),
   /// Forwarded message body. Chain-forwarding is forbidden (Req 4.6.x);
   /// the UI layer enforces this before sending.
   Forwarded {
@@ -94,6 +98,30 @@ pub enum MessageContent {
   },
   /// Placeholder shown after a successful revoke (Req 4.4.x).
   Revoked,
+}
+
+/// File attachment reference used by [`MessageContent::File`].
+///
+/// The actual transfer state (progress, status) lives on the
+/// `FileTransferManager`; this struct carries only the immutable
+/// metadata the chat bubble needs to render a placeholder card and
+/// look up the live transfer by id.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileRef {
+  /// Display filename.
+  pub filename: String,
+  /// File size in bytes.
+  pub size: u64,
+  /// MIME type (`application/octet-stream` when unknown).
+  pub mime_type: String,
+  /// Transfer id used to look up live progress on the file-transfer
+  /// manager.
+  pub transfer_id: message::TransferId,
+  /// Whether the file extension is flagged as potentially dangerous
+  /// (Req 6.8b / 6.8c).
+  pub dangerous: bool,
+  /// SHA-256 digest of the full file (32 bytes).
+  pub file_hash: [u8; 32],
 }
 
 /// Sticker reference (rendered from the sticker panel asset manifest).

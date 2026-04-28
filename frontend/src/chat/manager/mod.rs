@@ -295,6 +295,7 @@ pub fn preview_for(msg: &ChatMessage) -> String {
     MessageContent::Sticker(_) => "[Sticker]".to_string(),
     MessageContent::Voice(_) => "[Voice]".to_string(),
     MessageContent::Image(_) => "[Image]".to_string(),
+    MessageContent::File(file) => format!("[File] {}", file.filename),
     MessageContent::Forwarded { content, .. } => {
       let preview = crate::chat::markdown::to_plain_text(content);
       format!("[Forwarded] {preview}")

@@ -329,13 +329,15 @@ pub fn extend_inverted_index(idx: &mut InvertedIndex, records: &[MessageRecord])
 }
 
 /// Extract the searchable plaintext body of a record. Returns `None`
-/// for content types (voice / image / sticker / revoked) that have no
-/// textual component.
+/// for content types (voice / image / sticker / file / revoked) that
+/// carry no useful textual payload (`File` is searchable by filename,
+/// which we surface here).
 #[must_use]
 pub fn extract_body(content: &ContentRecord) -> Option<String> {
   match content {
     ContentRecord::Text { text } => Some(text.clone()),
     ContentRecord::Forwarded { text, .. } => Some(text.clone()),
+    ContentRecord::File { filename, .. } => Some(filename.clone()),
     ContentRecord::Sticker { .. }
     | ContentRecord::Voice { .. }
     | ContentRecord::Image { .. }

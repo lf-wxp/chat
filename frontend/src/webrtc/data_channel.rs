@@ -2,6 +2,25 @@
 //!
 //! Handles DataChannel creation, message serialization/deserialization,
 //! and sending/receiving messages over the P2P connection.
+//!
+//! # Frame formats (Task 19.1 — Req 5.1.3)
+//!
+//! Two on-the-wire frame formats coexist on the DataChannel:
+//!
+//! 1. **Plaintext frame** — `[discriminator (1 B)][bitcode payload]`.
+//!    Used exclusively for ECDH bootstrap messages which cannot be
+//!    encrypted because the shared key has not been derived yet.
+//!    `discriminator` ∈ 0x80..=0xC3 (see `message::datachannel`; the
+//!    current ceiling is `0xC1` with head-room reserved up to `0xC3`).
+//!
+//! 2. **Encrypted envelope** — `[ENCRYPTED_MARKER=0xFE][iv (12 B)][ciphertext+tag]`.
+//!    Used for every application-data message (chat, file, media
+//!    control). `ciphertext` decrypts to a plaintext frame
+//!    (format 1), which is then dispatched to the caller.
+//!
+//! The envelope marker `0xFE` lives outside the discriminator value
+//! range reserved for real message kinds, so a single byte suffices
+//! to route inbound frames to the correct path without ambiguity.
 
 use js_sys::{ArrayBuffer, Uint8Array};
 use message::datachannel::DataChannelMessage;
@@ -11,8 +30,25 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 use web_sys::{RtcDataChannel, RtcDataChannelState};
 
+/// Marker byte that identifies an encrypted envelope frame on the
+/// DataChannel. Chosen outside the `DataChannelMessage::discriminator`
+/// value range (`0x80..=0xC3`, current ceiling `0xC1` with head-room
+/// reserved up to `0xC3`) so the receive path can route on the first
+/// byte without ambiguity.
+pub const ENCRYPTED_MARKER: u8 = 0xFE;
+
 type MessageClosure = Closure<dyn FnMut(web_sys::MessageEvent)>;
 type EventClosure = Closure<dyn FnMut(web_sys::Event)>;
+
+/// Raw binary frame received on the DataChannel.
+///
+/// Callers inspect the first byte to decide whether the payload is
+/// an encrypted envelope (`bytes[0] == ENCRYPTED_MARKER`) or a
+/// plaintext `[discriminator][bitcode]` frame. This keeps the
+/// decryption path out of `PeerDataChannel` (which has no access to
+/// the per-peer `Crypto` handle) and lets `WebRtcManager` own the
+/// async decrypt + dispatch logic instead.
+pub type RawFrame = Vec<u8>;
 
 /// Wrapper around `RtcDataChannel` with message encoding/decoding.
 #[derive(Debug, Clone)]
@@ -140,6 +176,40 @@ impl PeerDataChannel {
     Ok(())
   }
 
+  /// Send raw encrypted bytes (for E2EE messages) with envelope.
+  ///
+  /// # Errors
+  /// Returns an error if the DataChannel is not open.
+  pub fn send_raw_envelope(&self, data: &[u8]) -> Result<(), String> {
+    let channel = self.get_channel()?;
+
+    if channel.ready_state() != RtcDataChannelState::Open {
+      return Err(format!(
+        "DataChannel not open (state={:?})",
+        channel.ready_state()
+      ));
+    }
+
+    // Build frame: [ENCRYPTED_MARKER (1 byte)] + [data]
+    let mut frame = Vec::with_capacity(1 + data.len());
+    frame.push(ENCRYPTED_MARKER);
+    frame.extend_from_slice(data);
+
+    let uint8 = Uint8Array::new_with_length(
+      frame
+        .len()
+        .try_into()
+        .expect("DataChannel message frame length exceeds JS u32 range"),
+    );
+    uint8.copy_from(&frame);
+
+    channel
+      .send_with_array_buffer(&uint8.buffer())
+      .map_err(|e| format!("Failed to send raw data: {:?}", e))?;
+
+    Ok(())
+  }
+
   /// Set up message handler for incoming messages.
   ///
   /// The callback receives the deserialized `DataChannelMessage`.
@@ -187,6 +257,42 @@ impl PeerDataChannel {
             );
           }
         }
+      } else if let Some(text) = event.data().as_string() {
+        web_sys::console::log_1(
+          &format!("[datachannel] Received text (unexpected): {}", text).into(),
+        );
+      }
+    }) as Box<dyn FnMut(web_sys::MessageEvent)>);
+
+    channel.set_onmessage(Some(closure.as_ref().unchecked_ref()));
+    *self.on_message.borrow_mut() = Some(closure);
+  }
+
+  /// Set up message handler for incoming messages.
+  ///
+  /// The callback receives the raw `Vec<u8>`.
+  pub fn set_on_raw_message<F>(&self, callback: F)
+  where
+    F: Fn(RawFrame) + 'static,
+  {
+    let channel = match self.get_channel() {
+      Ok(ch) => ch,
+      Err(e) => {
+        web_sys::console::error_1(&format!("[datachannel] Failed to set on_message: {}", e).into());
+        return;
+      }
+    };
+
+    let closure = Closure::wrap(Box::new(move |event: web_sys::MessageEvent| {
+      if let Ok(array_buffer) = event.data().dyn_into::<ArrayBuffer>() {
+        let uint8 = Uint8Array::new(&array_buffer);
+        let bytes = uint8.to_vec();
+
+        if bytes.is_empty() {
+          return;
+        }
+
+        callback(bytes);
       } else if let Some(text) = event.data().as_string() {
         web_sys::console::log_1(
           &format!("[datachannel] Received text (unexpected): {}", text).into(),
@@ -271,6 +377,18 @@ impl PeerDataChannel {
   #[must_use]
   pub fn is_initiator(&self) -> bool {
     self.is_initiator
+  }
+
+  /// Get the current `bufferedAmount` of the underlying DataChannel.
+  ///
+  /// Returns `None` if the DataChannel is not available (e.g. closed
+  /// or already dropped). The value represents the number of bytes
+  /// currently queued for transmission — the file-transfer subsystem
+  /// uses it for flow control (Req 6.4).
+  #[must_use]
+  pub fn buffered_amount(&self) -> Option<u32> {
+    let channel = self.get_channel().ok()?;
+    Some(channel.buffered_amount())
   }
 
   /// Get the underlying RtcDataChannel.

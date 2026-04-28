@@ -148,7 +148,7 @@ fn test_transfer_id_display() {
 #[test]
 fn test_transfer_id_clone_and_equality() {
   let id = TransferId::new();
-  let cloned = id.clone();
+  let cloned = id;
   assert_eq!(id, cloned);
 }
 

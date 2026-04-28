@@ -75,8 +75,35 @@ fn test_file_metadata_roundtrip() {
     chunk_size: 65536,
     reply_to: None,
     timestamp_nanos: 1_000_000_000,
+    room_id: None,
   };
   test_bitcode_roundtrip(&msg);
+}
+
+#[test]
+fn test_file_resume_request_roundtrip() {
+  let msg = FileResumeRequest {
+    transfer_id: TransferId::new(),
+    missing_chunks: vec![0, 3, 7, 15],
+    timestamp_nanos: 1_000_000_000,
+  };
+  test_bitcode_roundtrip(&msg);
+
+  // Empty missing_chunks (keep-alive / ack).
+  let empty = FileResumeRequest {
+    transfer_id: TransferId::new(),
+    missing_chunks: vec![],
+    timestamp_nanos: 1_000_000_000,
+  };
+  test_bitcode_roundtrip(&empty);
+
+  // Full retransmit request.
+  let full = FileResumeRequest {
+    transfer_id: TransferId::new(),
+    missing_chunks: (0..100).collect(),
+    timestamp_nanos: 1_000_000_000,
+  };
+  test_bitcode_roundtrip(&full);
 }
 
 #[test]

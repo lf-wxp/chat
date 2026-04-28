@@ -19,11 +19,10 @@ impl ChatManager {
     };
     let peer = peer.clone();
     wasm_bindgen_futures::spawn_local(async move {
-      let bytes = bitcode::encode(&wire);
-      let mut framed = Vec::with_capacity(1 + bytes.len());
-      framed.push(wire.discriminator());
-      framed.extend_from_slice(&bytes);
-      if let Err(e) = mgr.send_encrypted_message(peer.clone(), &framed).await {
+      if let Err(e) = mgr
+        .send_encrypted_data_channel_message(peer.clone(), &wire)
+        .await
+      {
         web_sys::console::warn_1(&format!("[chat] send_direct failed for peer {peer}: {e}").into());
       }
     });
@@ -98,13 +97,12 @@ pub(crate) fn send_wire_out(
     let mgr = mgr.clone();
     let wire = wire.clone();
     wasm_bindgen_futures::spawn_local(async move {
-      let bytes = bitcode::encode(&wire);
-      let mut framed = Vec::with_capacity(1 + bytes.len());
-      framed.push(wire.discriminator());
-      framed.extend_from_slice(&bytes);
-      if let Err(e) = mgr.send_encrypted_message(peer.clone(), &framed).await {
+      if let Err(e) = mgr
+        .send_encrypted_data_channel_message(peer.clone(), &wire)
+        .await
+      {
         web_sys::console::warn_1(
-          &format!("[chat] send_encrypted_message failed for peer {peer}: {e}").into(),
+          &format!("[chat] send_encrypted_data_channel_message failed for peer {peer}: {e}").into(),
         );
       }
     });

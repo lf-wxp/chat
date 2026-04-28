@@ -42,6 +42,12 @@ bitcode = "0.6.9"
 # pulling in std thread-based code paths.
 futures = { version = "0.3.32", default-features = false, features = ["std", "async-await"] }
 
+# SHA-256 for native unit tests (WASM uses SubtleCrypto via web-sys).
+sha2 = { workspace = true }
+
+# Hex encoding / decoding (file hash persistence)
+hex = "0.4"
+
 # Shared message crate (includes signaling, datachannel, etc.)
 message = { path = "../message", features = ["wasm"] }
 
@@ -114,6 +120,11 @@ features = [
   "AudioDestinationNode",
   "AudioParam",
   "MediaStreamAudioSourceNode",
+  # Voice recording (Task 16 — Opus capture + waveform)
+  "MediaRecorder",
+  "MediaRecorderOptions",
+  "BlobEvent",
+  "RecordingState",
   # RtcRtpReceiver & transceiver API (Req 3: seamless audio/video switch)
   "RtcRtpReceiver",
   "RtcRtpTransceiver",

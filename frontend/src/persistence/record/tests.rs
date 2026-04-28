@@ -91,3 +91,40 @@ fn forwarded_record_roundtrip() {
   let back = from_record(&rec).unwrap();
   assert_eq!(back, msg);
 }
+
+#[test]
+fn file_record_roundtrip() {
+  let mut msg = sample();
+  let hash = [0xab; 32];
+  msg.content = MessageContent::File(FileRef {
+    filename: "report.pdf".to_string(),
+    size: 1_048_576,
+    mime_type: "application/pdf".to_string(),
+    transfer_id: message::TransferId::new(),
+    dangerous: false,
+    file_hash: hash,
+  });
+  let conv = ConversationId::Direct(UserId::from(7u64));
+  let rec = to_record(&msg, &conv);
+  let back = from_record(&rec).unwrap();
+  assert_eq!(back, msg);
+}
+
+#[test]
+fn file_record_backward_compatible_missing_hash() {
+  // Old records persisted before the file_hash field was added
+  // should decode gracefully (defaulting to zeros).
+  let json = r#"{
+    "type": "file",
+    "filename": "old.bin",
+    "size": 1024,
+    "mime_type": "application/octet-stream",
+    "transfer_id": "550e8400-e29b-41d4-a716-446655440000",
+    "dangerous": false
+  }"#;
+  let rec: ContentRecord = serde_json::from_str(json).unwrap();
+  match rec {
+    ContentRecord::File { file_hash, .. } => assert!(file_hash.is_empty()),
+    _ => panic!("expected File variant"),
+  }
+}

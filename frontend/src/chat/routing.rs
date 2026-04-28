@@ -362,7 +362,8 @@ pub fn dispatch_incoming(
     // and never reach this chat router. Listed explicitly here so the
     // exhaustiveness check enforces the contract.
     | DataChannelMessage::MediaStateUpdate(_)
-    | DataChannelMessage::ReconnectingState(_) => {}
+    | DataChannelMessage::ReconnectingState(_)
+    | DataChannelMessage::FileResumeRequest(_) => {}
   }
 }
 

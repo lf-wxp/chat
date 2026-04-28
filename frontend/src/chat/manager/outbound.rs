@@ -207,10 +207,13 @@ impl ChatManager {
       // Chain forwarding is forbidden.
       MessageContent::Forwarded { .. } => return None,
       // Non-text content is out of scope for the forward command in
-      // Task 16 to keep the wire format compact.
+      // Task 16 to keep the wire format compact. File attachments
+      // require a separate re-transfer anyway (Task 19) so forwarding
+      // is also rejected here.
       MessageContent::Sticker(_)
       | MessageContent::Voice(_)
       | MessageContent::Image(_)
+      | MessageContent::File(_)
       | MessageContent::Revoked => return None,
     };
 
@@ -382,7 +385,11 @@ impl ChatManager {
   }
 
   /// Internal: push an outgoing message to the conversation state.
-  pub(super) fn push_outgoing(&self, conv: ConversationId, msg: ChatMessage) {
+  ///
+  /// Exposed across the crate so other subsystems (file-transfer,
+  /// call) can inject placeholder messages into the chat log without
+  /// going through the wire-format dispatcher.
+  pub fn push_outgoing(&self, conv: ConversationId, msg: ChatMessage) {
     let id = msg.id;
     let state = self.conversation_state(&conv);
     self.inner.borrow_mut().index.insert(id, conv.clone());
