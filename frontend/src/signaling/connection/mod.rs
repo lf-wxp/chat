@@ -17,7 +17,9 @@ use leptos::prelude::*;
 use message::UserId;
 use message::frame::{MessageFrame, encode_frame};
 use message::signaling::{
-  IceCandidate as IceCandidateMsg, PeerClosed as PeerClosedMsg,
+  ConnectionInvite as ConnectionInviteMsg, IceCandidate as IceCandidateMsg,
+  InviteAccepted as InviteAcceptedMsg, InviteDeclined as InviteDeclinedMsg,
+  MultiInvite as MultiInviteMsg, PeerClosed as PeerClosedMsg,
   PeerEstablished as PeerEstablishedMsg, SdpAnswer as SdpAnswerMsg, SdpOffer as SdpOfferMsg,
   SignalingMessage, TokenAuth, UserLogout,
 };
@@ -440,6 +442,61 @@ impl SignalingClient {
     let msg = SignalingMessage::PeerClosed(PeerClosedMsg {
       from: my_id,
       to: peer_id,
+    });
+    self.send(&msg)
+  }
+
+  // ── Connection invitation signaling (Req 9) ──
+
+  /// Send a `ConnectionInvite` to the given target user.
+  pub fn send_connection_invite(
+    &self,
+    target: &UserId,
+    note: Option<String>,
+  ) -> Result<(), String> {
+    let my_id = self
+      .current_user_id()
+      .ok_or("Cannot send ConnectionInvite: not authenticated")?;
+    let msg = SignalingMessage::ConnectionInvite(ConnectionInviteMsg {
+      from: my_id,
+      to: target.clone(),
+      note,
+    });
+    self.send(&msg)
+  }
+
+  /// Send a `MultiInvite` to the given list of targets.
+  pub fn send_multi_invite(&self, targets: Vec<UserId>) -> Result<(), String> {
+    let my_id = self
+      .current_user_id()
+      .ok_or("Cannot send MultiInvite: not authenticated")?;
+    let msg = SignalingMessage::MultiInvite(MultiInviteMsg {
+      from: my_id,
+      targets,
+    });
+    self.send(&msg)
+  }
+
+  /// Send an `InviteAccepted` reply addressed to the original inviter.
+  pub fn send_invite_accepted(&self, inviter: &UserId) -> Result<(), String> {
+    let my_id = self
+      .current_user_id()
+      .ok_or("Cannot send InviteAccepted: not authenticated")?;
+    let msg = SignalingMessage::InviteAccepted(InviteAcceptedMsg {
+      from: my_id,
+      to: inviter.clone(),
+    });
+    self.send(&msg)
+  }
+
+  /// Send an `InviteDeclined` reply addressed to the original inviter.
+  pub fn send_invite_declined(&self, inviter: &UserId) -> Result<(), String> {
+    let my_id = self
+      .current_user_id()
+      .ok_or("Cannot send InviteDeclined: not authenticated")?;
+    let msg = SignalingMessage::InviteDeclined(InviteDeclinedMsg {
+      from: my_id,
+      to: inviter.clone(),
     });
     self.send(&msg)
   }

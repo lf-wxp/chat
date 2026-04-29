@@ -13,6 +13,15 @@ leptos_meta = "0.8.6"
 leptos_router = "0.8.13"
 leptos_i18n = { version = "0.6.2", features = ["csr"] }
 
+# Leptos utility hooks (VueUse-style). Only the features we actually use
+# are enabled so the WASM bundle doesn't pull in `use_clipboard`,
+# `use_websocket`, `use_color_mode`, etc. that come with the default set.
+leptos-use = { version = "0.18.3", default-features = false, features = [
+  "use_event_listener",
+  "use_document",
+  "use_interval_fn",
+] }
+
 # Icon library
 leptos_icons = "0.7.1"
 icondata = "0.7.0"
@@ -142,6 +151,8 @@ features = [
   # Additional WebRTC features needed for methods
   "RtcDataChannelState",
   "RtcSignalingState",
+  "RtcPeerConnectionState",
+  "RtcOfferOptions",
   "console",
   # Chat UI (Task 16)
   "HtmlTextAreaElement",

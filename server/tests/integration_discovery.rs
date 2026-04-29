@@ -322,8 +322,15 @@ async fn test_invitation_timeout() {
 }
 
 /// Test: Bidirectional invitation conflict.
-/// When both users send invitations to each other, the server detects the conflict
-/// and auto-accepts, establishing a peer connection for both.
+/// When both users send invitations to each other, the server detects the
+/// conflict and auto-merges them. To avoid SDP "glare" between two
+/// concurrent offers, the server now elects exactly **one** initiator
+/// (the user whose id sorts lexicographically smaller) and:
+///
+/// - Sends `InviteAccepted` only to the elected initiator so that side
+///   triggers the SDP offer via `connect_to_peer`.
+/// - Sends `PeerEstablished` to **both** users so each side updates its
+///   peer-tracking state.
 #[tokio::test]
 async fn test_bidirectional_invitation_conflict() {
   let (addr, _ws_state, user_store) = create_test_server().await;
@@ -348,7 +355,7 @@ async fn test_bidirectional_invitation_conflict() {
     "User2 should receive ConnectionInvite from User1"
   );
 
-  // User2 sends invitation to User1 -> triggers bidirectional conflict auto-accept
+  // User2 sends invitation to User1 -> triggers bidirectional conflict auto-merge
   let invite2 = ConnectionInvite {
     from: user2.clone(),
     to: user1.clone(),
@@ -356,19 +363,54 @@ async fn test_bidirectional_invitation_conflict() {
   };
   send_signaling(&mut ws2, &SignalingMessage::ConnectionInvite(invite2)).await;
 
-  // Both users should receive InviteAccepted due to auto-merge
-  let recv_ws1 = recv_signaling(&mut ws1).await;
-  let recv_ws2 = recv_signaling(&mut ws2).await;
+  // Identify the elected initiator (smaller user id) and responder.
+  let (initiator, _responder) = if user1 < user2 {
+    (&user1, &user2)
+  } else {
+    (&user2, &user1)
+  };
+  let initiator_is_user1 = initiator == &user1;
 
+  // The initiator's socket must receive `InviteAccepted` followed by
+  // `PeerEstablished`; the responder's socket must receive only
+  // `PeerEstablished`. We use the lower-level filter helper directly
+  // here because the file-level `recv_signaling` filter intentionally
+  // skips `PeerEstablished` (it is treated as noise for most tests).
+  let (initiator_ws, responder_ws) = if initiator_is_user1 {
+    (&mut ws1, &mut ws2)
+  } else {
+    (&mut ws2, &mut ws1)
+  };
+
+  let skip_noise = |msg: &SignalingMessage| -> bool {
+    matches!(
+      msg,
+      SignalingMessage::Ping(_)
+        | SignalingMessage::Pong(_)
+        | SignalingMessage::ActivePeersList(_)
+        | SignalingMessage::UserListUpdate(_)
+        | SignalingMessage::UserStatusChange(_)
+    )
+  };
+
+  let initiator_first = recv_signaling_filtered(initiator_ws, skip_noise).await;
   assert!(
-    matches!(recv_ws1, Some(SignalingMessage::InviteAccepted(_))),
-    "User1 should receive InviteAccepted from auto-merge, got: {:?}",
-    recv_ws1
+    matches!(initiator_first, Some(SignalingMessage::InviteAccepted(_))),
+    "Initiator should receive InviteAccepted from auto-merge, got: {:?}",
+    initiator_first
   );
+  let initiator_second = recv_signaling_filtered(initiator_ws, skip_noise).await;
   assert!(
-    matches!(recv_ws2, Some(SignalingMessage::InviteAccepted(_))),
-    "User2 should receive InviteAccepted from auto-merge, got: {:?}",
-    recv_ws2
+    matches!(initiator_second, Some(SignalingMessage::PeerEstablished(_))),
+    "Initiator should also receive PeerEstablished, got: {:?}",
+    initiator_second
+  );
+
+  let responder_msg = recv_signaling_filtered(responder_ws, skip_noise).await;
+  assert!(
+    matches!(responder_msg, Some(SignalingMessage::PeerEstablished(_))),
+    "Responder should receive PeerEstablished only, got: {:?}",
+    responder_msg
   );
 }
 

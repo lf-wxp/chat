@@ -8,6 +8,7 @@ mod auth;
 mod call;
 mod chat_view;
 mod debug;
+mod discovery;
 mod error_toast;
 mod home_page;
 mod modal_manager;
@@ -21,6 +22,9 @@ pub use auth::AuthPage;
 pub use call::CallOverlay;
 pub use chat_view::ChatView;
 pub use debug::DebugPanel;
+pub use discovery::{
+  BlacklistManagementPanel, IncomingInviteModal, OnlineUsersPanel, UserInfoCard,
+};
 pub use error_toast::ErrorToastContainer;
 pub use home_page::HomePage;
 pub use modal_manager::ModalManager;

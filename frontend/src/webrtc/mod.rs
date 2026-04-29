@@ -287,6 +287,10 @@ pub(super) struct InnerManager {
   /// closure is not GC'd and so `Drop` on the manager cancels the timer.
   /// `None` in non-browser contexts (e.g. native unit tests).
   pub(super) prune_interval: Option<crate::utils::IntervalHandle>,
+  /// ICE restart timeout timers per peer. When a peer enters
+  /// `Disconnected`, the initiator starts a timer; if ICE hasn't
+  /// recovered by the timeout, the peer is treated as `Failed`.
+  pub(super) ice_restart_timers: HashMap<UserId, crate::utils::TimeoutHandle>,
 }
 
 /// RAII guard that decrements the in-flight connection counter on drop (P1-6 fix).
@@ -319,6 +323,7 @@ impl WebRtcManager {
         pending_broadcast: HashMap::new(),
         in_flight: Rc::new(Cell::new(0)),
         prune_interval: None,
+        ice_restart_timers: HashMap::new(),
       })),
     }
   }
@@ -701,19 +706,43 @@ impl WebRtcManager {
     // healthy enough to accept a new SDP without rebuild. We check for
     // both the connection and a stable signaling state under the same
     // borrow to avoid TOCTOU.
+    //
+    // ICE restart glare handling: if the local side has already sent an
+    // ICE restart offer (signaling_state == HaveLocalOffer) and the
+    // remote also sends a restart offer, rollback the local offer and
+    // accept the remote one. This follows RFC 5763 / RFC 8445.
     let renegotiation_pc = {
       let inner = self.inner.borrow();
       inner.connections.get(&peer_id).and_then(|pc| {
-        let stable = pc
-          .get_rtc_pc()
-          .ok()
-          .map(|rtc| rtc.signaling_state() == web_sys::RtcSignalingState::Stable)
-          .unwrap_or(false);
-        if stable { Some(pc.clone()) } else { None }
+        let rtc = pc.get_rtc_pc().ok()?;
+        let state = rtc.signaling_state();
+        let can_renegotiate = state == web_sys::RtcSignalingState::Stable
+          || state == web_sys::RtcSignalingState::HaveLocalOffer;
+        if can_renegotiate {
+          Some(pc.clone())
+        } else {
+          None
+        }
       })
     };
 
     if let Some(pc) = renegotiation_pc {
+      // ICE restart glare: if we have a pending local offer, rollback
+      // before accepting the remote offer.
+      if let Ok(rtc) = pc.get_rtc_pc()
+        && rtc.signaling_state() == web_sys::RtcSignalingState::HaveLocalOffer
+      {
+        web_sys::console::log_1(
+          &format!(
+            "[webrtc] Rolling back local offer for peer {} (ICE restart glare)",
+            peer_id
+          )
+          .into(),
+        );
+        let rollback = web_sys::RtcSessionDescriptionInit::new(web_sys::RtcSdpType::Rollback);
+        let _ = wasm_bindgen_futures::JsFuture::from(rtc.set_local_description(&rollback)).await;
+      }
+
       web_sys::console::log_1(
         &format!(
           "[webrtc] In-place renegotiation for peer {} (offer accepted on stable PC)",
@@ -1123,6 +1152,9 @@ impl WebRtcManager {
     // that drops out mid-handshake cannot leak memory via
     // `pending_broadcast`.
     inner.pending_broadcast.remove(peer_id);
+    // Cancel any pending ICE restart timer so a closed peer does not
+    // trigger a stale timeout callback.
+    inner.ice_restart_timers.remove(peer_id);
 
     had_connection
   }
@@ -1385,6 +1417,10 @@ impl WebRtcManager {
 
     match state {
       PeerConnectionState::Connected => {
+        // Cancel any pending ICE restart timer since the connection
+        // has recovered (Req 10.5.24 — ICE restart success path).
+        self.inner.borrow_mut().ice_restart_timers.remove(&peer_id);
+
         // Notify server about established peer
         if let Some(sig) = self.get_signaling() {
           let _ = sig.send_peer_established(&peer_id);
@@ -1432,8 +1468,47 @@ impl WebRtcManager {
         if let Some(file_mgr) = self.file_manager.borrow().clone() {
           file_mgr.pause_inbound_transfers(&peer_id);
         }
+
+        // ICE restart: only the initiator sends the restart offer to
+        // avoid glare (both sides offering simultaneously). The
+        // receiver waits for the initiator's restart offer.
+        let is_initiator = {
+          let inner = self.inner.borrow();
+          inner
+            .connections
+            .get(&peer_id)
+            .map(|pc| pc.is_initiator())
+            .unwrap_or(false)
+        };
+
+        if is_initiator {
+          // Start a 5-second timeout. If ICE hasn't recovered by then,
+          // treat the peer as Failed so recover_active_peers can
+          // perform a full rebuild.
+          let timeout_mgr = self.clone();
+          let timeout_peer_id = peer_id.clone();
+          if let Some(handle) = crate::utils::set_timeout_once(5000, move || {
+            timeout_mgr.handle_ice_restart_timeout(timeout_peer_id);
+          }) {
+            self
+              .inner
+              .borrow_mut()
+              .ice_restart_timers
+              .insert(peer_id.clone(), handle);
+          }
+
+          // Initiate ICE restart offer asynchronously.
+          let restart_mgr = self.clone();
+          let restart_peer_id = peer_id.clone();
+          wasm_bindgen_futures::spawn_local(async move {
+            restart_mgr.initiate_ice_restart(restart_peer_id).await;
+          });
+        }
       }
       PeerConnectionState::Failed | PeerConnectionState::Closed => {
+        // Cancel any pending ICE restart timer before cleanup.
+        self.inner.borrow_mut().ice_restart_timers.remove(&peer_id);
+
         // Notify server and clean up
         if let Some(sig) = self.get_signaling() {
           let _ = sig.send_peer_closed(peer_id.clone());
@@ -1459,6 +1534,117 @@ impl WebRtcManager {
   /// Get default ICE servers (Google STUN).
   fn default_ice_servers() -> Vec<IceServerConfig> {
     vec![IceServerConfig::stun("stun:stun.l.google.com:19302")]
+  }
+
+  /// Initiate ICE restart for a peer by creating a new offer with
+  /// iceRestart: true and sending it via signaling.
+  async fn initiate_ice_restart(&self, peer_id: UserId) {
+    let pc = {
+      let inner = self.inner.borrow();
+      match inner.connections.get(&peer_id).cloned() {
+        Some(pc) => pc,
+        None => {
+          web_sys::console::warn_1(
+            &format!("[webrtc] ICE restart: peer {} not found", peer_id).into(),
+          );
+          return;
+        }
+      }
+    };
+
+    let rtc_pc = match pc.get_rtc_pc() {
+      Ok(rtc) => rtc,
+      Err(e) => {
+        web_sys::console::warn_1(
+          &format!("[webrtc] ICE restart: invalid PC for {}: {}", peer_id, e).into(),
+        );
+        return;
+      }
+    };
+
+    // Only restart if still disconnected or connecting.
+    let state = rtc_pc.connection_state();
+    if state != web_sys::RtcPeerConnectionState::Disconnected
+      && state != web_sys::RtcPeerConnectionState::Connecting
+    {
+      web_sys::console::log_1(
+        &format!(
+          "[webrtc] ICE restart skipped for {}: state is {:?}",
+          peer_id, state
+        )
+        .into(),
+      );
+      return;
+    }
+
+    web_sys::console::log_1(&format!("[webrtc] Initiating ICE restart for {}", peer_id).into());
+
+    match pc.create_offer_with_ice_restart().await {
+      Ok(sdp) => {
+        if let Some(sig) = self.get_signaling()
+          && let Err(e) = sig.send_sdp_offer(&peer_id, &sdp)
+        {
+          web_sys::console::warn_1(
+            &format!("[webrtc] ICE restart: failed to send offer: {}", e).into(),
+          );
+        }
+      }
+      Err(e) => {
+        web_sys::console::warn_1(
+          &format!("[webrtc] ICE restart: create_offer failed: {}", e).into(),
+        );
+      }
+    }
+  }
+
+  /// Called when ICE restart timer expires without the connection
+  /// recovering. Treats the peer as Failed and triggers full teardown.
+  fn handle_ice_restart_timeout(&self, peer_id: UserId) {
+    web_sys::console::warn_1(
+      &format!(
+        "[webrtc] ICE restart timed out for {}, treating as Failed",
+        peer_id
+      )
+      .into(),
+    );
+
+    // Remove the timer handle so it is not double-cancelled.
+    self.inner.borrow_mut().ice_restart_timers.remove(&peer_id);
+
+    // If the connection already recovered, do nothing.
+    let current_state = {
+      let inner = self.inner.borrow();
+      inner
+        .connections
+        .get(&peer_id)
+        .and_then(|pc| pc.get_rtc_pc().ok())
+        .map(|rtc| rtc.connection_state())
+    };
+
+    if let Some(state) = current_state
+      && state == web_sys::RtcPeerConnectionState::Connected
+    {
+      web_sys::console::log_1(
+        &format!(
+          "[webrtc] Peer {} recovered before timeout, ignoring",
+          peer_id
+        )
+        .into(),
+      );
+      return;
+    }
+
+    // Force Failed handling. Use the current instance_id so stale
+    // callbacks from a replaced connection are ignored.
+    let instance_id = {
+      let inner = self.inner.borrow();
+      inner
+        .connections
+        .get(&peer_id)
+        .map(|pc| pc.instance_id())
+        .unwrap_or_else(uuid::Uuid::new_v4)
+    };
+    self.handle_connection_state_change(peer_id, PeerConnectionState::Failed, instance_id);
   }
 }
 

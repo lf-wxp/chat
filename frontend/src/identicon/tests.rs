@@ -53,3 +53,22 @@ fn test_unicode_username() {
   let svg = generate_identicon_svg("用户名");
   assert!(!svg.is_empty(), "Should handle unicode usernames");
 }
+
+#[test]
+fn test_data_uri_cache_hits_return_equal_strings() {
+  // Two back-to-back calls for the same username must produce byte-for-byte
+  // equal strings. Proves determinism and (indirectly) that the cache
+  // returns the stored value instead of recomputing it.
+  let first = generate_identicon_data_uri("cache-key");
+  let second = generate_identicon_data_uri("cache-key");
+  assert_eq!(first, second);
+}
+
+#[test]
+fn test_data_uri_cache_distinguishes_keys() {
+  // Different keys must still produce different URIs — guards against a
+  // hash collision in the cache map masking real behaviour.
+  let a = generate_identicon_data_uri("alice");
+  let b = generate_identicon_data_uri("bob");
+  assert_ne!(a, b);
+}

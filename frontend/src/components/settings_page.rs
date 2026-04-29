@@ -4,6 +4,7 @@
 //! animation. Provides access to appearance, language and account actions
 //! without replacing the main chat view.
 
+use crate::components::discovery::BlacklistManagementPanel;
 use crate::i18n;
 use crate::signaling::use_signaling_client;
 use crate::state::use_app_state;
@@ -162,6 +163,15 @@ pub fn SettingsPage() -> impl IntoView {
               </button>
             </div>
           </div>
+        </section>
+
+        // Privacy section -- blacklist management
+        <section class="settings-section" aria-labelledby="privacy-heading">
+          <h2 id="privacy-heading" class="settings-section-title">
+            <Icon icon=i::LuShield attr:class="settings-section-icon" />
+            {t!(i18n, settings.privacy)}
+          </h2>
+          <BlacklistManagementPanel />
         </section>
 
         // Account section

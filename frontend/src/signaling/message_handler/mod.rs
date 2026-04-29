@@ -3,7 +3,7 @@
 //! Routes incoming signaling messages to the appropriate handler
 //! and updates the application state accordingly.
 
-use leptos::prelude::{Set, Update, WithUntracked};
+use leptos::prelude::{Set, Update, With, WithUntracked};
 use message::signaling::SignalingMessage;
 
 use crate::state::AppState;
@@ -118,6 +118,7 @@ pub fn handle_signaling_message(
       // retrying with stale data (Review-P1 fix).
       let is_room_error = error.code.module == message::error::ErrorModule::Rom;
       let has_active_room = crate::auth::load_active_room_id().is_some();
+      let code_str = error.code.to_code_string();
 
       if is_room_error && has_active_room {
         crate::auth::save_active_room_id(None);
@@ -130,13 +131,22 @@ pub fn handle_signaling_message(
         // dedicated message for this case (Req 10.10.39).
         if error.code == message::error::codes::ROM105 {
           error_toast.show_error_message_with_key(
-            error.code.to_code_string().as_str(),
+            code_str.as_str(),
             "error.server_restarted",
             "The chat server has restarted; previous rooms and calls are no longer valid.",
           );
         } else {
           error_toast.show_error(&error);
         }
+      } else if code_str == "SIG004" {
+        // Bug-6 fix: dedicated copy explaining that the server still
+        // remembers a pending invite from a prior session even though
+        // our local UI no longer shows the "Inviting…" state.
+        error_toast.show_error_message_with_key(
+          "SIG004",
+          "discovery.invite_already_pending_server",
+          &error.message,
+        );
       } else {
         error_toast.show_error(&error);
       }
@@ -145,30 +155,59 @@ pub fn handle_signaling_message(
     // ── Connection Invitation (delegated to UI layer) ──
     SignalingMessage::ConnectionInvite(invite) => {
       log_debug(&format!("ConnectionInvite from {}", invite.from));
-      // TODO(task-17): Show invitation notification UI and auto-accept/decline
+      handle_incoming_invite(invite, app_state);
     }
     SignalingMessage::InviteAccepted(accepted) => {
-      log_debug(&format!("InviteAccepted by {}", accepted.to));
-      // On invite accepted, initiator should start WebRTC connection
+      log_debug(&format!("InviteAccepted by {}", accepted.from));
+      // Mark the outbound invite as accepted (transitions it to the
+      // `Connecting` state so the UI shows "Connection being
+      // established…" until the WebRTC handshake finishes — Req 9.14).
+      if let Some(mgr) = crate::invite::try_use_invite_manager() {
+        mgr.accept_outbound(&accepted.from);
+      }
+      // The accepting user materialises a direct conversation locally
+      // so the chat UI is ready before the DataChannel opens.
+      ensure_direct_conversation(&accepted.from, app_state);
+
+      // The original inviter (us) initiates the WebRTC handshake.
       if let Some(manager) = crate::webrtc::try_use_webrtc_manager() {
-        // Spawn async task to connect to peer
+        let peer = accepted.from.clone();
         wasm_bindgen_futures::spawn_local(async move {
-          if let Err(e) = manager.connect_to_peer(accepted.to.clone()).await {
-            web_sys::console::error_1(
-              &format!("[signaling] Failed to connect after invite accept: {}", e).into(),
-            );
+          match manager.connect_to_peer(peer.clone()).await {
+            Ok(()) => {
+              // Drop the `Connecting` entry now that the local SDP
+              // exchange has been kicked off and the peer entry is
+              // tracked elsewhere (`webrtc_state`).
+              if let Some(mgr) = crate::invite::try_use_invite_manager() {
+                mgr.clear_outbound(&peer);
+              }
+            }
+            Err(e) => {
+              web_sys::console::error_1(
+                &format!("[signaling] Failed to connect after invite accept: {e}").into(),
+              );
+              // Make sure the UI does not stay stuck on the
+              // "Connecting…" status if the SDP setup failed.
+              if let Some(mgr) = crate::invite::try_use_invite_manager() {
+                mgr.clear_outbound(&peer);
+              }
+            }
           }
         });
       }
     }
     SignalingMessage::InviteDeclined(declined) => {
-      log_debug(&format!("InviteDeclined by {}", declined.to));
+      log_debug(&format!("InviteDeclined by {}", declined.from));
+      surface_outbound_resolution(&declined.from, ResolutionKind::Declined, error_toast);
     }
     SignalingMessage::InviteTimeout(timeout) => {
       log_debug(&format!(
         "InviteTimeout from {} to {}",
         timeout.from, timeout.to
       ));
+      // The server reports the invitee on `to`; clear the outbound
+      // entry that targets that user.
+      surface_outbound_resolution(&timeout.to, ResolutionKind::TimedOut, error_toast);
     }
     SignalingMessage::MultiInvite(invite) => {
       log_debug(&format!(
@@ -176,6 +215,23 @@ pub fn handle_signaling_message(
         invite.from,
         invite.targets.len()
       ));
+      // The server fans the multi-invite out to each target as a regular
+      // ConnectionInvite, so for the receiver side this branch is purely
+      // informational. We still surface a notification when we are one
+      // of the targets so the UI shows multi-invite context.
+      let me = app_state
+        .auth
+        .with_untracked(|a| a.as_ref().map(|a| a.user_id.clone()));
+      if let Some(my_id) = me
+        && invite.targets.contains(&my_id)
+      {
+        let synthetic = message::signaling::ConnectionInvite {
+          from: invite.from,
+          to: my_id,
+          note: None,
+        };
+        handle_incoming_invite(synthetic, app_state);
+      }
     }
 
     // ── SDP / ICE Signaling → WebRtcManager ──
@@ -216,6 +272,32 @@ pub fn handle_signaling_message(
     // ── Peer Tracking ──
     SignalingMessage::PeerEstablished(peer) => {
       log_debug(&format!("PeerEstablished: {} <-> {}", peer.from, peer.to));
+      // Bug-1 fix (responder side): in a bidirectional merge the server
+      // sends `InviteAccepted` only to the elected initiator. The
+      // responder receives `PeerEstablished` without ever seeing
+      // `InviteAccepted`, so the outbound invite would remain in the
+      // `Connecting` state forever and the direct conversation would
+      // never be created. Clean up both here.
+      let me = app_state
+        .auth
+        .with_untracked(|a| a.as_ref().map(|a| a.user_id.clone()));
+      if let Some(my_id) = me {
+        // Determine which peer id is "the other side".
+        let other = if peer.from == my_id {
+          peer.to.clone()
+        } else {
+          peer.from.clone()
+        };
+        // Clear any lingering outbound invite (Connecting or Pending).
+        if let Some(mgr) = crate::invite::try_use_invite_manager()
+          && mgr.has_pending_outbound_untracked(&other)
+        {
+          mgr.clear_outbound(&other);
+        }
+        // Ensure a direct conversation entry exists so the chat UI is
+        // ready (mirrors the `InviteAccepted` path).
+        ensure_direct_conversation(&other, app_state);
+      }
     }
     SignalingMessage::PeerClosed(peer) => {
       log_debug(&format!("PeerClosed: {} <-> {}", peer.from, peer.to));
@@ -522,6 +604,205 @@ fn recover_active_peers(
 
 // Re-export shared signaling log helpers (Opt-B).
 use super::{log_debug, log_error, log_warn};
+
+/// Look up a display name for `user_id` in the online users directory,
+/// falling back to the stringified id when the user is not (yet) known.
+fn resolve_display_name(app_state: AppState, user_id: &message::UserId) -> String {
+  app_state.online_users.with_untracked(|users| {
+    users
+      .iter()
+      .find(|u| u.user_id == *user_id)
+      .map(|u| {
+        if u.nickname.is_empty() {
+          u.username.clone()
+        } else {
+          u.nickname.clone()
+        }
+      })
+      .unwrap_or_else(|| user_id.to_string())
+  })
+}
+
+/// Materialise a `ConversationId::Direct` entry for `peer` in
+/// `AppState::conversations` if one does not already exist.
+fn ensure_direct_conversation(peer: &message::UserId, app_state: AppState) {
+  use crate::state::{Conversation, ConversationId, ConversationType};
+  let conv_id = ConversationId::Direct(peer.clone());
+  let display_name = resolve_display_name(app_state, peer);
+  app_state.conversations.update(|list| {
+    if list.iter().any(|c| c.id == conv_id) {
+      return;
+    }
+    list.push(Conversation {
+      id: conv_id,
+      display_name,
+      last_message: None,
+      last_message_ts: Some(chrono::Utc::now().timestamp_millis()),
+      unread_count: 0,
+      pinned: false,
+      pinned_ts: None,
+      muted: false,
+      archived: false,
+      conversation_type: ConversationType::Direct,
+    });
+  });
+}
+
+/// Route an incoming `ConnectionInvite` according to the user's
+/// blacklist and to the invite-manager queue.
+///
+/// Blocked inviters trigger an auto-decline timer (Req 9.17) so the
+/// blocked user only ever observes a normal-looking timeout. Non-blocked
+/// inviters are appended to the in-memory queue so the
+/// `IncomingInviteModal` can render them.
+fn handle_incoming_invite(invite: message::signaling::ConnectionInvite, app_state: AppState) {
+  let inviter = invite.from.clone();
+  let display_name = resolve_display_name(app_state, &inviter);
+
+  // Auto-decline blocked invitations after a randomised delay
+  // (Req 9.17) — the local client never raises a UI prompt.
+  if let Some(blacklist) = crate::blacklist::try_use_blacklist_state()
+    && blacklist.is_blocked_untracked(&inviter)
+  {
+    // Reuse an already-armed timer for back-to-back invites from the
+    // same blocked inviter so we don't accumulate timers (P1 Bug-2 fix).
+    if blacklist.has_pending_auto_decline(&inviter) {
+      log_debug(&format!(
+        "[invite] Auto-decline timer already armed for blocked user {inviter}, reusing"
+      ));
+      return;
+    }
+    let delay = crate::blacklist::random_auto_decline_delay_ms();
+    log_debug(&format!(
+      "[invite] Auto-declining invite from blocked user {inviter} in {delay}ms"
+    ));
+    let inviter_for_timer = inviter.clone();
+    let blacklist_for_timer = blacklist.clone();
+    let app_state_for_timer = app_state;
+    // P2-3.3 fix: the delay is produced by `random_auto_decline_delay_ms`
+    // in `[30_000, 60_000]` which always fits in `i32`. Using `expect`
+    // surfaces any future widening of the delay bounds instead of
+    // silently neutralising the auto-decline with an `i32::MAX` timer.
+    let delay_ms =
+      i32::try_from(delay).expect("auto-decline delay must fit in i32 per Req 9.17 bounds");
+    let handle = crate::utils::set_timeout_once(delay_ms, move || {
+      // Clean up the registration first so a new invite arriving
+      // afterwards can arm a fresh timer.
+      blacklist_for_timer.forget_auto_decline(&inviter_for_timer);
+      // Re-check blocked status: if the user was unblocked between
+      // the timer being armed and firing, fall through to the normal
+      // inbound flow instead of silently declining.
+      if !blacklist_for_timer.is_blocked_untracked(&inviter_for_timer)
+        && let Some(mgr) = crate::invite::try_use_invite_manager()
+      {
+        let now = chrono::Utc::now().timestamp_millis();
+        // Resolve the display name from the online users directory
+        // (Opt-9 fix: previously this was `String::new()`, leaving
+        // the modal showing a bare user-id hash).
+        let resolved_name = resolve_display_name(app_state_for_timer, &inviter_for_timer);
+        // Only push to inbound queue if the inviter is still online
+        // (they may have gone offline during the delay window).
+        let still_online = app_state_for_timer
+          .online_users
+          .with(|list| list.iter().any(|u| u.user_id == inviter_for_timer));
+        if still_online {
+          mgr.push_inbound(crate::invite::IncomingInvite::new(
+            inviter_for_timer.clone(),
+            resolved_name,
+            None,
+            now,
+            crate::invite::INVITE_TIMEOUT_MS,
+          ));
+        }
+        return;
+      }
+      if let Some(client) = crate::signaling::try_use_signaling_client() {
+        let _ = client.send_invite_declined(&inviter_for_timer);
+      }
+    });
+    if let Some(handle) = handle {
+      blacklist.register_auto_decline(inviter.clone(), handle);
+    }
+    return;
+  }
+
+  if let Some(mgr) = crate::invite::try_use_invite_manager() {
+    let now = chrono::Utc::now().timestamp_millis();
+    mgr.push_inbound(crate::invite::IncomingInvite::new(
+      inviter,
+      display_name,
+      invite.note,
+      now,
+      crate::invite::INVITE_TIMEOUT_MS,
+    ));
+  }
+}
+
+/// Resolution kind for an outbound invite — drives the i18n key chosen
+/// by [`surface_outbound_resolution`].
+#[derive(Copy, Clone, Debug)]
+enum ResolutionKind {
+  Declined,
+  TimedOut,
+}
+
+/// Common helper for surfacing the resolution of an outbound invite to
+/// the UI. Resolves the invite in the manager, then fires:
+///
+/// 1. A per-invite info toast ("declined" or "timed out") so the
+///    sender always gets feedback (Req 9.7 / 9.8).
+/// 2. A batch-level toast when the parent multi-invite finishes
+///    without any acceptance (Req 9.12).
+fn surface_outbound_resolution(
+  target: &message::UserId,
+  kind: ResolutionKind,
+  error_toast: crate::error_handler::ErrorToastManager,
+) {
+  let Some(mgr) = crate::invite::try_use_invite_manager() else {
+    return;
+  };
+  let outcome = match kind {
+    ResolutionKind::Declined => mgr.decline_outbound(target),
+    ResolutionKind::TimedOut => mgr.timeout_outbound(target),
+  };
+  let Some(outcome) = outcome else {
+    return;
+  };
+
+  // Per-invite info toast.
+  let display = if outcome.invite.display_name.is_empty() {
+    target.to_string()
+  } else {
+    outcome.invite.display_name.clone()
+  };
+  match kind {
+    ResolutionKind::Declined => {
+      error_toast.show_info_message_with_key(
+        "DSC901",
+        "discovery.invite_declined_by_peer",
+        &format!("{display} declined your invitation."),
+      );
+    }
+    ResolutionKind::TimedOut => {
+      error_toast.show_info_message_with_key(
+        "DSC902",
+        "discovery.invite_expired",
+        &format!("Invitation to {display} timed out."),
+      );
+    }
+  }
+
+  // Batch-level "no one accepted" toast when applicable.
+  if let Some(progress) = outcome.batch_completed
+    && progress.is_unanswered()
+  {
+    error_toast.show_info_message_with_key(
+      "DSC903",
+      "discovery.multi_invite_no_acceptance",
+      "No one accepted the invitation; multi-user chat was not created.",
+    );
+  }
+}
 
 #[cfg(test)]
 mod tests;

@@ -3,12 +3,14 @@
 mod sidebar_conversation_item;
 mod sidebar_section;
 
+use crate::components::discovery::{OnlineUsersPanel, UserInfoCard};
 use crate::i18n;
 use crate::state::use_app_state;
 use icondata as i;
 use leptos::prelude::*;
 use leptos_i18n::{t, t_string};
 use leptos_icons::Icon;
+use message::UserId;
 use sidebar_section::SidebarSection;
 
 /// Sidebar navigation component.
@@ -20,6 +22,12 @@ use sidebar_section::SidebarSection;
 pub fn Sidebar() -> impl IntoView {
   let app_state = use_app_state();
   let i18n = i18n::use_i18n();
+
+  // Selection state shared between the online-users panel (which sets
+  // it on row click) and the user info card modal (which renders for
+  // the selected user). Lives in the sidebar so it survives navigation
+  // inside the chat area without remounting the modal.
+  let selected_user = RwSignal::new(Option::<UserId>::None);
 
   view! {
     <aside class="sidebar" data-testid="sidebar">
@@ -56,6 +64,9 @@ pub fn Sidebar() -> impl IntoView {
           title=move || t_string!(i18n, sidebar.archived)
           conversations=Signal::derive(move || app_state.archived_conversations())
         />
+
+        // Discovery: online users + invite entry point (Req 9.1).
+        <OnlineUsersPanel selected=selected_user />
       </div>
 
       // Footer: settings gear, pinned to bottom
@@ -71,6 +82,9 @@ pub fn Sidebar() -> impl IntoView {
           <span class="sidebar-footer-label">{t!(i18n, settings.title)}</span>
         </button>
       </div>
+
+      // User info card overlay (rendered while `selected_user` is Some).
+      <UserInfoCard target=selected_user />
     </aside>
   }
 }

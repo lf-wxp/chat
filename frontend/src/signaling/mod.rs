@@ -80,3 +80,11 @@ pub fn provide_signaling_client(
 pub fn use_signaling_client() -> SignalingClient {
   expect_context::<SignalingClient>()
 }
+
+/// Best-effort accessor — safe to call from non-reactive callbacks
+/// (e.g. WebSocket message handlers, `setTimeout` closures). Returns
+/// `None` when no signaling client has been provided yet.
+#[must_use]
+pub fn try_use_signaling_client() -> Option<SignalingClient> {
+  use_context::<SignalingClient>()
+}

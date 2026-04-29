@@ -10,7 +10,9 @@ use std::str::FromStr;
 use uuid::Uuid;
 
 /// Unique identifier for a user.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Encode, Decode)]
+#[derive(
+  Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, Encode, Decode,
+)]
 pub struct UserId(pub Uuid);
 
 impl UserId {

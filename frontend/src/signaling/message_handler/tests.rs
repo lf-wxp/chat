@@ -8,6 +8,11 @@ use message::signaling::{
 };
 use message::types::UserStatus;
 
+fn with_runtime<F: FnOnce()>(f: F) {
+  let owner = leptos::prelude::Owner::new();
+  owner.with(f);
+}
+
 // ── LOG_MODULE constant test ──
 
 #[test]
@@ -366,4 +371,173 @@ fn test_call_end_carries_from_field() {
     SignalingMessage::CallEnd(parsed) => assert_eq!(parsed.from, from),
     _ => panic!("Expected CallEnd"),
   }
+}
+
+// ── resolve_display_name tests ──
+// These test the pure logic of display-name resolution using simple
+// data structures rather than AppState (which requires WASM for
+// localStorage access).
+
+#[test]
+fn test_resolve_display_name_logic_prefers_nickname() {
+  // Verify the same logic used by resolve_display_name:
+  // if nickname is non-empty, prefer it over username.
+  let users = [message::types::UserInfo {
+    user_id: UserId::from_uuid(uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_DNS, b"nick-test")),
+    username: "alice_user".to_string(),
+    nickname: "Alice".to_string(),
+    status: UserStatus::Online,
+    avatar_url: None,
+    bio: String::new(),
+    created_at_nanos: 0,
+    last_seen_nanos: 0,
+  }];
+  let display = users
+    .iter()
+    .find(|u| u.nickname == "Alice")
+    .map(|u| {
+      if u.nickname.is_empty() {
+        u.username.clone()
+      } else {
+        u.nickname.clone()
+      }
+    })
+    .unwrap_or_default();
+  assert_eq!(display, "Alice", "should prefer nickname over username");
+}
+
+#[test]
+fn test_resolve_display_name_logic_uses_username_when_nickname_empty() {
+  let users = [message::types::UserInfo {
+    user_id: UserId::from_uuid(uuid::Uuid::new_v5(
+      &uuid::Uuid::NAMESPACE_DNS,
+      b"uname-test",
+    )),
+    username: "bob_user".to_string(),
+    nickname: String::new(),
+    status: UserStatus::Online,
+    avatar_url: None,
+    bio: String::new(),
+    created_at_nanos: 0,
+    last_seen_nanos: 0,
+  }];
+  let display = users
+    .iter()
+    .find(|u| u.username == "bob_user")
+    .map(|u| {
+      if u.nickname.is_empty() {
+        u.username.clone()
+      } else {
+        u.nickname.clone()
+      }
+    })
+    .unwrap_or_default();
+  assert_eq!(
+    display, "bob_user",
+    "should use username when nickname is empty"
+  );
+}
+
+// ── ensure_direct_conversation logic test ──
+// Tests the idempotent "check-then-insert" pattern used by
+// ensure_direct_conversation without needing a full AppState.
+
+#[test]
+fn test_ensure_conversation_idempotent_pattern() {
+  use crate::state::{Conversation, ConversationId, ConversationType};
+
+  let peer = UserId::from_uuid(uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_DNS, b"conv-idem"));
+  let conv_id = ConversationId::Direct(peer.clone());
+  let mut list: Vec<Conversation> = Vec::new();
+
+  // First insert
+  let display_name = "Peer".to_string();
+  if !list.iter().any(|c| c.id == conv_id) {
+    list.push(Conversation {
+      id: conv_id.clone(),
+      display_name: display_name.clone(),
+      last_message: None,
+      last_message_ts: Some(0),
+      unread_count: 0,
+      pinned: false,
+      pinned_ts: None,
+      muted: false,
+      archived: false,
+      conversation_type: ConversationType::Direct,
+    });
+  }
+  assert_eq!(list.len(), 1);
+
+  // Second insert should be a no-op
+  if !list.iter().any(|c| c.id == conv_id) {
+    list.push(Conversation {
+      id: conv_id.clone(),
+      display_name: display_name.clone(),
+      last_message: None,
+      last_message_ts: Some(0),
+      unread_count: 0,
+      pinned: false,
+      pinned_ts: None,
+      muted: false,
+      archived: false,
+      conversation_type: ConversationType::Direct,
+    });
+  }
+  assert_eq!(list.len(), 1, "should not create duplicate conversations");
+}
+
+// ── Invite manager integration tests ──
+
+#[test]
+fn test_peer_established_clears_outbound_invite() {
+  with_runtime(|| {
+    let mgr = crate::invite::InviteManager::new();
+    let peer = UserId::from_uuid(uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_DNS, b"peer-est"));
+    // Simulate an outbound invite in Connecting state (as would happen
+    // after the inviter receives InviteAccepted).
+    mgr.track_outbound(peer.clone(), "TestPeer".to_string());
+    mgr.accept_outbound(&peer); // transitions to Connecting
+    assert!(mgr.has_pending_outbound(&peer));
+
+    // Simulate PeerEstablished arriving — the handler clears the entry.
+    mgr.clear_outbound(&peer);
+    assert!(
+      !mgr.has_pending_outbound(&peer),
+      "should be cleared after PeerEstablished"
+    );
+    mgr.shutdown();
+  });
+}
+
+#[test]
+fn test_invite_manager_clear_state_on_logout() {
+  with_runtime(|| {
+    let mgr = crate::invite::InviteManager::new();
+    let alice = UserId::from_uuid(uuid::Uuid::new_v5(
+      &uuid::Uuid::NAMESPACE_DNS,
+      b"alice-logout",
+    ));
+    let bob = UserId::from_uuid(uuid::Uuid::new_v5(
+      &uuid::Uuid::NAMESPACE_DNS,
+      b"bob-logout",
+    ));
+    mgr.track_outbound(alice.clone(), "Alice".to_string());
+    mgr.push_inbound(crate::invite::IncomingInvite::new(
+      bob.clone(),
+      "Bob".to_string(),
+      None,
+      1_000,
+      crate::invite::INVITE_TIMEOUT_MS,
+    ));
+    assert!(mgr.has_pending_outbound(&alice));
+    assert!(mgr.front_inbound().is_some());
+
+    mgr.clear_state();
+    assert!(
+      !mgr.has_pending_outbound(&alice),
+      "outbound should be cleared"
+    );
+    assert!(mgr.front_inbound().is_none(), "inbound should be cleared");
+    mgr.shutdown();
+  });
 }

@@ -97,10 +97,45 @@ pub fn generate_identicon_svg(username: &str) -> String {
 /// Generate a data URI for an identicon SVG.
 ///
 /// This can be used directly as the `src` attribute of an `<img>` element.
+///
+/// ## Caching (Opt-4.3)
+///
+/// The data URI is deterministic in `username`, but previously every
+/// render of every row / modal / panel re-encoded the SVG. A
+/// thread-local `HashMap` now memoises the result so repeat lookups
+/// cost a single hash instead of hundreds of `format!` + `replace`
+/// allocations. `CACHE_CAPACITY` is a soft upper bound: once crossed
+/// the cache is cleared wholesale (rather than pulling in a full LRU
+/// implementation and its dependency). For typical discovery flows
+/// (< 200 online users + blacklist + modals) the cache stays well
+/// below that bound so the clear path never fires.
 #[must_use]
 pub fn generate_identicon_data_uri(username: &str) -> String {
-  let svg = generate_identicon_svg(username);
-  format!("data:image/svg+xml;charset=utf-8,{}", url_encode_svg(&svg))
+  /// Soft cap on the cache to prevent unbounded growth across a long
+  /// session. 1024 entries × ~1.5 KB/entry ≈ 1.5 MB, which is an
+  /// acceptable worst case for a CSR app.
+  const CACHE_CAPACITY: usize = 1024;
+
+  thread_local! {
+    static CACHE: std::cell::RefCell<std::collections::HashMap<String, String>> =
+      std::cell::RefCell::new(std::collections::HashMap::new());
+  }
+
+  CACHE.with(|cell| {
+    if let Some(cached) = cell.borrow().get(username) {
+      return cached.clone();
+    }
+
+    let svg = generate_identicon_svg(username);
+    let uri = format!("data:image/svg+xml;charset=utf-8,{}", url_encode_svg(&svg));
+
+    let mut map = cell.borrow_mut();
+    if map.len() >= CACHE_CAPACITY {
+      map.clear();
+    }
+    map.insert(username.to_owned(), uri.clone());
+    uri
+  })
 }
 
 /// Simple URL encoding for SVG data URIs.

@@ -130,6 +130,35 @@ impl PeerConnection {
     Self::get_sdp_from_desc(&offer)
   }
 
+  /// Create an SDP offer with ICE restart flag.
+  ///
+  /// Used when the connection enters `Disconnected` state due to
+  /// network interface change (e.g. WiFi -> 4G).
+  ///
+  /// # Errors
+  /// Returns an error if offer creation fails.
+  pub async fn create_offer_with_ice_restart(&self) -> Result<String, String> {
+    let pc = self.get_pc()?;
+
+    let offer_options = web_sys::RtcOfferOptions::new();
+    offer_options.set_ice_restart(true);
+
+    let offer =
+      wasm_bindgen_futures::JsFuture::from(pc.create_offer_with_rtc_offer_options(&offer_options))
+        .await
+        .map_err(|e| format!("Failed to create ICE restart offer: {:?}", e))?;
+
+    let sdp_string = Self::get_sdp_from_desc(&offer)?;
+    let session_desc = web_sys::RtcSessionDescriptionInit::new(web_sys::RtcSdpType::Offer);
+    session_desc.set_sdp(&sdp_string);
+
+    wasm_bindgen_futures::JsFuture::from(pc.set_local_description(&session_desc))
+      .await
+      .map_err(|e| format!("Failed to set local description: {:?}", e))?;
+
+    Self::get_sdp_from_desc(&offer)
+  }
+
   /// Handle an incoming SDP offer and create an answer.
   ///
   /// # Errors

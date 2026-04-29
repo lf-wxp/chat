@@ -74,41 +74,59 @@ pub async fn handle_connection_invite<S>(
       .discovery_state
       .merge_bidirectional_invitations(&invite.from, &invite.to);
 
-    // Notify both users of the connection
+    // P0-Bug-1 fix: avoid SDP "glare" race by deterministically
+    // electing exactly one initiator. Without this, both clients
+    // would receive `InviteAccepted` and concurrently call
+    // `connect_to_peer`, producing two crossed offers.
+    //
+    // Election rule: the user whose id sorts lexicographically
+    // smaller is the initiator (and therefore the one whose client
+    // creates the SDP offer). The other side only gets the
+    // `PeerEstablished` notification and waits for the offer.
+    let (initiator, responder) = if invite.from < invite.to {
+      (invite.from.clone(), invite.to.clone())
+    } else {
+      (invite.to.clone(), invite.from.clone())
+    };
+
+    // Send `InviteAccepted` only to the elected initiator. The
+    // initiator's client will trigger `connect_to_peer(responder)`.
     let accepted_msg = SignalingMessage::InviteAccepted(message::signaling::InviteAccepted {
-      from: invite.from.clone(),
-      to: invite.to.clone(),
+      // `from` is conventionally the user who is accepting (i.e. the
+      // peer the initiator is connecting to). Setting it to the
+      // responder makes the initiator's client call
+      // `connect_to_peer(accepted.from)` against the correct id.
+      from: responder.clone(),
+      to: initiator.clone(),
     });
 
-    if let Ok(encoded) = encode_signaling_message(&accepted_msg) {
-      // Send to both users
-      if let Some(sender) = ws_state.get_sender(&invite.from) {
-        let _ = sender.send(encoded.clone()).await;
-      }
-      if let Some(sender) = ws_state.get_sender(&invite.to) {
-        let _ = sender.send(encoded).await;
-      }
-    }
-
-    // Send PeerEstablished to both users
-    let peer_established_from =
-      SignalingMessage::PeerEstablished(message::signaling::PeerEstablished {
-        from: invite.from.clone(),
-        to: invite.to.clone(),
-      });
-    let peer_established_to =
-      SignalingMessage::PeerEstablished(message::signaling::PeerEstablished {
-        from: invite.to.clone(),
-        to: invite.from.clone(),
-      });
-
-    if let Ok(encoded) = encode_signaling_message(&peer_established_from)
-      && let Some(sender) = ws_state.get_sender(&invite.from)
+    if let Ok(encoded) = encode_signaling_message(&accepted_msg)
+      && let Some(sender) = ws_state.get_sender(&initiator)
     {
       let _ = sender.send(encoded).await;
     }
-    if let Ok(encoded) = encode_signaling_message(&peer_established_to)
-      && let Some(sender) = ws_state.get_sender(&invite.to)
+
+    // Send PeerEstablished to both users so the responder also
+    // updates its peer list and unblocks any UI gated on the
+    // connection being live.
+    let peer_established_for_initiator =
+      SignalingMessage::PeerEstablished(message::signaling::PeerEstablished {
+        from: initiator.clone(),
+        to: responder.clone(),
+      });
+    let peer_established_for_responder =
+      SignalingMessage::PeerEstablished(message::signaling::PeerEstablished {
+        from: responder.clone(),
+        to: initiator.clone(),
+      });
+
+    if let Ok(encoded) = encode_signaling_message(&peer_established_for_initiator)
+      && let Some(sender) = ws_state.get_sender(&initiator)
+    {
+      let _ = sender.send(encoded).await;
+    }
+    if let Ok(encoded) = encode_signaling_message(&peer_established_for_responder)
+      && let Some(sender) = ws_state.get_sender(&responder)
     {
       let _ = sender.send(encoded).await;
     }
