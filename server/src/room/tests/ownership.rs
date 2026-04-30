@@ -11,6 +11,7 @@ fn test_owner_can_transfer_ownership_to_member() {
   // Create and join room
   let create_request = message::signaling::CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -59,6 +60,7 @@ fn test_owner_can_transfer_ownership_to_admin() {
   // Create room
   let create_request = message::signaling::CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -106,6 +108,7 @@ fn test_admin_cannot_transfer_ownership() {
   // Create room
   let create_request = message::signaling::CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -152,6 +155,7 @@ fn test_member_cannot_transfer_ownership() {
   // Create room
   let create_request = message::signaling::CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -190,6 +194,7 @@ fn test_cannot_transfer_ownership_to_non_member() {
   // Create room
   let create_request = message::signaling::CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -215,6 +220,7 @@ fn test_owner_cannot_transfer_to_self() {
   // Create room
   let create_request = message::signaling::CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -255,6 +261,7 @@ fn test_multiple_ownership_transfers() {
   // Create room
   let create_request = message::signaling::CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: None,
     max_participants: 8,

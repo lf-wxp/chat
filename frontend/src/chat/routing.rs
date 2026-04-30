@@ -30,12 +30,11 @@ use message::{MessageId, UserId};
 use std::collections::BTreeMap;
 
 /// URL prefix used for inline `blob:` URLs produced from raw image or
-/// audio bytes. The frontend uses `URL.createObjectURL` to materialise
-/// these on demand — however, for transport-layer decoded bytes we
-/// simply keep the raw data as a `data:` URL which the browser can
-/// decode without any Rust-side registration. This keeps the routing
-/// layer allocation-free of `web_sys` and lets tests run under plain
-/// `cargo test` without a browser.
+/// audio bytes. For voice messages we use `audio/webm` since the
+/// MediaRecorder captures Opus-in-WebM. For images we use `image/jpeg`.
+/// The data-URL approach keeps the routing layer allocation-free of
+/// `web_sys` and lets tests run under plain `cargo test` without a
+/// browser.
 fn bytes_to_data_url(mime: &str, bytes: &[u8]) -> String {
   let b64 = base64_encode(bytes);
   format!("data:{mime};base64,{b64}")
@@ -244,7 +243,7 @@ pub fn dispatch_incoming(
         ack(mgr, peer, message_id, AckStatus::Received);
         return;
       }
-      let object_url = bytes_to_data_url("audio/ogg", &audio_data);
+      let object_url = bytes_to_data_url("audio/webm", &audio_data);
       let reply = resolve_reply_snippet(mgr, &conv, reply_to);
       let ui = build_inbound(
         message_id,

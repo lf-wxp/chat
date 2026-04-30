@@ -79,12 +79,14 @@ fn test_get_all_rooms_multiple() {
 
   let request1 = CreateRoom {
     name: "room1".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
   };
   let request2 = CreateRoom {
     name: "room2".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 8,
@@ -164,12 +166,14 @@ fn test_total_member_count_multiple_rooms() {
 
   let request1 = CreateRoom {
     name: "room1".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
   };
   let request2 = CreateRoom {
     name: "room2".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,

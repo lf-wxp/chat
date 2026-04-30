@@ -58,11 +58,15 @@
   border: none;
   background: none;
   color: var(--text-tertiary, #94a3b8);
-  font-size: var(--text-lg, 18px);
   line-height: 1;
   cursor: pointer;
   border-radius: var(--radius-sm, 4px);
   padding: 0;
+
+  & svg {
+    width: 14px;
+    height: 14px;
+  }
 
   &:hover {
     background-color: color-mix(in oklch, var(--color-error, #ef4444) 10%, transparent);

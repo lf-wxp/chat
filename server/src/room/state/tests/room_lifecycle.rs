@@ -105,12 +105,14 @@ fn test_create_room_same_owner_different_type_ok() {
 
   let request_chat = CreateRoom {
     name: "chat-room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
   };
   let request_theater = CreateRoom {
     name: "theater-room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 8,
@@ -130,6 +132,7 @@ fn test_create_room_password_too_short() {
   let owner_id = test_user_id(1);
   let request = CreateRoom {
     name: "test-room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: Some("ab".to_string()), // Too short (< 4 chars)
     max_participants: 8,
@@ -145,6 +148,7 @@ fn test_create_room_empty_name_fails() {
   let owner_id = test_user_id(1);
   let request = CreateRoom {
     name: "".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,

@@ -457,6 +457,7 @@ fn test_isolated_room_state() {
   let owner_id = message::types::UserId::new();
   let create_request = message::signaling::CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: None,
     max_participants: 8,

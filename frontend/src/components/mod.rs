@@ -13,6 +13,7 @@ mod error_toast;
 mod home_page;
 mod modal_manager;
 mod reconnect_banner;
+mod room;
 mod settings_page;
 mod sidebar;
 mod toast_container;
@@ -29,6 +30,10 @@ pub use error_toast::ErrorToastContainer;
 pub use home_page::HomePage;
 pub use modal_manager::ModalManager;
 pub use reconnect_banner::ReconnectBanner;
+pub use room::{
+  AnnouncementPanel, CreateRoomModal, MemberListPanel, MutedIndicator, NicknameEditor,
+  PasswordPromptModal, RoomListPanel,
+};
 pub use settings_page::SettingsPage;
 pub use sidebar::Sidebar;
 pub use toast_container::ToastContainer;

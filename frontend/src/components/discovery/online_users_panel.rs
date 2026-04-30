@@ -24,6 +24,8 @@ use crate::identicon::generate_identicon_data_uri;
 use crate::invite::{InviteStatus, use_invite_manager};
 use crate::state::{ConversationId, use_app_state};
 use crate::webrtc::try_use_webrtc_manager;
+use icondata as i;
+use leptos_icons::Icon;
 
 /// Online users sidebar panel.
 #[component]
@@ -315,7 +317,11 @@ fn UserRow(
       >
         <Show when=move || multi_select.get()>
           <span class="discovery-row__check" aria-hidden="true">
-            {move || if snapshot.get().selected { "☑" } else { "☐" }}
+            {move || if snapshot.get().selected {
+              view! { <Icon icon=i::LuSquareCheck /> }.into_any()
+            } else {
+              view! { <Icon icon=i::LuSquare /> }.into_any()
+            }}
           </span>
         </Show>
         <img

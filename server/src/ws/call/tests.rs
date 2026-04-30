@@ -30,6 +30,7 @@ fn test_call_invite_user_not_member() {
   // Create room
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -59,6 +60,7 @@ fn test_call_invite_member_success() {
   // Create room and add member
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -152,6 +154,7 @@ fn test_call_accept_user_not_member() {
   // Create room
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -180,6 +183,7 @@ fn test_call_accept_member_success() {
   // Create room and add member
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -236,6 +240,7 @@ fn test_call_decline_member_success() {
   // Create room and add member
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -288,6 +293,7 @@ fn test_call_end_member_success() {
   // Create room and add member
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -326,6 +332,7 @@ fn test_call_message_broadcast_to_members() {
   // Create room and add members
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -387,6 +394,7 @@ fn test_concurrent_call_messages() {
   // Create room
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 10,

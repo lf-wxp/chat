@@ -23,6 +23,8 @@ use crate::invite::{InviteStatus, use_invite_manager};
 use crate::signaling::use_signaling_client;
 use crate::state::use_app_state;
 use crate::webrtc::try_use_webrtc_manager;
+use icondata as i;
+use leptos_icons::Icon;
 
 /// User info card component. Renders nothing while `target` is `None`.
 #[component]
@@ -172,7 +174,7 @@ pub fn UserInfoCard(
               class="modal-close"
               aria-label=move || t_string!(i18n, common.close)
               on:click=move |_| close()
-            >"×"</button>
+            ><Icon icon=i::LuX /></button>
           </header>
 
           <div class="modal-body user-info-card__body">

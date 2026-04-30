@@ -20,10 +20,12 @@ use crate::components::chat_view::virtual_scroll::{
 };
 use crate::i18n;
 use crate::state::ConversationId;
+use icondata as i;
 use leptos::ev::Event;
 use leptos::html;
 use leptos::prelude::*;
 use leptos_i18n::t_string;
+use leptos_icons::Icon;
 use message::MessageId;
 use wasm_bindgen::{JsCast, closure::Closure};
 use web_sys::HtmlElement;
@@ -242,7 +244,10 @@ pub fn MessageList(
         let list = messages.get();
         if list.is_empty() {
           view! {
-            <div class="chat-view-empty">{t_string!(i18n, chat.no_messages)}</div>
+            <div class="chat-view-empty">
+              <Icon icon=i::LuMessageSquare />
+              <span>{t_string!(i18n, chat.no_messages)}</span>
+            </div>
           }
           .into_any()
         } else if list.len() > VIRTUAL_THRESHOLD {
@@ -333,7 +338,7 @@ pub fn MessageList(
 }
 
 fn scroll_to_bottom(node_ref: &NodeRef<html::Div>) {
-  if let Some(el) = node_ref.get() {
+  if let Some(el) = node_ref.get_untracked() {
     let height = el.scroll_height();
     el.set_scroll_top(height);
   }
@@ -353,7 +358,7 @@ fn request_animation_frame_scroll(node_ref: NodeRef<html::Div>) {
 /// Try to scroll to a message in the DOM. Returns `true` if the
 /// element was found and scrolled into view.
 fn try_scroll_to_message(node_ref: &NodeRef<html::Div>, id: MessageId) -> bool {
-  let Some(el) = node_ref.get() else {
+  let Some(el) = node_ref.get_untracked() else {
     return false;
   };
   let selector = format!("[data-message-id=\"{id}\"]");

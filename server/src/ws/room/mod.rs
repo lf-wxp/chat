@@ -248,7 +248,8 @@ pub async fn handle_kick_member<S>(
 {
   match ws_state.room_state.kick_member(&kick_member, user_id) {
     Ok((_removed_member, _room_info)) => {
-      // Send ModerationNotification to the kicked user
+      // Broadcast ModerationNotification to all remaining members AND the
+      // kicked user so everyone sees the toast (Req 15.3.23).
       let notification = SignalingMessage::ModerationNotification(ModerationNotification {
         room_id: kick_member.room_id.clone(),
         action: message::signaling::ModerationAction::Kicked,
@@ -257,10 +258,19 @@ pub async fn handle_kick_member<S>(
         duration_secs: None,
       });
 
-      if let Ok(encoded) = encode_signaling_message(&notification)
-        && let Some(sender) = ws_state.get_sender(&kick_member.target)
-      {
-        let _ = sender.send(encoded).await;
+      if let Ok(encoded) = encode_signaling_message(&notification) {
+        // Send to the kicked user (already removed from room).
+        if let Some(sender) = ws_state.get_sender(&kick_member.target) {
+          let _ = sender.send(encoded.clone()).await;
+        }
+        // Send to remaining room members.
+        if let Some(room) = ws_state.room_state.get_room(&kick_member.room_id) {
+          for m in room.get_members() {
+            if let Some(sender) = ws_state.get_sender(&m.user_id) {
+              let _ = sender.send(encoded.clone()).await;
+            }
+          }
+        }
       }
 
       // Broadcast RoomMemberUpdate to remaining members
@@ -320,7 +330,8 @@ pub async fn handle_mute_member<S>(
 {
   match ws_state.room_state.mute_member(&mute_member, user_id) {
     Ok((_member, mute_info)) => {
-      // Send ModerationNotification to the muted user
+      // Broadcast ModerationNotification to all room members so everyone
+      // sees the toast (Req 15.3.24).
       let notification = SignalingMessage::ModerationNotification(ModerationNotification {
         room_id: mute_member.room_id.clone(),
         action: message::signaling::ModerationAction::Muted,
@@ -330,9 +341,13 @@ pub async fn handle_mute_member<S>(
       });
 
       if let Ok(encoded) = encode_signaling_message(&notification)
-        && let Some(sender) = ws_state.get_sender(&mute_member.target)
+        && let Some(room) = ws_state.room_state.get_room(&mute_member.room_id)
       {
-        let _ = sender.send(encoded).await;
+        for m in room.get_members() {
+          if let Some(sender) = ws_state.get_sender(&m.user_id) {
+            let _ = sender.send(encoded.clone()).await;
+          }
+        }
       }
 
       // Broadcast MuteStatusChange to room members
@@ -394,7 +409,7 @@ pub async fn handle_unmute_member<S>(
 {
   match ws_state.room_state.unmute_member(&unmute_member, user_id) {
     Ok(_member) => {
-      // Send ModerationNotification to the unmuted user
+      // Broadcast ModerationNotification to all room members (Req 15.3.24).
       let notification = SignalingMessage::ModerationNotification(ModerationNotification {
         room_id: unmute_member.room_id.clone(),
         action: message::signaling::ModerationAction::Unmuted,
@@ -404,9 +419,13 @@ pub async fn handle_unmute_member<S>(
       });
 
       if let Ok(encoded) = encode_signaling_message(&notification)
-        && let Some(sender) = ws_state.get_sender(&unmute_member.target)
+        && let Some(room) = ws_state.room_state.get_room(&unmute_member.room_id)
       {
-        let _ = sender.send(encoded).await;
+        for m in room.get_members() {
+          if let Some(sender) = ws_state.get_sender(&m.user_id) {
+            let _ = sender.send(encoded.clone()).await;
+          }
+        }
       }
 
       // Broadcast MuteStatusChange to room members
@@ -467,7 +486,8 @@ pub async fn handle_ban_member<S>(
 {
   match ws_state.room_state.ban_member(&ban_member, user_id) {
     Ok((_removed_member, _room_info)) => {
-      // Send ModerationNotification to the banned user
+      // Broadcast ModerationNotification to all remaining members AND the
+      // banned user so everyone sees the toast (Req 15.3.23).
       let notification = SignalingMessage::ModerationNotification(ModerationNotification {
         room_id: ban_member.room_id.clone(),
         action: message::signaling::ModerationAction::Banned,
@@ -476,10 +496,19 @@ pub async fn handle_ban_member<S>(
         duration_secs: None,
       });
 
-      if let Ok(encoded) = encode_signaling_message(&notification)
-        && let Some(sender) = ws_state.get_sender(&ban_member.target)
-      {
-        let _ = sender.send(encoded).await;
+      if let Ok(encoded) = encode_signaling_message(&notification) {
+        // Send to the banned user (already removed from room).
+        if let Some(sender) = ws_state.get_sender(&ban_member.target) {
+          let _ = sender.send(encoded.clone()).await;
+        }
+        // Send to remaining room members.
+        if let Some(room) = ws_state.room_state.get_room(&ban_member.room_id) {
+          for m in room.get_members() {
+            if let Some(sender) = ws_state.get_sender(&m.user_id) {
+              let _ = sender.send(encoded.clone()).await;
+            }
+          }
+        }
       }
 
       // Broadcast RoomMemberUpdate to remaining members
@@ -539,7 +568,8 @@ pub async fn handle_unban_member<S>(
 {
   match ws_state.room_state.unban_member(&unban_member, user_id) {
     Ok(()) => {
-      // Send ModerationNotification to the unbanned user
+      // Broadcast ModerationNotification to the unbanned user AND all room
+      // members so everyone sees the toast (Req 15.3.23).
       let notification = SignalingMessage::ModerationNotification(ModerationNotification {
         room_id: unban_member.room_id.clone(),
         action: message::signaling::ModerationAction::Unbanned,
@@ -548,10 +578,19 @@ pub async fn handle_unban_member<S>(
         duration_secs: None,
       });
 
-      if let Ok(encoded) = encode_signaling_message(&notification)
-        && let Some(sender) = ws_state.get_sender(&unban_member.target)
-      {
-        let _ = sender.send(encoded).await;
+      if let Ok(encoded) = encode_signaling_message(&notification) {
+        // Send to the unbanned user (not in room yet).
+        if let Some(sender) = ws_state.get_sender(&unban_member.target) {
+          let _ = sender.send(encoded.clone()).await;
+        }
+        // Send to current room members.
+        if let Some(room) = ws_state.room_state.get_room(&unban_member.room_id) {
+          for m in room.get_members() {
+            if let Some(sender) = ws_state.get_sender(&m.user_id) {
+              let _ = sender.send(encoded.clone()).await;
+            }
+          }
+        }
       }
 
       info!(
@@ -594,7 +633,7 @@ pub async fn handle_promote_admin<S>(
 {
   match ws_state.room_state.promote_admin(&promote_admin, user_id) {
     Ok(_member) => {
-      // Send ModerationNotification to the promoted user
+      // Broadcast ModerationNotification to all room members (Req 15.3.23).
       let notification = SignalingMessage::ModerationNotification(ModerationNotification {
         room_id: promote_admin.room_id.clone(),
         action: message::signaling::ModerationAction::Promoted,
@@ -604,9 +643,13 @@ pub async fn handle_promote_admin<S>(
       });
 
       if let Ok(encoded) = encode_signaling_message(&notification)
-        && let Some(sender) = ws_state.get_sender(&promote_admin.target)
+        && let Some(room) = ws_state.room_state.get_room(&promote_admin.room_id)
       {
-        let _ = sender.send(encoded).await;
+        for m in room.get_members() {
+          if let Some(sender) = ws_state.get_sender(&m.user_id) {
+            let _ = sender.send(encoded.clone()).await;
+          }
+        }
       }
 
       // Broadcast RoomMemberUpdate to all members
@@ -667,7 +710,7 @@ pub async fn handle_demote_admin<S>(
 {
   match ws_state.room_state.demote_admin(&demote_admin, user_id) {
     Ok(_member) => {
-      // Send ModerationNotification to the demoted user
+      // Broadcast ModerationNotification to all room members (Req 15.3.23).
       let notification = SignalingMessage::ModerationNotification(ModerationNotification {
         room_id: demote_admin.room_id.clone(),
         action: message::signaling::ModerationAction::Demoted,
@@ -677,9 +720,13 @@ pub async fn handle_demote_admin<S>(
       });
 
       if let Ok(encoded) = encode_signaling_message(&notification)
-        && let Some(sender) = ws_state.get_sender(&demote_admin.target)
+        && let Some(room) = ws_state.room_state.get_room(&demote_admin.room_id)
       {
-        let _ = sender.send(encoded).await;
+        for m in room.get_members() {
+          if let Some(sender) = ws_state.get_sender(&m.user_id) {
+            let _ = sender.send(encoded.clone()).await;
+          }
+        }
       }
 
       // Broadcast RoomMemberUpdate to all members
@@ -932,6 +979,163 @@ pub async fn handle_nickname_change<S>(
       send_error_response(socket_tx, code, msg, None).await;
     }
   }
+}
+
+/// Handle UpdateRoomInfo message (Owner only — Req 4.5).
+pub async fn handle_update_room_info<S>(
+  socket_tx: &mut S,
+  ws_state: &Arc<WebSocketState>,
+  user_id: &UserId,
+  request: message::signaling::UpdateRoomInfo,
+) where
+  S: Sink<Message> + Unpin,
+  S::Error: Display,
+{
+  match ws_state.room_state.update_room_info(&request, user_id) {
+    Ok(_updated) => {
+      // Broadcast RoomListUpdate so every client refreshes its
+      // cached room metadata (name + description) immediately.
+      let rooms = ws_state.room_state.get_all_rooms();
+      let list_update = SignalingMessage::RoomListUpdate(RoomListUpdate { rooms });
+      if let Ok(encoded) = encode_signaling_message(&list_update) {
+        ws_state.broadcast(encoded).await;
+      }
+
+      info!(
+        owner = %user_id,
+        room_id = %request.room_id,
+        "Room info updated"
+      );
+    }
+    Err(e) => {
+      warn!(
+        owner = %user_id,
+        room_id = %request.room_id,
+        error = ?e,
+        "Failed to update room info"
+      );
+      let (code, msg) = match e {
+        crate::room::RoomError::InsufficientPermission => {
+          ("ROM2001", "Only the owner can update room info")
+        }
+        crate::room::RoomError::InvalidRoomName(_) => ("ROM2002", "Invalid room name"),
+        crate::room::RoomError::InvalidInput(_) => ("ROM2003", "Invalid description"),
+        crate::room::RoomError::RoomNotFound => ("ROM2004", "Room not found"),
+        _ => ("ROM2000", "Failed to update room info"),
+      };
+      send_error_response(socket_tx, code, msg, None).await;
+    }
+  }
+}
+
+/// Handle UpdateRoomPassword message (Owner only — Req 4.5a / 4.5b).
+pub async fn handle_update_room_password<S>(
+  socket_tx: &mut S,
+  ws_state: &Arc<WebSocketState>,
+  user_id: &UserId,
+  request: message::signaling::UpdateRoomPassword,
+) where
+  S: Sink<Message> + Unpin,
+  S::Error: Display,
+{
+  match ws_state.room_state.update_room_password(&request, user_id) {
+    Ok((_updated, cleared)) => {
+      // Broadcast RoomListUpdate so the password-protected badge
+      // updates everywhere (Req 4.9). Clients already in the room
+      // will additionally render a toast based on the diff.
+      let rooms = ws_state.room_state.get_all_rooms();
+      let list_update = SignalingMessage::RoomListUpdate(RoomListUpdate { rooms });
+      if let Ok(encoded) = encode_signaling_message(&list_update) {
+        ws_state.broadcast(encoded).await;
+      }
+
+      info!(
+        owner = %user_id,
+        room_id = %request.room_id,
+        cleared,
+        "Room password updated"
+      );
+    }
+    Err(e) => {
+      warn!(
+        owner = %user_id,
+        room_id = %request.room_id,
+        error = ?e,
+        "Failed to update room password"
+      );
+      let (code, msg) = match e {
+        crate::room::RoomError::InsufficientPermission => {
+          ("ROM2101", "Only the owner can change the password")
+        }
+        crate::room::RoomError::InvalidPassword(_) => ("ROM2102", "Invalid password"),
+        crate::room::RoomError::RoomNotFound => ("ROM2103", "Room not found"),
+        _ => ("ROM2100", "Failed to update room password"),
+      };
+      send_error_response(socket_tx, code, msg, None).await;
+    }
+  }
+}
+
+/// Handle RoomInvite message (Req 4.3).
+///
+/// Stamps the inviter's id and forwards the invite to the target.
+pub async fn handle_room_invite<S>(
+  socket_tx: &mut S,
+  ws_state: &Arc<WebSocketState>,
+  user_id: &UserId,
+  mut invite: message::signaling::RoomInvite,
+) where
+  S: Sink<Message> + Unpin,
+  S::Error: Display,
+{
+  // Stamp the actual inviter regardless of what the client supplied.
+  invite.from = user_id.clone();
+
+  // Make sure the room and target user exist before forwarding.
+  if ws_state.room_state.get_room(&invite.room_id).is_none() {
+    send_error_response(socket_tx, "ROM2401", "Room not found", None).await;
+    return;
+  }
+
+  let Some(target_sender) = ws_state.get_sender(&invite.to) else {
+    send_error_response(socket_tx, "ROM2402", "Target user is offline", None).await;
+    return;
+  };
+
+  let msg = SignalingMessage::RoomInvite(invite.clone());
+  if let Ok(encoded) = encode_signaling_message(&msg) {
+    let _ = target_sender.send(encoded).await;
+    info!(
+      from = %user_id,
+      to = %invite.to,
+      room_id = %invite.room_id,
+      "Room invite forwarded"
+    );
+  }
+}
+
+/// Handle RoomInviteResponse message (Req 4.4).
+///
+/// Forwards the response back to the original inviter so their UI can
+/// show success / decline feedback.
+pub async fn handle_room_invite_response<S>(
+  socket_tx: &mut S,
+  ws_state: &Arc<WebSocketState>,
+  _user_id: &UserId,
+  response: message::signaling::RoomInviteResponse,
+) where
+  S: Sink<Message> + Unpin,
+  S::Error: Display,
+{
+  let Some(target_sender) = ws_state.get_sender(&response.to) else {
+    // The original inviter went offline — the response is dropped.
+    return;
+  };
+  let msg = SignalingMessage::RoomInviteResponse(response.clone());
+  if let Ok(encoded) = encode_signaling_message(&msg) {
+    let _ = target_sender.send(encoded).await;
+  }
+  let _ = socket_tx; // No ack to the responder.
 }
 
 #[cfg(test)]

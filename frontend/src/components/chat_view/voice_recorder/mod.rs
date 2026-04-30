@@ -36,8 +36,10 @@ pub mod waveform;
 use crate::chat::use_chat_manager;
 use crate::i18n;
 use crate::state::ConversationId;
+use icondata as i;
 use leptos::prelude::*;
 use leptos_i18n::t_string;
+use leptos_icons::Icon;
 use waveform::{MAX_DURATION_MS, RecordingState};
 
 /// Number of waveform bars kept on screen during live capture.
@@ -236,9 +238,10 @@ pub fn VoiceRecorder(
             type="button"
             class="chat-input-btn voice-recorder__cancel"
             aria-label=move || t_string!(i18n, common.cancel)
+            title=move || t_string!(i18n, common.cancel)
             on:click=handle_cancel
           >
-            {move || t_string!(i18n, common.cancel)}
+            <Icon icon=i::LuX />
           </button>
 
           <Show
@@ -249,9 +252,10 @@ pub fn VoiceRecorder(
               type="button"
               class="chat-input-btn voice-recorder__record"
               aria-label=move || t_string!(i18n, chat.voice_record)
+              title=move || t_string!(i18n, chat.voice_record)
               on:click=handle_record
             >
-              "●"
+              <Icon icon=i::LuMic />
             </button>
           </Show>
 
@@ -263,9 +267,10 @@ pub fn VoiceRecorder(
               type="button"
               class="chat-input-btn voice-recorder__send"
               aria-label=move || t_string!(i18n, chat.voice_send)
+              title=move || t_string!(i18n, chat.voice_send)
               on:click=handle_stop_and_send
             >
-              "✓"
+              <Icon icon=i::LuSend />
             </button>
           </Show>
         </div>

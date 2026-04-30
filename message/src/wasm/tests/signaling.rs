@@ -198,6 +198,7 @@ fn test_wasm_create_room_roundtrip() {
   use crate::types::RoomType;
   let msg = CreateRoom {
     name: "WASM Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,

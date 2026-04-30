@@ -130,10 +130,11 @@ fn send_file(
     let bytes_for_cb = bytes.clone();
     let url_for_cb = url_for_img.clone();
     let thumb_for_cb = thumbnail_url.clone();
+    let img_for_cb = img.clone();
 
     let on_img_load = Closure::once_into_js(move || {
-      let w = img.natural_width();
-      let h = img.natural_height();
+      let w = img_for_cb.natural_width();
+      let h = img_for_cb.natural_height();
       let payload = ImagePayload {
         image_data: bytes_for_cb.clone(),
         thumbnail: bytes_for_cb,
@@ -145,9 +146,8 @@ fn send_file(
       let _ = manager_clone.send_image(conv, payload);
     });
 
-    let img2 = web_sys::HtmlImageElement::new().unwrap();
-    img2.set_onload(Some(on_img_load.unchecked_ref()));
-    img2.set_src(&url_for_img);
+    img.set_onload(Some(on_img_load.unchecked_ref()));
+    img.set_src(&url_for_img);
   });
 
   reader.set_onloadend(Some(on_load.unchecked_ref()));

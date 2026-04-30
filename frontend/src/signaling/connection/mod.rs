@@ -17,12 +17,22 @@ use leptos::prelude::*;
 use message::UserId;
 use message::frame::{MessageFrame, encode_frame};
 use message::signaling::{
-  ConnectionInvite as ConnectionInviteMsg, IceCandidate as IceCandidateMsg,
+  BanMember as BanMemberMsg, ConnectionInvite as ConnectionInviteMsg, CreateRoom as CreateRoomMsg,
+  DemoteAdmin as DemoteAdminMsg, IceCandidate as IceCandidateMsg,
   InviteAccepted as InviteAcceptedMsg, InviteDeclined as InviteDeclinedMsg,
-  MultiInvite as MultiInviteMsg, PeerClosed as PeerClosedMsg,
-  PeerEstablished as PeerEstablishedMsg, SdpAnswer as SdpAnswerMsg, SdpOffer as SdpOfferMsg,
-  SignalingMessage, TokenAuth, UserLogout,
+  JoinRoom as JoinRoomMsg, KickMember as KickMemberMsg, LeaveRoom as LeaveRoomMsg,
+  MultiInvite as MultiInviteMsg, MuteMember as MuteMemberMsg, NicknameChange as NicknameChangeMsg,
+  PeerClosed as PeerClosedMsg, PeerEstablished as PeerEstablishedMsg,
+  PromoteAdmin as PromoteAdminMsg, RoomAnnouncement as RoomAnnouncementMsg,
+  SdpAnswer as SdpAnswerMsg, SdpOffer as SdpOfferMsg, SignalingMessage, TokenAuth,
+  TransferOwnership as TransferOwnershipMsg, UnbanMember as UnbanMemberMsg,
+  UnmuteMember as UnmuteMemberMsg, UpdateRoomInfo as UpdateRoomInfoMsg,
+  UpdateRoomPassword as UpdateRoomPasswordMsg, UserLogout,
 };
+use message::signaling::{
+  RoomInvite as RoomInviteMsg, RoomInviteResponse as RoomInviteResponseMsg,
+};
+use message::types::{RoomId, RoomType};
 use wasm_bindgen::prelude::*;
 use web_sys::WebSocket;
 
@@ -497,6 +507,167 @@ impl SignalingClient {
     let msg = SignalingMessage::InviteDeclined(InviteDeclinedMsg {
       from: my_id,
       to: inviter.clone(),
+    });
+    self.send(&msg)
+  }
+
+  // ── Room management signaling (Req 4, Req 15) ──
+
+  /// Create a new room (Chat or Theater) on the server.
+  pub fn send_create_room(
+    &self,
+    name: String,
+    description: String,
+    room_type: RoomType,
+    password: Option<String>,
+  ) -> Result<(), String> {
+    let msg = SignalingMessage::CreateRoom(CreateRoomMsg {
+      name,
+      description,
+      room_type,
+      password,
+      max_participants: 8,
+    });
+    self.send(&msg)
+  }
+
+  /// Join an existing room, optionally supplying the password.
+  pub fn send_join_room(&self, room_id: RoomId, password: Option<String>) -> Result<(), String> {
+    let msg = SignalingMessage::JoinRoom(JoinRoomMsg { room_id, password });
+    self.send(&msg)
+  }
+
+  /// Leave the specified room.
+  pub fn send_leave_room(&self, room_id: RoomId) -> Result<(), String> {
+    let msg = SignalingMessage::LeaveRoom(LeaveRoomMsg { room_id });
+    self.send(&msg)
+  }
+
+  /// Kick a member out of a room (Owner / Admin only).
+  pub fn send_kick_member(&self, room_id: RoomId, target: UserId) -> Result<(), String> {
+    let msg = SignalingMessage::KickMember(KickMemberMsg { room_id, target });
+    self.send(&msg)
+  }
+
+  /// Mute a member for the given duration (None = permanent).
+  pub fn send_mute_member(
+    &self,
+    room_id: RoomId,
+    target: UserId,
+    duration_secs: Option<u64>,
+  ) -> Result<(), String> {
+    let msg = SignalingMessage::MuteMember(MuteMemberMsg {
+      room_id,
+      target,
+      duration_secs,
+    });
+    self.send(&msg)
+  }
+
+  /// Clear a member's mute status ahead of time.
+  pub fn send_unmute_member(&self, room_id: RoomId, target: UserId) -> Result<(), String> {
+    let msg = SignalingMessage::UnmuteMember(UnmuteMemberMsg { room_id, target });
+    self.send(&msg)
+  }
+
+  /// Ban a member from the room (Owner only).
+  pub fn send_ban_member(&self, room_id: RoomId, target: UserId) -> Result<(), String> {
+    let msg = SignalingMessage::BanMember(BanMemberMsg { room_id, target });
+    self.send(&msg)
+  }
+
+  /// Lift a ban from a user (Owner only).
+  pub fn send_unban_member(&self, room_id: RoomId, target: UserId) -> Result<(), String> {
+    let msg = SignalingMessage::UnbanMember(UnbanMemberMsg { room_id, target });
+    self.send(&msg)
+  }
+
+  /// Promote a member to the Admin role (Owner only).
+  pub fn send_promote_admin(&self, room_id: RoomId, target: UserId) -> Result<(), String> {
+    let msg = SignalingMessage::PromoteAdmin(PromoteAdminMsg { room_id, target });
+    self.send(&msg)
+  }
+
+  /// Demote an Admin back to a regular Member (Owner only).
+  pub fn send_demote_admin(&self, room_id: RoomId, target: UserId) -> Result<(), String> {
+    let msg = SignalingMessage::DemoteAdmin(DemoteAdminMsg { room_id, target });
+    self.send(&msg)
+  }
+
+  /// Transfer room ownership to another member (Owner only).
+  pub fn send_transfer_ownership(&self, room_id: RoomId, target: UserId) -> Result<(), String> {
+    let msg = SignalingMessage::TransferOwnership(TransferOwnershipMsg { room_id, target });
+    self.send(&msg)
+  }
+
+  /// Broadcast a nickname change to the signaling server.
+  pub fn send_nickname_change(&self, new_nickname: String) -> Result<(), String> {
+    let my_id = self
+      .current_user_id()
+      .ok_or("Cannot send NicknameChange: not authenticated")?;
+    let msg = SignalingMessage::NicknameChange(NicknameChangeMsg {
+      user_id: my_id,
+      new_nickname,
+    });
+    self.send(&msg)
+  }
+
+  /// Update a room's announcement (Owner only).
+  pub fn send_room_announcement(&self, room_id: RoomId, content: String) -> Result<(), String> {
+    let msg = SignalingMessage::RoomAnnouncement(RoomAnnouncementMsg { room_id, content });
+    self.send(&msg)
+  }
+
+  /// Update a room's name and description (Owner only — Req 4.5).
+  pub fn send_update_room_info(
+    &self,
+    room_id: RoomId,
+    name: String,
+    description: String,
+  ) -> Result<(), String> {
+    let msg = SignalingMessage::UpdateRoomInfo(UpdateRoomInfoMsg {
+      room_id,
+      name,
+      description,
+    });
+    self.send(&msg)
+  }
+
+  /// Update or clear a room's password (Owner only — Req 4.5a / 4.5b).
+  ///
+  /// `password = None` clears the password; `Some(non_empty)` sets a
+  /// new password.
+  pub fn send_update_room_password(
+    &self,
+    room_id: RoomId,
+    password: Option<String>,
+  ) -> Result<(), String> {
+    let msg = SignalingMessage::UpdateRoomPassword(UpdateRoomPasswordMsg { room_id, password });
+    self.send(&msg)
+  }
+
+  /// Send a room invite to another user (Req 4.3).
+  pub fn send_room_invite(&self, room_id: RoomId, to: UserId, note: String) -> Result<(), String> {
+    let msg = SignalingMessage::RoomInvite(RoomInviteMsg {
+      room_id,
+      from: UserId::new(), // Server overrides with the actual caller.
+      to,
+      note,
+    });
+    self.send(&msg)
+  }
+
+  /// Respond to a room invite (Req 4.4).
+  pub fn send_room_invite_response(
+    &self,
+    room_id: RoomId,
+    to: UserId,
+    accepted: bool,
+  ) -> Result<(), String> {
+    let msg = SignalingMessage::RoomInviteResponse(RoomInviteResponseMsg {
+      room_id,
+      to,
+      accepted,
     });
     self.send(&msg)
   }

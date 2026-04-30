@@ -136,6 +136,15 @@
   width: 1.25rem;
   text-align: center;
   font-size: var(--font-base, 1rem);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary, #94a3b8);
+}
+
+.discovery-row__check svg {
+  width: 16px;
+  height: 16px;
 }
 
 .discovery-row__avatar {
@@ -449,12 +458,9 @@
   font-size: var(--font-xs, 0.75rem);
 }
 
-/* ── Mobile collapse: hide discovery section title labels but keep avatars ── */
+/* Mobile: sidebar is full-width overlay, so keep discovery info visible.
+   Only hide the multi-invite footer to save vertical space. */
 @media (max-width: 767px) {
-  .discovery-panel__title,
-  .discovery-panel__search,
-  .discovery-row__info,
-  .discovery-row__badge,
   .discovery-panel__multi-footer {
     display: none;
   }

@@ -21,8 +21,10 @@ use crate::components::chat_view::reaction_picker::ReactionPicker;
 use crate::components::chat_view::virtual_scroll::VirtualScrollState;
 use crate::i18n;
 use crate::state::use_app_state;
+use icondata as i;
 use leptos::prelude::*;
 use leptos_i18n::{t, t_string};
+use leptos_icons::Icon;
 use wasm_bindgen::JsCast;
 
 /// Callbacks exposed by the parent `ChatView` so the bubble can ask
@@ -74,6 +76,22 @@ pub fn MessageBubble(
   let msg_timestamp = msg.timestamp_ms;
   let msg_outgoing = msg.outgoing;
   let sender_label = msg.sender_name.clone();
+  let sender_id_for_badge = msg.sender.clone();
+  let sender_label_for_badge = msg.sender_name.clone();
+  // Lookup the sender's canonical username for the disambiguation
+  // badge (Req 15.1.5). The badge is suppressed when the username and
+  // the displayed nickname are equal — there is nothing to clarify.
+  let sender_username_badge = Memo::new(move |_| {
+    let id = sender_id_for_badge.clone();
+    let nickname = sender_label_for_badge.clone();
+    app_state.online_users.with(|users| {
+      users
+        .iter()
+        .find(|u| u.user_id == id)
+        .filter(|u| !u.username.is_empty() && u.username != nickname)
+        .map(|u| u.username.clone())
+    })
+  });
   let reply_snippet = msg.reply_to.clone();
   let reactions = msg.reactions.clone();
   let me_user_id = app_state.current_user_id();
@@ -142,7 +160,7 @@ pub fn MessageBubble(
     let manager_for_resend = manager.clone();
     Some(view! {
       <span class=move || format!("message-status {}", status.css_class())>
-        {status_label(status)}
+        {status_icon(status)}
         <Show when=move || status == MessageStatus::Failed fallback=|| ()>
           <button
             type="button"
@@ -204,6 +222,19 @@ pub fn MessageBubble(
       <Show when=move || !outgoing fallback=|| ()>
         <div class="message-sender" aria-hidden="true">
           {sender_label.clone()}
+          <Show when=move || sender_username_badge.get().is_some()>
+            <small
+              class="message-sender__username-badge"
+              data-testid="message-sender-username-badge"
+            >
+              {move || {
+                sender_username_badge
+                  .get()
+                  .map(|u| format!(" ({u})"))
+                  .unwrap_or_default()
+              }}
+            </small>
+          </Show>
         </div>
       </Show>
 
@@ -219,11 +250,11 @@ pub fn MessageBubble(
         </Show>
 
         {content_view}
-      </div>
 
-      <div class="message-time" aria-label=move || format!("Sent at {}", time_label.clone())>
-        {time_label.clone()}
-        {status_view}
+        <div class="message-time" aria-label=move || format!("Sent at {}", time_label.clone())>
+          {time_label.clone()}
+          {status_view}
+        </div>
       </div>
 
       {reaction_chips}
@@ -247,7 +278,7 @@ pub fn MessageBubble(
             }
           }
         >
-          "↩"
+          <Icon icon=i::LuReply />
         </button>
 
         <button
@@ -257,7 +288,7 @@ pub fn MessageBubble(
           title=move || t_string!(i18n, chat.add_reaction)
           on:click=move |_| picker_open.update(|v| *v = !*v)
         >
-          "😊"
+          <Icon icon=i::LuSmilePlus />
         </button>
 
         <button
@@ -270,7 +301,7 @@ pub fn MessageBubble(
             move |_| cbs.open_forward.run(msg.clone())
           }
         >
-          "➤"
+          <Icon icon=i::LuForward />
         </button>
 
         <Show when=move || outgoing && can_revoke.get() fallback=|| ()>
@@ -289,7 +320,7 @@ pub fn MessageBubble(
               }
             }
           >
-            "⌫"
+            <Icon icon=i::LuTrash2 />
           </button>
         </Show>
 
@@ -303,7 +334,7 @@ pub fn MessageBubble(
             move |_| copy_message(&msg)
           }
         >
-          "⎘"
+          <Icon icon=i::LuCopy />
         </button>
       </div>
 
@@ -317,14 +348,18 @@ pub fn MessageBubble(
   }
 }
 
-fn status_label(status: MessageStatus) -> &'static str {
+/// Render a status icon for the message status indicator.
+fn status_icon(status: MessageStatus) -> AnyView {
   match status {
-    MessageStatus::Sending => "⏳",
-    MessageStatus::Sent => "✓",
-    MessageStatus::Delivered => "✓✓",
-    MessageStatus::Read => "✓✓",
-    MessageStatus::Failed => "✗",
-    MessageStatus::Received => "",
+    MessageStatus::Sending => view! { <Icon icon=i::LuClock4 /> }.into_any(),
+    MessageStatus::Sent => view! { <Icon icon=i::LuCheck /> }.into_any(),
+    MessageStatus::Delivered => view! { <Icon icon=i::LuCheckCheck /> }.into_any(),
+    MessageStatus::Read => view! {
+      <span class="message-status-read"><Icon icon=i::LuCheckCheck /></span>
+    }
+    .into_any(),
+    MessageStatus::Failed => view! { <Icon icon=i::LuCircleAlert /> }.into_any(),
+    MessageStatus::Received => ().into_any(),
   }
 }
 
@@ -343,7 +378,7 @@ fn content_view(msg: &ChatMessage, self_nickname: Memo<String>, cbs: BubbleCallb
       .into_any()
     }
     MessageContent::Sticker(sticker) => render_sticker(sticker),
-    MessageContent::Voice(clip) => render_voice(clip),
+    MessageContent::Voice(clip) => render_voice(clip, msg.outgoing),
     MessageContent::Image(image) => {
       let object_url = image.object_url.clone();
       let thumb_url = image.thumbnail_url.clone();
@@ -425,33 +460,40 @@ fn render_sticker(sticker: &StickerRef) -> AnyView {
       src=url
       alt=label.clone()
       loading="lazy"
-      style="max-width:120px;max-height:120px"
       onerror="this.replaceWith(document.createTextNode(this.alt))"
     />
   }
   .into_any()
 }
 
-fn render_voice(clip: &VoiceClip) -> AnyView {
+fn render_voice(clip: &VoiceClip, outgoing: bool) -> AnyView {
+  use crate::components::chat_view::voice_waveform::VoiceWaveform;
+
   let url = clip.object_url.clone();
   let duration_label = format_duration_ms(clip.duration_ms);
   let bars = clip.waveform.clone();
-  // Normalise waveform samples to percentage heights (2..100).
-  let max = bars.iter().copied().max().unwrap_or(1).max(1);
-  let bar_views = bars
-    .iter()
-    .map(|&v| {
-      let pct = (f32::from(v) / f32::from(max)).clamp(0.08, 1.0) * 100.0;
-      let style = format!("height:{pct:.0}%");
-      view! { <span style=style></span> }
-    })
-    .collect_view();
+  let duration_ms = clip.duration_ms;
 
   let audio_ref = NodeRef::<leptos::html::Audio>::new();
   let playing = RwSignal::new(false);
+  let progress = RwSignal::new(0.0_f64);
   let i18n = i18n::use_i18n();
 
+  // Time-update handler: compute progress fraction from currentTime.
+  let progress_for_update = progress;
+  let duration_ms_for_update = duration_ms;
+  let on_time_update = move || {
+    if let Some(audio) = audio_ref.get_untracked() {
+      let current = audio.current_time() * 1000.0;
+      if duration_ms_for_update > 0 {
+        let frac = current / f64::from(duration_ms_for_update);
+        progress_for_update.set(frac.clamp(0.0, 1.0));
+      }
+    }
+  };
+
   let label_playing = playing;
+  let progress_signal: Signal<f64> = progress.into();
   view! {
     <div class="message-voice" data-testid="message-voice">
       <button
@@ -476,15 +518,23 @@ fn render_voice(clip: &VoiceClip) -> AnyView {
           }
         }
       >
-        {move || if playing.get() { "❚❚" } else { "▶" }}
+        {move || if playing.get() {
+          view! { <Icon icon=i::LuPause /> }.into_any()
+        } else {
+          view! { <Icon icon=i::LuPlay /> }.into_any()
+        }}
       </button>
-      <span class="message-voice-waveform" aria-hidden="true">{bar_views}</span>
+      <VoiceWaveform bars=bars outgoing=outgoing progress=progress_signal />
       <span class="message-voice-duration">{duration_label}</span>
       <audio
         node_ref=audio_ref
         src=url
         preload="metadata"
-        on:ended=move |_| playing.set(false)
+        on:timeupdate=move |_| on_time_update()
+        on:ended=move |_| {
+          playing.set(false);
+          progress.set(0.0);
+        }
       ></audio>
     </div>
   }

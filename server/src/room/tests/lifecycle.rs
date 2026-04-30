@@ -9,6 +9,7 @@ fn test_create_room() {
 
   let request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -31,6 +32,7 @@ fn test_create_room_with_password() {
 
   let request = CreateRoom {
     name: "Private Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: Some("secret123".to_string()),
     max_participants: 8,
@@ -52,6 +54,7 @@ fn test_join_room() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -79,6 +82,7 @@ fn test_join_password_protected_room() {
   // Create room with password
   let create_request = CreateRoom {
     name: "Private Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: Some("secret123".to_string()),
     max_participants: 8,
@@ -111,6 +115,7 @@ fn test_leave_room() {
   // Create and join room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -148,6 +153,7 @@ fn test_ownership_transfer_on_owner_leave() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -189,6 +195,7 @@ fn test_room_destruction_when_empty() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -219,6 +226,7 @@ fn test_room_full() {
   // Create room with max 2 members
   let create_request = CreateRoom {
     name: "Small Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: None,
     max_participants: 2,
@@ -256,6 +264,7 @@ fn test_transfer_ownership() {
   // Create and join room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: None,
     max_participants: 8,

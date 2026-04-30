@@ -91,6 +91,7 @@ async fn create_room_with_password(
 ) -> RoomId {
   let create_msg = CreateRoom {
     name: name.to_string(),
+    description: String::new(),
     room_type,
     password,
     max_participants: 8,
@@ -132,6 +133,7 @@ async fn test_error_rom101_already_own_same_type() {
   // Try to create second Chat room — should return ROM101
   let create_msg = CreateRoom {
     name: "Second Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,

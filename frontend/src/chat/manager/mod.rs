@@ -58,7 +58,10 @@ pub struct ChatConversationState {
 }
 
 impl ChatConversationState {
-  fn new() -> Self {
+  fn new_in_owner() -> Self {
+    // Caller must have set the correct Owner (conv_owner) before calling
+    // this method, so that the signals are registered under the
+    // ChatManager's long-lived owner rather than a UI component's owner.
     Self {
       messages: RwSignal::new(Vec::new()),
       unread: RwSignal::new(0),
@@ -185,6 +188,9 @@ pub struct ChatManager {
   pub(crate) webrtc: Rc<RefCell<Option<WebRtcManager>>>,
   pub(crate) persistence: Rc<RefCell<Option<PersistenceManager>>>,
   pub(crate) _tick: Rc<RefCell<Option<IntervalHandle>>>,
+  /// Dedicated owner for all `ChatConversationState` signals so they are
+  /// not disposed when UI components unmount.
+  pub(crate) conv_owner: Owner,
 }
 
 impl std::fmt::Debug for ChatManager {
@@ -199,12 +205,14 @@ impl ChatManager {
   /// Build a new manager wired to the given app state.
   #[must_use]
   pub fn new(app_state: AppState) -> Self {
+    let conv_owner = Owner::new();
     let mgr = Self {
       inner: Rc::new(RefCell::new(Inner::new())),
       app_state,
       webrtc: Rc::new(RefCell::new(None)),
       persistence: Rc::new(RefCell::new(None)),
       _tick: Rc::new(RefCell::new(None)),
+      conv_owner,
     };
     mgr.start_housekeeping();
     mgr
@@ -225,10 +233,14 @@ impl ChatManager {
   /// Look up or create the reactive state for a conversation.
   pub fn conversation_state(&self, id: &ConversationId) -> ChatConversationState {
     let mut inner = self.inner.borrow_mut();
-    *inner
-      .conversations
-      .entry(id.clone())
-      .or_insert_with(ChatConversationState::new)
+    *inner.conversations.entry(id.clone()).or_insert_with(|| {
+      // Create signals under the ChatManager's dedicated Owner so they
+      // survive component unmounts.  Without this, signals created here
+      // would be registered with the current component's Owner and
+      // disposed on unmount — causing "disposed signal" panics.
+      self.conv_owner.set();
+      ChatConversationState::new_in_owner()
+    })
   }
 
   /// Check if a message is already known (in-memory index). Used for

@@ -39,6 +39,7 @@ fn is_noise_message(msg: &SignalingMessage) -> bool {
       | SignalingMessage::PeerEstablished(_)
       | SignalingMessage::RoomCreated(_)
       | SignalingMessage::RoomJoined(_)
+      | SignalingMessage::ModerationNotification(_)
   )
 }
 
@@ -98,6 +99,7 @@ async fn test_room_creation() {
   // Create a room
   let create_msg = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -127,6 +129,7 @@ async fn test_multi_user_join_room() {
 
   let create_msg = CreateRoom {
     name: "Multi User Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -202,6 +205,7 @@ async fn test_user_leave_room() {
   // Create room
   let create_msg = CreateRoom {
     name: "Leave Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -306,6 +310,7 @@ async fn test_kick_member() {
   // Create room
   let create_msg = CreateRoom {
     name: "Kick Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -383,6 +388,7 @@ async fn test_promote_to_admin() {
   // Create room
   let create_msg = CreateRoom {
     name: "Promote Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -461,6 +467,7 @@ async fn test_ownership_transfer() {
   // Create room
   let create_msg = CreateRoom {
     name: "Transfer Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -527,6 +534,7 @@ async fn test_automatic_ownership_transfer() {
   // Create room
   let create_msg = CreateRoom {
     name: "Auto Transfer Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -667,6 +675,7 @@ async fn test_password_protected_room() {
   // Create password-protected room
   let create_msg = CreateRoom {
     name: "Protected Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: Some("secret123".to_string()),
     max_participants: 8,
@@ -741,6 +750,7 @@ async fn test_room_member_limit() {
   // Create room with low member limit (owner counts as 1, so 2 more can join)
   let create_msg = CreateRoom {
     name: "Limited Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 3, // Only 3 members allowed (owner + 2 joiners)
@@ -819,6 +829,7 @@ async fn test_empty_room_destruction() {
   // Create room
   let create_msg = CreateRoom {
     name: "Destroyable Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -880,6 +891,7 @@ async fn test_multiple_independent_rooms() {
   // Create first room (Chat type)
   let create_msg1 = CreateRoom {
     name: "Room One".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -899,6 +911,7 @@ async fn test_multiple_independent_rooms() {
   // Create second room (Theater type)
   let create_msg2 = CreateRoom {
     name: "Room Two".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 8,
@@ -931,6 +944,7 @@ async fn test_theater_room_creation() {
   // Create theater room
   let create_msg = CreateRoom {
     name: "Movie Theater".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 8,
@@ -960,6 +974,7 @@ async fn test_theater_mute_all() {
   // Create theater room
   let create_msg = CreateRoom {
     name: "Mute Theater".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 8,
@@ -1050,6 +1065,7 @@ async fn test_theater_transfer_owner() {
   // Create theater room
   let create_msg = CreateRoom {
     name: "Transfer Theater".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 8,
@@ -1157,6 +1173,7 @@ async fn test_mute_member() {
   // Create room
   let create_msg = CreateRoom {
     name: "Mute Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -1219,6 +1236,7 @@ async fn test_unmute_member() {
   // Create room
   let create_msg = CreateRoom {
     name: "Unmute Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -1323,6 +1341,7 @@ async fn test_ban_member() {
   // Create room
   let create_msg = CreateRoom {
     name: "Ban Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -1425,6 +1444,7 @@ async fn test_unban_member() {
   // Create room
   let create_msg = CreateRoom {
     name: "Unban Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -1514,6 +1534,7 @@ async fn test_demote_admin() {
   // Create room
   let create_msg = CreateRoom {
     name: "Demote Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -1599,6 +1620,7 @@ async fn test_mute_member_permission_denied() {
   // Create room
   let create_msg = CreateRoom {
     name: "Mute Perm Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -1677,6 +1699,7 @@ async fn test_room_announcement() {
   // Create room
   let create_msg = CreateRoom {
     name: "Announcement Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -1748,6 +1771,7 @@ async fn test_room_announcement_permission_denied() {
   // Create room
   let create_msg = CreateRoom {
     name: "Ann Perm Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -1815,6 +1839,7 @@ async fn test_nickname_change() {
   // Create room
   let create_msg = CreateRoom {
     name: "Nickname Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -1891,6 +1916,7 @@ async fn test_nickname_change_other_user_denied() {
   // Create room
   let create_msg = CreateRoom {
     name: "Nick Deny Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,

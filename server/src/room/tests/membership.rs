@@ -11,6 +11,7 @@ fn test_promote_demote_admin() {
   // Create and join room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -63,6 +64,7 @@ fn test_set_announcement() {
   // Create and join room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -109,6 +111,7 @@ fn test_set_nickname() {
   // Create and join room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: message::types::RoomType::Chat,
     password: None,
     max_participants: 8,

@@ -69,7 +69,16 @@
   border-radius: var(--radius-full, 9999px);
   color: var(--text-tertiary, #94a3b8);
   cursor: pointer;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
   transition: all var(--duration-fast, 150ms) var(--ease-default, ease);
+
+  & svg {
+    width: 18px;
+    height: 18px;
+  }
 
   &:hover {
     background-color: var(--bg-tertiary, #f1f5f9);
@@ -201,10 +210,23 @@
 
 /* ── Responsive: Mobile ── */
 @media (max-width: 767px) {
-  .modal {
+  .modal,
+  .modal-sm,
+  .modal-lg,
+  .modal-xl {
     max-width: 100%;
     border-radius: var(--radius-xl, 0.75rem) var(--radius-xl, 0.75rem) 0 0;
-    max-height: 80vh;
+    max-height: 85vh;
+    /* Mobile: slide up from bottom instead of scale */
+    transform: translateY(100%);
+    transition: transform var(--duration-slow, 300ms) var(--ease-default, ease);
+  }
+
+  .modal-backdrop-visible .modal,
+  .modal-backdrop-visible .modal-sm,
+  .modal-backdrop-visible .modal-lg,
+  .modal-backdrop-visible .modal-xl {
+    transform: translateY(0);
   }
 
   .modal-header,

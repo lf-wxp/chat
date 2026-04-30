@@ -110,6 +110,7 @@ async fn test_room_handler_timeout_protection() {
   for i in 0..100 {
     let create_request = CreateRoom {
       name: format!("Room {}", i),
+      description: String::new(),
       room_type: RoomType::Chat,
       password: None,
       max_participants: 8,

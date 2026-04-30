@@ -60,7 +60,19 @@ pub fn handle_signaling_message(
     // ── Room Management ──
     SignalingMessage::RoomListUpdate(update) => {
       log_debug(&format!("RoomListUpdate: {} rooms", update.rooms.len()));
-      app_state.rooms.set(update.rooms);
+      app_state.rooms.set(update.rooms.clone());
+      // Sync room names into existing conversations so that any
+      // conversation created from RoomCreated (which may have raced
+      // ahead of this update) gets the correct display_name.
+      app_state.conversations.update(|convs| {
+        for conv in convs.iter_mut() {
+          if let crate::state::ConversationId::Room(ref room_id) = conv.id
+            && let Some(room) = update.rooms.iter().find(|r| r.room_id == *room_id)
+          {
+            conv.display_name = room.name.clone();
+          }
+        }
+      });
     }
     SignalingMessage::RoomMemberUpdate(update) => {
       log_debug(&format!(
@@ -68,15 +80,38 @@ pub fn handle_signaling_message(
         update.room_id,
         update.members.len()
       ));
+      // Compute the diff so removed members can have their
+      // PeerConnection torn down on the local side (Req 15.5.40 —
+      // Sprint 5.3). The set of removed peers may include kicked,
+      // banned and self-leaving members alike.
+      let removed: Vec<message::UserId> = app_state.room_members.with(|map| {
+        let prev: std::collections::HashSet<&message::UserId> = map
+          .get(&update.room_id)
+          .map(|list| list.iter().map(|m| &m.user_id).collect())
+          .unwrap_or_default();
+        let now: std::collections::HashSet<&message::UserId> =
+          update.members.iter().map(|m| &m.user_id).collect();
+        prev.difference(&now).map(|u| (*u).clone()).collect()
+      });
       app_state.room_members.update(|map| {
         map.insert(update.room_id, update.members);
       });
+      if !removed.is_empty()
+        && let Some(manager) = crate::webrtc::try_use_webrtc_manager()
+      {
+        for peer in removed {
+          manager.close_connection(&peer);
+        }
+      }
     }
     SignalingMessage::RoomCreated(created) => {
       log_debug(&format!("RoomCreated: room_id={}", created.room_id));
       // Persist the active room so page refreshes can auto-rejoin it
       // (Req 10.4, R2-Issue-1 fix).
       crate::auth::save_active_room_id(Some(&created.room_id.to_string()));
+      // The creator is automatically a member — materialise the room
+      // conversation and switch to it so the chat view is shown.
+      ensure_room_conversation(&created.room_id, Some(&created.room_info), app_state);
     }
     SignalingMessage::RoomJoined(joined) => {
       log_debug(&format!("RoomJoined: room_id={}", joined.room_id));
@@ -89,6 +124,10 @@ pub fn handle_signaling_message(
       // behalf. Hide the "Restoring connections..." banner now so the
       // UX does not appear stuck (Req 10.11.42, R2-Issue-4 fix).
       app_state.reconnecting.set(false);
+
+      // Materialise the room conversation (if not yet present) and
+      // switch to it so the chat view is shown.
+      ensure_room_conversation(&joined.room_id, Some(&joined.room_info), app_state);
     }
     SignalingMessage::RoomLeft(left) => {
       log_debug(&format!(
@@ -98,6 +137,20 @@ pub fn handle_signaling_message(
       // Clear the persisted room pointer so we do not try to rejoin a
       // room the user explicitly left (Req 10.4, R2-Issue-1 fix).
       crate::auth::save_active_room_id(None);
+      // Remove the room conversation entry and clear the active
+      // conversation so the UI falls back to the room list panel.
+      {
+        use crate::state::ConversationId;
+        let conv_id = ConversationId::Room(left.room_id.clone());
+        app_state.conversations.update(|list| {
+          list.retain(|c| c.id != conv_id);
+        });
+        app_state.active_conversation.update(|active| {
+          if active.as_ref() == Some(&conv_id) {
+            *active = None;
+          }
+        });
+      }
     }
     SignalingMessage::OwnerChanged(_) | SignalingMessage::MuteStatusChange(_) => {
       log_debug("Room response received");
@@ -353,30 +406,41 @@ pub fn handle_signaling_message(
       // TODO(task-19): Transfer theater ownership
     }
 
-    // ── Moderation (task-17: room management implementation) ──
+    // ── Moderation (Task 21: room permission management) ──
     SignalingMessage::MuteMember(msg) => {
       log_debug(&format!("MuteMember in room {}", msg.room_id));
-      // TODO(task-17): Update member mute state in UI
+      apply_mute_update(app_state, msg.room_id, msg.target, msg.duration_secs);
     }
     SignalingMessage::UnmuteMember(msg) => {
       log_debug(&format!("UnmuteMember in room {}", msg.room_id));
-      // TODO(task-17): Update member unmute state in UI
+      apply_unmute(app_state, msg.room_id, msg.target);
     }
     SignalingMessage::BanMember(msg) => {
       log_debug(&format!("BanMember in room {}", msg.room_id));
-      // TODO(task-17): Remove banned member from UI
+      remove_member_locally(app_state, msg.room_id, msg.target);
     }
     SignalingMessage::UnbanMember(msg) => {
       log_debug(&format!("UnbanMember in room {}", msg.room_id));
-      // TODO(task-17): Handle unban notification
+      // Server will follow up with RoomMemberUpdate when the user
+      // rejoins. Nothing to do locally beyond logging.
     }
     SignalingMessage::PromoteAdmin(msg) => {
       log_debug(&format!("PromoteAdmin in room {}", msg.room_id));
-      // TODO(task-17): Update member role in UI
+      apply_role_update(
+        app_state,
+        msg.room_id,
+        msg.target,
+        message::types::RoomRole::Admin,
+      );
     }
     SignalingMessage::DemoteAdmin(msg) => {
       log_debug(&format!("DemoteAdmin in room {}", msg.room_id));
-      // TODO(task-17): Update member role in UI
+      apply_role_update(
+        app_state,
+        msg.room_id,
+        msg.target,
+        message::types::RoomRole::Member,
+      );
     }
     SignalingMessage::NicknameChange(msg) => {
       log_debug(&format!("NicknameChange: user_id={}", msg.user_id));
@@ -389,14 +453,58 @@ pub fn handle_signaling_message(
           user.nickname = msg.new_nickname.clone();
         }
       });
+      // Task 21: also propagate into every room membership record so
+      // the member list reflects the new display name in real time.
+      app_state.room_members.update(|map| {
+        for members in map.values_mut() {
+          if let Some(m) = members.iter_mut().find(|m| m.user_id == msg.user_id) {
+            m.nickname = msg.new_nickname.clone();
+          }
+        }
+      });
     }
     SignalingMessage::RoomAnnouncement(msg) => {
       log_debug(&format!("RoomAnnouncement in room {}", msg.room_id));
-      // TODO(task-17): Display announcement in room chat
+      app_state.rooms.update(|rooms| {
+        if let Some(room) = rooms.iter_mut().find(|r| r.room_id == msg.room_id) {
+          room.announcement = msg.content.clone();
+        }
+      });
     }
     SignalingMessage::ModerationNotification(msg) => {
       log_debug(&format!("ModerationNotification in room {}", msg.room_id));
-      // TODO(task-17): Show moderation action toast
+      let i18n_key = moderation_notification_key(msg.action);
+      error_toast.show_info_message_with_key("ROM201", i18n_key, &format_moderation_fallback(&msg));
+      // Append to the per-room moderation log (Req 15.6.50, Sprint
+      // 5.2). The cap is enforced by `record_moderation_entry` so
+      // repeated events do not grow without bound.
+      record_moderation_entry(app_state, &msg);
+    }
+
+    // ── Room invites (Req 4.3 / 4.4 — Sprint 5.4) ──
+    SignalingMessage::RoomInvite(invite) => {
+      log_debug(&format!(
+        "RoomInvite from {} to room {}",
+        invite.from, invite.room_id
+      ));
+      app_state.pending_room_invite.set(Some(invite));
+    }
+    SignalingMessage::RoomInviteResponse(response) => {
+      log_debug(&format!(
+        "RoomInviteResponse for room {}: accepted={}",
+        response.room_id, response.accepted
+      ));
+      let key = if response.accepted {
+        "room.invite_accepted"
+      } else {
+        "room.invite_declined"
+      };
+      let fallback = if response.accepted {
+        format!("{} accepted your room invite.", response.to)
+      } else {
+        format!("{} declined your room invite.", response.to)
+      };
+      error_toast.show_info_message_with_key("ROM2403", key, &fallback);
     }
 
     // ── Auth messages handled in connection.rs ──
@@ -415,7 +523,9 @@ pub fn handle_signaling_message(
     | SignalingMessage::JoinRoom(_)
     | SignalingMessage::LeaveRoom(_)
     | SignalingMessage::KickMember(_)
-    | SignalingMessage::TransferOwnership(_) => {
+    | SignalingMessage::TransferOwnership(_)
+    | SignalingMessage::UpdateRoomInfo(_)
+    | SignalingMessage::UpdateRoomPassword(_) => {
       log_warn("Received client-to-server message type, ignoring");
     }
   }
@@ -648,6 +758,56 @@ fn ensure_direct_conversation(peer: &message::UserId, app_state: AppState) {
   });
 }
 
+/// Materialise a `ConversationId::Room` entry for `room_id` in
+/// `AppState::conversations` if one does not already exist, and
+/// set it as the active conversation so the chat view is shown.
+///
+/// `room_info` is provided when the caller already has the full
+/// `RoomInfo` (e.g. from `RoomCreated` / `RoomJoined`). When `None`,
+/// the name is resolved from the `AppState::rooms` signal as a fallback.
+fn ensure_room_conversation(
+  room_id: &message::RoomId,
+  room_info: Option<&message::types::RoomInfo>,
+  app_state: AppState,
+) {
+  use crate::state::{Conversation, ConversationId, ConversationType};
+  let conv_id = ConversationId::Room(room_id.clone());
+  // Resolve room name: prefer the provided room_info (avoids the race
+  // where RoomCreated arrives before RoomListUpdate populates
+  // app_state.rooms), then fall back to the rooms signal, then to the
+  // raw room_id string.
+  let room_name = room_info.map(|ri| ri.name.clone()).unwrap_or_else(|| {
+    app_state.rooms.with_untracked(|rooms| {
+      rooms
+        .iter()
+        .find(|r| r.room_id == *room_id)
+        .map(|r| r.name.clone())
+        .unwrap_or_else(|| room_id.to_string())
+    })
+  });
+  app_state.conversations.update(|list| {
+    if list.iter().any(|c| c.id == conv_id) {
+      return;
+    }
+    list.push(Conversation {
+      id: conv_id.clone(),
+      display_name: room_name,
+      last_message: None,
+      last_message_ts: Some(chrono::Utc::now().timestamp_millis()),
+      unread_count: 0,
+      pinned: false,
+      pinned_ts: None,
+      muted: false,
+      archived: false,
+      conversation_type: ConversationType::Room,
+    });
+  });
+  app_state.active_conversation.set(Some(conv_id));
+  // On mobile, hide the sidebar so the chat view gets the full width.
+  app_state.sidebar_visible.set(false);
+}
+
+/// Route an incoming `ConnectionInvite`
 /// Route an incoming `ConnectionInvite` according to the user's
 /// blacklist and to the invite-manager queue.
 ///
@@ -802,6 +962,125 @@ fn surface_outbound_resolution(
       "No one accepted the invitation; multi-user chat was not created.",
     );
   }
+}
+
+// ── Task 21: Moderation state-sync helpers ──
+//
+// These helpers keep the reactive `room_members` map in sync with the
+// moderation events pushed by the server. The server is still the
+// source of truth (a `RoomMemberUpdate` eventually follows), but
+// applying the change locally first keeps the UI snappy.
+
+/// Apply a mute event to the local room membership entry.
+fn apply_mute_update(
+  app_state: AppState,
+  room_id: message::RoomId,
+  target: message::UserId,
+  duration_secs: Option<u64>,
+) {
+  use leptos::prelude::Update;
+  let new_mute = match duration_secs {
+    None => message::types::MuteInfo::permanent(),
+    Some(secs) => message::types::MuteInfo::timed(chrono::Duration::seconds(secs as i64)),
+  };
+  app_state.room_members.update(|map| {
+    if let Some(members) = map.get_mut(&room_id)
+      && let Some(m) = members.iter_mut().find(|m| m.user_id == target)
+    {
+      m.mute_info = new_mute;
+    }
+  });
+}
+
+/// Clear a member's mute state in the local room membership entry.
+fn apply_unmute(app_state: AppState, room_id: message::RoomId, target: message::UserId) {
+  use leptos::prelude::Update;
+  app_state.room_members.update(|map| {
+    if let Some(members) = map.get_mut(&room_id)
+      && let Some(m) = members.iter_mut().find(|m| m.user_id == target)
+    {
+      m.mute_info = message::types::MuteInfo::NotMuted;
+    }
+  });
+}
+
+/// Update a member's role in the local membership list.
+fn apply_role_update(
+  app_state: AppState,
+  room_id: message::RoomId,
+  target: message::UserId,
+  new_role: message::types::RoomRole,
+) {
+  use leptos::prelude::Update;
+  app_state.room_members.update(|map| {
+    if let Some(members) = map.get_mut(&room_id)
+      && let Some(m) = members.iter_mut().find(|m| m.user_id == target)
+    {
+      m.role = new_role;
+    }
+  });
+}
+
+/// Remove a banned or kicked member from the local membership list.
+fn remove_member_locally(app_state: AppState, room_id: message::RoomId, target: message::UserId) {
+  use leptos::prelude::Update;
+  app_state.room_members.update(|map| {
+    if let Some(members) = map.get_mut(&room_id) {
+      members.retain(|m| m.user_id != target);
+    }
+  });
+}
+
+/// Map a server-side moderation action to the matching i18n key. The
+/// keys are rendered by the error toast layer which already knows how
+/// to look up fallbacks for unknown codes.
+const fn moderation_notification_key(action: message::signaling::ModerationAction) -> &'static str {
+  match action {
+    message::signaling::ModerationAction::Kicked => "room.notification_kicked",
+    message::signaling::ModerationAction::Muted => "room.notification_muted",
+    message::signaling::ModerationAction::Unmuted => "room.notification_unmuted",
+    message::signaling::ModerationAction::Banned => "room.notification_banned",
+    message::signaling::ModerationAction::Unbanned => "room.notification_unbanned",
+    message::signaling::ModerationAction::Promoted => "room.notification_promoted",
+    message::signaling::ModerationAction::Demoted => "room.notification_demoted",
+  }
+}
+
+/// Plain-text fallback for the moderation toast so users still receive
+/// a meaningful message if the i18n lookup is missing.
+fn format_moderation_fallback(msg: &message::signaling::ModerationNotification) -> String {
+  let action = match msg.action {
+    message::signaling::ModerationAction::Kicked => "kicked",
+    message::signaling::ModerationAction::Muted => "muted",
+    message::signaling::ModerationAction::Unmuted => "unmuted",
+    message::signaling::ModerationAction::Banned => "banned",
+    message::signaling::ModerationAction::Unbanned => "unbanned",
+    message::signaling::ModerationAction::Promoted => "promoted to admin",
+    message::signaling::ModerationAction::Demoted => "demoted to member",
+  };
+  format!("{} has been {}", msg.target, action)
+}
+
+/// Append a moderation event to the per-room rolling log
+/// (Req 15.6.50, Sprint 5.2). Older entries are evicted once the cap
+/// (`MAX_MODERATION_LOG`) is reached so the local cache stays bounded.
+fn record_moderation_entry(app_state: AppState, msg: &message::signaling::ModerationNotification) {
+  use leptos::prelude::Update;
+  let entry = crate::state::ModerationLogEntry {
+    action: msg.action,
+    target: msg.target.clone(),
+    duration_secs: msg.duration_secs,
+    timestamp_nanos: chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0),
+  };
+  app_state.moderation_log.update(|map| {
+    let log = map.entry(msg.room_id.clone()).or_default();
+    log.push(entry);
+    let max = crate::state::MAX_MODERATION_LOG;
+    if log.len() > max {
+      let drop_n = log.len() - max;
+      log.drain(0..drop_n);
+    }
+  });
 }
 
 #[cfg(test)]

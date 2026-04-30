@@ -18,10 +18,12 @@ use crate::chat::models::MAX_TEXT_LENGTH;
 use crate::chat::{ReplySnippet, use_chat_manager};
 use crate::components::chat_view::helpers::preview_text;
 use crate::i18n;
-use crate::state::ConversationId;
+use crate::state::{ConversationId, use_app_state};
+use icondata as i;
 use leptos::html;
 use leptos::prelude::*;
-use leptos_i18n::{t, t_string};
+use leptos_i18n::t_string;
+use leptos_icons::Icon;
 use wasm_bindgen::JsCast;
 use web_sys::HtmlTextAreaElement;
 
@@ -53,19 +55,62 @@ pub fn InputBar(
 ) -> impl IntoView {
   let manager = use_chat_manager();
   let i18n = i18n::use_i18n();
+  let app_state = use_app_state();
 
   // Composition buffer.
   let draft = RwSignal::new(String::new());
   let textarea_ref = NodeRef::<html::Textarea>::new();
 
+  // Consume one-shot mention requests from the room member list
+  // ("Mention in chat" action — Req 15.4 §35). Appends `@{nickname} `
+  // to the draft, focuses the textarea, then clears the request.
+  Effect::new(move |_| {
+    if let Some(nickname) = app_state.pending_mention.get() {
+      let snippet = format!("@{nickname} ");
+      draft.update(|d| {
+        if !d.is_empty() && !d.ends_with(' ') {
+          d.push(' ');
+        }
+        d.push_str(&snippet);
+      });
+      if let Some(ta) = textarea_ref.get() {
+        let _ = ta.focus();
+      }
+      app_state.pending_mention.set(None);
+    }
+  });
+
   // Derived character count and over-limit flag.
   let char_count = Memo::new(move |_| draft.get().chars().count());
   let over_limit = Memo::new(move |_| char_count.get() > MAX_TEXT_LENGTH);
 
-  // Whether the send button is active (non-empty + under limit).
+  // Whether the local user is currently muted inside the active room
+  // (Req 15.5.41). Direct conversations are never muted at this layer.
+  let is_muted = Memo::new(move |_| {
+    let Some(ConversationId::Room(rid)) = conv.get() else {
+      return false;
+    };
+    let me = app_state
+      .auth
+      .with(|a| a.as_ref().map(|a| a.user_id.clone()));
+    let Some(me) = me else { return false };
+    app_state.room_members.with(|map| {
+      map
+        .get(&rid)
+        .and_then(|list| list.iter().find(|m| m.user_id == me))
+        .is_some_and(|m| {
+          matches!(
+            m.mute_info,
+            message::types::MuteInfo::Permanent | message::types::MuteInfo::Timed { .. }
+          ) && m.is_muted()
+        })
+    })
+  });
+
+  // Whether the send button is active (non-empty + under limit + not muted).
   let can_send = Memo::new(move |_| {
     let n = char_count.get();
-    n > 0 && n <= MAX_TEXT_LENGTH && conv.get().is_some()
+    n > 0 && n <= MAX_TEXT_LENGTH && conv.get().is_some() && !is_muted.get()
   });
 
   // Perform the send: trims, dispatches, clears the draft, drops the
@@ -161,7 +206,7 @@ pub fn InputBar(
                 aria-label=move || t_string!(i18n, chat.cancel_reply)
                 on:click=cancel_reply
               >
-                "×"
+                <Icon icon=i::LuX />
               </button>
             </div>
           }
@@ -174,36 +219,40 @@ pub fn InputBar(
           type="button"
           class="chat-input-btn"
           aria-label=move || t_string!(i18n, chat.sticker_panel)
+          title=move || t_string!(i18n, chat.sticker_panel)
           on:click=move |_| overlays.stickers.update(|v| *v = !*v)
         >
-          "😊"
+          <Icon icon=i::LuSmile />
         </button>
 
         <button
           type="button"
           class="chat-input-btn"
           aria-label=move || t_string!(i18n, chat.attach_image)
+          title=move || t_string!(i18n, chat.attach_image)
           on:click=move |_| overlays.image.update(|v| *v = !*v)
         >
-          "🖼"
+          <Icon icon=i::LuImage />
         </button>
 
         <button
           type="button"
           class="chat-input-btn"
           aria-label=move || t_string!(i18n, file.send_file)
+          title=move || t_string!(i18n, file.send_file)
           on:click=move |_| overlays.file.update(|v| *v = !*v)
         >
-          "📎"
+          <Icon icon=i::LuPaperclip />
         </button>
 
         <button
           type="button"
           class="chat-input-btn"
           aria-label=move || t_string!(i18n, chat.record_voice)
+          title=move || t_string!(i18n, chat.record_voice)
           on:click=move |_| overlays.voice.update(|v| *v = !*v)
         >
-          "🎙"
+          <Icon icon=i::LuMic />
         </button>
 
         <textarea
@@ -211,8 +260,15 @@ pub fn InputBar(
           class="chat-input-textarea"
           rows="1"
           maxlength=MAX_TEXT_LENGTH as i64
-          placeholder=move || t_string!(i18n, chat.type_message)
+          placeholder=move || {
+            if is_muted.get() {
+              t_string!(i18n, room.muted_indicator).to_string()
+            } else {
+              t_string!(i18n, chat.type_message).to_string()
+            }
+          }
           prop:value=move || draft.get()
+          prop:disabled=move || is_muted.get()
           on:input=on_input
           on:keydown=on_keydown
         ></textarea>
@@ -221,10 +277,11 @@ pub fn InputBar(
           type="button"
           class="chat-input-btn primary"
           aria-label=move || t_string!(i18n, chat.send)
+          title=move || t_string!(i18n, chat.send)
           prop:disabled=move || !can_send.get()
           on:click=on_send_click
         >
-          {move || t!(i18n, chat.send)}
+          <Icon icon=i::LuSend />
         </button>
       </div>
 

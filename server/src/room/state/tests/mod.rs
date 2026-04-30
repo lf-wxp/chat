@@ -14,6 +14,7 @@ use message::types::{RoomType, UserId};
 pub(super) fn create_room_request() -> CreateRoom {
   CreateRoom {
     name: "test-room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -24,6 +25,7 @@ pub(super) fn create_room_request() -> CreateRoom {
 pub(super) fn create_room_request_with_password(password: &str) -> CreateRoom {
   CreateRoom {
     name: "test-room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: Some(password.to_string()),
     max_participants: 8,
@@ -34,6 +36,7 @@ pub(super) fn create_room_request_with_password(password: &str) -> CreateRoom {
 pub(super) fn create_room_request_with_params(name: &str, room_type: RoomType) -> CreateRoom {
   CreateRoom {
     name: name.to_string(),
+    description: String::new(),
     room_type,
     password: None,
     max_participants: 8,

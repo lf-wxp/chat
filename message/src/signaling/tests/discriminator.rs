@@ -35,6 +35,7 @@ fn test_signaling_message_discriminator() {
 fn test_signaling_message_roundtrip() {
   let msg = SignalingMessage::CreateRoom(CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 8,
@@ -142,6 +143,7 @@ fn create_room_management_discriminators() -> Vec<u8> {
   vec![
     SignalingMessage::CreateRoom(CreateRoom {
       name: String::new(),
+      description: String::new(),
       room_type: RoomType::Chat,
       password: None,
       max_participants: 8,
@@ -386,6 +388,7 @@ fn create_room_management_messages() -> Vec<SignalingMessage> {
   vec![
     SignalingMessage::CreateRoom(CreateRoom {
       name: String::new(),
+      description: String::new(),
       room_type: RoomType::Chat,
       password: None,
       max_participants: 0,

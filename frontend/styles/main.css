@@ -32,6 +32,7 @@
 @import url("./components/debug-panel.css") layer(components);
 @import url("./components/call.css") layer(components);
 @import url("./components/discovery.css") layer(components);
+@import url("./components/room.css") layer(components);
 
 /* ── Layer: Utilities ── */
 @import url("./utilities.css") layer(utilities);
@@ -48,9 +49,9 @@ html {
 
 /* ── App Layout ── */
 .app {
-  min-height: 100vh;
+  height: 100dvh;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   background-color: var(--bg-primary, #ffffff);
   color: var(--text-primary, #0f172a);
   /* Enable View Transitions for page-level navigation */
@@ -71,6 +72,98 @@ html {
 /* ── Responsive Breakpoints ── */
 /* Desktop: ≥1024px | Tablet: 768-1023px | Mobile: <768px */
 /* Handled via @container queries and @media queries in components */
+
+/* ── Home Empty State ── */
+.home-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--space-4, 1rem);
+  text-align: center;
+  padding: var(--space-6, 2rem);
+  animation: fade-in-up 300ms var(--ease-default, ease) both;
+}
+
+.home-empty__icon {
+  font-size: 3rem;
+  opacity: 0.6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary, #94a3b8);
+}
+
+.home-empty__icon svg {
+  width: 48px;
+  height: 48px;
+}
+
+.home-empty__title {
+  font-size: var(--font-xl, 1.25rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--text-primary, #0f172a);
+  margin: 0;
+}
+
+.home-empty__hint {
+  font-size: var(--font-sm, 0.875rem);
+  color: var(--text-tertiary, #94a3b8);
+  max-width: 24rem;
+  margin: 0;
+}
+
+/* ── Animations ── */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-bottom {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* Reduced motion: disable all custom animations */
+@media (prefers-reduced-motion: reduce) {
+  .home-empty {
+    animation: none;
+  }
+
+  .sidebar,
+  .modal-backdrop,
+  .modal {
+    transition: none !important;
+    animation: none !important;
+  }
+}
 
 /* ── Scroll Behavior ── */
 html {

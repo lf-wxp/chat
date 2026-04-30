@@ -69,6 +69,7 @@ async fn create_room_with_two_users(
   // Owner creates a room
   let create_msg = CreateRoom {
     name: room_name.to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,

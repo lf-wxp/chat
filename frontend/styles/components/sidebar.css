@@ -20,30 +20,38 @@
   transition: width var(--duration-normal, 200ms) var(--ease-default, ease);
 }
 
-/* Narrow viewports -- collapse to an icon-only rail. */
+/* ── Mobile Backdrop (behind sidebar overlay) ── */
+.sidebar-backdrop {
+  display: none; /* hidden on desktop */
+}
+
+@media (max-width: 767px) {
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background-color: var(--bg-overlay, rgb(0 0 0 / 0.5));
+    z-index: calc(var(--z-overlay, 300) - 1);
+    animation: fade-in var(--duration-normal, 200ms) var(--ease-default, ease) both;
+  }
+}
+
+/* Mobile: sidebar is hidden by default and shown as a full-width overlay
+   when the user taps the menu button. On desktop it's always visible.
+   Uses a slide-in/slide-out animation for the mobile overlay. */
 @media (max-width: 767px) {
   .sidebar {
-    width: 3.5rem;
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    z-index: var(--z-overlay, 300);
+    box-shadow: var(--shadow-xl);
+    animation: slide-in-left var(--duration-slow, 300ms) var(--ease-default, ease) both;
   }
 
-  .sidebar .sidebar-brand-title,
-  .sidebar .sidebar-search,
-  .sidebar .sidebar-section-title,
-  .sidebar .sidebar-conversation-info,
-  .sidebar .sidebar-conversation-preview,
-  .sidebar .sidebar-item-badge,
-  .sidebar .sidebar-footer-label {
+  .sidebar.sidebar-mobile-hidden {
     display: none;
-  }
-
-  .sidebar .sidebar-header,
-  .sidebar .sidebar-footer {
-    justify-content: center;
-  }
-
-  .sidebar .sidebar-footer-btn {
-    justify-content: center;
-    padding: var(--space-2, 0.5rem);
+    animation: none;
   }
 }
 
@@ -55,6 +63,32 @@
   padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
   border-bottom: 1px solid var(--border-color, #e2e8f0);
   min-height: 3.5rem;
+}
+
+.sidebar-close-btn {
+  display: none; /* hidden on desktop */
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 0.375rem);
+  color: var(--text-secondary, #475569);
+  cursor: pointer;
+  transition: all var(--duration-fast, 150ms) var(--ease-default, ease);
+}
+
+.sidebar-close-btn:hover {
+  background-color: var(--bg-tertiary, #f1f5f9);
+  color: var(--text-primary, #0f172a);
+}
+
+@media (max-width: 767px) {
+  .sidebar-close-btn {
+    display: inline-flex;
+  }
 }
 
 .sidebar-brand {
@@ -296,4 +330,137 @@
 
 .sidebar-footer-label {
   white-space: nowrap;
+}
+
+/* ── Sidebar Room Section ── */
+.sidebar-room-section {
+  padding: var(--space-2, 0.5rem) 0;
+}
+
+.sidebar-room-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-1, 0.25rem) var(--space-4, 1rem);
+  font-size: var(--font-xs, 0.75rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--text-tertiary, #94a3b8);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sidebar-room-section__create-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-md, 0.375rem);
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--bg-primary, #ffffff);
+  color: var(--color-primary, #3b82f6);
+  font-size: var(--font-sm, 0.875rem);
+  cursor: pointer;
+  transition: all var(--duration-fast, 150ms) var(--ease-default, ease);
+  line-height: 1;
+  padding: 0;
+}
+
+.sidebar-room-section__create-btn:hover {
+  background-color: var(--color-primary, #3b82f6);
+  color: #ffffff;
+  border-color: var(--color-primary, #3b82f6);
+}
+
+.sidebar-room-section__empty {
+  padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+  font-size: var(--font-xs, 0.75rem);
+  color: var(--text-tertiary, #94a3b8);
+  font-style: italic;
+}
+
+/* ── Sidebar Room Item ── */
+.sidebar-room-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+  margin: 0 var(--space-2, 0.5rem);
+  border-radius: var(--radius-md, 0.375rem);
+  transition: background-color var(--duration-fast, 150ms) var(--ease-default, ease);
+}
+
+.sidebar-room-item:hover {
+  background-color: var(--bg-tertiary, #f1f5f9);
+}
+
+.sidebar-room-item__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-room-item__name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1, 0.25rem);
+}
+
+.sidebar-room-item__name {
+  font-size: var(--font-sm, 0.875rem);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--text-primary, #0f172a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-room-item__lock {
+  font-size: var(--font-xs, 0.75rem);
+  flex-shrink: 0;
+}
+
+.sidebar-room-item__badge {
+  font-size: var(--font-2xs, 0.625rem);
+  padding: 1px var(--space-1, 0.25rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-primary);
+  background-color: color-mix(in oklch, var(--color-primary) 15%, transparent);
+  border-radius: var(--radius-full, 9999px);
+  align-self: flex-start;
+}
+
+.sidebar-room-item__badge--theater {
+  color: var(--color-warning);
+  background-color: color-mix(in oklch, var(--color-warning) 15%, transparent);
+}
+
+.sidebar-room-item__join-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  color: var(--color-primary, #3b82f6);
+  background: transparent;
+  border: 1px solid var(--color-primary, #3b82f6);
+  border-radius: var(--radius-md, 0.375rem);
+  cursor: pointer;
+  transition: all var(--duration-fast, 150ms) var(--ease-default, ease);
+}
+
+.sidebar-room-item__join-btn:hover:not(:disabled) {
+  background-color: var(--color-primary, #3b82f6);
+  color: #ffffff;
+}
+
+.sidebar-room-item__join-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  color: var(--text-tertiary, #94a3b8);
+  border-color: var(--border-color, #e2e8f0);
 }

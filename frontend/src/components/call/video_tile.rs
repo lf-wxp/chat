@@ -12,8 +12,10 @@
 //! (Req 3.5 / 7.1 / 10.5.24): muted microphone, camera disabled,
 //! reconnecting.
 
+use icondata as i;
 use leptos::html;
 use leptos::prelude::*;
+use leptos_icons::Icon;
 use message::UserId;
 use web_sys::{HtmlVideoElement, MediaStream};
 
@@ -163,19 +165,19 @@ pub fn VideoTile(
       </Show>
       <Show when=move || show_remote_media_icons && reconnecting>
         <div class="video-tile__status video-tile__status--reconnecting" role="status">
-          "⟳"
+          <Icon icon=i::LuRefreshCw />
         </div>
       </Show>
       <footer class="video-tile__meta">
         <span class="video-tile__name">{display_name}</span>
         <Show when=move || show_remote_media_icons && !mic_enabled>
           <span class="video-tile__icon video-tile__icon--muted" aria-label="muted">
-            "🔇"
+            <Icon icon=i::LuMicOff />
           </span>
         </Show>
         <Show when=move || show_remote_media_icons && !camera_enabled>
           <span class="video-tile__icon video-tile__icon--camera-off" aria-label="camera off">
-            "📷"
+            <Icon icon=i::LuVideoOff />
           </span>
         </Show>
         <Show when=move || !is_local>

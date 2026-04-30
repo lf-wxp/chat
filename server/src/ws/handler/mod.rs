@@ -450,6 +450,18 @@ where
         SignalingMessage::NicknameChange(nickname_change) => {
           super::room::handle_nickname_change(socket_tx, ws_state, &user_id, nickname_change).await;
         }
+        SignalingMessage::UpdateRoomInfo(update) => {
+          super::room::handle_update_room_info(socket_tx, ws_state, &user_id, update).await;
+        }
+        SignalingMessage::UpdateRoomPassword(update) => {
+          super::room::handle_update_room_password(socket_tx, ws_state, &user_id, update).await;
+        }
+        SignalingMessage::RoomInvite(invite) => {
+          super::room::handle_room_invite(socket_tx, ws_state, &user_id, invite).await;
+        }
+        SignalingMessage::RoomInviteResponse(response) => {
+          super::room::handle_room_invite_response(socket_tx, ws_state, &user_id, response).await;
+        }
         // SDP/ICE signaling messages
         SignalingMessage::SdpOffer(sdp_offer) => {
           super::webrtc::handle_sdp_offer(socket_tx, ws_state, &user_id, sdp_offer).await;

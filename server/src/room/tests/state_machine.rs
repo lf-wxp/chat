@@ -20,6 +20,7 @@ fn test_room_count_increases_on_create() {
   // Create first room
   let create_request = CreateRoom {
     name: "Room 1".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -33,6 +34,7 @@ fn test_room_count_increases_on_create() {
   let owner2_id = UserId::new();
   let create_request = CreateRoom {
     name: "Room 2".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -49,6 +51,7 @@ fn test_room_count_decreases_on_destroy() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -77,6 +80,7 @@ fn test_multiple_rooms_independent_operations() {
   // Create two rooms
   let create_request1 = CreateRoom {
     name: "Room 1".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -87,6 +91,7 @@ fn test_multiple_rooms_independent_operations() {
 
   let create_request2 = CreateRoom {
     name: "Room 2".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -145,6 +150,7 @@ fn test_user_cannot_be_in_multiple_rooms() {
   // Create two rooms
   let create_request1 = CreateRoom {
     name: "Room 1".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -155,6 +161,7 @@ fn test_user_cannot_be_in_multiple_rooms() {
 
   let create_request2 = CreateRoom {
     name: "Room 2".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -207,6 +214,7 @@ fn test_room_member_roles_independent_across_rooms() {
   // Create two rooms
   let create_request1 = CreateRoom {
     name: "Room 1".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -217,6 +225,7 @@ fn test_room_member_roles_independent_across_rooms() {
 
   let create_request2 = CreateRoom {
     name: "Room 2".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -266,6 +275,7 @@ fn test_ban_state_persists_across_operations() {
   // Create and join room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -315,6 +325,7 @@ fn test_mute_state_persistence() {
   // Create and join room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -367,6 +378,7 @@ fn test_room_list_operations() {
     let owner_id = UserId::new();
     let create_request = CreateRoom {
       name: format!("Room {}", i),
+      description: String::new(),
       room_type: RoomType::Chat,
       password: None,
       max_participants: 8,
@@ -396,6 +408,7 @@ fn test_concurrent_room_operations() {
       let owner_id = UserId::new();
       let create_request = CreateRoom {
         name: format!("Concurrent Room {}", i),
+        description: String::new(),
         room_type: RoomType::Chat,
         password: None,
         max_participants: 8,

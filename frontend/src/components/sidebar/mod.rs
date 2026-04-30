@@ -1,6 +1,7 @@
 //! Sidebar navigation component.
 
 mod sidebar_conversation_item;
+mod sidebar_room_section;
 mod sidebar_section;
 
 use crate::components::discovery::{OnlineUsersPanel, UserInfoCard};
@@ -11,13 +12,15 @@ use leptos::prelude::*;
 use leptos_i18n::{t, t_string};
 use leptos_icons::Icon;
 use message::UserId;
+use sidebar_room_section::SidebarRoomSection;
 use sidebar_section::SidebarSection;
 
 /// Sidebar navigation component.
 ///
-/// Always visible on all viewport sizes. At narrow widths (`<768px`) it
-/// collapses to an icon-only rail. Container queries inside the CSS drive
-/// the responsive behavior -- no `hidden` class here.
+/// On desktop (≥768px) the sidebar is always visible at 16rem width.
+/// On mobile (<768px) the sidebar is hidden by default and shown as a
+/// full-width overlay when the user taps the menu button in the top bar.
+/// Selecting a conversation or pressing back closes the overlay.
 #[component]
 pub fn Sidebar() -> impl IntoView {
   let app_state = use_app_state();
@@ -29,14 +32,43 @@ pub fn Sidebar() -> impl IntoView {
   // inside the chat area without remounting the modal.
   let selected_user = RwSignal::new(Option::<UserId>::None);
 
+  // On desktop the sidebar is always visible. On mobile, it is hidden
+  // unless the user has explicitly opened it via the menu button.
+  // When a conversation is selected the sidebar auto-closes.
+  let sidebar_class = move || {
+    let visible = app_state.sidebar_visible.get();
+    if visible {
+      "sidebar"
+    } else {
+      "sidebar sidebar-mobile-hidden"
+    }
+  };
+
   view! {
-    <aside class="sidebar" data-testid="sidebar">
-      // Header: app title + logo
+    // Mobile backdrop overlay — tapping it closes the sidebar
+    <Show when=move || app_state.sidebar_visible.get()>
+      <div
+        class="sidebar-backdrop"
+        on:click=move |_| app_state.sidebar_visible.set(false)
+        data-testid="sidebar-backdrop"
+      />
+    </Show>
+    <aside class=sidebar_class data-testid="sidebar">
+      // Header: app title + logo + close button (mobile)
       <div class="sidebar-header">
         <div class="sidebar-brand">
           <Icon icon=i::LuMessageCircle attr:class="sidebar-brand-icon" />
           <span class="sidebar-brand-title">{t!(i18n, app.title)}</span>
         </div>
+        // Close button: mobile only, closes the sidebar overlay
+        <button
+          class="sidebar-close-btn"
+          aria-label=move || t_string!(i18n, common.close)
+          title=move || t_string!(i18n, common.close)
+          on:click=move |_| app_state.sidebar_visible.set(false)
+        >
+          <Icon icon=i::LuX />
+        </button>
       </div>
 
       // Search
@@ -64,6 +96,9 @@ pub fn Sidebar() -> impl IntoView {
           title=move || t_string!(i18n, sidebar.archived)
           conversations=Signal::derive(move || app_state.archived_conversations())
         />
+
+        // Room list: browse/join/create rooms
+        <SidebarRoomSection />
 
         // Discovery: online users + invite entry point (Req 9.1).
         <OnlineUsersPanel selected=selected_user />

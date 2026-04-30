@@ -11,8 +11,10 @@
 use crate::chat::{ChatMessage, MessageContent, use_chat_manager};
 use crate::i18n;
 use crate::state::{Conversation, ConversationId, use_app_state};
+use icondata as i;
 use leptos::prelude::*;
 use leptos_i18n::t_string;
+use leptos_icons::Icon;
 use wasm_bindgen::JsCast;
 
 /// Forward-message modal.
@@ -105,7 +107,7 @@ pub fn ForwardModal(
               aria-label=move || t_string!(i18n, common.close)
               on:click=close
             >
-              "×"
+              <Icon icon=i::LuX />
             </button>
           </header>
 

@@ -11,6 +11,7 @@ fn test_owner_can_promote_admin() {
   // Create and join room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -46,6 +47,7 @@ fn test_admin_cannot_promote_admin() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -92,6 +94,7 @@ fn test_member_cannot_promote() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -131,6 +134,7 @@ fn test_admin_can_mute() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -178,6 +182,7 @@ fn test_admin_can_kick() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -224,6 +229,7 @@ fn test_admin_cannot_ban() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -270,6 +276,7 @@ fn test_member_cannot_mute_another_member() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -309,6 +316,7 @@ fn test_admin_cannot_mute_owner() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -352,6 +360,7 @@ fn test_admin_cannot_kick_owner() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -394,6 +403,7 @@ fn test_admin_cannot_demote_owner() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -437,6 +447,7 @@ fn test_non_member_cannot_perform_actions() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -482,6 +493,7 @@ fn test_admin_can_unmute() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,

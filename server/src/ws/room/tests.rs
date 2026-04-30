@@ -13,6 +13,7 @@ fn test_create_room_success() {
 
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -35,6 +36,7 @@ fn test_create_room_with_password() {
 
   let create_room = CreateRoom {
     name: "Private Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: Some("secret123".to_string()),
     max_participants: 8,
@@ -56,6 +58,7 @@ fn test_create_room_user_already_owner_of_same_type() {
 
   let create_room = CreateRoom {
     name: "Room 1".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -70,6 +73,7 @@ fn test_create_room_user_already_owner_of_same_type() {
   // Try to create second room of same type
   let create_room2 = CreateRoom {
     name: "Room 2".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -93,6 +97,7 @@ fn test_create_different_room_types() {
   // Create Chat room
   let create_chat = CreateRoom {
     name: "Chat Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -107,6 +112,7 @@ fn test_create_different_room_types() {
   // Create Theater room (should succeed - different type)
   let create_theater = CreateRoom {
     name: "Theater Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -134,6 +140,7 @@ fn test_join_room_success() {
   // Create room
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -164,6 +171,7 @@ fn test_join_room_with_password() {
   // Create room with password
   let create_room = CreateRoom {
     name: "Private Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: Some("secret123".to_string()),
     max_participants: 8,
@@ -194,6 +202,7 @@ fn test_join_room_wrong_password() {
   // Create room with password
   let create_room = CreateRoom {
     name: "Private Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: Some("secret123".to_string()),
     max_participants: 8,
@@ -251,6 +260,7 @@ fn test_leave_room_success() {
   // Create room
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -286,6 +296,7 @@ fn test_leave_room_owner_destroys_room() {
   // Create room
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -318,6 +329,7 @@ fn test_kick_member_as_owner() {
   // Create room and add member
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -355,6 +367,7 @@ fn test_kick_member_insufficient_permission() {
   // Create room and add members
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -401,6 +414,7 @@ fn test_mute_member_success() {
   // Create room and add member
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -438,6 +452,7 @@ fn test_unmute_member_success() {
   // Create room, add member, and mute
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -486,6 +501,7 @@ fn test_ban_member_success() {
   // Create room and add member
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -522,6 +538,7 @@ fn test_banned_user_cannot_rejoin() {
   // Create room
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -573,6 +590,7 @@ fn test_promote_admin_success() {
   // Create room and add member
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -609,6 +627,7 @@ fn test_demote_admin_success() {
   // Create room, add member, promote to admin
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -656,6 +675,7 @@ fn test_transfer_ownership_success() {
   // Create room and add member
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -699,6 +719,7 @@ fn test_transfer_ownership_non_owner_fails() {
   // Create room and add members
   let create_room = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,

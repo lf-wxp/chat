@@ -12,6 +12,8 @@ use web_sys::HtmlVideoElement;
 use crate::call::{use_call_manager, use_call_signals};
 use crate::i18n;
 use crate::utils::format_duration;
+use icondata as i;
+use leptos_icons::Icon;
 
 /// Ordered list of CSS selectors used to pick the "best" `<video>`
 /// element for Picture-in-Picture (Req 7.3).
@@ -143,7 +145,11 @@ pub fn CallControls() -> impl IntoView {
           }
         }
       >
-        {move || if mic_enabled.get() { "🎤" } else { "🔇" }}
+        {move || if mic_enabled.get() {
+          view! { <Icon icon=i::LuMic /> }.into_any()
+        } else {
+          view! { <Icon icon=i::LuMicOff /> }.into_any()
+        }}
       </button>
       <button
         type="button"
@@ -153,7 +159,11 @@ pub fn CallControls() -> impl IntoView {
         aria-pressed=move || aria_pressed(!cam_enabled.get())
         aria-label=move || t_string!(i18n, call.camera)
       >
-        {move || if cam_enabled.get() { "📹" } else { "📷" }}
+        {move || if cam_enabled.get() {
+          view! { <Icon icon=i::LuVideo /> }.into_any()
+        } else {
+          view! { <Icon icon=i::LuVideoOff /> }.into_any()
+        }}
       </button>
       <button
         type="button"
@@ -163,7 +173,7 @@ pub fn CallControls() -> impl IntoView {
         aria-pressed=move || aria_pressed(screen_on.get())
         aria-label=move || t_string!(i18n, call.screen_share)
       >
-        "🖥"
+        <Icon icon=i::LuMonitor />
       </button>
       <button
         type="button"
@@ -173,7 +183,7 @@ pub fn CallControls() -> impl IntoView {
         aria-pressed=move || aria_pressed(pip_on.get())
         aria-label=move || t_string!(i18n, call.pip)
       >
-        "⤢"
+        <Icon icon=i::LuPictureInPicture2 />
       </button>
       <button
         type="button"
@@ -181,7 +191,7 @@ pub fn CallControls() -> impl IntoView {
         on:click=on_end
         aria-label=move || t_string!(i18n, call.end)
       >
-        "📞"
+        <Icon icon=i::LuPhoneOff />
       </button>
     </div>
   }

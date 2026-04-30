@@ -133,6 +133,9 @@ impl RoomState {
     // Set max participants
     room.info.max_members = request.max_participants.clamp(2, MAX_MEMBERS_PER_ROOM);
 
+    // Set optional description (Req 4.1).
+    room.info.description = request.description.clone();
+
     // Set password if provided
     if let Some(ref password) = request.password
       && !password.is_empty()
@@ -641,6 +644,79 @@ impl RoomState {
     );
 
     Ok((old_owner, new_owner))
+  }
+
+  /// Update room name and description (Owner only — Req 4.5).
+  pub fn update_room_info(
+    &self,
+    request: &message::signaling::UpdateRoomInfo,
+    actor_id: &UserId,
+  ) -> Result<RoomInfo, RoomError> {
+    // Validate the new room name with the same rules as creation so
+    // operators cannot smuggle invalid characters / leading spaces.
+    validate_room_name(&request.name)?;
+
+    let mut room = self
+      .rooms
+      .get_mut(&request.room_id)
+      .ok_or(RoomError::RoomNotFound)?;
+
+    if room.info.owner_id != *actor_id {
+      return Err(RoomError::InsufficientPermission);
+    }
+
+    room.set_room_info(request.name.clone(), request.description.clone())?;
+    let updated = room.to_room_info();
+
+    info!(
+      room_id = %request.room_id,
+      actor = %actor_id,
+      "Room info updated"
+    );
+
+    Ok(updated)
+  }
+
+  /// Update or clear the room password (Owner only — Req 4.5a / 4.5b).
+  ///
+  /// `password = None` clears the password (room becomes public);
+  /// `password = Some(non_empty)` sets a new password (Argon2 hashed
+  /// inside [`Room::set_password`]).
+  pub fn update_room_password(
+    &self,
+    request: &message::signaling::UpdateRoomPassword,
+    actor_id: &UserId,
+  ) -> Result<(RoomInfo, bool), RoomError> {
+    let mut room = self
+      .rooms
+      .get_mut(&request.room_id)
+      .ok_or(RoomError::RoomNotFound)?;
+
+    if room.info.owner_id != *actor_id {
+      return Err(RoomError::InsufficientPermission);
+    }
+
+    let cleared = match request.password.as_deref() {
+      None | Some("") => {
+        room.set_password(None)?;
+        true
+      }
+      Some(pwd) => {
+        room.set_password(Some(pwd))?;
+        false
+      }
+    };
+
+    let updated = room.to_room_info();
+
+    info!(
+      room_id = %request.room_id,
+      actor = %actor_id,
+      cleared,
+      "Room password updated"
+    );
+
+    Ok((updated, cleared))
   }
 
   /// Update room announcement.

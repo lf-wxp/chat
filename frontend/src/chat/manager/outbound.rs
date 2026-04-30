@@ -422,7 +422,22 @@ impl ChatManager {
   ) {
     let peers = self.expected_peers(&conv);
     if peers.is_empty() {
-      self.mark_failed(id);
+      // For room conversations, an empty peer list means the user is the
+      // only member — mark as Sent instead of Failed because the message
+      // is stored locally and will be delivered when other members join.
+      // For direct conversations, no peers means the connection is down,
+      // so Failed is the correct status.
+      if matches!(conv, ConversationId::Room(_)) {
+        if let Some(state) = self.inner.borrow().conversations.get(&conv).copied() {
+          state.messages.update(|list| {
+            if let Some(m) = list.iter_mut().find(|m| m.id == id) {
+              m.status = MessageStatus::Sent;
+            }
+          });
+        }
+      } else {
+        self.mark_failed(id);
+      }
       return;
     }
     {

@@ -6,6 +6,7 @@ use super::*;
 fn test_create_room_roundtrip() {
   let msg = CreateRoom {
     name: "My Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: Some("secret".to_string()),
     max_participants: 8,
@@ -228,6 +229,7 @@ fn test_discriminator_room_management() {
   assert_eq!(
     SignalingMessage::CreateRoom(CreateRoom {
       name: "n".into(),
+      description: String::new(),
       room_type: RoomType::Chat,
       password: None,
       max_participants: 8

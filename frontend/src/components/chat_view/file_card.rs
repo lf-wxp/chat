@@ -11,8 +11,10 @@ use crate::file_transfer::{
   TransferProgress, TransferStatus, format_bytes, try_use_file_transfer_manager,
 };
 use crate::i18n;
+use icondata as i;
 use leptos::prelude::*;
 use leptos_i18n::t_string;
+use leptos_icons::Icon;
 use message::MessageId;
 
 /// Whether the MIME type represents an image.
@@ -21,21 +23,21 @@ fn is_image(mime: &str) -> bool {
 }
 
 /// Build the file-card icon for the given MIME type.
-fn type_icon(mime: &str) -> &'static str {
+fn type_icon(mime: &str) -> icondata::Icon {
   if is_image(mime) {
-    "🖼"
+    i::LuImage
   } else if mime.starts_with("video/") {
-    "🎬"
+    i::LuFilm
   } else if mime.starts_with("audio/") {
-    "🎵"
+    i::LuMusic
   } else if mime.starts_with("application/pdf") {
-    "📕"
+    i::LuBookOpen
   } else if mime.contains("zip") || mime.contains("compressed") || mime.contains("tar") {
-    "🗜"
+    i::LuArchive
   } else if mime.starts_with("text/") {
-    "📄"
+    i::LuFileText
   } else {
-    "📎"
+    i::LuPaperclip
   }
 }
 
@@ -231,7 +233,7 @@ pub fn FileCard(
         />
       </Show>
       <div class="message-file-head">
-        <span class="message-file-icon" aria-hidden="true">{type_icon(&file_for_icon.mime_type)}</span>
+        <span class="message-file-icon" aria-hidden="true"><Icon icon=type_icon(&file_for_icon.mime_type) /></span>
         <div class="message-file-meta">
           <div class="message-file-name" title=file_for_title.filename.clone()>
             {move || {

@@ -41,6 +41,7 @@ fn test_theater_mute_all_non_owner_fails() {
   // Create room
   let create_room = CreateRoom {
     name: "Theater Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -74,6 +75,7 @@ fn test_theater_mute_all_owner_success() {
   // Create theater room
   let create_room = CreateRoom {
     name: "Theater Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -103,6 +105,7 @@ fn test_theater_mute_all_broadcasts_to_members() {
   // Create theater room and add members
   let create_room = CreateRoom {
     name: "Theater Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -163,6 +166,7 @@ fn test_theater_transfer_owner_non_owner_fails() {
   // Create room
   let create_room = CreateRoom {
     name: "Theater Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -202,6 +206,7 @@ fn test_theater_transfer_target_not_member() {
   // Create room
   let create_room = CreateRoom {
     name: "Theater Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -225,6 +230,7 @@ fn test_theater_transfer_owner_success() {
   // Create theater room and add target member
   let create_room = CreateRoom {
     name: "Theater Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -267,6 +273,7 @@ fn test_theater_transfer_broadcasts_to_all() {
   // Create theater room and add members
   let create_room = CreateRoom {
     name: "Theater Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -311,6 +318,7 @@ fn test_theater_mode_for_theater_room_type() {
   // Create Theater room
   let create_room = CreateRoom {
     name: "Theater Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -331,6 +339,7 @@ fn test_theater_mode_for_chat_room() {
   // Create Chat room (theater mode might still apply)
   let create_room = CreateRoom {
     name: "Chat Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -354,6 +363,7 @@ fn test_concurrent_theater_transfers() {
   // Create theater room
   let create_room = CreateRoom {
     name: "Theater Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -392,6 +402,7 @@ fn test_theater_transfer_to_self() {
   // Create room
   let create_room = CreateRoom {
     name: "Theater Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -423,6 +434,7 @@ fn test_theater_mute_all_empty_room() {
   // Create room with only owner
   let create_room = CreateRoom {
     name: "Theater Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,

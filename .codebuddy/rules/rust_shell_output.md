@@ -73,3 +73,4 @@ while [ ! -f /tmp/cargo-test-done ]; do sleep 10; done
 # 前端组件的书写注意
 - 每个文件中只能有一个组件，多个组件不能在一个文件中
 - html的代码块中标签的缩进使用2个空格
+- 前端组件中可以用icon的地方就尽可能用icon， 使用leptos-icon

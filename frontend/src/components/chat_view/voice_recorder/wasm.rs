@@ -244,7 +244,7 @@ async fn start_recording_async(
     }
 
     // Paint the canvas.
-    if let Some(canvas_el) = canvas_for_raf.get() {
+    if let Some(canvas_el) = canvas_for_raf.get_untracked() {
       let html_canvas: &HtmlCanvasElement = canvas_el.as_ref();
       draw_waveform_bars(html_canvas, &aggregator_for_raf.borrow());
     }

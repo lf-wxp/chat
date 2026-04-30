@@ -39,5 +39,6 @@ pub mod typing_indicator;
 pub mod view_root;
 pub mod virtual_scroll;
 pub mod voice_recorder;
+pub mod voice_waveform;
 
 pub use view_root::ChatView;

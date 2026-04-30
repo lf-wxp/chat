@@ -86,6 +86,7 @@ async fn test_theater_mute_all_room_not_found() {
   // Create a theater room first
   let create_msg = CreateRoom {
     name: "Theater Mute Test".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -138,6 +139,7 @@ async fn test_theater_mute_all_non_owner_fails() {
   let (mut ws_owner, _owner_id) = auth_user(addr, &user_store, "mute_room_owner", "password").await;
   let create_msg = CreateRoom {
     name: "Theater Mute Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -209,6 +211,7 @@ async fn test_theater_mute_all_owner_success() {
     auth_user(addr, &user_store, "mute_success_owner", "password").await;
   let create_msg = CreateRoom {
     name: "Theater Mute Success Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -291,6 +294,7 @@ async fn test_theater_mute_all_broadcasts_to_members() {
     auth_user(addr, &user_store, "mute_broadcast_owner", "password").await;
   let create_msg = CreateRoom {
     name: "Broadcast Mute Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -384,6 +388,7 @@ async fn test_theater_transfer_owner_room_not_found() {
   // Create a theater room first
   let create_msg = CreateRoom {
     name: "Theater Transfer Test".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -441,6 +446,7 @@ async fn test_theater_transfer_owner_non_owner_fails() {
     auth_user(addr, &user_store, "transfer_room_owner", "password").await;
   let create_msg = CreateRoom {
     name: "Theater Transfer Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -519,6 +525,7 @@ async fn test_theater_transfer_to_self() {
     auth_user(addr, &user_store, "self_transfer_owner", "password").await;
   let create_msg = CreateRoom {
     name: "Self Transfer Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -575,6 +582,7 @@ async fn test_theater_transfer_target_not_member() {
     auth_user(addr, &user_store, "not_member_owner", "password").await;
   let create_msg = CreateRoom {
     name: "Not Member Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -633,6 +641,7 @@ async fn test_theater_transfer_owner_success() {
   let (mut ws_owner, _owner_id) = auth_user(addr, &user_store, "xfer_ok_owner", "password").await;
   let create_msg = CreateRoom {
     name: "Transfer Success Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,
@@ -718,6 +727,7 @@ async fn test_theater_transfer_broadcasts_to_all() {
     auth_user(addr, &user_store, "bcast_xfer_owner", "password").await;
   let create_msg = CreateRoom {
     name: "Broadcast Transfer Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Theater,
     password: None,
     max_participants: 50,

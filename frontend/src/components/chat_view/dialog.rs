@@ -10,8 +10,10 @@
 //! tick.
 
 use crate::i18n;
+use icondata as i;
 use leptos::prelude::*;
 use leptos_i18n::t_string;
+use leptos_icons::Icon;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -129,17 +131,21 @@ pub fn Dialog(
               <button
                 type="button"
                 class="dialog-btn dialog-btn-cancel"
+                aria-label=move || t_string!(i18n, common.cancel)
+                title=move || t_string!(i18n, common.cancel)
                 on:click=move |_| on_cancel.run(())
               >
-                {t_string!(i18n, common.cancel)}
+                <Icon icon=i::LuX />
               </button>
             </Show>
             <button
               type="button"
               class="dialog-btn dialog-btn-ok"
+              aria-label=move || t_string!(i18n, common.ok)
+              title=move || t_string!(i18n, common.ok)
               on:click=move |_| on_ok.run(())
             >
-              {t_string!(i18n, common.ok)}
+              <Icon icon=i::LuCheck />
             </button>
           </div>
         </div>

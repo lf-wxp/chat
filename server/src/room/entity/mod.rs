@@ -20,6 +20,8 @@ const DEFAULT_MAX_MEMBERS: u8 = 8;
 const MAX_ANNOUNCEMENT_LENGTH: usize = 500;
 /// Maximum nickname length.
 const MAX_NICKNAME_LENGTH: usize = 20;
+/// Maximum room description length.
+const MAX_ROOM_DESCRIPTION_LENGTH: usize = 500;
 
 // =============================================================================
 // Room Entity
@@ -234,6 +236,34 @@ impl Room {
       )));
     }
     self.info.announcement = content;
+    Ok(())
+  }
+
+  /// Update room name and description in one shot (Owner only — Req 4.5).
+  ///
+  /// The caller is responsible for verifying owner permission first;
+  /// this method only enforces the structural validation rules
+  /// (length limits) so that broken inputs cannot mutate state.
+  pub fn set_room_info(&mut self, name: String, description: String) -> Result<(), RoomError> {
+    if name.is_empty() {
+      return Err(RoomError::InvalidRoomName(
+        "name cannot be empty".to_string(),
+      ));
+    }
+    if name.len() > 100 {
+      return Err(RoomError::InvalidRoomName(format!(
+        "name exceeds maximum length of {} characters",
+        100
+      )));
+    }
+    if description.len() > MAX_ROOM_DESCRIPTION_LENGTH {
+      return Err(RoomError::InvalidInput(format!(
+        "Description exceeds maximum length of {} characters",
+        MAX_ROOM_DESCRIPTION_LENGTH
+      )));
+    }
+    self.info.name = name;
+    self.info.description = description;
     Ok(())
   }
 

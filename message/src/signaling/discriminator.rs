@@ -118,3 +118,11 @@ pub const ROOM_LEFT: u8 = 0x59;
 pub const OWNER_CHANGED: u8 = 0x5A;
 /// Mute status change message type.
 pub const MUTE_STATUS_CHANGE: u8 = 0x5B;
+/// Update room name + description (Owner only — Req 4.5).
+pub const UPDATE_ROOM_INFO: u8 = 0x5C;
+/// Update or clear room password (Owner only — Req 4.5a / 4.5b).
+pub const UPDATE_ROOM_PASSWORD: u8 = 0x5D;
+/// Room invite from one user to another (Req 4.3).
+pub const ROOM_INVITE: u8 = 0x5E;
+/// Response to a room invite (Req 4.4).
+pub const ROOM_INVITE_RESPONSE: u8 = 0x5F;

@@ -11,8 +11,10 @@
 use crate::chat::use_chat_manager;
 use crate::i18n;
 use crate::state::ConversationId;
+use icondata as i;
 use leptos::prelude::*;
 use leptos_i18n::t_string;
+use leptos_icons::Icon;
 
 /// A single sticker pack.
 #[derive(Clone, Debug)]
@@ -88,19 +90,37 @@ pub fn StickerPanel(
 
   view! {
     <Show when=move || visible.get() fallback=|| ()>
+      // Backdrop: clicking outside closes the panel
+      <div
+        class="sticker-panel-backdrop"
+        on:click=move |_| visible.set(false)
+        data-testid="sticker-panel-backdrop"
+      />
       <div class="sticker-panel" role="dialog" data-testid="sticker-panel">
-        <div class="sticker-panel-search">
-          <input
-            type="search"
-            placeholder=move || t_string!(i18n, chat.sticker_search)
-            aria-label=move || t_string!(i18n, chat.sticker_search)
-            prop:value=move || search.get()
-            on:input=move |ev| {
-              if let Some(target) = event_target_value_opt(&ev) {
-                search.set(target);
+        // Header: search + close
+        <div class="sticker-panel-header">
+          <div class="sticker-panel-search">
+            <Icon icon=i::LuSearch attr:class="sticker-panel-search-icon" />
+            <input
+              type="search"
+              placeholder=move || t_string!(i18n, chat.sticker_search)
+              aria-label=move || t_string!(i18n, chat.sticker_search)
+              prop:value=move || search.get()
+              on:input=move |ev| {
+                if let Some(target) = event_target_value_opt(&ev) {
+                  search.set(target);
+                }
               }
-            }
-          />
+            />
+          </div>
+          <button
+            type="button"
+            class="sticker-panel-close-btn"
+            aria-label=move || t_string!(i18n, common.close)
+            on:click=move |_| visible.set(false)
+          >
+            <Icon icon=i::LuX />
+          </button>
         </div>
 
         <div class="sticker-panel-tabs" role="tablist">

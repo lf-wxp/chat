@@ -115,6 +115,36 @@ pub const ROM106: ErrorCode = ErrorCode::new(ErrorModule::Rom, ErrorCategory::Cl
 pub const ROM107: ErrorCode = ErrorCode::new(ErrorModule::Rom, ErrorCategory::Client, 7);
 /// Cannot kick/modify owner
 pub const ROM108: ErrorCode = ErrorCode::new(ErrorModule::Rom, ErrorCategory::Client, 8);
+/// Room operation send failed (create / join)
+pub const ROM109: ErrorCode = ErrorCode::new(ErrorModule::Rom, ErrorCategory::Client, 9);
+/// Moderation action send failed (kick / mute / ban / promote / demote / transfer)
+pub const ROM110: ErrorCode = ErrorCode::new(ErrorModule::Rom, ErrorCategory::Client, 10);
+/// Batch moderation operation send failed
+pub const ROM111: ErrorCode = ErrorCode::new(ErrorModule::Rom, ErrorCategory::Client, 11);
+/// Room settings update send failed (name / description / password)
+pub const ROM112: ErrorCode = ErrorCode::new(ErrorModule::Rom, ErrorCategory::Client, 12);
+/// Announcement update send failed
+pub const ROM113: ErrorCode = ErrorCode::new(ErrorModule::Rom, ErrorCategory::Client, 13);
+/// Nickname change send failed
+pub const ROM114: ErrorCode = ErrorCode::new(ErrorModule::Rom, ErrorCategory::Client, 14);
+
+// ============================================================================
+// Frontend-only Informational Codes (ROM)
+// ============================================================================
+// The following codes are used as string identifiers in the frontend for
+// informational toast messages. They do NOT use the ErrorCode struct because
+// they are success/info notifications, not errors.
+//
+// | Code    | Description                          |
+// |---------|--------------------------------------|
+// | ROM2000 | Room info updated successfully       |
+// | ROM2100 | Room password updated/cleared        |
+// | ROM2102 | Room password validation failed      |
+// | ROM2200 | View profile (pending feature)       |
+// | ROM2300 | Batch selection max reached          |
+// | ROM2301 | Batch moderation action succeeded    |
+// | ROM2401 | Room invite accepted                 |
+// | ROM2402 | Room invite declined                 |
 
 // ============================================================================
 // Error Code Constants - Theater (THR)

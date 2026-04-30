@@ -37,6 +37,9 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
         let conv_id_click = conv_id.clone();
         move |_| {
           app_state.active_conversation.set(Some(conv_id_click.clone()));
+          // On mobile, hide the sidebar so the chat view gets the
+          // full viewport width. The top-bar back button restores it.
+          app_state.sidebar_visible.set(false);
         }
       }
       on:keydown={
@@ -44,6 +47,7 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
         move |ev: web_sys::KeyboardEvent| {
           if ev.key() == "Enter" || ev.key() == " " {
             app_state.active_conversation.set(Some(conv_id_key.clone()));
+            app_state.sidebar_visible.set(false);
           }
         }
       }

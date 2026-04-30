@@ -22,7 +22,8 @@ pub use moderation::{
 };
 pub use room::{
   CreateRoom, JoinRoom, KickMember, LeaveRoom, MuteStatusChange, OwnerChanged, RoomCreated,
-  RoomJoined, RoomLeft, RoomListUpdate, RoomMemberUpdate, TransferOwnership,
+  RoomInvite, RoomInviteResponse, RoomJoined, RoomLeft, RoomListUpdate, RoomMemberUpdate,
+  TransferOwnership, UpdateRoomInfo, UpdateRoomPassword,
 };
 pub use user::{UserListUpdate, UserStatusChange};
 pub use webrtc::{ActivePeersList, IceCandidate, PeerClosed, PeerEstablished, SdpAnswer, SdpOffer};
@@ -118,6 +119,14 @@ pub enum SignalingMessage {
   OwnerChanged(OwnerChanged),
   /// Mute status change notification.
   MuteStatusChange(MuteStatusChange),
+  /// Update room name and description (Owner only — Req 4.5).
+  UpdateRoomInfo(UpdateRoomInfo),
+  /// Update or clear room password (Owner only — Req 4.5a / 4.5b).
+  UpdateRoomPassword(UpdateRoomPassword),
+  /// Room invite from one user to another (Req 4.3).
+  RoomInvite(RoomInvite),
+  /// Response to a room invite (Req 4.4).
+  RoomInviteResponse(RoomInviteResponse),
 
   // Call Signaling
   /// Call invitation.
@@ -199,6 +208,10 @@ impl SignalingMessage {
       Self::RoomLeft(_) => discriminator::ROOM_LEFT,
       Self::OwnerChanged(_) => discriminator::OWNER_CHANGED,
       Self::MuteStatusChange(_) => discriminator::MUTE_STATUS_CHANGE,
+      Self::UpdateRoomInfo(_) => discriminator::UPDATE_ROOM_INFO,
+      Self::UpdateRoomPassword(_) => discriminator::UPDATE_ROOM_PASSWORD,
+      Self::RoomInvite(_) => discriminator::ROOM_INVITE,
+      Self::RoomInviteResponse(_) => discriminator::ROOM_INVITE_RESPONSE,
 
       Self::CallInvite(_) => discriminator::CALL_INVITE,
       Self::CallAccept(_) => discriminator::CALL_ACCEPT,

@@ -114,7 +114,7 @@ pub fn App() -> impl IntoView {
       when=move || auth.get().is_some()
       fallback=move || view! { <AuthPage /> }
     >
-      <div class="app flex h-screen overflow-hidden">
+      <div class="app flex overflow-hidden">
         // Sidebar
         <Sidebar />
 

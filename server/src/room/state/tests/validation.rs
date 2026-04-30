@@ -13,6 +13,7 @@ fn test_room_name_too_short() {
   // Single character name - but validation checks empty, not length minimum
   let request = CreateRoom {
     name: "a".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -30,6 +31,7 @@ fn test_room_name_too_long() {
   let long_name = "a".repeat(101); // Exceeds MAX_ROOM_NAME_LENGTH (100)
   let request = CreateRoom {
     name: long_name,
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -45,6 +47,7 @@ fn test_room_name_empty() {
   let owner_id = test_user_id(1);
   let request = CreateRoom {
     name: "".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -61,6 +64,7 @@ fn test_room_name_maximum_length() {
   let max_name = "a".repeat(100); // Exactly MAX_ROOM_NAME_LENGTH
   let request = CreateRoom {
     name: max_name,
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -76,6 +80,7 @@ fn test_room_name_with_leading_whitespace() {
   let owner_id = test_user_id(1);
   let request = CreateRoom {
     name: " room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -91,6 +96,7 @@ fn test_room_name_with_trailing_whitespace() {
   let owner_id = test_user_id(1);
   let request = CreateRoom {
     name: "room ".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -106,6 +112,7 @@ fn test_room_name_consecutive_spaces() {
   let owner_id = test_user_id(1);
   let request = CreateRoom {
     name: "my  room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -121,6 +128,7 @@ fn test_room_name_invalid_characters() {
   let owner_id = test_user_id(1);
   let request = CreateRoom {
     name: "room@#".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -136,6 +144,7 @@ fn test_room_name_valid_with_hyphen() {
   let owner_id = test_user_id(1);
   let request = CreateRoom {
     name: "my-room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -151,6 +160,7 @@ fn test_room_name_valid_with_underscore() {
   let owner_id = test_user_id(1);
   let request = CreateRoom {
     name: "my_room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -166,6 +176,7 @@ fn test_room_password_minimum_length() {
   let owner_id = test_user_id(1);
   let request = CreateRoom {
     name: "test-room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: Some("1234".to_string()),
     max_participants: 8,
@@ -181,6 +192,7 @@ fn test_room_password_too_short() {
   let owner_id = test_user_id(1);
   let request = CreateRoom {
     name: "test-room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: Some("ab".to_string()),
     max_participants: 8,

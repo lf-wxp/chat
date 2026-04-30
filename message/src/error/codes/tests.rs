@@ -167,6 +167,30 @@ fn test_rom_error_codes_module_category() {
   assert_eq!(ROM108.module, ErrorModule::Rom);
   assert_eq!(ROM108.category, ErrorCategory::Client);
   assert_eq!(ROM108.sequence, 8);
+
+  assert_eq!(ROM109.module, ErrorModule::Rom);
+  assert_eq!(ROM109.category, ErrorCategory::Client);
+  assert_eq!(ROM109.sequence, 9);
+
+  assert_eq!(ROM110.module, ErrorModule::Rom);
+  assert_eq!(ROM110.category, ErrorCategory::Client);
+  assert_eq!(ROM110.sequence, 10);
+
+  assert_eq!(ROM111.module, ErrorModule::Rom);
+  assert_eq!(ROM111.category, ErrorCategory::Client);
+  assert_eq!(ROM111.sequence, 11);
+
+  assert_eq!(ROM112.module, ErrorModule::Rom);
+  assert_eq!(ROM112.category, ErrorCategory::Client);
+  assert_eq!(ROM112.sequence, 12);
+
+  assert_eq!(ROM113.module, ErrorModule::Rom);
+  assert_eq!(ROM113.category, ErrorCategory::Client);
+  assert_eq!(ROM113.sequence, 13);
+
+  assert_eq!(ROM114.module, ErrorModule::Rom);
+  assert_eq!(ROM114.category, ErrorCategory::Client);
+  assert_eq!(ROM114.sequence, 14);
 }
 
 /// Test that all Theater (THR) error codes have correct module and category
@@ -338,8 +362,8 @@ fn test_error_codes_unique_strings() {
     CHT001, CHT002, CHT003, CHT101, CHT102, CHT103, CHT104, CHT105, CHT501, CHT502,
     // AV
     AV001, AV002, AV401, AV402, AV403, AV404, AV405, // ROM
-    ROM001, ROM002, ROM101, ROM102, ROM103, ROM104, ROM105, ROM106, ROM107, ROM108,
-    // THR
+    ROM001, ROM002, ROM101, ROM102, ROM103, ROM104, ROM105, ROM106, ROM107, ROM108, ROM109, ROM110,
+    ROM111, ROM112, ROM113, ROM114, // THR
     THR001, THR002, THR003, THR101, THR102, THR103, THR104, // FIL
     FIL001, FIL002, FIL101, FIL102, FIL103, FIL104, // AUTH
     AUTH001, AUTH101, AUTH102, AUTH103, AUTH501, AUTH502, AUTH503, // PST
@@ -409,7 +433,7 @@ fn test_error_codes_match_requirements() {
 /// When adding a new error code, this constant MUST be updated.
 /// This test acts as a guardrail: if you add a code but forget to
 /// update the exhaustiveness list, the count check will fail.
-const TOTAL_DEFINED_ERROR_CODES: usize = 64;
+const TOTAL_DEFINED_ERROR_CODES: usize = 70;
 
 /// Exhaustive list of ALL error codes defined in the codes module.
 /// When adding a new error code constant, you MUST also add it here.
@@ -424,9 +448,9 @@ fn all_error_codes() -> Vec<ErrorCode> {
     // CHT (10 codes)
     CHT001, CHT002, CHT003, CHT101, CHT102, CHT103, CHT104, CHT105, CHT501, CHT502,
     // AV (7 codes)
-    AV001, AV002, AV401, AV402, AV403, AV404, AV405, // ROM (10 codes)
-    ROM001, ROM002, ROM101, ROM102, ROM103, ROM104, ROM105, ROM106, ROM107, ROM108,
-    // THR (7 codes)
+    AV001, AV002, AV401, AV402, AV403, AV404, AV405, // ROM (16 codes)
+    ROM001, ROM002, ROM101, ROM102, ROM103, ROM104, ROM105, ROM106, ROM107, ROM108, ROM109, ROM110,
+    ROM111, ROM112, ROM113, ROM114, // THR (7 codes)
     THR001, THR002, THR003, THR101, THR102, THR103, THR104, // FIL (6 codes)
     FIL001, FIL002, FIL101, FIL102, FIL103, FIL104, // AUTH (7 codes)
     AUTH001, AUTH101, AUTH102, AUTH103, AUTH501, AUTH502, AUTH503, // PST (3 codes)

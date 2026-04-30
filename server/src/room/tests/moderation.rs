@@ -11,6 +11,7 @@ fn test_kick_member() {
   // Create and join room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -49,6 +50,7 @@ fn test_mute_member() {
   // Create and join room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -89,6 +91,7 @@ fn test_ban_member() {
   // Create and join room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -136,6 +139,7 @@ fn test_mute_member_timed() {
   // Create and join room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -182,6 +186,7 @@ fn test_mute_member_permanent() {
   // Create and join room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -223,6 +228,7 @@ fn test_check_expired_mutes_with_short_duration() {
   // Create and join room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -284,6 +290,7 @@ fn test_check_expired_mutes_permanent_not_expired() {
   // Create and join room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -329,6 +336,7 @@ fn test_unmute_member() {
   // Create and join room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,

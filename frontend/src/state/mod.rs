@@ -40,6 +40,24 @@ pub enum ConversationId {
 /// Maximum number of pinned conversations.
 pub const MAX_PINS: usize = 5;
 
+/// Maximum entries kept in the per-room moderation log
+/// (Req 15.6.50 — Sprint 5.2).
+pub const MAX_MODERATION_LOG: usize = 100;
+
+/// One entry in the moderation history for a room.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModerationLogEntry {
+  /// What action was taken (kick / mute / ban / promote …).
+  pub action: message::signaling::ModerationAction,
+  /// User the action was applied to.
+  pub target: UserId,
+  /// Optional duration for timed actions (mute).
+  pub duration_secs: Option<u64>,
+  /// Wall-clock timestamp when the entry was recorded
+  /// (Unix nanoseconds — matches the rest of the protocol).
+  pub timestamp_nanos: i64,
+}
+
 /// Conversation model for sidebar and chat views.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Conversation {
@@ -125,8 +143,36 @@ pub struct AppState {
   pub debug: RwSignal<bool>,
   /// Whether the settings drawer is currently open.
   pub settings_open: RwSignal<bool>,
+  /// One-shot pending mention nickname injected by the room member
+  /// list ("Mention in chat" action — Req 15.4 §35). The chat input
+  /// bar consumes and clears this signal on focus.
+  pub pending_mention: RwSignal<Option<String>>,
+  /// One-shot pending profile-card target. Currently consumed by a
+  /// fallback toast until a dedicated profile modal lands
+  /// (Req 15.4 §35 partial implementation).
+  pub pending_profile: RwSignal<Option<UserId>>,
+  /// Global 1 Hz tick signal. Components that need to recompute time
+  /// derived values (mute countdowns, call durations, "last seen"
+  /// labels …) subscribe to this signal instead of registering their
+  /// own `setInterval`, which avoids dozens of redundant timers.
+  ///
+  /// The value is a free-running `u64` that increments by one every
+  /// second; consumers should treat it as opaque and rely on
+  /// [`Utc::now`] for the actual time computation.
+  pub now_tick: RwSignal<u64>,
+  /// Per-room moderation history (Req 15.6.50 — Sprint 5.2).
+  /// Capped at 100 entries per room (oldest evicted on overflow).
+  pub moderation_log: RwSignal<HashMap<RoomId, Vec<ModerationLogEntry>>>,
+  /// Incoming room invite waiting for the user to accept / decline
+  /// (Req 4.4 — Sprint 5.4). At most one invite is queued at a time;
+  /// newer invites overwrite older ones.
+  pub pending_room_invite: RwSignal<Option<message::signaling::RoomInvite>>,
   /// WebRTC peer connection and encryption state.
   pub webrtc_state: RwSignal<WebRtcState>,
+  /// Mobile sidebar visibility toggle. On small screens the sidebar
+  /// is hidden while a conversation is active; the top-bar back button
+  /// sets this to `true` to reveal the sidebar / room list again.
+  pub sidebar_visible: RwSignal<bool>,
 }
 
 impl AppState {
@@ -158,20 +204,26 @@ impl AppState {
       locale: RwSignal::new(locale),
       debug: RwSignal::new(debug),
       settings_open: RwSignal::new(false),
+      pending_mention: RwSignal::new(None),
+      pending_profile: RwSignal::new(None),
+      now_tick: RwSignal::new(0),
+      moderation_log: RwSignal::new(HashMap::new()),
+      pending_room_invite: RwSignal::new(None),
       webrtc_state: RwSignal::new(WebRtcState::new()),
+      sidebar_visible: RwSignal::new(true),
     }
   }
 
   /// Check if user is authenticated.
   #[must_use]
   pub fn is_authenticated(&self) -> bool {
-    self.auth.get().is_some()
+    self.auth.get_untracked().is_some()
   }
 
   /// Get current user ID.
   #[must_use]
   pub fn current_user_id(&self) -> Option<UserId> {
-    self.auth.get().map(|state| state.user_id)
+    self.auth.get_untracked().map(|state| state.user_id)
   }
 
   /// Get pinned conversations (sorted by pinned_ts desc).
@@ -360,8 +412,20 @@ pub fn provide_app_state() -> AppState {
 
   // Restore the previously active conversation (Req 10.9.34). The Effect
   // below will persist any subsequent changes automatically.
+  // Validate the restored ID still exists in the conversation list;
+  // stale entries (e.g. from a previous session) cause ChatView to
+  // render against a non-existent conversation, triggering WASM panics
+  // when accessing message signals.
   if let Some(id) = AppState::load_active_conversation() {
-    state.active_conversation.set(Some(id));
+    let exists = state
+      .conversations
+      .with_untracked(|convs| convs.iter().any(|c| c.id == id));
+    if exists {
+      state.active_conversation.set(Some(id));
+    } else {
+      // Clear the stale entry so the room-list panel is shown instead.
+      AppState::persist_active_conversation(None);
+    }
   }
 
   // Persist `active_conversation` whenever it changes.
@@ -370,6 +434,19 @@ pub fn provide_app_state() -> AppState {
     let current = active.get();
     AppState::persist_active_conversation(current.as_ref());
   });
+
+  // Drive the global 1 Hz tick (Sprint 4.3 of the review-task-21
+  // follow-up). All time-derived UI (mute countdowns, call durations,
+  // …) subscribes to this single signal instead of registering its
+  // own setInterval, which keeps timer count constant regardless of
+  // how many components mount.
+  let tick = state.now_tick;
+  leptos_use::use_interval_fn(
+    move || {
+      tick.update(|v| *v = v.wrapping_add(1));
+    },
+    1_000_u64,
+  );
 
   provide_context(state);
   state

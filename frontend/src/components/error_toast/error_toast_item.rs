@@ -6,8 +6,10 @@
 use crate::error_handler::ErrorToast;
 use crate::error_handler::use_error_toast_manager;
 use crate::i18n;
+use icondata as i;
 use leptos::prelude::*;
 use leptos_i18n::{t, t_string};
+use leptos_icons::Icon;
 
 /// Resolve an error message using the i18n key with compile-time `t_string!`
 /// dispatch. Falls back to the default English message when the key is
@@ -47,6 +49,12 @@ fn resolve_error_message(key: &str, fallback: &str) -> String {
     "error.rom106" => t_string!(i18n, error.rom106),
     "error.rom107" => t_string!(i18n, error.rom107),
     "error.rom108" => t_string!(i18n, error.rom108),
+    "error.rom109" => t_string!(i18n, error.rom109),
+    "error.rom110" => t_string!(i18n, error.rom110),
+    "error.rom111" => t_string!(i18n, error.rom111),
+    "error.rom112" => t_string!(i18n, error.rom112),
+    "error.rom113" => t_string!(i18n, error.rom113),
+    "error.rom114" => t_string!(i18n, error.rom114),
     // ── E2EE ──
     "error.e2e001" => t_string!(i18n, error.e2e001),
     "error.e2e501" => t_string!(i18n, error.e2e501),
@@ -176,7 +184,7 @@ pub fn ErrorToastItem(
           on:click=move |_| dismiss_action()
           aria-label="Close error notification"
         >
-          "×"
+          <Icon icon=i::LuX />
         </button>
       </div>
       <p class="error-toast-message">{move || resolve_error_message(&i18n_key.get(), &fallback_message.get())}</p>

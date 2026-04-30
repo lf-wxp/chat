@@ -36,6 +36,7 @@ fn test_kick_nonexistent_member() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -62,6 +63,7 @@ fn test_promote_nonexistent_member() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -87,6 +89,7 @@ fn test_already_member() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -113,6 +116,7 @@ fn test_already_admin() {
   // Create and join room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -150,6 +154,7 @@ fn test_demote_regular_member() {
   // Create and join room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -183,6 +188,7 @@ fn test_cannot_demote_owner() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -209,6 +215,7 @@ fn test_create_duplicate_room_name() {
   // Create first room
   let create_request = CreateRoom {
     name: "Duplicate Name".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -219,6 +226,7 @@ fn test_create_duplicate_room_name() {
   // Create second room with same name (should succeed - names don't need to be unique)
   let create_request = CreateRoom {
     name: "Duplicate Name".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
@@ -241,6 +249,7 @@ fn test_password_validation_wrong_password() {
   // Create room with password
   let create_request = CreateRoom {
     name: "Protected Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: Some("correct-password".to_string()),
     max_participants: 8,
@@ -330,6 +339,7 @@ fn test_get_room_info() {
   // Create room
   let create_request = CreateRoom {
     name: "Test Room".to_string(),
+    description: String::new(),
     room_type: RoomType::Chat,
     password: None,
     max_participants: 8,
