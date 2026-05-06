@@ -28,7 +28,6 @@ ws = true
 
 [tools]
 sass = "1.77"
-wasm_bindgen = "0.2.118"
 
 [[hooks]]
 # Pre-build hook: run css-processor to expand composes declarations.

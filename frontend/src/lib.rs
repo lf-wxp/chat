@@ -19,6 +19,7 @@ pub mod logging;
 pub mod persistence;
 pub mod signaling;
 pub mod state;
+pub mod theater;
 pub mod user_status;
 pub mod utils;
 pub mod webrtc;
@@ -151,6 +152,11 @@ pub fn init() {
     let file_manager = file_transfer::provide_file_transfer_manager();
     file_manager.set_webrtc(webrtc_manager.clone());
     webrtc_manager.set_file_transfer_manager(file_manager);
+
+    // Initialize theater state (Task 22 — Req 12). Pure presentation
+    // state owned by the Leptos component tree; the WebRTC / DataChannel
+    // paths are wired up lazily by the theater components themselves.
+    theater::provide_theater_state();
 
     // Run a maintenance tick (retention sweep + index rebuild) every
     // 60 seconds.

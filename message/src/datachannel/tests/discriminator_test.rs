@@ -456,6 +456,18 @@ fn create_theater_discriminators() -> Vec<u8> {
       room_id: RoomId::new(),
     })
     .discriminator(),
+    DataChannelMessage::DanmakuBatch(DanmakuBatch {
+      room_id: RoomId::new(),
+      entries: vec![],
+    })
+    .discriminator(),
+    DataChannelMessage::TheaterChatText(TheaterChatText {
+      room_id: RoomId::new(),
+      sender_id: UserId::default(),
+      content: String::new(),
+      timestamp_nanos: 0,
+    })
+    .discriminator(),
   ]
 }
 
@@ -474,8 +486,8 @@ fn test_discriminator_all_values_unique() {
   }
   assert_eq!(
     discriminators.len(),
-    19,
-    "Should have 19 DataChannel variants"
+    21,
+    "Should have 21 DataChannel variants"
   );
 }
 

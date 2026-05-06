@@ -33,6 +33,7 @@
 @import url("./components/call.css") layer(components);
 @import url("./components/discovery.css") layer(components);
 @import url("./components/room.css") layer(components);
+@import url("./components/theater.css") layer(components);
 
 /* ── Layer: Utilities ── */
 @import url("./utilities.css") layer(utilities);

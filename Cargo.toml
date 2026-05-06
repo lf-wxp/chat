@@ -12,13 +12,13 @@ version = "0.1.0"
 
 [workspace.dependencies]
 # Async runtime
-tokio = {version = "1.52.0", features = ["full"]}
+tokio = {version = "1.52.2", features = ["full"]}
 
 # Web framework
 axum = {version = "0.8.9", features = ["ws", "macros"]}
 axum-extra = {version = "0.12.6", features = ["typed-header"]}
 tower = {version = "0.5.3", features = ["util"]}
-tower-http = {version = "0.6.8", features = ["fs", "cors", "trace"]}
+tower-http = {version = "0.6.9", features = ["fs", "cors", "trace"]}
 
 # Serialization
 bitcode = {version = "0.6.9", features = ["serde", "uuid"]}
@@ -26,20 +26,20 @@ serde = {version = "1.0.228", features = ["derive"]}
 serde_json = "1.0.149"
 
 # Frontend framework (WASM)
-leptos = "0.8.17"
+leptos = "0.8.19"
 leptos_i18n = "0.6.2"
 leptos_meta = "0.8"
 leptos_router = "0.8"
 
 # WASM bindings
-js-sys = "0.3.95"
-wasm-bindgen = "0.2.118"
-wasm-bindgen-futures = "0.4.68"
-web-sys = "0.3.95"
+js-sys = "0.3.97"
+wasm-bindgen = "0.2.120"
+wasm-bindgen-futures = "0.4.70"
+web-sys = "0.3.97"
 
 # Logging and tracing
 tracing = "0.1.44"
-tracing-appender = "0.2.4"
+tracing-appender = "0.2.5"
 tracing-subscriber = {version = "0.3.23", features = ["env-filter", "json"]}
 
 # Error handling
@@ -47,7 +47,7 @@ anyhow = "1.0.102"
 thiserror = "2.0.18"
 
 # UUID and identifiers
-uuid = {version = "1.23.0", features = ["v4", "v5", "serde"]}
+uuid = {version = "1.23.1", features = ["v4", "v5", "serde"]}
 
 # Cryptography
 argon2 = {version = "0.5.3", features = ["std"]}

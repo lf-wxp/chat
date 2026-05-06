@@ -213,6 +213,38 @@ type MediaStateUpdateHandler = Rc<dyn Fn(UserId, message::datachannel::MediaStat
 /// from a transient network blip (Req 10.5.24).
 type ReconnectingStateHandler = Rc<dyn Fn(UserId, message::datachannel::ReconnectingState)>;
 
+/// Callback invoked when a remote peer forwards a theater-class
+/// DataChannel message (danmaku, subtitle track replacement, subtitle
+/// clear, playback progress). Routed to the theater subsystem so the
+/// overlay canvas / subtitle state / playback HUD can stay in sync
+/// with the owner (Req 12.3 – 12.6).
+type TheaterMessageHandler = Rc<dyn Fn(UserId, message::datachannel::DataChannelMessage)>;
+
+/// Theater-specific peer lifecycle event (Req 12.2 §6a / 12.3 §12).
+///
+/// Fired in addition to the generic [`PeerConnectedHandler`] /
+/// [`PeerClosedHandler`] so the theater subsystem can observe owner
+/// disconnects without clobbering the call subsystem's handlers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TheaterPeerEvent {
+  /// The peer transitioned into `Connected`. Owner side uses this to
+  /// push the current MediaStream to a late-joining viewer.
+  Connected,
+  /// The peer transitioned into `Disconnected` — a transient ICE
+  /// flap. Viewer side flips `owner_reconnecting` if the peer is the
+  /// owner so the grace banner surfaces (Req 12.2 §6a).
+  Disconnected,
+  /// The peer transitioned into `Failed` or `Closed`. Viewer side
+  /// treats the owner as permanently gone and surfaces the offline
+  /// CTA.
+  Closed,
+}
+
+/// Theater peer-lifecycle callback. Co-exists with the generic
+/// [`PeerClosedHandler`] / [`PeerConnectedHandler`] so the call and
+/// theater subsystems can observe the same transitions independently.
+type TheaterPeerEventHandler = Rc<dyn Fn(UserId, TheaterPeerEvent)>;
+
 /// Main WebRTC manager that orchestrates all peer connections.
 ///
 /// Uses `Rc<RefCell<>>` for single-threaded WASM compatibility.
@@ -247,6 +279,15 @@ pub struct WebRtcManager {
   /// Callback invoked when a remote peer broadcasts a
   /// [`message::datachannel::ReconnectingState`] (Req 10.5.24).
   on_reconnecting_state: Rc<RefCell<Option<ReconnectingStateHandler>>>,
+  /// Callback invoked when a remote peer forwards a theater-class
+  /// DataChannel message (Req 12.3 – 12.6). Wired by the theater page
+  /// on mount so the overlay / subtitle / playback HUDs stay in sync.
+  on_theater_message: Rc<RefCell<Option<TheaterMessageHandler>>>,
+  /// Callback invoked when a peer-connection lifecycle transition
+  /// relevant to the theater subsystem fires (Req 12.2 §6a / 12.3
+  /// §12). Runs alongside the call-focused [`on_peer_connected`] /
+  /// [`on_peer_closed`] handlers so both subsystems stay informed.
+  on_theater_peer_event: Rc<RefCell<Option<TheaterPeerEventHandler>>>,
   inner: Rc<RefCell<InnerManager>>,
 }
 
@@ -315,6 +356,8 @@ impl WebRtcManager {
       on_peer_connected: Rc::new(RefCell::new(None)),
       on_media_state_update: Rc::new(RefCell::new(None)),
       on_reconnecting_state: Rc::new(RefCell::new(None)),
+      on_theater_message: Rc::new(RefCell::new(None)),
+      on_theater_peer_event: Rc::new(RefCell::new(None)),
       inner: Rc::new(RefCell::new(InnerManager {
         connections: HashMap::new(),
         crypto: HashMap::new(),
@@ -404,6 +447,44 @@ impl WebRtcManager {
     F: Fn(UserId, message::datachannel::ReconnectingState) + 'static,
   {
     *self.on_reconnecting_state.borrow_mut() = Some(Rc::new(callback));
+  }
+
+  /// Register a callback for inbound theater DataChannel messages
+  /// (Req 12.3 – 12.5). The theater page installs a handler on mount
+  /// so danmaku, subtitle replacements, subtitle clears, and playback
+  /// progress broadcasts flow into `TheaterState`. The handler is
+  /// cleared on unmount so re-entering the page reinstalls a fresh
+  /// closure (the theater state is reset between sessions).
+  pub fn set_on_theater_message<F>(&self, callback: F)
+  where
+    F: Fn(UserId, message::datachannel::DataChannelMessage) + 'static,
+  {
+    *self.on_theater_message.borrow_mut() = Some(Rc::new(callback));
+  }
+
+  /// Remove any previously-installed theater message handler. Safe
+  /// to call when no handler was registered.
+  pub fn clear_on_theater_message(&self) {
+    *self.on_theater_message.borrow_mut() = None;
+  }
+
+  /// Register a callback invoked on theater-related peer lifecycle
+  /// transitions (Req 12.2 §6a / 12.3 §12). This callback runs in
+  /// addition to the generic [`Self::set_on_peer_connected`] and
+  /// [`Self::set_on_peer_closed`] so the theater subsystem can
+  /// observe owner disconnects without displacing the call
+  /// subsystem's handlers.
+  pub fn set_on_theater_peer_event<F>(&self, callback: F)
+  where
+    F: Fn(UserId, TheaterPeerEvent) + 'static,
+  {
+    *self.on_theater_peer_event.borrow_mut() = Some(Rc::new(callback));
+  }
+
+  /// Remove any previously-installed theater peer-event handler.
+  /// Safe to call when no handler was registered.
+  pub fn clear_on_theater_peer_event(&self) {
+    *self.on_theater_peer_event.borrow_mut() = None;
   }
 
   /// Install the configured remote-track handler on a freshly-created
@@ -1444,6 +1525,12 @@ impl WebRtcManager {
         if let Some(handler) = self.on_peer_connected.borrow().clone() {
           handler(peer_id.clone());
         }
+        // Theater subsystem — Req 12.3 §12 (late-joiner auto stream
+        // push) plus Req 12.2 §6a (clear owner-reconnecting banner
+        // when the link recovers).
+        if let Some(handler) = self.on_theater_peer_event.borrow().clone() {
+          handler(peer_id.clone(), TheaterPeerEvent::Connected);
+        }
         // Req 6.6 — after a reconnection, check if any inbound
         // transfer from this peer was paused and send a resume
         // request for the missing chunks so the transfer can
@@ -1467,6 +1554,12 @@ impl WebRtcManager {
         // connection recovers (or when the peer reconnects later).
         if let Some(file_mgr) = self.file_manager.borrow().clone() {
           file_mgr.pause_inbound_transfers(&peer_id);
+        }
+
+        // Theater subsystem — Req 12.2 §6a (surface the 30-second
+        // owner-reconnecting grace banner on viewers).
+        if let Some(handler) = self.on_theater_peer_event.borrow().clone() {
+          handler(peer_id.clone(), TheaterPeerEvent::Disconnected);
         }
 
         // ICE restart: only the initiator sends the restart offer to
@@ -1525,6 +1618,12 @@ impl WebRtcManager {
         // (close_connection above already released them).
         if let Some(handler) = self.on_peer_closed.borrow().clone() {
           handler(peer_id.clone());
+        }
+        // Theater subsystem — Req 12.2 §6a terminal path: the owner
+        // (or a viewer) has left permanently, switch the grace
+        // banner to "offline" messaging.
+        if let Some(handler) = self.on_theater_peer_event.borrow().clone() {
+          handler(peer_id.clone(), TheaterPeerEvent::Closed);
         }
       }
       _ => {}
@@ -1751,4 +1850,53 @@ pub(super) fn build_file_placeholder(
     mentions_me: false,
     counted_unread: false,
   }
+}
+
+/// Extract the aggregate `bytesSent` from an `RTCStatsReport` JsValue
+/// returned by `RTCPeerConnection.getStats()`. Iterates the report
+/// entries and sums the `bytesSent` field from all `outbound-rtp`
+/// type records.
+///
+/// Returns `None` if the report cannot be parsed (e.g. the browser
+/// returned an unexpected format).
+#[must_use]
+pub fn extract_outbound_bytes_sent(report: &JsValue) -> Option<u64> {
+  use js_sys::{Iterator, Reflect};
+  use wasm_bindgen::JsCast;
+
+  // RTCStatsReport is a Map-like object. We iterate its values.
+  let values_fn = Reflect::get(report, &JsValue::from_str("values")).ok()?;
+  let iterator: Iterator = values_fn
+    .dyn_ref::<js_sys::Function>()?
+    .call0(report)
+    .ok()?
+    .unchecked_into();
+
+  let mut total: u64 = 0;
+  loop {
+    let next = iterator.next().ok()?;
+    if js_sys::Reflect::get(&next, &JsValue::from_str("done"))
+      .ok()?
+      .as_bool()
+      .unwrap_or(true)
+    {
+      break;
+    }
+    let value = Reflect::get(&next, &JsValue::from_str("value")).ok()?;
+    // Check if this entry is type "outbound-rtp".
+    let entry_type = Reflect::get(&value, &JsValue::from_str("type"))
+      .ok()
+      .and_then(|v| v.as_string());
+    if entry_type.as_deref() != Some("outbound-rtp") {
+      continue;
+    }
+    // Extract bytesSent.
+    if let Some(bytes) = Reflect::get(&value, &JsValue::from_str("bytesSent"))
+      .ok()
+      .and_then(|v| v.as_f64())
+    {
+      total = total.saturating_add(bytes as u64);
+    }
+  }
+  Some(total)
 }

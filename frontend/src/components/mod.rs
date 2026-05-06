@@ -16,6 +16,7 @@ mod reconnect_banner;
 mod room;
 mod settings_page;
 mod sidebar;
+mod theater;
 mod toast_container;
 mod top_bar;
 
@@ -36,5 +37,11 @@ pub use room::{
 };
 pub use settings_page::SettingsPage;
 pub use sidebar::Sidebar;
+pub use theater::{
+  CopyrightNotice, DanmakuCanvas, DanmakuInput, DanmakuItem, DanmakuSettingsPanel, SubtitleOverlay,
+  SubtitleSettingsPanel, TheaterChatBubble, TheaterChatPanel, TheaterGraceBanner,
+  TheaterMemberPanel, TheaterPage, TheaterPlaybackControls, TheaterVideoPlayer, VideoSource,
+  VideoSourceKind, VideoSourcePicker,
+};
 pub use toast_container::ToastContainer;
 pub use top_bar::TopBar;

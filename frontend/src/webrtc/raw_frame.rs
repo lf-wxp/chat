@@ -286,6 +286,20 @@ impl WebRtcManager {
         };
         file_mgr.on_file_resume_request(peer_id, request);
       }
+      DataChannelMessage::Danmaku(_)
+      | DataChannelMessage::SubtitleData(_)
+      | DataChannelMessage::SubtitleClear(_)
+      | DataChannelMessage::PlaybackProgress(_)
+      | DataChannelMessage::DanmakuBatch(_)
+      | DataChannelMessage::TheaterChatText(_) => {
+        // Req 12.3 – 12.6 — theater-class DataChannel messages. The
+        // theater page installs the handler on mount; when no page is
+        // currently mounted the message is silently ignored because
+        // the user is not in a theater session.
+        if let Some(handler) = self.on_theater_message.borrow().clone() {
+          handler(peer_id, msg);
+        }
+      }
       _ => {
         // P2-7 (Review Round 3 guard): intentionally log ONLY the
         // discriminator byte here, never the payload. Unknown

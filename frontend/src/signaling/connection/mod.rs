@@ -24,7 +24,8 @@ use message::signaling::{
   MultiInvite as MultiInviteMsg, MuteMember as MuteMemberMsg, NicknameChange as NicknameChangeMsg,
   PeerClosed as PeerClosedMsg, PeerEstablished as PeerEstablishedMsg,
   PromoteAdmin as PromoteAdminMsg, RoomAnnouncement as RoomAnnouncementMsg,
-  SdpAnswer as SdpAnswerMsg, SdpOffer as SdpOfferMsg, SignalingMessage, TokenAuth,
+  SdpAnswer as SdpAnswerMsg, SdpOffer as SdpOfferMsg, SignalingMessage,
+  TheaterMuteAll as TheaterMuteAllMsg, TheaterTransferOwner as TheaterTransferOwnerMsg, TokenAuth,
   TransferOwnership as TransferOwnershipMsg, UnbanMember as UnbanMemberMsg,
   UnmuteMember as UnmuteMemberMsg, UpdateRoomInfo as UpdateRoomInfoMsg,
   UpdateRoomPassword as UpdateRoomPasswordMsg, UserLogout,
@@ -597,6 +598,22 @@ impl SignalingClient {
   /// Transfer room ownership to another member (Owner only).
   pub fn send_transfer_ownership(&self, room_id: RoomId, target: UserId) -> Result<(), String> {
     let msg = SignalingMessage::TransferOwnership(TransferOwnershipMsg { room_id, target });
+    self.send(&msg)
+  }
+
+  /// Theater-specific shortcut: mute every viewer at once (Req 12.7
+  /// §36). The owner can still speak; all other participants get the
+  /// "You have been muted" prompt in the chat composer.
+  pub fn send_theater_mute_all(&self, room_id: RoomId) -> Result<(), String> {
+    let msg = SignalingMessage::TheaterMuteAll(TheaterMuteAllMsg { room_id });
+    self.send(&msg)
+  }
+
+  /// Theater-specific shortcut: transfer ownership to a viewer
+  /// (Req 12.7 §39). Emits the dedicated theater variant so the
+  /// star-topology re-negotiation path is triggered on the server.
+  pub fn send_theater_transfer_owner(&self, room_id: RoomId, target: UserId) -> Result<(), String> {
+    let msg = SignalingMessage::TheaterTransferOwner(TheaterTransferOwnerMsg { room_id, target });
     self.send(&msg)
   }
 

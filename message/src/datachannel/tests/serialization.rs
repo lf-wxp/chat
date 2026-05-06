@@ -52,6 +52,23 @@ fn test_datachannel_message_json_roundtrip_all_variants() {
     DataChannelMessage::SubtitleClear(SubtitleClear {
       room_id: RoomId::new(),
     }),
+    DataChannelMessage::DanmakuBatch(DanmakuBatch {
+      room_id: RoomId::new(),
+      entries: vec![Danmaku {
+        content: "batch entry".to_string(),
+        font_size: 20,
+        color: 0xFF_00_FF,
+        position: DanmakuPosition::Scroll,
+        video_time_ms: 1_000,
+        timestamp_nanos: 1_000_000_000,
+      }],
+    }),
+    DataChannelMessage::TheaterChatText(TheaterChatText {
+      room_id: RoomId::new(),
+      sender_id: UserId::default(),
+      content: "Hello theater".to_string(),
+      timestamp_nanos: 1_000_000_000,
+    }),
   ];
 
   for msg in messages {

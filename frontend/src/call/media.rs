@@ -267,3 +267,35 @@ pub fn attach_stream_to_video(
   video.set_autoplay(true);
   Ok(())
 }
+
+/// Capture a `MediaStream` from a `<video>` element using the
+/// `captureStream()` API (Req 12.3 §8).
+///
+/// Tries `captureStream()` first (Chrome, Edge), then falls back to
+/// `mozCaptureStream()` (Firefox). Returns an error message suitable
+/// for display when neither API is available.
+///
+/// # Errors
+/// Returns `Err` when the browser does not support video stream
+/// capture (e.g. Safari < 17, or non-HTTPS contexts).
+pub fn capture_stream_from_video(video: &HtmlVideoElement) -> Result<MediaStream, String> {
+  // Try standard `captureStream()` first.
+  if let Ok(func) = Reflect::get(video, &JsValue::from_str("captureStream"))
+    && let Ok(function) = func.dyn_into::<js_sys::Function>()
+    && let Ok(result) = function.call0(video)
+    && let Ok(stream) = result.dyn_into::<MediaStream>()
+  {
+    return Ok(stream);
+  }
+
+  // Fallback: Firefox uses `mozCaptureStream()`.
+  if let Ok(func) = Reflect::get(video, &JsValue::from_str("mozCaptureStream"))
+    && let Ok(function) = func.dyn_into::<js_sys::Function>()
+    && let Ok(result) = function.call0(video)
+    && let Ok(stream) = result.dyn_into::<MediaStream>()
+  {
+    return Ok(stream);
+  }
+
+  Err("Your browser does not support video stream capture. Please use Chrome or Edge.".to_string())
+}

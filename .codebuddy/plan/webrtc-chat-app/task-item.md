@@ -398,7 +398,7 @@
   - 编写单元测试：权限检查逻辑、成员搜索过滤
   - _需求：Req 4 (Room)、Req 15 (Profile & Permissions)_
 
-- [ ] 22. 实现剧场模式（Theater Mode）
+- [x] 22. 实现剧场模式（Theater Mode）
   - 实现剧场创建/加入/离开 UI
   - 实现视频源选择：本地文件（MP4/WebM/OGG）、在线 URL、CORS 错误处理
   - 实现 `captureStream()` / `mozCaptureStream()` 视频流捕获

@@ -1,0 +1,889 @@
+/**
+ * Theater mode component styles (Req 12).
+ *
+ * Scope for batch B1: copyright notice tooltip + create-theater hint
+ * panel. Subsequent batches will extend this file with video-player,
+ * danmaku, subtitle, and layout styles.
+ */
+
+/* ── Copyright notice with tooltip ── */
+.theater-copyright {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1, .25rem);
+  color: var(--text-tertiary, #94a3b8);
+  cursor: help;
+  font-size: var(--font-sm, .875rem);
+}
+
+.theater-copyright:focus-visible {
+  outline: 2px solid var(--color-primary, #3b82f6);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.theater-copyright svg {
+  width: 16px;
+  height: 16px;
+}
+
+.theater-copyright__label {
+  color: var(--text-secondary, #64748b);
+}
+
+.theater-copyright__tooltip {
+  position: absolute;
+  bottom: calc(100% + .5rem);
+  left: 0;
+  max-width: 20rem;
+  padding: var(--space-2, .5rem) var(--space-3, .75rem);
+  background: var(--bg-elevated, #1f2937);
+  color: var(--text-inverse, #f8fafc);
+  border-radius: var(--radius-md, 6px);
+  font-size: var(--font-xs, .75rem);
+  line-height: 1.4;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast, 150ms) ease;
+  z-index: var(--z-tooltip, 60);
+  box-shadow: var(--shadow-md, 0 4px 12px rgb(0 0 0 / .15));
+}
+
+.theater-copyright:hover .theater-copyright__tooltip,
+.theater-copyright:focus-visible .theater-copyright__tooltip {
+  opacity: 1;
+}
+
+/* ── Create-theater hint (inside CreateRoomModal) ── */
+.create-room-modal__theater-hint {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, .5rem);
+  padding: var(--space-3, .75rem);
+  border-radius: var(--radius-md, 6px);
+  background: color-mix(in oklch, var(--color-primary, #3b82f6) 8%, transparent);
+  border: 1px solid color-mix(in oklch, var(--color-primary, #3b82f6) 20%, transparent);
+}
+
+.create-room-modal__max-viewers {
+  margin: 0;
+  font-size: var(--font-sm, .875rem);
+  color: var(--text-secondary, #64748b);
+}
+
+/* ── Theater video player ── */
+.theater-video-player {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2, .5rem);
+  inline-size: 100%;
+  block-size: 100%;
+  min-block-size: 16rem;
+  background: #000;
+  border-radius: var(--radius-md, 6px);
+  overflow: hidden;
+}
+
+.theater-video-player__surface {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.theater-video-player__waiting {
+  color: var(--text-inverse, #f8fafc);
+  font-size: var(--font-sm, .875rem);
+  padding: var(--space-4, 1rem);
+  text-align: center;
+}
+
+.theater-video-player__viewer-hint {
+  position: absolute;
+  inset-block-end: var(--space-3, .75rem);
+  inset-inline-start: var(--space-3, .75rem);
+  margin: 0;
+  padding: var(--space-1, .25rem) var(--space-2, .5rem);
+  background: rgb(0 0 0 / .55);
+  color: var(--text-inverse, #f8fafc);
+  font-size: var(--font-xs, .75rem);
+  border-radius: var(--radius-sm, 4px);
+}
+
+/* ── Video source picker ── */
+.theater-source-picker {
+  inline-size: min(32rem, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, .75rem);
+  padding: var(--space-4, 1rem);
+  background: var(--bg-elevated, #1f2937);
+  color: var(--text-inverse, #f8fafc);
+  border-radius: var(--radius-md, 6px);
+}
+
+.theater-source-picker__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2, .5rem);
+}
+
+.theater-source-picker__title {
+  margin: 0;
+  font-size: var(--font-base, 1rem);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.theater-source-picker__options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--space-2, .5rem);
+}
+
+.theater-source-picker__option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1, .25rem);
+  padding: var(--space-3, .75rem);
+  background: rgb(255 255 255 / .08);
+  color: inherit;
+  border: 1px solid rgb(255 255 255 / .12);
+  border-radius: var(--radius-md, 6px);
+  cursor: pointer;
+  transition: background-color var(--duration-fast, 150ms) ease;
+}
+
+.theater-source-picker__option:hover,
+.theater-source-picker__option:focus-visible {
+  background: rgb(255 255 255 / .16);
+}
+
+.theater-source-picker__option svg {
+  inline-size: 24px;
+  block-size: 24px;
+}
+
+.theater-source-picker__file-input {
+  display: none;
+}
+
+.theater-source-picker__url-form {
+  display: flex;
+  gap: var(--space-2, .5rem);
+}
+
+.theater-source-picker__url-form .input {
+  flex: 1;
+}
+
+.theater-source-picker__error {
+  margin: 0;
+  color: var(--color-danger, #ef4444);
+  font-size: var(--font-sm, .875rem);
+}
+
+/* ── Playback controls toolbar ── */
+.theater-playback-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, .5rem);
+  padding: var(--space-2, .5rem) var(--space-3, .75rem);
+  background: color-mix(in oklch, #000 70%, transparent);
+  color: var(--text-inverse, #f8fafc);
+  border-radius: var(--radius-md, 6px);
+}
+
+.theater-playback-controls__time {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-xs, .75rem);
+  min-inline-size: 3rem;
+  text-align: center;
+}
+
+.theater-playback-controls__seek {
+  flex: 1;
+  cursor: pointer;
+}
+
+.theater-playback-controls__seek[disabled] {
+  cursor: not-allowed;
+  opacity: .75;
+}
+
+.theater-playback-controls__volume {
+  inline-size: 6rem;
+  cursor: pointer;
+}
+
+/* ── Subtitle overlay ── */
+.subtitle-overlay {
+  position: absolute;
+  inset-inline: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  padding: var(--space-3, .75rem);
+  z-index: 5;
+}
+
+.subtitle-overlay--bottom {
+  inset-block-end: 3.5rem;
+}
+
+.subtitle-overlay--top {
+  inset-block-start: 1rem;
+}
+
+.subtitle-overlay__line {
+  max-inline-size: min(80%, 40rem);
+  margin: 0;
+  padding: var(--space-1, .25rem) var(--space-3, .75rem);
+  text-align: center;
+  font-weight: var(--font-weight-semibold, 600);
+  line-height: 1.35;
+  text-shadow: 0 1px 2px rgb(0 0 0 / .85);
+  border-radius: var(--radius-sm, 4px);
+  white-space: pre-line;
+}
+
+/* ── Subtitle settings panel ── */
+.subtitle-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, .75rem);
+  padding: var(--space-4, 1rem);
+  background: var(--bg-secondary, #f1f5f9);
+  border-radius: var(--radius-md, 6px);
+}
+
+.subtitle-settings__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2, .5rem);
+}
+
+.subtitle-settings__title {
+  margin: 0;
+  font-size: var(--font-base, 1rem);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.subtitle-settings__upload {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, .25rem);
+}
+
+.subtitle-settings__hint {
+  margin: 0;
+  font-size: var(--font-xs, .75rem);
+  color: var(--text-tertiary, #94a3b8);
+}
+
+.subtitle-settings__file-input {
+  display: none;
+}
+
+.subtitle-settings__clear {
+  align-self: flex-start;
+}
+
+.subtitle-settings__status {
+  margin: 0;
+  font-size: var(--font-sm, .875rem);
+  color: var(--text-secondary, #64748b);
+}
+
+.subtitle-settings__error {
+  margin: 0;
+  color: var(--color-danger, #ef4444);
+  font-size: var(--font-sm, .875rem);
+}
+
+.subtitle-settings__read-only {
+  margin: 0;
+  font-size: var(--font-sm, .875rem);
+  color: var(--text-tertiary, #94a3b8);
+}
+
+.subtitle-settings__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, .5rem);
+}
+
+.subtitle-settings__appearance {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, .25rem);
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.subtitle-settings__appearance legend {
+  font-size: var(--font-sm, .875rem);
+  font-weight: var(--font-weight-semibold, 600);
+  margin-block-end: var(--space-1, .25rem);
+}
+
+/* ── Danmaku canvas overlay ── */
+.danmaku-canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.danmaku-canvas__entry {
+  position: absolute;
+  white-space: nowrap;
+  font-weight: var(--font-weight-semibold, 600);
+  text-shadow: 0 1px 2px rgb(0 0 0 / .85);
+  will-change: transform;
+}
+
+.danmaku-canvas__entry--scroll {
+  left: 0;
+  transform: translateX(100vw);
+  animation-name: danmaku-scroll;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+
+.danmaku-canvas__entry--top,
+.danmaku-canvas__entry--bottom {
+  animation: danmaku-fade 300ms ease-out both;
+}
+
+@keyframes danmaku-scroll {
+  from { transform: translateX(100vw); }
+  to   { transform: translateX(-110%); }
+}
+
+@keyframes danmaku-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .danmaku-canvas__entry--scroll {
+    animation-duration: 0ms !important;
+  }
+}
+
+/* ── Danmaku composer ── */
+.danmaku-input {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, .5rem);
+  padding: var(--space-3, .75rem);
+  background: var(--bg-elevated, #1f2937);
+  color: var(--text-inverse, #f8fafc);
+  border-radius: var(--radius-md, 6px);
+}
+
+.danmaku-input__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, .5rem);
+  flex-wrap: wrap;
+}
+
+.danmaku-input__field {
+  flex: 1;
+  min-inline-size: 12rem;
+}
+
+.danmaku-input__label {
+  font-size: var(--font-xs, .75rem);
+  color: var(--text-tertiary, #94a3b8);
+}
+
+.danmaku-input__palette {
+  display: inline-flex;
+  gap: var(--space-1, .25rem);
+}
+
+.danmaku-input__swatch {
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.danmaku-input__swatch.is-active {
+  border-color: var(--color-primary, #3b82f6);
+  box-shadow: 0 0 0 2px rgb(255 255 255 / .25);
+}
+
+.danmaku-input__position {
+  min-inline-size: 7rem;
+}
+
+.danmaku-input__muted {
+  margin: 0;
+  padding: var(--space-1, .25rem) var(--space-2, .5rem);
+  background: color-mix(in oklch, var(--color-danger, #ef4444) 25%, transparent);
+  border-radius: var(--radius-sm, 4px);
+  font-size: var(--font-sm, .875rem);
+}
+
+.danmaku-input__error {
+  margin: 0;
+  color: var(--color-danger, #ef4444);
+  font-size: var(--font-sm, .875rem);
+}
+
+/* ── Danmaku settings panel ── */
+.danmaku-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, .75rem);
+  padding: var(--space-4, 1rem);
+  background: var(--bg-secondary, #f1f5f9);
+  border-radius: var(--radius-md, 6px);
+}
+
+.danmaku-settings__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.danmaku-settings__title {
+  margin: 0;
+  font-size: var(--font-base, 1rem);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.danmaku-settings__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, .5rem);
+}
+
+.danmaku-settings__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, .25rem);
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.danmaku-settings__group legend {
+  font-size: var(--font-sm, .875rem);
+  font-weight: var(--font-weight-semibold, 600);
+  margin-block-end: var(--space-1, .25rem);
+}
+
+/* ── Theater chat panel (Req 12.6) ── */
+.theater-chat-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, .5rem);
+  block-size: 100%;
+  padding: var(--space-3, .75rem);
+  background: var(--bg-secondary, #f1f5f9);
+  border-radius: var(--radius-md, 6px);
+  min-block-size: 16rem;
+}
+
+.theater-chat-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.theater-chat-panel__title {
+  margin: 0;
+  font-size: var(--font-base, 1rem);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.theater-chat-panel__list {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, .5rem);
+  min-block-size: 12rem;
+}
+
+.theater-chat-panel__empty {
+  margin: auto;
+  padding: var(--space-4, 1rem);
+  color: var(--text-tertiary, #94a3b8);
+  text-align: center;
+  list-style: none;
+}
+
+.theater-chat-panel__composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, .25rem);
+}
+
+.theater-chat-panel__composer-row {
+  display: flex;
+  gap: var(--space-2, .5rem);
+}
+
+.theater-chat-panel__input {
+  flex: 1;
+}
+
+.theater-chat-panel__muted {
+  margin: 0;
+  padding: var(--space-1, .25rem) var(--space-2, .5rem);
+  background: color-mix(in oklch, var(--color-danger, #ef4444) 20%, transparent);
+  border-radius: var(--radius-sm, 4px);
+  font-size: var(--font-sm, .875rem);
+}
+
+.theater-chat-panel__error {
+  margin: 0;
+  color: var(--color-danger, #ef4444);
+  font-size: var(--font-sm, .875rem);
+}
+
+/* ── Theater chat bubble ── */
+.theater-chat-bubble {
+  list-style: none;
+  max-inline-size: 90%;
+  padding: var(--space-2, .5rem) var(--space-3, .75rem);
+  border-radius: var(--radius-md, 6px);
+  background: var(--bg-elevated, #1f2937);
+  color: var(--text-inverse, #f8fafc);
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, .25rem);
+}
+
+.theater-chat-bubble--self {
+  background: var(--color-primary, #3b82f6);
+  color: #fff;
+  align-self: flex-end;
+}
+
+.theater-chat-bubble__meta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2, .5rem);
+  font-size: var(--font-xs, .75rem);
+  opacity: .8;
+}
+
+.theater-chat-bubble__sender {
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.theater-chat-bubble__time {
+  font-variant-numeric: tabular-nums;
+}
+
+.theater-chat-bubble__body {
+  margin: 0;
+  font-size: var(--font-sm, .875rem);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Screen-reader-only helper (shared, kept here to avoid a standalone
+   file for one rule). */
+.sr-only {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Theater member panel (Req 12.7) ── */
+.theater-member-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, .5rem);
+  padding: var(--space-3, .75rem);
+  background: var(--bg-secondary, #f1f5f9);
+  border-radius: var(--radius-md, 6px);
+}
+
+.theater-member-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.theater-member-panel__title {
+  margin: 0;
+  font-size: var(--font-base, 1rem);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.theater-member-panel__count {
+  color: var(--text-tertiary, #94a3b8);
+  font-variant-numeric: tabular-nums;
+}
+
+.theater-member-panel__mute-all {
+  align-self: flex-start;
+}
+
+.theater-member-panel__mute-all.is-active {
+  background: color-mix(in oklch, var(--color-danger, #ef4444) 85%, transparent);
+  color: #fff;
+}
+
+.theater-member-panel__mute-banner {
+  margin: 0;
+  padding: var(--space-1, .25rem) var(--space-2, .5rem);
+  background: color-mix(in oklch, var(--color-danger, #ef4444) 20%, transparent);
+  border-radius: var(--radius-sm, 4px);
+  font-size: var(--font-sm, .875rem);
+}
+
+.theater-member-panel__list {
+  flex: 1;
+  min-block-size: 0;
+}
+
+/* ── Theater page layout (Req 12.8) ── */
+.theater-page {
+  display: flex;
+  flex-direction: column;
+  block-size: 100%;
+  min-block-size: 0;
+  padding: var(--space-4, 1rem);
+  gap: var(--space-3, .75rem);
+  overflow: hidden;
+}
+
+.theater-page--fullscreen {
+  padding: 0;
+  background: #000;
+}
+
+.theater-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, .75rem);
+}
+
+.theater-page__title {
+  margin: 0;
+  font-size: var(--font-lg, 1.125rem);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.theater-page__actions {
+  display: flex;
+  gap: var(--space-2, .5rem);
+}
+
+.theater-page__body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(18rem, 1fr);
+  gap: var(--space-3, .75rem);
+  min-block-size: 0;
+}
+
+.theater-page--fullscreen .theater-page__body {
+  grid-template-columns: 1fr;
+}
+
+.theater-page__stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, .5rem);
+  min-block-size: 0;
+}
+
+.theater-page__surface {
+  position: relative;
+  flex: 1;
+  min-block-size: 16rem;
+  background: #000;
+  border-radius: var(--radius-md, 6px);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.theater-page__composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, .5rem);
+}
+
+.theater-page__owner-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2, .5rem);
+}
+
+.theater-page__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, .5rem);
+  min-block-size: 0;
+}
+
+.theater-page--fullscreen .theater-page__side {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  inline-size: min(22rem, 80vw);
+  z-index: var(--z-overlay, 50);
+  background: var(--bg-primary, #ffffff);
+  box-shadow: -4px 0 12px rgb(0 0 0 / .25);
+  transition: transform var(--duration-normal, 200ms) ease;
+}
+
+.theater-page__side--hidden {
+  transform: translateX(100%);
+  pointer-events: none;
+}
+
+.theater-page__panel-toggle {
+  position: absolute;
+  inset-block-start: var(--space-2, .5rem);
+  inset-inline-end: var(--space-2, .5rem);
+  z-index: var(--z-tooltip, 60);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2, .5rem);
+  background: rgb(0 0 0 / .55);
+  color: #fff;
+  border: 0;
+  border-radius: var(--radius-md, 6px);
+  cursor: pointer;
+  opacity: .7;
+  transition: opacity var(--duration-fast, 150ms) ease;
+}
+
+.theater-page__panel-toggle:hover,
+.theater-page__panel-toggle:focus-visible {
+  opacity: 1;
+}
+
+.theater-page__tabs {
+  display: flex;
+  gap: var(--space-1, .25rem);
+  background: var(--bg-secondary, #f1f5f9);
+  padding: var(--space-1, .25rem);
+  border-radius: var(--radius-md, 6px);
+}
+
+.theater-page__tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1, .25rem);
+  padding: var(--space-2, .5rem);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  color: var(--text-secondary, #475569);
+  font-weight: var(--font-weight-medium, 500);
+}
+
+.theater-page__tab.is-active {
+  background: var(--bg-elevated, #ffffff);
+  color: var(--text-primary, #0f172a);
+  box-shadow: 0 1px 2px rgb(0 0 0 / .08);
+}
+
+.theater-page__tab-panel {
+  flex: 1;
+  min-block-size: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.theater-page__badge {
+  margin-inline-start: var(--space-1, .25rem);
+  padding: 0 var(--space-1, .25rem);
+  min-inline-size: 1.25rem;
+  block-size: 1.25rem;
+  border-radius: 9999px;
+  background: var(--color-danger, #ef4444);
+  color: #fff;
+  font-size: var(--font-xs, .75rem);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 768px) {
+  .theater-page__body {
+    grid-template-columns: 1fr;
+    grid-auto-rows: minmax(0, auto);
+  }
+  .theater-page__owner-panels {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Grace window banner (Req 12.2 §6a) ── */
+.theater-grace-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2, .5rem);
+  padding: var(--space-2, .5rem) var(--space-3, .75rem);
+  border-radius: var(--radius-md, 6px);
+  background: color-mix(in oklch, var(--color-warning, #f59e0b) 30%, transparent);
+  color: var(--text-primary, #0f172a);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.theater-grace-banner--offline {
+  background: color-mix(in oklch, var(--color-danger, #ef4444) 30%, transparent);
+}
+
+.theater-grace-banner__message {
+  flex: 1;
+}
+
+/* ── High-load banner (Req 12.5 §28 / Req 12.2 §4a) ── */
+.theater-load-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, .5rem);
+  margin-top: var(--space-2, .5rem);
+  padding: var(--space-2, .5rem) var(--space-3, .75rem);
+  border-radius: var(--radius-md, 6px);
+  background: color-mix(in oklch, var(--color-warning, #f59e0b) 22%, transparent);
+  color: var(--text-primary, #0f172a);
+  font-size: var(--font-size-sm, .875rem);
+}
+
+.theater-load-banner__icon {
+  flex: none;
+}

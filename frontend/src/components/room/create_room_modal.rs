@@ -14,6 +14,7 @@ use message::types::RoomType;
 
 use crate::components::room::modal_wrapper::{ModalSize, ModalWrapper};
 use crate::components::room::utils::event_target_checked;
+use crate::components::theater::CopyrightNotice;
 use crate::i18n;
 use icondata as i;
 use leptos_icons::Icon;
@@ -160,6 +161,15 @@ pub fn CreateRoomModal(
                 <span>{t!(i18n, room.room_type_theater)}</span>
               </label>
             </fieldset>
+
+            <Show when=move || room_type.get() == RoomType::Theater>
+              <div class="create-room-modal__theater-hint" data-testid="theater-extra-hint">
+                <p class="create-room-modal__max-viewers">
+                  {t!(i18n, theater.max_viewers_hint)}
+                </p>
+                <CopyrightNotice inline=true />
+              </div>
+            </Show>
 
             <label class="create-room-modal__label" for="create-room-name">
               {t!(i18n, room.room_name)}

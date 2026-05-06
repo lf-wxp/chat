@@ -64,7 +64,7 @@ pub mod discriminator {
   /// Avatar data type.
   pub const AVATAR_DATA: u8 = 0xA2;
 
-  // Theater (0xB0-0xB3)
+  // Theater (0xB0-0xB5)
   /// Danmaku message type.
   pub const DANMAKU: u8 = 0xB0;
   /// Playback progress type.
@@ -73,6 +73,15 @@ pub mod discriminator {
   pub const SUBTITLE_DATA: u8 = 0xB2;
   /// Subtitle clear type.
   pub const SUBTITLE_CLEAR: u8 = 0xB3;
+  /// Danmaku batch type — a single merged frame carrying several
+  /// danmaku entries for the theater owner-relay fan-out (Req 12.5
+  /// §28).
+  pub const DANMAKU_BATCH: u8 = 0xB4;
+  /// Theater-scoped chat text type — a room-scoped chat bubble
+  /// relayed through the theater owner (Req 12.6 §30). Distinct from
+  /// the generic [`CHAT_TEXT`] so the routing layer can branch on
+  /// theater membership without guessing.
+  pub const THEATER_CHAT_TEXT: u8 = 0xB5;
 
   // Call-side status broadcasts (0xC0-0xC1)
   /// Local media state broadcast (mic / camera / screen-share flags).
@@ -380,6 +389,42 @@ pub struct Danmaku {
   pub timestamp_nanos: u64,
 }
 
+/// Batched danmaku fan-out frame used by the theater owner-relay
+/// (Req 12.5 §28).
+///
+/// The owner collects inbound danmaku every 50 ms and forwards a
+/// single `DanmakuBatch` — instead of one `Danmaku` message per
+/// entry — to each viewer, cutting the per-peer send count from
+/// `N * M` to `M` for `N` danmaku / `M` viewers.
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
+pub struct DanmakuBatch {
+  /// Room ID of the theater the batch belongs to. Viewers filter on
+  /// room membership before draining the entries.
+  pub room_id: RoomId,
+  /// Ordered list of danmaku entries in this batch (FIFO).
+  pub entries: Vec<Danmaku>,
+}
+
+/// Theater-scoped chat message relayed by the owner (Req 12.6 §30).
+///
+/// Unlike the generic [`ChatText`] which travels through the chat
+/// manager and the `IndexedDB` history pipeline, a `TheaterChatText`
+/// is a live-only bubble scoped to a single theater room. It carries
+/// the room ID explicitly so the routing layer can filter stale
+/// frames after the user leaves the theater.
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
+pub struct TheaterChatText {
+  /// Room ID of the theater the bubble belongs to.
+  pub room_id: RoomId,
+  /// User ID of the original sender (preserved across owner relay so
+  /// late viewers can attribute the bubble correctly).
+  pub sender_id: UserId,
+  /// Plain-text body. Already length-validated by the sender.
+  pub content: String,
+  /// Sender timestamp in nanoseconds since Unix epoch.
+  pub timestamp_nanos: u64,
+}
+
 /// Playback progress synchronization.
 #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
 pub struct PlaybackProgress {
@@ -515,6 +560,10 @@ pub enum DataChannelMessage {
   SubtitleData(SubtitleData),
   /// Subtitle clear.
   SubtitleClear(SubtitleClear),
+  /// Batched danmaku fan-out frame (owner-relay, Req 12.5 §28).
+  DanmakuBatch(DanmakuBatch),
+  /// Theater-scoped chat bubble (Req 12.6 §30).
+  TheaterChatText(TheaterChatText),
 
   // Call Status Broadcasts
   /// Local media state (mic / camera / screen-share) broadcast.
@@ -554,6 +603,8 @@ impl DataChannelMessage {
       Self::PlaybackProgress(_) => discriminator::PLAYBACK_PROGRESS,
       Self::SubtitleData(_) => discriminator::SUBTITLE_DATA,
       Self::SubtitleClear(_) => discriminator::SUBTITLE_CLEAR,
+      Self::DanmakuBatch(_) => discriminator::DANMAKU_BATCH,
+      Self::TheaterChatText(_) => discriminator::THEATER_CHAT_TEXT,
 
       Self::MediaStateUpdate(_) => discriminator::MEDIA_STATE_UPDATE,
       Self::ReconnectingState(_) => discriminator::RECONNECTING_STATE,
@@ -585,6 +636,7 @@ impl DataChannelMessage {
         | Self::MediaStateUpdate(_)
         | Self::ReconnectingState(_)
         | Self::FileResumeRequest(_)
+        | Self::TheaterChatText(_)
     )
   }
 }
