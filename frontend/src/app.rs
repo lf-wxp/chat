@@ -10,10 +10,10 @@ use crate::components::{
 use crate::i18n::{self, Locale};
 use crate::i18n_helpers;
 use crate::logging::use_logger_state;
+use crate::settings::use_settings_state;
 use crate::state::use_app_state;
 use crate::utils;
 use leptos::prelude::*;
-use wasm_bindgen::prelude::*;
 
 /// Root App component.
 #[component]
@@ -22,15 +22,31 @@ pub fn App() -> impl IntoView {
   let logger = use_logger_state();
   let i18n = i18n::use_i18n();
 
-  // Dedicated trigger to force theme recalculation when the system
-  // color scheme preference changes (avoids the theme.set("system") hack).
-  let system_theme_trigger = Trigger::new();
+  // Install the Debug Panel visibility signal at the App root so
+  // sibling components (Settings drawer's "Open Debug Panel" button,
+  // header shortcuts, etc.) can toggle it via context. Previously
+  // the signal was provided inside `DebugPanel` itself, which made
+  // it invisible to siblings like `SettingsPage` (V2-S-3 fix).
+  let _ = crate::components::debug::provide_debug_panel_visibility();
 
-  // Theme switching effect
+  // Reactive signal tracking whether the system prefers dark mode.
+  // `use_media_query` automatically subscribes to changes and cleans
+  // up on unmount — no manual `Closure` / `StoredValue` / `on_cleanup`
+  // bookkeeping required.
+  let prefers_dark = leptos_use::use_media_query("(prefers-color-scheme: dark)");
+
+  // Theme switching effect. Bumps the shared `saved_tick` on every
+  // user-initiated change so the Settings drawer's "Saved" indicator
+  // fires for theme toggles as well (Req 13.6.3 — V2-S-1). The initial
+  // Effect run (which only reflects the persisted value) is skipped
+  // via a previous-value guard provided by the `Effect` closure's
+  // `prev` parameter.
   let theme = app_state.theme;
-  Effect::new(move || {
-    // Track the trigger so this effect re-runs on system theme changes
-    system_theme_trigger.track();
+  let settings_for_theme = use_settings_state();
+  Effect::new(move |prev: Option<String>| {
+    // Read the reactive signal so this effect re-runs when the
+    // system color-scheme preference changes.
+    let is_dark = prefers_dark.get();
     let theme_val = theme.get();
     if let Some(window) = web_sys::window()
       && let Some(document) = window.document()
@@ -40,50 +56,29 @@ pub fn App() -> impl IntoView {
         "dark" => "dark",
         "light" => "light",
         _ => {
-          // "system" -- check prefers-color-scheme
-          let has_dark_preference = window
-            .match_media("(prefers-color-scheme: dark)")
-            .ok()
-            .flatten()
-            .map(|mql| mql.matches())
-            .unwrap_or(false);
-          if has_dark_preference { "dark" } else { "light" }
+          // "system" -- use the reactive prefers-dark signal
+          if is_dark { "dark" } else { "light" }
         }
       };
       let _ = html.set_attribute("data-theme", resolved_theme);
-      // Persist theme preference to localStorage
-      utils::save_to_local_storage("theme", &theme_val);
+      // Persist theme preference to localStorage under the namespaced
+      // `settings_theme` key (Req 13 — unified `settings_` prefix).
+      utils::save_to_local_storage("settings_theme", &theme_val);
     }
+    // Skip the very first run so we don't flash "Saved" on startup.
+    if let Some(previous) = &prev
+      && previous != &theme_val
+    {
+      settings_for_theme.bump_saved();
+    }
+    theme_val
   });
 
-  // Watch for system theme changes -- register listener with cleanup
-  if let Some(window) = web_sys::window()
-    && let Ok(Some(mql)) = window.match_media("(prefers-color-scheme: dark)")
-  {
-    let on_change = Closure::wrap(Box::new({
-      let trigger = system_theme_trigger;
-      move |_: web_sys::MediaQueryListEvent| {
-        // Only re-trigger when the user preference is "system"
-        if theme.get() == "system" {
-          trigger.notify();
-        }
-      }
-    }) as Box<dyn Fn(_)>);
-    // Set the callback BEFORE converting closure to JsValue
-    mql.set_onchange(Some(on_change.as_ref().unchecked_ref::<js_sys::Function>()));
-    // Store closure in StoredValue to prevent GC; clean up on unmount
-    let stored_closure = StoredValue::new(on_change.into_js_value());
-    let mql_clone = mql.clone();
-    on_cleanup(move || {
-      // Clear the listener so the closure can be GC'd
-      mql_clone.set_onchange(None);
-      stored_closure.dispose();
-    });
-  }
-
-  // Locale switching effect
+  // Locale switching effect. Also bumps `saved_tick` so the
+  // "Saved" indicator fires for language changes (V2-S-1).
   let locale = app_state.locale;
-  Effect::new(move || {
+  let settings_for_locale = use_settings_state();
+  Effect::new(move |prev: Option<String>| {
     let locale_val = locale.get();
     let new_locale = if locale_val.starts_with("zh") {
       Locale::zh_CN
@@ -92,12 +87,32 @@ pub fn App() -> impl IntoView {
     };
     i18n.set_locale(new_locale);
     i18n_helpers::persist_locale(new_locale);
+    if let Some(previous) = &prev
+      && previous != &locale_val
+    {
+      settings_for_locale.bump_saved();
+    }
+    locale_val
   });
 
   // Debug mode effect -- adjust logging verbosity
   let debug = app_state.debug;
   Effect::new(move || {
     logger.set_debug_mode(debug.get());
+  });
+
+  // Font scale effect -- mirror the chosen FontScale to
+  // `<html data-font-scale="...">` so the CSS tokens layer can pick
+  // it up via the `[data-font-scale]` selector.
+  let settings_state = use_settings_state();
+  Effect::new(move || {
+    let scale = settings_state.get().font_scale;
+    if let Some(window) = web_sys::window()
+      && let Some(document) = window.document()
+      && let Some(html) = document.document_element()
+    {
+      let _ = html.set_attribute("data-font-scale", scale.as_str());
+    }
   });
 
   // Auth gate: show auth page when not authenticated, main app otherwise

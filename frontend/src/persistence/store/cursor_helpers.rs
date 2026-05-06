@@ -10,6 +10,10 @@ use wasm_bindgen::closure::Closure;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::IdbCursorWithValue;
 
+/// Shared slot holding a `success` event closure whose lifetime must
+/// extend past the async scope that installed it.
+type OnSuccessSlot = Rc<RefCell<Option<Closure<dyn FnMut(web_sys::Event)>>>>;
+
 /// Iterate a cursor and deserialise up to `limit` records.
 pub(super) async fn collect_messages_from_cursor(
   request: web_sys::IdbRequest,
@@ -21,8 +25,7 @@ pub(super) async fn collect_messages_from_cursor(
   let out = Rc::new(RefCell::new(Vec::<MessageRecord>::with_capacity(
     limit.min(64),
   )));
-  let on_success: Rc<RefCell<Option<Closure<dyn FnMut(web_sys::Event)>>>> =
-    Rc::new(RefCell::new(None));
+  let on_success: OnSuccessSlot = Rc::new(RefCell::new(None));
 
   let promise = {
     let out = out.clone();
@@ -104,8 +107,7 @@ pub(super) async fn iterate_cursor_delete_limited(
   }
 
   let counter = Rc::new(Cell::new(0usize));
-  let on_success: Rc<RefCell<Option<Closure<dyn FnMut(web_sys::Event)>>>> =
-    Rc::new(RefCell::new(None));
+  let on_success: OnSuccessSlot = Rc::new(RefCell::new(None));
 
   let promise = {
     let counter = counter.clone();
@@ -173,8 +175,7 @@ pub(super) async fn iterate_cursor_delete_matching(
   use std::cell::Cell;
 
   let counter = Rc::new(Cell::new(0usize));
-  let on_success: Rc<RefCell<Option<Closure<dyn FnMut(web_sys::Event)>>>> =
-    Rc::new(RefCell::new(None));
+  let on_success: OnSuccessSlot = Rc::new(RefCell::new(None));
   let matches = Rc::new(RefCell::new(matches));
 
   let promise = {
@@ -206,11 +207,11 @@ pub(super) async fn iterate_cursor_delete_matching(
           let _ = resolve_clone.call0(&JsValue::UNDEFINED);
           return;
         };
-        if let Ok(value) = cursor.value() {
-          if (matches_inner.borrow_mut())(&value) {
-            let _ = cursor.delete();
-            counter_inner.set(counter_inner.get().saturating_add(1));
-          }
+        if let Ok(value) = cursor.value()
+          && (matches_inner.borrow_mut())(&value)
+        {
+          let _ = cursor.delete();
+          counter_inner.set(counter_inner.get().saturating_add(1));
         }
         let _ = cursor.continue_();
       });

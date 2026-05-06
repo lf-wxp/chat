@@ -11,11 +11,50 @@ use message::types::MediaType;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-  DisplayMediaStreamConstraints, HtmlVideoElement, MediaStream, MediaStreamConstraints,
-  MediaStreamTrack, MediaTrackConstraints,
+  DisplayMediaStreamConstraints, HtmlMediaElement, HtmlVideoElement, MediaStream,
+  MediaStreamConstraints, MediaStreamTrack, MediaTrackConstraints,
 };
 
 use super::types::VideoProfile;
+use crate::settings::{UserSettings, VideoQualityPref, load_snapshot};
+
+/// Translate the user's persisted [`VideoQualityPref`] into a
+/// concrete [`VideoProfile`]. The runtime quality controller may
+/// further degrade this profile when network conditions worsen — the
+/// preference is treated as an upper bound.
+#[must_use]
+pub fn baseline_video_profile(pref: VideoQualityPref) -> VideoProfile {
+  match pref {
+    VideoQualityPref::Auto => VideoProfile::HIGH,
+    VideoQualityPref::Low => VideoProfile::LOW,
+    VideoQualityPref::Standard => VideoProfile::HIGH,
+    VideoQualityPref::High => VideoProfile {
+      width: 1920,
+      height: 1080,
+      frame_rate: 30,
+    },
+  }
+}
+
+/// Apply the user's preferred audio-input device id to the audio
+/// constraints, when one is configured. No-op for `None`.
+fn apply_audio_device(audio: &MediaTrackConstraints, settings: &UserSettings) {
+  if let Some(device_id) = settings.default_microphone.as_deref()
+    && !device_id.is_empty()
+  {
+    audio.set_device_id(&JsValue::from_str(device_id));
+  }
+}
+
+/// Apply the user's preferred camera device id to the video
+/// constraints, when one is configured.
+fn apply_video_device(video: &MediaTrackConstraints, settings: &UserSettings) {
+  if let Some(device_id) = settings.default_camera.as_deref()
+    && !device_id.is_empty()
+  {
+    video.set_device_id(&JsValue::from_str(device_id));
+  }
+}
 
 /// Acquire a local camera+microphone stream for the given call mode.
 ///
@@ -34,8 +73,12 @@ pub async fn acquire_user_media(media_type: MediaType) -> Result<MediaStream, St
     .media_devices()
     .map_err(|e| format!("mediaDevices unavailable: {e:?}"))?;
 
+  let settings = load_snapshot();
   let constraints = MediaStreamConstraints::new();
-  constraints.set_audio(&JsValue::TRUE);
+  // Apply the user's preferred microphone (Req 13.1.5).
+  let audio = MediaTrackConstraints::new();
+  apply_audio_device(&audio, &settings);
+  constraints.set_audio(&JsValue::from(&audio));
 
   match media_type {
     MediaType::Audio | MediaType::ScreenShare => {
@@ -43,13 +86,12 @@ pub async fn acquire_user_media(media_type: MediaType) -> Result<MediaStream, St
     }
     MediaType::Video => {
       let video = MediaTrackConstraints::new();
-      // Use the `HIGH` profile to stay aligned with the initial value
-      // of `CallSignals::self_video_profile` (Round-4 consistency fix).
-      // `HIGH` and `MEDIUM` currently share the same 720p@30 resolution
-      // (see `VideoProfile`), so this change is semantically equivalent
-      // but avoids a confusing "signal says HIGH, constraint says
-      // MEDIUM" mismatch for future readers.
-      apply_video_profile(&video, VideoProfile::HIGH);
+      // Apply the user's preferred camera (Req 13.1.4) and the
+      // baseline profile derived from the video-quality preference
+      // (Req 13.1.6). The runtime quality controller may downgrade
+      // this profile later via `applyConstraints`.
+      apply_video_device(&video, &settings);
+      apply_video_profile(&video, baseline_video_profile(settings.video_quality));
       constraints.set_video(&JsValue::from(&video));
     }
   }
@@ -85,10 +127,12 @@ pub async fn acquire_video_only_stream() -> Result<MediaStream, String> {
     .media_devices()
     .map_err(|e| format!("mediaDevices unavailable: {e:?}"))?;
 
+  let settings = load_snapshot();
   let constraints = MediaStreamConstraints::new();
   constraints.set_audio(&JsValue::FALSE);
   let video = MediaTrackConstraints::new();
-  apply_video_profile(&video, VideoProfile::HIGH);
+  apply_video_device(&video, &settings);
+  apply_video_profile(&video, baseline_video_profile(settings.video_quality));
   constraints.set_video(&JsValue::from(&video));
 
   let promise = devices
@@ -253,7 +297,9 @@ pub async fn exit_picture_in_picture() -> Result<(), String> {
 /// Attach a `MediaStream` to a `<video>` element, enabling autoplay.
 ///
 /// Uses `Reflect::set` for the `srcObject` property because `web_sys`
-/// does not expose the DOM setter directly.
+/// does not expose the DOM setter directly. Also applies the user's
+/// preferred output device and speaker volume (Req 13.1.2 / 13.1.5)
+/// so playback honours the persisted settings.
 ///
 /// # Errors
 /// Returns `Err` if the property assignment throws.
@@ -265,7 +311,33 @@ pub fn attach_stream_to_video(
   Reflect::set(video, &JsValue::from_str("srcObject"), &value)
     .map_err(|e| format!("Failed to set srcObject: {e:?}"))?;
   video.set_autoplay(true);
+  let media_el: &HtmlMediaElement = video.as_ref();
+  apply_speaker_settings(media_el);
   Ok(())
+}
+
+/// Apply the persisted speaker preferences (output device + volume)
+/// to a media element. Silently no-ops on browsers that do not expose
+/// `setSinkId` (Firefox, Safari < 17). Volume is always set since
+/// every browser supports `HTMLMediaElement.volume`.
+pub fn apply_speaker_settings(media: &HtmlMediaElement) {
+  let settings = load_snapshot();
+  // Volume is a 0.0 – 1.0 scalar — sanitised on load.
+  media.set_volume(f64::from(settings.speaker_volume));
+
+  if let Some(sink_id) = settings.default_speaker.as_deref()
+    && !sink_id.is_empty()
+    && let Ok(set_sink_fn) = Reflect::get(media, &JsValue::from_str("setSinkId"))
+    && let Ok(function) = set_sink_fn.dyn_into::<js_sys::Function>()
+    && let Ok(promise_val) = function.call1(media, &JsValue::from_str(sink_id))
+    && let Ok(promise) = promise_val.dyn_into::<js_sys::Promise>()
+  {
+    // Fire-and-forget: rejection (e.g. unsupported sink) is swallowed
+    // because the user can correct the device choice from settings.
+    wasm_bindgen_futures::spawn_local(async move {
+      let _ = JsFuture::from(promise).await;
+    });
+  }
 }
 
 /// Capture a `MediaStream` from a `<video>` element using the

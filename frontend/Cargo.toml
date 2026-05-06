@@ -20,6 +20,10 @@ leptos-use = { version = "0.18.3", default-features = false, features = [
   "use_event_listener",
   "use_document",
   "use_interval_fn",
+  "use_media_query",
+  "use_raf_fn",
+  "use_window",
+  "use_document_visibility",
 ] }
 
 # Icon library

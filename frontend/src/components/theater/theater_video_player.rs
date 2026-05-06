@@ -133,6 +133,11 @@ pub fn TheaterVideoPlayer(
       }
     }
     video.set_autoplay(true);
+    // Apply the user-configured speaker volume + output device so the
+    // theater stream honours the persisted preferences (Req 13.1.2 /
+    // 13.1.5). A second Effect below keeps this in sync when the
+    // user tweaks settings mid-playback.
+    crate::call::apply_speaker_settings(video.as_ref());
     state.has_video_source.set(true);
     state.video_source_label.set(src.label.clone());
 
@@ -202,6 +207,23 @@ pub fn TheaterVideoPlayer(
       } else {
         state.local_stream.set(None);
       }
+    }
+  });
+
+  // --- Effect: react to live speaker-setting changes -----------------
+  // Mirrors the video_tile equivalent so volume / output-device
+  // adjustments from the settings drawer take effect during an active
+  // theater session (Req 13.1.2 — "preview volume changes in
+  // real-time").
+  let settings = crate::settings::use_settings_state();
+  Effect::new(move |_| {
+    let snap = settings.get();
+    let _ = snap.speaker_volume;
+    let _ = snap.microphone_volume;
+    let _ = snap.default_speaker.clone();
+    if let Some(el) = video_ref.get() {
+      let video: &HtmlVideoElement = el.as_ref();
+      crate::call::apply_speaker_settings(video.as_ref());
     }
   });
 

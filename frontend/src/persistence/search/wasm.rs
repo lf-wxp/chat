@@ -9,6 +9,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
+
+/// Shared slot holding a `success` event closure whose lifetime must
+/// extend past the async scope that installed it.
+type OnSuccessSlot = Rc<RefCell<Option<Closure<dyn FnMut(web_sys::Event)>>>>;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{IdbCursorDirection, IdbCursorWithValue, IdbDatabase};
@@ -49,8 +53,7 @@ pub async fn full_scan_search(
     scanned: 0,
   }));
   let query_rc = Rc::new(query.clone());
-  let on_success: Rc<RefCell<Option<Closure<dyn FnMut(web_sys::Event)>>>> =
-    Rc::new(RefCell::new(None));
+  let on_success: OnSuccessSlot = Rc::new(RefCell::new(None));
   // After accumulating enough hits we scan one extra batch so that
   // high-scoring records that straddle the batch boundary are not
   // missed (BUG-4 fix).

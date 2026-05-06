@@ -34,13 +34,26 @@ impl ChatManager {
     let ts = msg.timestamp_ms;
     self.app_state.conversations.update(|list| {
       if let Some(c) = list.iter_mut().find(|c| c.id == conv) {
-        c.last_message = Some(preview);
+        c.last_message = Some(preview.clone());
         c.last_message_ts = Some(ts);
         if !active {
           c.unread_count = c.unread_count.saturating_add(1);
         }
       }
     });
+
+    // Surface a desktop notification when the chat is not the active
+    // conversation. The notifications module enforces the
+    // "Message Notifications" toggle, the Do-Not-Disturb window and
+    // the document-hidden gate (Req 13.4.2 / 13.4.4).
+    if !active {
+      let title = if msg.sender_name.is_empty() {
+        "New message".to_string()
+      } else {
+        msg.sender_name.clone()
+      };
+      crate::notifications::show_message_notification(title, preview);
+    }
 
     // Fire-and-forget persistence to IndexedDB.
     #[cfg(target_arch = "wasm32")]

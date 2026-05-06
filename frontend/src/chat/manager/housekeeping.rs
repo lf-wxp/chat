@@ -68,17 +68,24 @@ impl ChatManager {
         for (conv, _id, wire) in &retries {
           send_wire_out(&mgr, &app_state, conv, wire.clone());
         }
-        for (peer, ids) in read_batches {
-          let payload = DataChannelMessage::MessageRead(MessageRead {
-            message_ids: ids,
-            timestamp_nanos: now_ms_to_nanos(now),
-          });
-          let mgr = mgr.clone();
-          wasm_bindgen_futures::spawn_local(async move {
-            let _ = mgr
-              .send_encrypted_data_channel_message(peer, &payload)
-              .await;
-          });
+        // Read-receipt batches are gated by the user-level "Send Read
+        // Receipts" toggle (Req 13.3.5). When the user has opted out,
+        // we still drained the batches above (so they do not pile up
+        // forever) but skip the actual broadcast.
+        let read_receipts_enabled = crate::settings::load_snapshot().read_receipts;
+        if read_receipts_enabled {
+          for (peer, ids) in read_batches {
+            let payload = DataChannelMessage::MessageRead(MessageRead {
+              message_ids: ids,
+              timestamp_nanos: now_ms_to_nanos(now),
+            });
+            let mgr = mgr.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+              let _ = mgr
+                .send_encrypted_data_channel_message(peer, &payload)
+                .await;
+            });
+          }
         }
       }
     });

@@ -16,7 +16,9 @@ pub mod i18n_helpers;
 pub mod identicon;
 pub mod invite;
 pub mod logging;
+pub mod notifications;
 pub mod persistence;
+pub mod settings;
 pub mod signaling;
 pub mod state;
 pub mod theater;
@@ -30,6 +32,7 @@ include!(concat!(env!("OUT_DIR"), "/mod.rs"));
 
 use leptos::prelude::*;
 use logging::provide_logger_state;
+use settings::provide_settings_state;
 use state::provide_app_state;
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -44,6 +47,7 @@ pub fn init() {
   mount_to_body(|| {
     let app_state = provide_app_state();
     provide_logger_state();
+    let settings_state = provide_settings_state();
 
     // Initialize blacklist + invite manager early so signaling-message
     // handlers (registered while wiring the signaling client below) can
@@ -137,7 +141,19 @@ pub fn init() {
     // Initialize persistence manager (Task 17) and attach to the chat
     // manager so messages are saved to / loaded from IndexedDB.
     let pm = persistence::provide_persistence_manager();
-    chat_manager.set_persistence(pm);
+    chat_manager.set_persistence(pm.clone());
+
+    // Mirror the user-configured retention policy (Task 23 / Req 13.5)
+    // into the persistence manager so the 72 h / 24 h / 7 d window
+    // stays in sync with the UI selector.
+    {
+      let pm = pm.clone();
+      let settings = settings_state;
+      Effect::new(move |_| {
+        let snapshot = settings.get();
+        pm.set_retention_policy(snapshot.retention);
+      });
+    }
 
     // Initialize call manager (Task 18). Wire signaling + WebRTC so
     // CallInvite/Accept/Decline/End flow through the signaling client

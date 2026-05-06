@@ -53,27 +53,26 @@ impl ChatManager {
             next_retry_ms: next_retry,
             created_ms: entry.created_ms,
           };
-          if let Ok(msg_id) = entry.message_id.parse::<MessageId>() {
-            if let Ok(peer_id) = entry.peer_id.parse::<UserId>() {
-              inner.ack_queue.restore_entry(
-                msg_id,
-                entry.conversation_key.clone(),
-                peer_id,
-                pending,
-                entry.created_ms,
-              );
+          if let Ok(msg_id) = entry.message_id.parse::<MessageId>()
+            && let Ok(peer_id) = entry.peer_id.parse::<UserId>()
+          {
+            inner.ack_queue.restore_entry(
+              msg_id,
+              entry.conversation_key.clone(),
+              peer_id,
+              pending,
+              entry.created_ms,
+            );
 
-              // Restore the wire payload so process_ack_ticks() can
-              // actually resend on retry (Req 11.3).
-              if !inner.retry_payloads.contains_key(&msg_id) {
-                if let Some(json) = &entry.payload {
-                  if let Ok(wire) =
-                    serde_json::from_str::<message::datachannel::DataChannelMessage>(json)
-                  {
-                    inner.retry_payloads.insert(msg_id, wire);
-                  }
-                }
-              }
+            // Restore the wire payload so process_ack_ticks() can
+            // actually resend on retry (Req 11.3).
+            if let std::collections::hash_map::Entry::Vacant(slot) =
+              inner.retry_payloads.entry(msg_id)
+              && let Some(json) = &entry.payload
+              && let Ok(wire) =
+                serde_json::from_str::<message::datachannel::DataChannelMessage>(json)
+            {
+              slot.insert(wire);
             }
           }
         }

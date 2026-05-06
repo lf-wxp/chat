@@ -124,6 +124,23 @@ pub fn VideoTile(
     }
   });
 
+  // React to live changes of the user's speaker settings (volume +
+  // output device) so the "preview volume changes in real-time"
+  // acceptance criterion (Req 13.1.2) is honoured while a call is
+  // already in progress.
+  let settings = crate::settings::use_settings_state();
+  Effect::new(move |_| {
+    // Subscribe to the fields that affect playback.
+    let snap = settings.get();
+    let _ = snap.speaker_volume;
+    let _ = snap.microphone_volume;
+    let _ = snap.default_speaker.clone();
+    if let Some(el) = video_ref.get() {
+      let html_video: &HtmlVideoElement = el.as_ref();
+      crate::call::apply_speaker_settings(html_video.as_ref());
+    }
+  });
+
   let indicator_user = user_id.clone();
   let label = display_name.clone();
   let avatar_label = display_name.clone();

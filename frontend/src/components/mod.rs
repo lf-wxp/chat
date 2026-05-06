@@ -7,7 +7,7 @@
 mod auth;
 mod call;
 mod chat_view;
-mod debug;
+pub mod debug;
 mod discovery;
 mod error_toast;
 mod home_page;

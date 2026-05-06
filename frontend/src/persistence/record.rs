@@ -51,6 +51,17 @@ impl RetentionPolicy {
       _ => None,
     }
   }
+
+  /// Stable string token for the `<select>` value attribute and
+  /// settings persistence. The inverse of [`Self::parse_policy`].
+  #[must_use]
+  pub fn as_str(self) -> &'static str {
+    match self {
+      Self::Day => "24h",
+      Self::ThreeDays => "72h",
+      Self::Week => "7d",
+    }
+  }
 }
 
 /// Wire projection of a stored message record.

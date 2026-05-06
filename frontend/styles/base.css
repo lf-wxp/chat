@@ -13,6 +13,17 @@ html {
               color var(--duration-normal, 200ms) var(--ease-default, ease);
 }
 
+/* User-configurable font scale (Task 23 / Req 13.2). Scales the whole
+   document so every rem-based token follows along. 14 / 16 / 18 px
+   matches the spec's Small / Medium / Large targets exactly. */
+html[data-font-scale="small"] {
+  font-size: 14px;
+}
+
+html[data-font-scale="large"] {
+  font-size: 18px;
+}
+
 body {
   min-height: 100vh;
   font-family: var(--font-family, system-ui, sans-serif);

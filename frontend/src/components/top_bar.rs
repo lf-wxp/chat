@@ -92,12 +92,9 @@ pub fn TopBar() -> impl IntoView {
               "dark" => "system",
               _ => "light",
             };
+            // Persistence is handled by the theme Effect in app.rs which
+            // also triggers the "Saved" indicator via bump_saved().
             theme.set(new_theme.to_string());
-            if let Some(window) = web_sys::window()
-              && let Ok(Some(storage)) = window.local_storage()
-            {
-              let _ = storage.set_item("theme", new_theme);
-            }
           }
         >
           {move || match theme.get().as_str() {

@@ -102,7 +102,7 @@ pub async fn delete_ack_entry(db: &IdbDatabase, message_id: &str, peer_id: &str)
   let req = index.open_cursor_with_range(&range)?;
   let peer_id_owned = peer_id.to_string();
   let deleted = iterate_cursor_delete_matching(req, move |value| {
-    if let Ok(entry) = from_js::<AckQueueEntry>(&value) {
+    if let Ok(entry) = from_js::<AckQueueEntry>(value) {
       entry.peer_id == peer_id_owned
     } else {
       false

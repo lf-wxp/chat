@@ -13,8 +13,27 @@ use super::debug_log_entry::DebugLogEntry;
 use crate::logging::{LogLevel, LoggerState};
 use crate::state::AppState;
 use leptos::prelude::*;
-use wasm_bindgen::JsCast;
-use wasm_bindgen::prelude::*;
+
+/// Reactive handle to the Debug Panel's visibility signal, published
+/// via Leptos context so unrelated components (Settings drawer, etc.)
+/// can open the panel without knowing about its internals.
+#[derive(Debug, Clone, Copy)]
+pub struct DebugPanelVisibility(pub RwSignal<bool>);
+
+/// Install [`DebugPanelVisibility`] at the root of the Leptos tree
+/// **before** any sibling component that might consume it (e.g. the
+/// Settings drawer's "Open Debug Panel" button). Providing the
+/// context inside [`DebugPanel`] itself is not sufficient, because
+/// `provide_context` is only visible to descendants — sibling
+/// components would get `None` and the button would become a silent
+/// no-op (V2-S-3 fix).
+#[must_use]
+pub fn provide_debug_panel_visibility() -> DebugPanelVisibility {
+  let visible = RwSignal::new(false);
+  let handle = DebugPanelVisibility(visible);
+  provide_context(handle);
+  handle
+}
 
 /// Debug Panel component.
 ///
@@ -27,8 +46,10 @@ pub fn DebugPanel() -> impl IntoView {
   let app_state = expect_context::<AppState>();
   let logger = expect_context::<LoggerState>();
 
-  // Panel visibility signal
-  let visible = RwSignal::new(false);
+  // Pull the visibility signal from the ancestor-provided context.
+  // `provide_debug_panel_visibility` must have been called by the
+  // root `App` component before `DebugPanel` is mounted.
+  let DebugPanelVisibility(visible) = expect_context::<DebugPanelVisibility>();
 
   // Filter state
   let search_text = RwSignal::new(String::new());
@@ -223,37 +244,20 @@ pub fn DebugPanel() -> impl IntoView {
 }
 
 /// Register the global keyboard shortcut for toggling the debug panel.
+///
+/// Uses `leptos_use::use_event_listener` so the listener is
+/// automatically cleaned up when the component unmounts — no manual
+/// `Closure` / `StoredValue` / `remove_event_listener` bookkeeping.
 fn register_keyboard_shortcut(visible: RwSignal<bool>) {
-  let handler = Closure::wrap(Box::new(move |ev: web_sys::KeyboardEvent| {
+  use leptos::ev::keydown;
+  use leptos_use::use_event_listener;
+
+  let _cleanup = use_event_listener(window(), keydown, move |ev: web_sys::KeyboardEvent| {
     // Ctrl+Shift+D (Windows/Linux) or Cmd+Shift+D (macOS)
     let is_mod = ev.ctrl_key() || ev.meta_key();
     if is_mod && ev.shift_key() && ev.key() == "D" {
       ev.prevent_default();
       visible.update(|v| *v = !*v);
     }
-  }) as Box<dyn Fn(_)>);
-
-  if let Some(window) = web_sys::window() {
-    // Clone the function reference FIRST (before into_js_value consumes handler)
-    let func_for_cleanup: js_sys::Function =
-      handler.as_ref().unchecked_ref::<js_sys::Function>().clone();
-
-    // Set the callback
-    let _ = window.add_event_listener_with_callback(
-      "keydown",
-      handler.as_ref().unchecked_ref::<js_sys::Function>(),
-    );
-
-    // Store closure in StoredValue to prevent GC; clean up on unmount
-    let stored = StoredValue::new(handler.into_js_value());
-
-    // Remove the event listener when the component unmounts.
-    on_cleanup(move || {
-      if let Some(window) = web_sys::window() {
-        let _ =
-          window.remove_event_listener_with_callback("keydown", func_for_cleanup.unchecked_ref());
-      }
-      stored.dispose();
-    });
-  }
+  });
 }

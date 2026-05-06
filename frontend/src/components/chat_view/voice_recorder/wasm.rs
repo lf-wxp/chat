@@ -43,6 +43,11 @@ const MIME_TYPE: &str = "audio/webm;codecs=opus";
 /// flush. 250 ms keeps memory bounded without fragmenting the clip.
 const CHUNK_SLICE_MS: i32 = 250;
 
+/// Shared slot holding the rAF loop closure. The closure captures
+/// clones of this slot so it can re-arm itself from within its own
+/// body, which is why the slot is wrapped in `Rc<RefCell<_>>`.
+pub(super) type RafClosureSlot = Rc<RefCell<Option<Closure<dyn FnMut(f64)>>>>;
+
 /// Per-peer resources allocated for the active recording.
 pub(super) struct RecordingSession {
   pub(super) stream: MediaStream,
@@ -56,7 +61,7 @@ pub(super) struct RecordingSession {
   /// Kept so the closures are not GC'd until we call `close()`.
   pub(super) _on_data: Closure<dyn FnMut(BlobEvent)>,
   pub(super) _on_stop: Closure<dyn FnMut(web_sys::Event)>,
-  pub(super) _raf_closure: Rc<RefCell<Option<Closure<dyn FnMut(f64)>>>>,
+  pub(super) _raf_closure: RafClosureSlot,
   /// Resolves when the final `dataavailable` event has fired after
   /// `MediaRecorder::stop()`. Used by `spawn_stop_and_send` to await
   /// the flush without polling.
@@ -170,7 +175,7 @@ async fn start_recording_async(
   let chunks: Rc<RefCell<Vec<Vec<u8>>>> = Rc::new(RefCell::new(Vec::new()));
   let aggregator = Rc::new(RefCell::new(WaveformAggregator::new()));
   let raf_handle: Rc<RefCell<Option<i32>>> = Rc::new(RefCell::new(None));
-  let raf_closure_slot: Rc<RefCell<Option<Closure<dyn FnMut(f64)>>>> = Rc::new(RefCell::new(None));
+  let raf_closure_slot: RafClosureSlot = Rc::new(RefCell::new(None));
 
   let chunks_for_data = chunks.clone();
   let on_data = Closure::wrap(Box::new(move |ev: BlobEvent| {
@@ -266,10 +271,9 @@ async fn start_recording_async(
     // Re-arm the RAF.
     if let Some(win) = window()
       && let Some(cb) = raf_slot_for_raf.borrow().as_ref()
+      && let Ok(handle) = win.request_animation_frame(cb.as_ref().unchecked_ref())
     {
-      if let Ok(handle) = win.request_animation_frame(cb.as_ref().unchecked_ref()) {
-        *raf_handle_for_raf.borrow_mut() = Some(handle);
-      }
+      *raf_handle_for_raf.borrow_mut() = Some(handle);
     }
   }) as Box<dyn FnMut(f64)>);
 

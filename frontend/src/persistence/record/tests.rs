@@ -63,6 +63,18 @@ fn retention_policy_parse() {
 }
 
 #[test]
+fn retention_policy_as_str_round_trip() {
+  for policy in [
+    RetentionPolicy::Day,
+    RetentionPolicy::ThreeDays,
+    RetentionPolicy::Week,
+  ] {
+    let token = policy.as_str();
+    assert_eq!(RetentionPolicy::parse_policy(token), Some(policy));
+  }
+}
+
+#[test]
 fn retention_window_matches_spec() {
   assert_eq!(RetentionPolicy::Day.as_ms(), 86_400_000);
   assert_eq!(RetentionPolicy::ThreeDays.as_ms(), 259_200_000);

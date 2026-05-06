@@ -162,6 +162,21 @@ impl UserStatusManager {
     self.send_status_change(status);
   }
 
+  /// Re-broadcast the currently held status without changing the
+  /// local `my_status` signal.
+  ///
+  /// Called when a setting that affects broadcast behaviour flips
+  /// mid-session — today that is the "Show Online Status" privacy
+  /// toggle (Req 13.3.4: "immediately update the user's online
+  /// status broadcast behavior"). The downstream filter in
+  /// [`Self::send_status_change`] will translate the broadcast to
+  /// `Offline` when the user is now Invisible, or back to the real
+  /// status when they turn visibility back on.
+  pub fn refresh_broadcast(&self) {
+    let status = self.app_state.my_status.with_untracked(|s| *s);
+    self.send_status_change(status);
+  }
+
   /// Record user activity, resetting the idle timer.
   ///
   /// If the user was Away, switch back to the appropriate status:
@@ -280,9 +295,24 @@ impl UserStatusManager {
         .filter(|s| !s.is_empty())
     });
 
+    // Honour the privacy setting "Show Online Status" (Req 13.3.4).
+    // When disabled, broadcast `Offline` instead of `Online`/`Away` so
+    // peers see the user as offline; the user remains authenticated and
+    // can still appear inside rooms (server-side broadcast only).
+    // `Busy` is preserved so explicit "do not contact" still surfaces.
+    let visible = crate::settings::load_snapshot().online_status_visible;
+    let broadcast_status = if visible {
+      status
+    } else {
+      match status {
+        UserStatus::Online | UserStatus::Away => UserStatus::Offline,
+        other => other,
+      }
+    };
+
     let msg = SignalingMessage::UserStatusChange(UserStatusChange {
       user_id,
-      status,
+      status: broadcast_status,
       signature,
     });
 

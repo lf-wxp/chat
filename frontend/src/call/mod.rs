@@ -36,9 +36,10 @@ mod wasm_tests;
 
 pub use manager::{CallManager, CallSignals, INVITE_TIMEOUT_MS, RemoteParticipant, load_persisted};
 pub use media::{
-  acquire_display_stream, acquire_user_media, acquire_video_only_stream, attach_stream_to_video,
-  capture_stream_from_video, exit_picture_in_picture, first_audio_track, first_video_track,
-  request_picture_in_picture, retarget_video_track, stop_stream,
+  acquire_display_stream, acquire_user_media, acquire_video_only_stream, apply_speaker_settings,
+  attach_stream_to_video, baseline_video_profile, capture_stream_from_video,
+  exit_picture_in_picture, first_audio_track, first_video_track, request_picture_in_picture,
+  retarget_video_track, stop_stream,
 };
 pub use stats::{QualityAction, QualityController, STATS_POLL_INTERVAL_MS, parse_stats_report};
 pub use types::{

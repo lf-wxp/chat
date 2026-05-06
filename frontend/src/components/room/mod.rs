@@ -19,7 +19,7 @@
 
 mod announcement_editor;
 mod announcement_panel;
-mod confirm_dialog;
+pub(crate) mod confirm_dialog;
 mod create_room_modal;
 mod incoming_room_invite_modal;
 mod invite_member_modal;

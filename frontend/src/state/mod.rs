@@ -179,8 +179,16 @@ impl AppState {
   /// Create new application state.
   #[must_use]
   pub fn new() -> Self {
-    let theme = utils::load_from_local_storage("theme").unwrap_or_else(|| "system".to_string());
-    let locale = utils::load_from_local_storage("locale").unwrap_or_else(Self::detect_locale);
+    // Read the canonical `settings_theme` key first, falling back to
+    // the legacy `theme` key for backwards compatibility with
+    // installations that pre-date the `settings_` prefix migration
+    // (Req 13 Technical Implementation Constraints #1).
+    let theme = utils::load_from_local_storage("settings_theme")
+      .or_else(|| utils::load_from_local_storage("theme"))
+      .unwrap_or_else(|| "system".to_string());
+    let locale = utils::load_from_local_storage("settings_locale")
+      .or_else(|| utils::load_from_local_storage("locale"))
+      .unwrap_or_else(Self::detect_locale);
     // Debug mode is enabled if EITHER localStorage has `debug_mode=true`
     // OR the URL contains `?debug=true` (P2-3 fix). Previously the URL
     // check was only a fallback when localStorage was absent.

@@ -8,17 +8,23 @@ use crate::i18n::Locale;
 /// Detect preferred locale from browser environment.
 ///
 /// Detection order:
-/// 1. localStorage `locale` key
+/// 1. localStorage `settings_locale` key (legacy `locale` key fallback)
 /// 2. Browser `navigator.language`
 /// 3. Default: English
 pub fn detect_browser_locale() -> Locale {
   if let Some(window) = web_sys::window() {
-    // 1. Check localStorage
-    if let Ok(Some(storage)) = window.local_storage()
-      && let Ok(Some(locale_str)) = storage.get_item("locale")
-      && let Some(locale) = parse_locale(&locale_str)
-    {
-      return locale;
+    // 1. Check localStorage (new key first, legacy fallback).
+    if let Ok(Some(storage)) = window.local_storage() {
+      let stored = storage
+        .get_item("settings_locale")
+        .ok()
+        .flatten()
+        .or_else(|| storage.get_item("locale").ok().flatten());
+      if let Some(locale_str) = stored
+        && let Some(locale) = parse_locale(&locale_str)
+      {
+        return locale;
+      }
     }
 
     // 2. Check browser language
@@ -53,7 +59,7 @@ pub fn persist_locale(locale: Locale) {
       Locale::en => "en",
       Locale::zh_CN => "zh-CN",
     };
-    let _ = storage.set_item("locale", locale_str);
+    let _ = storage.set_item("settings_locale", locale_str);
   }
 }
 

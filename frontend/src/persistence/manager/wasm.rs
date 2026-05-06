@@ -108,10 +108,10 @@ impl PersistenceManager {
         }
       };
       // Persist the new entries outside the borrow.
-      if let Some(entries) = search_entries {
-        if let Ok(db) = this.db().await {
-          let _ = put_search_entries(&db, &entries).await;
-        }
+      if let Some(entries) = search_entries
+        && let Ok(db) = this.db().await
+      {
+        let _ = put_search_entries(&db, &entries).await;
       }
     });
   }
