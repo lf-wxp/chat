@@ -18,8 +18,7 @@ const MAX_DELAY: Duration = Duration::from_secs(30);
 /// Source of `[0.0, 1.0)` random samples used for jitter.
 ///
 /// Extracted as a trait so tests can inject deterministic sequences and
-/// exercise the full ±10% jitter range instead of clamping to the midpoint
-/// (P2-1 fix).
+/// exercise the full ±10% jitter range instead of clamping to the midpoint.
 pub trait RandSource {
   /// Return a pseudo-random `f64` in `[0.0, 1.0)`.
   fn next_f64(&mut self) -> f64;
@@ -142,8 +141,8 @@ impl<R: RandSource> ReconnectStrategy<R> {
     // The jitter shifts the delay by -10%..+10% of the capped value.
     let jitter_ms = if capped > 100 {
       let jitter_range = (capped / 10) as f64;
-      // Use `next_f64()` so tests can inject a seeded generator
-      // (P2-1 fix). The default source calls `Math.random()` on WASM.
+      // Use `next_f64()` so tests can inject a seeded generator.
+      // The default source calls `Math.random()` on WASM.
       let random_factor = self.rand.next_f64();
       // Map [0,1) → [-1, +1) then scale to jitter_range
       (random_factor * 2.0 - 1.0) * jitter_range
@@ -181,7 +180,7 @@ impl<R: RandSource> ReconnectStrategy<R> {
   /// Get the 1-based attempt number for display purposes.
   ///
   /// Returns `attempt + 1` so callers don't need the `attempt + 1` hack
-  /// in log messages (Issue-10 fix).
+  /// in log messages.
   #[must_use]
   pub fn display_attempt(&self) -> u32 {
     self.attempt + 1

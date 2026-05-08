@@ -408,6 +408,18 @@ impl TheaterState {
     batcher.lock().map(|mut g| f(&mut g)).unwrap_or_default()
   }
 
+  /// localStorage key for the persisted overlay settings.
+  ///
+  /// Uses the unified `settings_` prefix (Storage Audit S4) so the
+  /// data-management "clear cache" sweep recognises it as a user
+  /// preference and preserves it alongside theme / locale.
+  const STORAGE_KEY: &str = "settings_theater_overlay";
+
+  /// Legacy key written by builds before the `settings_` prefix
+  /// migration. Read on startup and removed once the migration has
+  /// been observed.
+  const LEGACY_STORAGE_KEY: &str = "theater_overlay_settings";
+
   /// Persist overlay settings to localStorage.
   pub fn persist_overlay_settings(&self) {
     let current = self.overlay_settings.get();
@@ -415,7 +427,7 @@ impl TheaterState {
       && let Ok(Some(storage)) = window.local_storage()
       && let Ok(json) = serde_json::to_string(&current)
     {
-      let _ = storage.set_item("theater_overlay_settings", &json);
+      let _ = storage.set_item(Self::STORAGE_KEY, &json);
     }
   }
 
@@ -426,12 +438,24 @@ impl TheaterState {
     let Ok(Some(storage)) = window.local_storage() else {
       return TheaterOverlaySettings::default();
     };
-    storage
-      .get_item("theater_overlay_settings")
-      .ok()
-      .flatten()
-      .and_then(|raw| serde_json::from_str::<TheaterOverlaySettings>(&raw).ok())
-      .unwrap_or_default()
+    // Prefer the canonical key. Fall back to the legacy key for
+    // upgrades, then opportunistically migrate by writing under the
+    // new key and clearing the old one.
+    if let Ok(Some(raw)) = storage.get_item(Self::STORAGE_KEY)
+      && let Ok(parsed) = serde_json::from_str::<TheaterOverlaySettings>(&raw)
+    {
+      return parsed;
+    }
+    if let Ok(Some(legacy)) = storage.get_item(Self::LEGACY_STORAGE_KEY)
+      && let Ok(parsed) = serde_json::from_str::<TheaterOverlaySettings>(&legacy)
+    {
+      if let Ok(json) = serde_json::to_string(&parsed) {
+        let _ = storage.set_item(Self::STORAGE_KEY, &json);
+      }
+      let _ = storage.remove_item(Self::LEGACY_STORAGE_KEY);
+      return parsed;
+    }
+    TheaterOverlaySettings::default()
   }
 }
 

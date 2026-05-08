@@ -116,3 +116,66 @@ fn dedup_via_primary_key_simulated() {
   by_id.insert(r2.message_id.clone(), r2);
   assert_eq!(by_id.len(), 1);
 }
+
+// ---------------------------------------------------------------------------
+// background_image constants & guards (plan §7.2 / batch 6)
+//
+// These tests live on the native target so they compile even when
+// the wasm-gated store layer is invisible. They protect the
+// invariants the UI (batch 7) and the blob-loading renderer rely on.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn background_image_canonical_keys_are_distinct() {
+  use crate::persistence::schema::{KEY_USER_BG_DARK, KEY_USER_BG_LIGHT};
+  assert_ne!(KEY_USER_BG_LIGHT, KEY_USER_BG_DARK);
+  assert!(!KEY_USER_BG_LIGHT.is_empty());
+  assert!(!KEY_USER_BG_DARK.is_empty());
+}
+
+#[test]
+fn background_image_is_canonical_key_accepts_both_slots() {
+  use crate::persistence::schema::{
+    KEY_USER_BG_DARK, KEY_USER_BG_LIGHT, is_canonical_background_key,
+  };
+  assert!(is_canonical_background_key(KEY_USER_BG_LIGHT));
+  assert!(is_canonical_background_key(KEY_USER_BG_DARK));
+}
+
+#[test]
+fn background_image_is_canonical_key_rejects_arbitrary_strings() {
+  use crate::persistence::schema::is_canonical_background_key;
+  assert!(!is_canonical_background_key(""));
+  assert!(!is_canonical_background_key("user_bg_light_"));
+  assert!(!is_canonical_background_key("USER_BG_LIGHT"));
+  assert!(!is_canonical_background_key("../evil"));
+  assert!(!is_canonical_background_key("random_key"));
+}
+
+#[test]
+fn background_image_max_bytes_is_four_mib() {
+  use crate::persistence::schema::BACKGROUND_IMAGE_MAX_BYTES;
+  assert_eq!(BACKGROUND_IMAGE_MAX_BYTES, 4 * 1024 * 1024);
+}
+
+#[test]
+fn background_image_store_name_matches_plan() {
+  use crate::persistence::schema::STORE_BACKGROUND_IMAGE;
+  // Keeping this as a literal rather than reaching back to the
+  // constant so an accidental rename surfaces here before it
+  // migrates through to end users.
+  assert_eq!(STORE_BACKGROUND_IMAGE, "background_image");
+}
+
+#[test]
+fn db_version_covers_background_image_migration() {
+  use crate::persistence::schema::DB_VERSION;
+  // v5 introduces the `background_image` store; downgrading below
+  // this would silently skip the migration.
+  const {
+    assert!(
+      DB_VERSION >= 5,
+      "DB_VERSION must stay at 5 or higher after batch 6"
+    )
+  };
+}

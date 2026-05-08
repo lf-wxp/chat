@@ -253,7 +253,17 @@
 	"sidebar": {
 		"pinned": "Pinned",
 		"active": "Active",
-		"archived": "Archived"
+		"archived": "Archived",
+		"pin": "Pin conversation",
+		"unpin": "Unpin conversation",
+		"mute": "Mute notifications",
+		"unmute": "Unmute notifications",
+		"archive": "Archive conversation",
+		"unarchive": "Unarchive conversation",
+		"pin_limit_reached": "Pin limit reached (5 conversations). Unpin one to pin another.",
+		"open_conversation_actions": "Conversation actions",
+		"muted_aria_suffix": "muted",
+		"unread_aria_suffix": "unread"
 	},
 	"theater": {
 		"create": "Create Theater",
@@ -373,12 +383,18 @@
 		"auto_ended_all_left": "Call ended — every other participant left.",
 		"duration_summary": "Call duration",
 		"network_poor": "Your connection is poor. Video quality may be reduced.",
+		"quality_restored": "Network quality restored.",
 		"network_quality_detail": "Network: {{quality}} · RTT: {{rtt}}ms · Loss: {{loss}}%",
 		"quality_excellent": "Excellent",
 		"quality_good": "Good",
 		"quality_fair": "Fair",
 		"quality_poor": "Poor",
-		"quality_unknown": "Unknown"
+		"quality_unknown": "Unknown",
+		"connection_type_direct": "Direct (P2P)",
+		"connection_type_relayed": "Relayed (TURN)",
+		"connection_type_unknown": "Unknown",
+		"bandwidth_label": "Bandwidth",
+		"connection_type_label": "Connection"
 	},
 	"file": {
 		"send_file": "Send File",
@@ -417,6 +433,29 @@
 		"font_size_small": "Small",
 		"font_size_medium": "Medium",
 		"font_size_large": "Large",
+		"visual_effects": "Visual effects",
+		"enable_glass": "Enable glass effect",
+		"enable_glass_hint": "Adds a Mica-style translucent blur to panels and overlays.",
+		"enable_motion": "Enable ambient motion",
+		"enable_motion_hint": "Plays subtle pulses, drifts and shimmer across the UI.",
+		"background": "Background",
+		"background_mode": "Background mode",
+		"background_mode_preset": "Preset",
+		"background_mode_solid": "Solid",
+		"background_mode_image": "Image",
+		"background_solid_color": "Solid colour",
+		"background_upload": "Custom image",
+		"background_upload_button": "Choose image",
+		"background_upload_clear": "Remove",
+		"background_upload_hint": "JPEG / PNG / WebP / AVIF, up to 4 MB. Large images are downscaled and re-encoded automatically.",
+		"background_upload_empty": "The selected file appears to be empty.",
+		"background_upload_too_large": "The selected file is larger than 4 MB. Pick a smaller image.",
+		"background_upload_unsupported": "Unsupported file format. Use JPEG, PNG, WebP or AVIF.",
+		"background_blur": "Blur",
+		"background_overlay": "Overlay opacity",
+		"background_theme_aware": "Separate light and dark",
+		"background_theme_aware_hint": "Store different backgrounds for the light and dark themes.",
+		"background_reset": "Reset to default",
 		"privacy": "Privacy",
 		"read_receipts": "Send Read Receipts",
 		"read_receipts_hint": "Let contacts know when you have read their messages.",
@@ -430,6 +469,7 @@
 		"dnd_start": "From",
 		"dnd_end": "Until",
 		"dnd_permission_note": "Enable desktop notifications in your browser to receive alerts.",
+		"dnd_time_invalid": "Please enter a valid time (00:00–23:59).",
 		"dnd_active": "Quiet hours active",
 		"data_management": "Data Management",
 		"clear_chat_history": "Clear Chat History",
@@ -466,6 +506,12 @@
 		"microphone_volume": "Microphone Volume",
 		"microphone_level": "Microphone Level",
 		"microphone_level_denied": "Microphone access denied — level feedback unavailable.",
+		"test_microphone": "Test Microphone",
+		"stop_test_microphone": "Stop Test",
+		"camera_preview": "Camera Preview",
+		"start_camera_preview": "Preview Camera",
+		"stop_camera_preview": "Stop Preview",
+		"camera_preview_denied": "Camera access was denied. Please check browser permissions.",
 		"video_quality": "Video Quality",
 		"video_quality_auto": "Auto",
 		"video_quality_low": "Save Data (360p)",
@@ -513,7 +559,13 @@
 		"no": "No",
 		"enabled": "Enabled",
 		"disabled": "Disabled",
-		"optional": "(optional)"
+		"optional": "(optional)",
+		"connected": "Connected",
+		"disconnected": "Disconnected",
+		"reconnecting": "Reconnecting..."
+	},
+	"a11y": {
+		"skip_to_content": "Skip to content"
 	},
 	"error": {
 		"connection_lost": "Connection lost. Reconnecting...",
@@ -582,6 +634,9 @@
 		"server_restarted": "The chat server has restarted; previous rooms and calls are no longer valid.",
 		"sys001": "Browser offline",
 		"sys201": "Unexpected internal error",
-		"sys301": "Browser not supported"
+		"sys301": "Browser not supported",
+		"retry": "Retry",
+		"retry_connection": "Retry connection",
+		"dismiss_banner": "Dismiss"
 	}
 }

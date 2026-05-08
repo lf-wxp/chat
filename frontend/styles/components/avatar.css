@@ -42,6 +42,12 @@
 
   &.avatar-status-online {
     background-color: var(--color-success, #22c55e);
+    /* Gentle breathing pulse for the online presence dot. Uses a
+     * success-tinted glow instead of the global `.anim-glow-pulse`
+     * (which is primary-blue) so the hue matches the dot itself.
+     * Motion is disabled by the global `html[data-motion="off"]`
+     * override and `prefers-reduced-motion` rule in animations.css. */
+    animation: avatar-status-breathe 2400ms ease-in-out infinite;
   }
 
   &.avatar-status-away {
@@ -54,6 +60,23 @@
 
   &.avatar-status-offline {
     background-color: var(--text-tertiary, #94a3b8);
+  }
+}
+
+/* Success-tinted breathing keyframes used exclusively by the online
+ * avatar-status dot. Kept local to avatar.css so a theme that wants
+ * to retune the presence colour does not have to touch global
+ * animation utilities. */
+@keyframes avatar-status-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgb(34 197 94 / 0),
+      0 0 6px 0 rgb(34 197 94 / 0.25);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgb(34 197 94 / 0.22),
+      0 0 14px 2px rgb(34 197 94 / 0.50);
   }
 }
 

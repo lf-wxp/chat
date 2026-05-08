@@ -4,7 +4,7 @@
 //! or speaker), backed by the shared `DeviceCache`. Extracted from
 //! `av_section.rs` to satisfy the "one component per file" rule.
 
-use super::av_section::{DeviceEntry, DeviceKind};
+use super::av_helpers::{DeviceEntry, DeviceKind};
 use crate::i18n;
 use crate::settings::use_settings_state;
 use leptos::prelude::*;
@@ -46,6 +46,11 @@ pub(super) fn DeviceSelect(
         class="settings-select"
         prop:value=move || selected_value.get()
         on:change=on_change
+        data-testid=match kind {
+          DeviceKind::Camera => "select-camera",
+          DeviceKind::Microphone => "select-microphone",
+          DeviceKind::Speaker => "select-speaker",
+        }
       >
         <option value="">{t!(i18n, settings.default_device_system)}</option>
         <For

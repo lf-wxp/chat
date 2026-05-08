@@ -37,7 +37,7 @@ pub fn VideoGrid() -> impl IntoView {
   // rules to pick the right column layout.
   let count_attr = Memo::new(move |_| signals.participants.with(|map| map.len() + 1));
 
-  // P2-9 fix: removed the speaking-clear Effect that previously fought
+  // Removed the speaking-clear Effect that previously fought
   // with the VAD sweep at 100 Hz. The `speaking` flag is now driven
   // exclusively by `CallManager::sweep_vad`, and tiles render whatever
   // the participants signal currently reports — no per-render reset.

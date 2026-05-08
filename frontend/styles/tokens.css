@@ -32,10 +32,18 @@
   --bg-elevated: #ffffff;
   --bg-overlay: rgb(0 0 0 / 0.5);
 
-  /* Text layers */
+  /* Text layers
+   *
+   * --text-tertiary uses #64748b (slate-500) instead of #94a3b8
+   * (slate-400) so non-essential labels still meet the WCAG 2.1 AA
+   * 4.5:1 contrast ratio against --bg-primary (#fff). Several call
+   * sites still hard-code #94a3b8 as a fallback; those fall back to
+   * the literal only when the custom property is unavailable, which
+   * shouldn't happen in production.
+   */
   --text-primary: #0f172a;
   --text-secondary: #475569;
-  --text-tertiary: #94a3b8;
+  --text-tertiary: #64748b;
   --text-inverse: #f8fafc;
 
   /* Border colors */
@@ -121,6 +129,73 @@
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  /* ── Motion Extensions (Cool animations) ──
+   * Extra easings beyond the existing ones. `expo` provides a snappy
+   * decelerating curve suitable for modal pop-ins; `spring` produces a
+   * slight overshoot used by toasts and popovers; `smooth` is a less
+   * aggressive default for hover lifts.
+   */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Ambient loop durations (used by `@keyframes` in animations.css). */
+  --duration-glow: 2400ms;
+  --duration-shimmer: 1800ms;
+  --duration-drift: 60s;
+
+  /* Colored glows — kept separate from `--shadow-*` because these
+   * carry brand color and are meant to be composed with the base
+   * shadow, not to replace it. */
+  --glow-primary:
+    0 0 0 1px rgb(59 130 246 / 0.35),
+    0 0 16px 2px rgb(59 130 246 / 0.45);
+  --glow-soft: 0 0 24px 4px rgb(59 130 246 / 0.25);
+  --shimmer-gradient: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgb(255 255 255 / 0.18) 50%,
+    transparent 80%
+  );
+
+  /* ── Glass (Windows 11 Mica) ──
+   * Tint RGB channels are kept as separate numbers so downstream
+   * rules can `rgb(var(--glass-tint-r) ... / <alpha>)` to build
+   * custom opacity panels without re-declaring the base color.
+   */
+  --glass-tint-r: 255;
+  --glass-tint-g: 255;
+  --glass-tint-b: 255;
+
+  --glass-bg-l2: rgb(var(--glass-tint-r) var(--glass-tint-g) var(--glass-tint-b) / 0.55);
+  --glass-bg-l3: rgb(var(--glass-tint-r) var(--glass-tint-g) var(--glass-tint-b) / 0.70);
+  --glass-bg-l4: rgb(var(--glass-tint-r) var(--glass-tint-g) var(--glass-tint-b) / 0.78);
+
+  --glass-border: rgb(255 255 255 / 0.18);
+  --glass-highlight: rgb(255 255 255 / 0.35);
+  --glass-noise-opacity: 0.04;
+
+  --glass-blur-sm: 12px;
+  --glass-blur-md: 16px;
+  --glass-blur-lg: 20px;
+  --glass-saturate: 180%;
+
+  /* ── Application Background ──
+   * MVP renders only the default themed gradient; fields like
+   * `--app-bg-image` / `--app-bg-blur` are reserved so the later
+   * user-customised-background feature can flip them without
+   * touching component CSS.
+   */
+  --app-bg-mode: preset;
+  --app-bg-solid: transparent;
+  --app-bg-image: none;
+  --app-bg-overlay: rgb(0 0 0 / 0.18);
+  --app-bg-blur: 0px;
+  --app-bg-gradient:
+    radial-gradient(circle at 20% 0%, rgb(59 130 246 / 0.18), transparent 60%),
+    radial-gradient(circle at 80% 100%, rgb(236 72 153 / 0.14), transparent 55%),
+    linear-gradient(180deg, #f8fafc, #ffffff);
 }
 
 /* ── Dark Theme Overrides ── */
@@ -137,14 +212,69 @@
 
   --text-primary: #f8fafc;
   --text-secondary: #cbd5e1;
-  --text-tertiary: #64748b;
+  --text-tertiary: #b0bdd0;
+  --text-inverse: #0f172a;
 
   --border-color: #334155;
   --border-color-hover: #475569;
+
+  --color-warning: #b7950b;
 
   --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.2);
   --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.2);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.2);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.2);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.3), 0 8px 10px -6px rgb(0 0 0 / 0.2);
+
+  /* Glass tint shifts to a deep slate so the Mica effect reads as
+   * "tinted dark acrylic" rather than "washed-out white". */
+  --glass-tint-r: 15;
+  --glass-tint-g: 23;
+  --glass-tint-b: 42;
+  --glass-bg-l2: rgb(var(--glass-tint-r) var(--glass-tint-g) var(--glass-tint-b) / 0.60);
+  --glass-bg-l3: rgb(var(--glass-tint-r) var(--glass-tint-g) var(--glass-tint-b) / 0.72);
+  --glass-bg-l4: rgb(var(--glass-tint-r) var(--glass-tint-g) var(--glass-tint-b) / 0.82);
+  --glass-border: rgb(255 255 255 / 0.08);
+  --glass-highlight: rgb(255 255 255 / 0.10);
+  --glass-noise-opacity: 0.06;
+
+  /* Glow uses a slightly brighter primary tint to stay visible on
+   * dark panels. */
+  --glow-primary:
+    0 0 0 1px rgb(96 165 250 / 0.40),
+    0 0 18px 2px rgb(96 165 250 / 0.45);
+  --glow-soft: 0 0 28px 6px rgb(96 165 250 / 0.28);
+
+  /* Dark-theme default background: deeper slate with accent glows. */
+  --app-bg-overlay: rgb(0 0 0 / 0.32);
+  --app-bg-gradient:
+    radial-gradient(circle at 15% 0%, rgb(59 130 246 / 0.22), transparent 55%),
+    radial-gradient(circle at 85% 100%, rgb(168 85 247 / 0.18), transparent 50%),
+    linear-gradient(180deg, #0b1120, #0f172a);
+}
+
+/* ── Small-screen blur reduction ──
+ * Very large backdrop-filter blur radii are expensive on mobile
+ * GPUs. Halve the blur budget below 640px so scroll/animation
+ * performance stays acceptable on phones.
+ */
+@media (max-width: 640px) {
+  :root {
+    --glass-blur-md: 10px;
+    --glass-blur-lg: 14px;
+  }
+}
+
+/* ── Reduced transparency accessibility override ──
+ * Mirrors the OS-level "Reduce transparency" preference. When set,
+ * glass panels fall back to the elevated surface color so text
+ * contrast does not depend on whatever is behind the panel.
+ */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-bg-l2: var(--bg-elevated);
+    --glass-bg-l3: var(--bg-elevated);
+    --glass-bg-l4: var(--bg-elevated);
+    --glass-noise-opacity: 0;
+  }
 }

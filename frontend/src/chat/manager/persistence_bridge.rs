@@ -112,7 +112,7 @@ impl ChatManager {
               *list = msgs;
             } else {
               // Race: messages arrived while the async load was in flight.
-              // Merge and deduplicate so history is not lost (BUG-2 fix).
+              // Merge and deduplicate so history is not lost.
               let mut seen: std::collections::HashSet<MessageId> =
                 list.iter().map(|m| m.id).collect();
               for m in msgs {
@@ -238,7 +238,7 @@ impl ChatManager {
           state.messages.update(|list| {
             // Build a set of all known IDs for O(1) dedup lookups (N2 fix).
             // Include the target_id so the target message is never
-            // erroneously deduplicated from the existing list (BUG-1 fix).
+            // erroneously deduplicated from the existing list.
             let mut seen: std::collections::HashSet<MessageId> =
               older.iter().map(|m| m.id).collect();
             seen.insert(target_id);

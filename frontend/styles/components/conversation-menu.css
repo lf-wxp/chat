@@ -1,0 +1,213 @@
+/**
+ * Sidebar Conversation Menu (Pin / Mute / Archive)
+ *
+ * The more-actions button sits on the right edge of every conversation
+ * row. It is hidden by default and only appears on hover / focus / when
+ * the row or its menu is active, matching the interaction pattern in
+ * Req 14.1.2.3.
+ *
+ * The menu itself is a popover anchored to the row via CSS Anchor
+ * Positioning with a conservative fallback for browsers that still
+ * lack support.
+ */
+
+/* ── More-actions button ── */
+.sidebar-conversation {
+  position: relative;
+}
+
+.sidebar-conversation-actions-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md, 0.375rem);
+  color: var(--text-tertiary, #94a3b8);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--duration-fast, 150ms) var(--ease-default, ease),
+    background-color var(--duration-fast, 150ms) var(--ease-default, ease),
+    color var(--duration-fast, 150ms) var(--ease-default, ease);
+}
+
+/* Reveal the trigger on hover / focus-within / when its menu is open. */
+.sidebar-conversation:hover .sidebar-conversation-actions-btn,
+.sidebar-conversation:focus-within .sidebar-conversation-actions-btn,
+.sidebar-conversation.has-menu-open .sidebar-conversation-actions-btn {
+  opacity: 1;
+}
+
+.sidebar-conversation-actions-btn:hover,
+.sidebar-conversation-actions-btn:focus-visible {
+  background-color: color-mix(in oklch, var(--color-primary) 12%, transparent);
+  color: var(--text-primary, #0f172a);
+}
+
+.sidebar-conversation-actions-btn:focus-visible {
+  outline: 2px solid var(--color-primary, #3b82f6);
+  outline-offset: 2px;
+}
+
+.sidebar-conversation-actions-btn svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Mute / pin decoration icons */
+.sidebar-conversation-pin-icon {
+  width: 0.75rem;
+  height: 0.75rem;
+  color: var(--color-warning, #f59e0b);
+  margin-right: var(--space-1, 0.25rem);
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.sidebar-conversation-mute-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-tertiary, #94a3b8);
+  margin-left: var(--space-1, 0.25rem);
+}
+
+.sidebar-conversation-mute-icon svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+/* ── Popover menu ── */
+.sidebar-conversation-menu {
+  position: absolute;
+  top: 100%;
+  right: var(--space-2, 0.5rem);
+  z-index: var(--z-popover, 500);
+  display: flex;
+  flex-direction: column;
+  min-width: 10rem;
+  padding: var(--space-1, 0.25rem);
+  /* Background / border / box-shadow are owned by the effects layer
+   * (glass.css); shape tokens and layout stay here. */
+  border-radius: var(--radius-md, 0.375rem);
+  /* Entry animation (Req 14.6 micro-interactions) */
+  animation: conversation-menu-enter var(--duration-slow, 300ms)
+    var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+}
+
+@starting-style {
+  .sidebar-conversation-menu {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes conversation-menu-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(0) scale(1.02);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.sidebar-conversation-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  width: 100%;
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm, 0.25rem);
+  color: var(--text-primary, #0f172a);
+  font-size: var(--font-sm, 0.875rem);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast, 150ms) var(--ease-default, ease);
+}
+
+.sidebar-conversation-menu__item:hover,
+.sidebar-conversation-menu__item:focus-visible {
+  background-color: var(--bg-tertiary, #f1f5f9);
+}
+
+.sidebar-conversation-menu__item:focus-visible {
+  outline: 2px solid var(--color-primary, #3b82f6);
+  outline-offset: -2px;
+}
+
+.sidebar-conversation-menu__item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sidebar-conversation-menu__item svg {
+  width: 1rem;
+  height: 1rem;
+  color: var(--text-secondary, #475569);
+  flex-shrink: 0;
+}
+
+/* Reduced motion: disable the entry animation */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-conversation-menu {
+    animation: none;
+  }
+}
+
+/* ── Connection status badge ── */
+.sidebar-connection-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  margin-left: var(--space-1, 0.25rem);
+  flex-shrink: 0;
+}
+
+.sidebar-connection-status svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.sidebar-connection-status--connected {
+  color: var(--color-success, #22c55e);
+}
+
+.sidebar-connection-status--reconnecting {
+  color: var(--color-warning, #f59e0b);
+  animation: sidebar-connection-pulse 1.2s ease-in-out infinite;
+}
+
+.sidebar-connection-status--disconnected {
+  color: var(--color-error, #ef4444);
+}
+
+@keyframes sidebar-connection-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-connection-status--reconnecting {
+    animation: none;
+    opacity: 1;
+  }
+}

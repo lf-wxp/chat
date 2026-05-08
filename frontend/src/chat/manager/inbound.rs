@@ -42,17 +42,23 @@ impl ChatManager {
       }
     });
 
+    // Req 7.7f — auto-unarchive on new message arrival so the
+    // conversation reappears in the main list even if the user had
+    // previously archived it. Idempotent for non-archived chats.
+    self.app_state.auto_unarchive(&conv);
+
     // Surface a desktop notification when the chat is not the active
     // conversation. The notifications module enforces the
-    // "Message Notifications" toggle, the Do-Not-Disturb window and
-    // the document-hidden gate (Req 13.4.2 / 13.4.4).
+    // "Message Notifications" toggle, the global Do-Not-Disturb
+    // window, the per-conversation muted flag (Req 7.7e), and the
+    // document-hidden gate (Req 13.4.2 / 13.4.4).
     if !active {
       let title = if msg.sender_name.is_empty() {
         "New message".to_string()
       } else {
         msg.sender_name.clone()
       };
-      crate::notifications::show_message_notification(title, preview);
+      crate::notifications::show_message_notification(conv.clone(), title, preview);
     }
 
     // Fire-and-forget persistence to IndexedDB.

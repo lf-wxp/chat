@@ -14,7 +14,7 @@ use leptos::prelude::*;
 ///
 /// When the component unmounts (e.g. during page navigation), all
 /// pending auto-remove timers are cancelled to prevent orphaned
-/// closures and console warnings (W4 fix).
+/// closures and console warnings.
 #[component]
 pub fn ErrorToastContainer() -> impl IntoView {
   let manager = use_error_toast_manager();

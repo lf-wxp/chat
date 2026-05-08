@@ -18,7 +18,7 @@
 /// these impls because `provide_context` is monomorphised on all targets).
 /// If this crate is ever compiled for a truly multi-threaded target (native
 /// SSR, server-side tests) these impls MUST be removed and the interior
-/// wrapped in `Arc<Mutex<>>` instead (Issue-7 + R2-Issue-12).
+/// wrapped in `Arc<Mutex<>>` instead.
 #[macro_export]
 macro_rules! wasm_send_sync {
   ($type:ty) => {
@@ -45,7 +45,7 @@ pub fn load_from_local_storage(key: &str) -> Option<String> {
 ///
 /// Logs a warning on failure (e.g., storage quota exceeded or no window)
 /// so that critical data persistence issues are visible in the console
-/// instead of being silently lost (P2-3 fix).
+/// instead of being silently lost.
 pub fn save_to_local_storage(key: &str, value: &str) {
   if let Some(window) = web_sys::window()
     && let Ok(Some(storage)) = window.local_storage()

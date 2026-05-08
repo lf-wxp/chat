@@ -52,7 +52,7 @@ pub(super) const PONG_TIMEOUT_MS: i64 = 55_000;
 /// Rejoin timeout after `AuthSuccess`: if the server never replies to
 /// our `JoinRoom` with either `RoomJoined` or an `ErrorResponse`, force
 /// the reconnect banner off after this many milliseconds so the UI does
-/// not remain stuck (P1-2 fix).
+/// not remain stuck.
 pub(super) const REJOIN_TIMEOUT_MS: i32 = 10_000;
 
 /// WebSocket close codes relevant to our reconnect decision tree.
@@ -107,13 +107,13 @@ pub(super) struct Inner {
   pub(super) heartbeat_closure: Option<Closure<dyn Fn()>>,
   /// Retained reconnect timeout closure (dropped when the timer fires
   /// or on `disconnect()`). Prevents the WASM heap leak caused by the
-  /// previous `Closure::once_into_js` approach (Opt-3).
+  /// previous `Closure::once_into_js` approach.
   pub(super) reconnect_timeout_closure: Option<Closure<dyn Fn()>>,
   pub(super) reconnect_timeout_id: Option<i32>,
   /// Pending rejoin-watchdog timeout set in `handle_auth_success` when
   /// we attempt to rejoin a previously active room. Cleared by
   /// `RoomJoined` / `ErrorResponse` handlers or on disconnect so the
-  /// banner-forcing callback does not fire on a stale session (P1-2).
+  /// banner-forcing callback does not fire on a stale session.
   pub(super) rejoin_timeout: Option<crate::utils::TimeoutHandle>,
 }
 
@@ -173,15 +173,14 @@ impl SignalingClient {
         console_error(&err_msg);
         // WebSocket::new failures are typically permanent (bad URL syntax,
         // blocked by browser policy). Stop reconnecting to avoid a futile
-        // retry loop and notify the user (Issue-13 fix).
+        // retry loop and notify the user.
         self.inner.borrow_mut().reconnect.stop();
         self.app_state.reconnecting.set(false);
         // Use the cached ErrorToastManager instead of calling
         // use_error_toast_manager() which requires Leptos context
         // (unavailable in some call paths). Route through the
         // `error.sig001` i18n key so non-English locales see a
-        // localised string instead of the English fallback
-        // (R2-Issue-7 fix).
+        // localised string instead of the English fallback.
         self.error_toast.show_error_message_with_key(
           "SIG001",
           "error.sig001",
@@ -216,7 +215,7 @@ impl SignalingClient {
   ///   `close_with_code`; otherwise a plain `close()` is used.
   pub(super) fn close_and_cleanup_ws(&self, close_code: Option<u16>) {
     // Take the WebSocket and drop all retained closures in a single
-    // borrow_mut to improve readability (P2-4 fix). The previous
+    // borrow_mut to improve readability. The previous
     // two-borrow approach was safe but easy to misread as a potential
     // double-borrow panic.
     let (ws, _closures) = {
@@ -349,8 +348,8 @@ impl SignalingClient {
   /// **Note on ordering**: Steps 1–3 must happen *before* the WebSocket
   /// is closed so that `PeerClosed` and `UserLogout` signaling messages
   /// can still be delivered to the server. Step 3 (stop status manager)
-  /// prevents spurious `UserStatusChange` messages during teardown
-  /// (P1 Bug-6 fix). After `disconnect()`, the `onclose` handler will
+  /// prevents spurious `UserStatusChange` messages during teardown.
+  /// After `disconnect()`, the `onclose` handler will
   /// *not* schedule a reconnect because `reconnect.stop()` is called
   /// inside `disconnect()`. The UI then redirects to the login page
   /// because `auth` signal becomes `None` (Req 10.9.35g — redirect).
@@ -372,7 +371,7 @@ impl SignalingClient {
 
     // 3. Stop user status monitoring (idle checks + activity listeners)
     //    before clearing auth to avoid sending status changes during
-    //    teardown (P1 Bug-6 fix). Use the cached reference instead of
+    //    teardown. Use the cached reference instead of
     //    calling use_context which may be unavailable during teardown.
     self.user_status.stop();
 
@@ -708,6 +707,32 @@ impl SignalingClient {
 
   // ── Reconnection ──
 
+  /// Cancel any pending reconnect backoff timer and trigger an
+  /// immediate fresh connection attempt. Used by the
+  /// [`ReconnectBanner`](crate::components::reconnect_banner)
+  /// "Retry" button so users do not have to wait for the next
+  /// exponential-backoff slot when they suspect the network is
+  /// available again (review v3 §O5).
+  ///
+  /// Idempotent — safe to call when no reconnection is currently
+  /// scheduled. The reconnect-attempt counter is reset so the
+  /// retry behaves like a fresh outage rather than continuing the
+  /// existing exponential backoff progression.
+  pub fn force_reconnect_now(&self) {
+    self.cancel_reconnect_timeout();
+    {
+      let mut inner = self.inner.borrow_mut();
+      inner.reconnect.reset();
+    }
+    self.app_state.reconnecting.set(true);
+    self
+      .app_state
+      .recovery_phase
+      .set(crate::state::RecoveryPhase::Reconnecting);
+    // Fire and forget — `connect()` logs / surfaces errors itself.
+    let _ = self.connect();
+  }
+
   pub(super) fn schedule_reconnect(&self) {
     let mut inner = self.inner.borrow_mut();
     if inner.reconnect.is_stopped() {
@@ -721,7 +746,7 @@ impl SignalingClient {
 
     if let Some(delay) = delay {
       self.app_state.reconnecting.set(true);
-      // P2-1 fix: Reset recovery phase to "Reconnecting" when starting a
+      // Reset recovery phase to "Reconnecting" when starting a
       // reconnection attempt so the banner shows the correct text.
       self
         .app_state
@@ -740,7 +765,7 @@ impl SignalingClient {
       let client = self.clone();
       let cb = Closure::wrap(Box::new(move || {
         // Clear the retained closure from Inner now that it has fired,
-        // so the WASM heap memory is reclaimed (Opt-3 fix).
+        // so the WASM heap memory is reclaimed.
         {
           let mut inner = client.inner.borrow_mut();
           inner.reconnect_timeout_closure = None;
@@ -790,7 +815,7 @@ impl SignalingClient {
   }
 }
 
-// ── Console logging helpers (Opt-B) ──
+// ── Console logging helpers ──
 //
 // Re-export the shared signaling log helpers so that sub-modules
 // (`handlers`, `heartbeat`) can continue to import them from `super::`.

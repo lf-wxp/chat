@@ -427,6 +427,24 @@
   outline-offset: 2px;
 }
 
+.settings-time-input-invalid {
+  border-color: var(--color-error, #ef4444);
+}
+
+.settings-time-input-invalid:focus-visible {
+  outline-color: var(--color-error, #ef4444);
+}
+
+.settings-error {
+  margin: var(--space-1, 0.25rem) 0 0;
+  font-size: var(--font-xs, 0.75rem);
+  color: var(--color-error, #ef4444);
+}
+
+.settings-dnd-validation {
+  padding-left: var(--space-2, 0.5rem);
+}
+
 .settings-inline-label {
   font-size: var(--font-sm, 0.875rem);
   color: var(--text-secondary, #475569);
@@ -623,4 +641,133 @@
 .settings-permission-badge.is-unsupported {
   background: var(--color-muted, #9ca3af);
   color: #fff;
+}
+
+/* Quick-nav bar for fast section jumping (O-8).
+ *
+ * Sticky row of icon anchors that sits just below the drawer header
+ * and stays visible while the long settings list is scrolled.
+ *
+ * Theming notes:
+ *   - Uses design tokens (--bg-*, --text-*, --border-color) so the
+ *     bar inherits the active light / dark theme automatically.
+ *     Earlier version referenced non-existent `--color-surface`
+ *     variables and fell back to a hard-coded `#fff`, which caused
+ *     a white bar with white text in dark mode.
+ *   - A faint backdrop blur + translucent background keeps the bar
+ *     from feeling like an opaque block punched into the scroll
+ *     flow, matching the floating-chip aesthetic used elsewhere.
+ *
+ * Layout notes:
+ *   - `space-between` evenly distributes the 7 section icons across
+ *     the full drawer-body width so the row no longer looks
+ *     left-clumped with empty space on the right.
+ *   - Horizontal padding aligns the first / last icon with the rest
+ *     of the drawer content without needing per-link margins.
+ */
+.settings-quick-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  /* Bleed into the surrounding drawer-body padding so the bar sits
+   * flush against the header instead of floating 24 px below it.
+   * The negative margins on all four sides cancel out
+   * `.drawer-body { padding: var(--space-5, 1.5rem) }`; we then
+   * re-apply the horizontal padding as our own so the icons keep
+   * their breathing room. A small bottom margin restores spacing
+   * between the nav and the first settings section. */
+  margin: calc(-1 * var(--space-5, 1.5rem));
+  margin-bottom: var(--space-4, 1rem);
+  padding: 0.5rem var(--space-5, 1.5rem);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  position: sticky;
+  /* Negative `top` pulls the sticky threshold up by the parent's
+   * padding-top, so the negative block margin above actually
+   * renders as "flush against the header" instead of being
+   * clamped by the default `top: 0` (which pins the element at
+   * the padding-box edge). */
+  top: calc(-1 * var(--space-5, 1.5rem));
+  background: color-mix(in oklch, var(--bg-elevated, #fff) 88%, transparent);
+  backdrop-filter: saturate(180%) blur(10px);
+  -webkit-backdrop-filter: saturate(180%) blur(10px);
+  z-index: var(--z-sticky, 200);
+}
+
+.settings-quick-nav-link {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-md, 0.375rem);
+  color: var(--text-secondary, #475569);
+  text-decoration: none;
+  transition:
+    background var(--duration-fast, 150ms) var(--ease-out, ease),
+    color var(--duration-fast, 150ms) var(--ease-out, ease),
+    transform var(--duration-fast, 150ms) var(--ease-out, ease);
+}
+
+.settings-quick-nav-link:hover {
+  background: var(--bg-tertiary, #f1f5f9);
+  color: var(--text-primary, #0f172a);
+  transform: translateY(-1px);
+}
+
+.settings-quick-nav-link:active {
+  transform: translateY(0);
+  background: color-mix(in oklch, var(--bg-tertiary, #e2e8f0) 80%, var(--color-primary, #3b82f6));
+}
+
+.settings-quick-nav-link:focus-visible {
+  outline: 2px solid var(--border-color-focus, var(--color-primary, #3b82f6));
+  outline-offset: 2px;
+}
+
+/* Highlight the section the URL hash currently points to so users
+ * can see which icon represents the section they jumped to. */
+.settings-quick-nav-link.is-active,
+.settings-quick-nav-link:target {
+  color: var(--color-primary, #3b82f6);
+  background: color-mix(in oklch, var(--color-primary, #3b82f6) 12%, transparent);
+}
+
+/* On very narrow viewports tighten the horizontal padding so the
+ * first / last icon still have room to breathe without clipping.
+ * The vertical bleed stays the same — we only trim the re-applied
+ * horizontal padding, not the negative margins. */
+@media (max-width: 420px) {
+  .settings-quick-nav {
+    padding: 0.5rem var(--space-3, 0.75rem);
+    gap: 0.25rem;
+  }
+
+  .settings-quick-nav-link {
+    min-width: 2rem;
+    height: 2rem;
+  }
+}
+
+/* Camera preview (A14) */
+.settings-camera-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.settings-camera-video {
+  width: 100%;
+  max-width: 320px;
+  border-radius: 0.5rem;
+  background: #000;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.settings-camera-preview-row {
+  flex-direction: column;
+  align-items: stretch;
 }

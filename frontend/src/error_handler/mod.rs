@@ -8,7 +8,8 @@
 mod manager;
 
 pub use manager::{
-  ErrorToast, ErrorToastManager, provide_error_toast_manager, use_error_toast_manager,
+  ErrorToast, ErrorToastManager, QUALITY_RESTORED_DURATION_MS, provide_error_toast_manager,
+  use_error_toast_manager,
 };
 
 #[cfg(test)]

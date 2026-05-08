@@ -79,17 +79,19 @@ pub fn DataManagementSection() -> impl IntoView {
           let chat = chat.clone();
           let app_state = app_state;
           let status_for = status_message;
+          // Snapshot i18n strings before spawning the async task to
+          // avoid reading a stale locale if the user switches
+          // language while the clear operation is in flight (B-4).
+          let success_template = t_string!(i18n, settings.clear_chat_history_success).to_string();
+          let failed_msg = t_string!(i18n, settings.clear_chat_history_failed).to_string();
           spawn_local(async move {
             match clear_all_history(&chat, app_state).await {
               Ok(count) => {
-                let success_template =
-                  t_string!(i18n, settings.clear_chat_history_success).to_string();
                 let msg = success_template.replace("{count}", &count.to_string());
                 status_for.set(Some(msg));
                 refresh_storage_estimate(storage_usage);
               }
               Err(err) => {
-                let failed_msg = t_string!(i18n, settings.clear_chat_history_failed).to_string();
                 status_for.set(Some(format!("{failed_msg}: {err}")));
               }
             }

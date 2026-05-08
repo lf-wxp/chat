@@ -139,7 +139,7 @@ mod wasm {
       avatar: String::new(),
       signature: String::new(),
     }));
-    let manager = ChatManager::new(app_state.clone());
+    let manager = ChatManager::new(app_state);
     (app_state, manager, me, peer)
   }
 
@@ -216,6 +216,63 @@ mod wasm {
     assert_eq!(state.unread.get_untracked(), 1);
     assert_eq!(state.messages.get_untracked().len(), 1);
     assert!(!state.messages.get_untracked()[0].outgoing);
+  }
+
+  #[wasm_bindgen_test]
+  fn incoming_text_auto_unarchives_archived_conversation() {
+    // T4: Req 7.7f — a new inbound message must move an archived
+    // conversation back into the active list automatically.
+    use crate::state::{Conversation, ConversationType};
+
+    let (app, manager, _me, peer) = setup();
+    let conv = ConversationId::Direct(peer.clone());
+    // Seed the conversations signal with the target conversation
+    // already archived (the inbound flow normally lazy-creates it,
+    // but auto_unarchive only flips an existing entry — see Req
+    // 7.7f's idempotence contract).
+    app.conversations.set(vec![Conversation {
+      id: conv.clone(),
+      display_name: "Peer".to_string(),
+      last_message: None,
+      last_message_ts: None,
+      unread_count: 0,
+      pinned: false,
+      pinned_ts: None,
+      muted: false,
+      archived: true,
+      conversation_type: ConversationType::Direct,
+    }]);
+
+    let id = MessageId::new();
+    let wire = DataChannelMessage::ChatText(ChatText {
+      message_id: id,
+      content: "are you there".to_string(),
+      reply_to: None,
+      timestamp_nanos: 1_700_000_000_000_000_000,
+    });
+    crate::chat::routing::dispatch_incoming(
+      &manager,
+      peer.clone(),
+      "Peer".to_string(),
+      Some("Me"),
+      conv.clone(),
+      wire,
+    );
+
+    let row = app
+      .conversations
+      .get_untracked()
+      .into_iter()
+      .find(|c| c.id == conv)
+      .expect("conversation row");
+    assert!(
+      !row.archived,
+      "inbound message must auto-unarchive the conversation",
+    );
+    assert!(
+      app.dirty_conv_ids.get_untracked().contains(&conv),
+      "auto_unarchive must mark the conversation dirty so the IDB row reflects the new flag",
+    );
   }
 
   #[wasm_bindgen_test]

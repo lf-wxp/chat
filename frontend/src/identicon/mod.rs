@@ -98,7 +98,7 @@ pub fn generate_identicon_svg(username: &str) -> String {
 ///
 /// This can be used directly as the `src` attribute of an `<img>` element.
 ///
-/// ## Caching (Opt-4.3)
+/// ## Caching
 ///
 /// The data URI is deterministic in `username`, but previously every
 /// render of every row / modal / panel re-encoded the SVG. A
@@ -156,7 +156,7 @@ fn url_encode_svg(svg: &str) -> String {
 ///
 /// Produces an 8-byte array suitable for deriving grid patterns and colors.
 /// This is NOT a cryptographic hash — it's only used for visual consistency.
-/// Renamed from `simple_hash` to make the limited scope explicit (Review-L3).
+/// Renamed from `simple_hash` to make the limited scope explicit.
 fn identicon_hash(input: &str) -> [u8; 8] {
   let mut hash1: u32 = 0x811c_9dc5; // FNV-1a offset basis
   let mut hash2: u32 = 0xc1bd_ceee; // Second hash for more entropy

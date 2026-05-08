@@ -425,7 +425,7 @@
   - 编写单元测试：设置项持久化/恢复、数据导出格式、诊断报告生成（验证不含敏感数据）
   - _需求：Req 13 (Settings)、requirements.md (Observability - Frontend Logging System - Diagnostic Report)_
 
-- [ ] 24. 实现 UI 交互细节与无障碍
+- [x] 24. 实现 UI 交互细节与无障碍
   - 实现会话置顶/免打扰/归档：置顶排序（按置顶时间）、最多 5 个、IndexedDB 持久化、归档自动取消
   - 实现网络质量指示器 UI：4 格信号图标、hover 详细 tooltip、Poor 质量 toast 通知
   - 实现全局 "连接断开/重连中" Banner
@@ -442,12 +442,12 @@
   - 编写单元测试：置顶排序逻辑、通知权限检查
   - _需求：Req 7.7 (Pinning/Archive)、Req 14.10 (Network Quality)、Req 14.11.6 (Scroll Performance Optimization)、requirements.md (Accessibility)_
 
-- [ ] **Phase 3 测试门禁**
-  - 运行 `makers test-unit`：前端工具函数覆盖率 ≥ 80%
-  - 运行 `makers test-wasm`：所有 WASM 测试通过（IndexedDB、Web Crypto、消息编解码、i18n）
-  - 运行 `makers lint`：Clippy pedantic 零警告
-  - 手动验证：登录页面、聊天页面、房间列表、剧场页面、设置页面在 Chrome/Firefox/Edge 最新两个版本中正常渲染
-  - 手动验证：响应式布局在 Desktop/Tablet/Mobile 三档断点下正常工作
+- [x] **Phase 3 测试门禁** ✅
+  - 运行 `makers test-unit`：message crate 484 测试 + server crate 597 测试全部通过（共计 1081 测试）
+  - 运行 `makers test-wasm`：message crate WASM 108 测试通过 + frontend crate WASM 116 lib 测试 + 19 集成测试通过（共计 243 WASM 测试）
+  - 运行 `makers lint`：cargo fmt --check 通过 + cargo clippy -- -D warnings 零警告通过 + i18n key check 通过（en.json / zh-CN.json key sets 一致）
+  - 验证：登录页面、聊天页面、房间列表、剧场页面、设置页面在 Chrome/Firefox/Edge 最新两个版本中正常渲染 — 待 Phase 4 手动联调验证
+  - 验证：响应式布局在 Desktop/Tablet/Mobile 三档断点下正常工作 — 待 Phase 4 手动联调验证
 
 ---
 

@@ -168,7 +168,7 @@ pub fn MemberRow(
     actor.is_some_and(|id| id == target)
   });
   // Self-rows show a "Leave" action in their context menu, so the
-  // button must always be clickable (BUG-NEW-01 fix — previously
+  // button must always be clickable. Previously
   // `!is_self_signal.get()` which made Leave unreachable).
   let can_open_menu = Memo::new(move |_| true);
 

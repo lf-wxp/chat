@@ -42,16 +42,18 @@
   padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
   min-width: 20rem;
   max-width: 28rem;
-  background-color: var(--bg-elevated, #ffffff);
-  border: 1px solid var(--border-color, #e2e8f0);
+  /* Background / border / shadow are owned by the effects layer
+   * (glass.css); we only keep shape tokens here. */
+  border: 1px solid transparent;
   border-radius: var(--radius-lg, 0.5rem);
-  box-shadow: var(--shadow-lg);
   font-size: var(--font-sm, 0.875rem);
   color: var(--text-primary, #0f172a);
   pointer-events: auto;
   transform: translateX(100%);
   opacity: 0;
-  transition: all var(--duration-normal, 200ms) var(--ease-default, ease);
+  transition:
+    transform var(--duration-slow, 300ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
+    opacity var(--duration-normal, 200ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
   /* Enable View Transitions for toast add/remove */
   view-transition-name: toast;
 
@@ -177,11 +179,13 @@
   transition: width linear;
 }
 
-/* ── Toast Dark Theme Override ── */
-[data-theme="dark"] .toast {
-  background-color: var(--bg-elevated, #1e293b);
-  border-color: var(--border-color, #334155);
-}
+/* ── Toast Dark Theme Override ──
+ * Background is now owned by the `effects` layer (glass.css) which
+ * reads theme-aware tints from `--glass-bg-l3`, so no dark override
+ * is required here. Border continues to default to transparent;
+ * variant-specific borders (toast-error / toast-warning) still win
+ * through their own declarations below.
+ */
 
 /* ── Entry Animation ── */
 @starting-style {

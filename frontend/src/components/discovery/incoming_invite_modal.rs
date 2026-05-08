@@ -60,6 +60,11 @@ pub fn IncomingInviteModal() -> impl IntoView {
   // works regardless of where focus lives. `use_event_listener`
   // auto-removes the listener on cleanup; no manual `StoredValue`
   // bookkeeping is needed anymore.
+  //
+  // `stop_propagation()` is called in both branches to prevent the
+  // global Escape handler (app.rs) from also firing while the modal
+  // is visible — without it, a rapid double-press could race and
+  // both the invite and an underlying overlay would close (review §3.2).
   let keydown_mgr = invite_mgr.clone();
   let keydown_signaling = signaling.clone();
   let _ = use_event_listener(
@@ -70,10 +75,14 @@ pub fn IncomingInviteModal() -> impl IntoView {
         return;
       }
       let Some(invite) = front.get_untracked() else {
+        // No invite to decline, but still stop the event so the
+        // global handler does not double-handle this Escape.
+        ev.stop_propagation();
         return;
       };
       keydown_mgr.take_inbound(&invite.from);
       let _ = keydown_signaling.send_invite_declined(&invite.from);
+      ev.stop_propagation();
     },
   );
 
@@ -178,7 +187,11 @@ pub fn IncomingInviteModal() -> impl IntoView {
             <h2 id="incoming-invite-title" class="modal-title">
               {t!(i18n, discovery.invite_received_title)}
             </h2>
-            <span class="incoming-invite-modal__countdown" aria-live="polite">
+            // aria-live="off" avoids flooding the screen-reader with a
+            // new announcement every second. The countdown is still
+            // visible visually; a periodic announcement would be
+            // excessively verbose (WCAG 2.1, review §3.4).
+            <span class="incoming-invite-modal__countdown" aria-live="off">
               {move || format!("{}s", remaining_seconds.get())}
             </span>
           </header>

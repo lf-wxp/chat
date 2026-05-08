@@ -200,7 +200,7 @@ impl PeerCrypto {
     .await
     .map_err(|e| format!("Failed to derive shared secret: {:?}", e))?;
 
-    // Verify ECDH P-256 shared secret length before HKDF (P1-15 fix).
+    // Verify ECDH P-256 shared secret length before HKDF.
     // All spec-compliant browsers return 32 bytes (256 bits) for P-256.
     let raw_bytes = Uint8Array::new(&raw_secret);
     if raw_bytes.length() != 32 {

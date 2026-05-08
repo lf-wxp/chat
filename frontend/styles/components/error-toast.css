@@ -19,18 +19,14 @@
 /* ── Individual Toast ── */
 .error-toast {
   pointer-events: auto;
-  background-color: var(--bg-primary, #ffffff);
+  /* Background / box-shadow are owned by the effects layer
+   * (glass.css). The distinctive red left stripe stays here. */
   border: 1px solid color-mix(in oklch, var(--color-error, #ef4444) 30%, transparent);
   border-left: 4px solid var(--color-error, #ef4444);
   border-radius: var(--radius-md, 8px);
-  box-shadow: var(--shadow-lg, 0 10px 15px -3px rgb(0 0 0 / 0.1));
   padding: var(--space-3, 12px) var(--space-4, 16px);
-  animation: error-toast-in 200ms ease-out;
+  animation: error-toast-in var(--duration-slow, 300ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
   overflow: hidden;
-
-  [data-theme="dark"] & {
-    background-color: var(--bg-primary, #1e293b);
-  }
 }
 
 /* ── Header ── */
@@ -149,11 +145,11 @@
 @keyframes error-toast-in {
   from {
     opacity: 0;
-    transform: translateX(20px);
+    transform: translateX(24px) scale(0.96);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateX(0) scale(1);
   }
 }
 

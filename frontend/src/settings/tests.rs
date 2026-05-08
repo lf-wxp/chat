@@ -150,6 +150,9 @@ fn settings_serde_round_trip() {
       enabled: true,
     },
     retention: crate::persistence::RetentionPolicy::Week,
+    glass_enabled: false,
+    motion_enabled: false,
+    background: BackgroundSettings::default(),
   };
   let json = serde_json::to_string(&settings).expect("serialise");
   let decoded: UserSettings = serde_json::from_str(&json).expect("deserialise");
@@ -358,4 +361,313 @@ fn permission_badge_class_maps_all_states() {
   assert_eq!(permission_badge_class("default"), "is-unsupported");
   assert_eq!(permission_badge_class(""), "is-unsupported");
   assert_eq!(permission_badge_class("unknown"), "is-unsupported");
+}
+
+// ---------------------------------------------------------------------------
+// BackgroundSettings — plan §7.1 / batch 5
+// ---------------------------------------------------------------------------
+
+#[test]
+fn background_mode_parse_round_trip() {
+  for value in [
+    BackgroundMode::Preset,
+    BackgroundMode::Solid,
+    BackgroundMode::Gradient,
+    BackgroundMode::Image,
+  ] {
+    assert_eq!(BackgroundMode::parse(value.as_str()), value);
+  }
+  // Unknown tokens fall back to Preset.
+  assert_eq!(BackgroundMode::parse("xyz"), BackgroundMode::Preset);
+  assert_eq!(BackgroundMode::parse(""), BackgroundMode::Preset);
+}
+
+#[test]
+fn background_settings_default_is_preset() {
+  let s = BackgroundSettings::default();
+  assert_eq!(s.mode, BackgroundMode::Preset);
+  assert_eq!(s.blur_px, 0);
+  assert!((s.overlay_alpha - 0.2).abs() < f32::EPSILON);
+  assert!(!s.theme_aware);
+  assert!(s.dark.is_none());
+  assert!(s.gradient.is_none());
+  assert!(s.solid_color.is_none());
+  assert!(s.image_blob_key.is_none());
+}
+
+#[test]
+fn background_settings_sanitised_clamps_blur() {
+  let s = BackgroundSettings {
+    blur_px: 200,
+    ..BackgroundSettings::default()
+  };
+  assert_eq!(s.sanitised().blur_px, BACKGROUND_BLUR_MAX_PX);
+}
+
+#[test]
+fn background_settings_sanitised_clamps_overlay_alpha() {
+  let high = BackgroundSettings {
+    overlay_alpha: 5.0,
+    ..BackgroundSettings::default()
+  };
+  assert!((high.sanitised().overlay_alpha - BACKGROUND_OVERLAY_ALPHA_MAX).abs() < f32::EPSILON);
+
+  let negative = BackgroundSettings {
+    overlay_alpha: -0.5,
+    ..BackgroundSettings::default()
+  };
+  assert!(negative.sanitised().overlay_alpha >= 0.0);
+}
+
+#[test]
+fn background_settings_solid_without_color_falls_back_to_preset() {
+  let s = BackgroundSettings {
+    mode: BackgroundMode::Solid,
+    solid_color: None,
+    ..BackgroundSettings::default()
+  };
+  assert_eq!(s.sanitised().mode, BackgroundMode::Preset);
+}
+
+#[test]
+fn background_settings_gradient_without_payload_falls_back_to_preset() {
+  let s = BackgroundSettings {
+    mode: BackgroundMode::Gradient,
+    gradient: None,
+    ..BackgroundSettings::default()
+  };
+  assert_eq!(s.sanitised().mode, BackgroundMode::Preset);
+}
+
+#[test]
+fn background_settings_image_without_key_stays_in_image_mode() {
+  // Image mode is preserved even without a blob key so the upload UI
+  // remains visible while the user picks a file.
+  let s = BackgroundSettings {
+    mode: BackgroundMode::Image,
+    image_blob_key: None,
+    ..BackgroundSettings::default()
+  };
+  assert_eq!(s.sanitised().mode, BackgroundMode::Image);
+}
+
+#[test]
+fn background_settings_theme_aware_off_drops_dark_variant() {
+  let s = BackgroundSettings {
+    theme_aware: false,
+    dark: Some(Box::new(BackgroundVariantData {
+      mode: BackgroundMode::Solid,
+      solid_color: Some("#000".into()),
+      ..BackgroundVariantData::default()
+    })),
+    ..BackgroundSettings::default()
+  };
+  assert!(s.sanitised().dark.is_none());
+}
+
+#[test]
+fn gradient_spec_sanitised_clamps_angle_and_stops() {
+  let spec = GradientSpec {
+    kind: GradientKind::Linear,
+    angle_deg: 999,
+    stops: vec![GradientStop {
+      color: "#ff0000".into(),
+      offset: 2.0,
+    }],
+  };
+  let sanitised = spec.sanitised();
+  assert_eq!(sanitised.angle_deg, 360);
+  assert!(sanitised.stops.len() >= 2);
+  assert!(sanitised.stops[0].offset <= 1.0);
+}
+
+#[test]
+fn gradient_spec_sanitised_fills_empty_color() {
+  let spec = GradientSpec {
+    kind: GradientKind::Linear,
+    angle_deg: 90,
+    stops: vec![
+      GradientStop {
+        color: "   ".into(),
+        offset: 0.0,
+      },
+      GradientStop {
+        color: "#00ff00".into(),
+        offset: 1.0,
+      },
+    ],
+  };
+  let sanitised = spec.sanitised();
+  assert!(!sanitised.stops[0].color.trim().is_empty());
+}
+
+#[test]
+fn gradient_spec_to_css_linear_and_radial() {
+  let linear = GradientSpec {
+    kind: GradientKind::Linear,
+    angle_deg: 90,
+    stops: vec![
+      GradientStop {
+        color: "#ff0000".into(),
+        offset: 0.0,
+      },
+      GradientStop {
+        color: "#0000ff".into(),
+        offset: 1.0,
+      },
+    ],
+  };
+  let css = linear.to_css();
+  assert!(css.starts_with("linear-gradient(90deg,"));
+  assert!(css.contains("#ff0000 0.0%"));
+  assert!(css.contains("#0000ff 100.0%"));
+
+  let radial = GradientSpec {
+    kind: GradientKind::Radial,
+    ..linear
+  };
+  let css = radial.to_css();
+  assert!(css.starts_with("radial-gradient(circle at center,"));
+}
+
+#[test]
+fn background_settings_to_css_vars_preset_has_no_bg_value() {
+  let s = BackgroundSettings::default();
+  let vars: std::collections::HashMap<_, _> = s.to_css_vars(false).into_iter().collect();
+  // Preset mode defers to tokens.css — neither solid nor gradient
+  // values are emitted. Only the overlay + blur helpers come
+  // through.
+  assert!(!vars.contains_key("--app-bg-solid"));
+  assert!(!vars.contains_key("--app-bg-gradient"));
+  assert!(vars.contains_key("--app-bg-blur"));
+  assert!(vars.contains_key("--app-bg-overlay"));
+}
+
+#[test]
+fn background_settings_to_css_vars_solid_emits_color() {
+  let s = BackgroundSettings {
+    mode: BackgroundMode::Solid,
+    solid_color: Some("#123456".into()),
+    ..BackgroundSettings::default()
+  };
+  let vars: std::collections::HashMap<_, _> = s.to_css_vars(false).into_iter().collect();
+  assert_eq!(
+    vars.get("--app-bg-solid").map(String::as_str),
+    Some("#123456")
+  );
+}
+
+#[test]
+fn background_settings_to_css_vars_gradient_emits_css() {
+  let s = BackgroundSettings {
+    mode: BackgroundMode::Gradient,
+    gradient: Some(GradientSpec::default()),
+    ..BackgroundSettings::default()
+  };
+  let vars: std::collections::HashMap<_, _> = s.to_css_vars(false).into_iter().collect();
+  let gradient = vars
+    .get("--app-bg-gradient")
+    .expect("gradient CSS var emitted");
+  assert!(gradient.starts_with("linear-gradient("));
+}
+
+#[test]
+fn background_settings_active_variant_picks_dark_when_theme_aware() {
+  let s = BackgroundSettings {
+    mode: BackgroundMode::Solid,
+    solid_color: Some("#ffffff".into()),
+    theme_aware: true,
+    dark: Some(Box::new(BackgroundVariantData {
+      mode: BackgroundMode::Solid,
+      solid_color: Some("#000000".into()),
+      ..BackgroundVariantData::default()
+    })),
+    ..BackgroundSettings::default()
+  };
+
+  let light = s.active_variant(false);
+  assert_eq!(light.solid_color, Some("#ffffff"));
+
+  let dark = s.active_variant(true);
+  assert_eq!(dark.solid_color, Some("#000000"));
+}
+
+#[test]
+fn background_settings_active_variant_falls_back_without_dark_payload() {
+  let s = BackgroundSettings {
+    mode: BackgroundMode::Solid,
+    solid_color: Some("#ffffff".into()),
+    theme_aware: true,
+    dark: None,
+    ..BackgroundSettings::default()
+  };
+  // Even when theme_aware is true, a missing dark payload should
+  // seamlessly fall back to the top-level light variant so the UI
+  // never ends up rendering nothing.
+  let dark = s.active_variant(true);
+  assert_eq!(dark.solid_color, Some("#ffffff"));
+}
+
+#[test]
+fn background_settings_serde_round_trip_preserves_all_fields() {
+  let original = BackgroundSettings {
+    mode: BackgroundMode::Gradient,
+    preset_id: Some("aurora".into()),
+    solid_color: Some("#abcdef".into()),
+    gradient: Some(GradientSpec::default()),
+    image_blob_key: Some("user_bg_light".into()),
+    blur_px: 12,
+    overlay_alpha: 0.45,
+    theme_aware: true,
+    dark: Some(Box::new(BackgroundVariantData {
+      mode: BackgroundMode::Solid,
+      solid_color: Some("#112233".into()),
+      ..BackgroundVariantData::default()
+    })),
+  };
+  let json = serde_json::to_string(&original).expect("serialise");
+  let decoded: BackgroundSettings = serde_json::from_str(&json).expect("deserialise");
+  assert_eq!(decoded, original);
+}
+
+#[test]
+fn user_settings_deserialises_without_background_field() {
+  // Forward-compatibility guard: older persisted payloads predate
+  // the `background` field. `#[serde(default)]` must cover them.
+  let legacy = r#"{
+    "default_camera": null,
+    "default_microphone": null,
+    "default_speaker": null,
+    "speaker_volume": 0.5,
+    "microphone_volume": 0.5,
+    "video_quality": "auto",
+    "font_scale": "medium",
+    "online_status_visible": true,
+    "read_receipts": true,
+    "message_notifications": true,
+    "call_notifications": true,
+    "dnd": { "start_minutes": 0, "end_minutes": 0, "enabled": false },
+    "retention": "ThreeDays"
+  }"#;
+  let settings: UserSettings =
+    serde_json::from_str(legacy).expect("legacy payload without background field deserialises");
+  // Defaults kick in for the missing block.
+  assert_eq!(settings.background, BackgroundSettings::default());
+  assert!(settings.glass_enabled);
+  assert!(settings.motion_enabled);
+}
+
+#[test]
+fn user_settings_sanitised_cascades_into_background() {
+  let settings = UserSettings {
+    background: BackgroundSettings {
+      blur_px: 200,
+      overlay_alpha: 10.0,
+      ..BackgroundSettings::default()
+    },
+    ..UserSettings::default()
+  };
+  let sanitised = settings.sanitised();
+  assert_eq!(sanitised.background.blur_px, BACKGROUND_BLUR_MAX_PX);
+  assert!((sanitised.background.overlay_alpha - BACKGROUND_OVERLAY_ALPHA_MAX).abs() < f32::EPSILON);
 }

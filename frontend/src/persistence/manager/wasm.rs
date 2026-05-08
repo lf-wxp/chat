@@ -303,7 +303,7 @@ impl PersistenceManager {
   }
 
   /// Streaming index rebuild: reads messages in batches so the full
-  /// corpus is never materialised in memory at once (BUG-5 / OOM fix).
+  /// corpus is never materialised in memory at once.
   async fn rebuild_index_streaming(&self) -> Result<(), PersistError> {
     let db = self.db().await?;
     let mut from_ts = 0_i64;

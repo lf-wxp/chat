@@ -67,18 +67,18 @@ pub fn login(
 /// Attempt to recover auth state from localStorage and reconnect.
 ///
 /// Called on app startup. If a valid token is found in localStorage,
-/// performs a lightweight local JWT expiry check (Issue-5 fix) before
+/// performs a lightweight local JWT expiry check before
 /// setting the auth state and connecting the signaling client (which
 /// will send `TokenAuth` to verify the token with the server).
 ///
 /// If `signaling.connect()` fails synchronously (e.g. malformed ws URL,
 /// browser CSP block), the auth state is rolled back and storage is
 /// cleared so the UI falls through to the login page instead of
-/// appearing "logged in but disconnected" (P1-1 fix).
+/// appearing "logged in but disconnected".
 pub fn try_recover_auth(app_state: AppState) -> bool {
   if let Some(auth) = load_auth_from_storage() {
     // Quick local check: if the JWT has expired, skip the connect
-    // attempt and go straight to the login page (Issue-5 fix).
+    // attempt and go straight to the login page.
     if is_jwt_expired(&auth.token) {
       clear_auth_storage();
       return false;
@@ -87,8 +87,8 @@ pub fn try_recover_auth(app_state: AppState) -> bool {
     let client = crate::signaling::use_signaling_client();
     if let Err(e) = client.connect() {
       // Roll back the optimistic auth update so the UI doesn't show a
-      // "logged in" state that will never receive `AuthSuccess`
-      // (P1-1 fix). The connect_with_url path already surfaced a toast
+      // "logged in" state that will never receive `AuthSuccess`.
+      // The connect_with_url path already surfaced a toast
       // and stopped the reconnect loop.
       web_sys::console::error_1(&wasm_bindgen::JsValue::from_str(&format!(
         "[auth] Recovery aborted — signaling connect failed: {}",
@@ -109,7 +109,7 @@ pub fn try_recover_auth(app_state: AppState) -> bool {
 /// The signaling client is captured *before* entering the async block so
 /// that `expect_context` runs while the Leptos reactive owner is still
 /// in scope. Inside `spawn_local` the owner may have been dropped, which
-/// causes `use_signaling_client()` to panic (Bug-signaling-context).
+/// causes `use_signaling_client()` to panic.
 fn send_auth_request<T: Serialize + 'static>(
   url: String,
   body: T,
@@ -148,7 +148,7 @@ fn send_auth_request<T: Serialize + 'static>(
         // If the signaling connection cannot even be created (malformed
         // URL, blocked by CSP, ...), roll back the freshly-persisted auth
         // state so the UI doesn't get stuck on a "logged in but
-        // disconnected" screen (P1-1 fix). The connect path has already
+        // disconnected" screen. The connect path has already
         // surfaced a user-visible toast.
         if let Err(e) = signaling_client.connect() {
           clear_auth_storage();
@@ -171,7 +171,7 @@ fn send_auth_request<T: Serialize + 'static>(
 
 /// Send an HTTP POST request and parse the auth response.
 async fn send_http_request<T: Serialize>(url: &str, body: &T) -> Result<AuthResponse, String> {
-  /// Request timeout in milliseconds (Optimisation 3).
+  /// Request timeout in milliseconds.
   const REQUEST_TIMEOUT_MS: i32 = 10_000;
 
   let window = web_sys::window().ok_or("no window")?;
@@ -198,7 +198,7 @@ async fn send_http_request<T: Serialize>(url: &str, body: &T) -> Result<AuthResp
 
   // Schedule abort after the timeout.  We use `Closure::wrap` and keep
   // a handle so the closure is dropped deterministically after the
-  // request completes instead of being leaked via `once_into_js` (Opt-C).
+  // request completes instead of being leaked via `once_into_js`.
   let abort_controller_for_timeout = abort_controller.clone();
   let timeout_cb = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
     abort_controller_for_timeout.abort();
@@ -216,7 +216,7 @@ async fn send_http_request<T: Serialize>(url: &str, body: &T) -> Result<AuthResp
       if abort_signal.aborted() {
         "Request timed out".to_string()
       } else {
-        // P2-4 fix: Detect network/CORS errors and return a dedicated
+        // Detect network/CORS errors and return a dedicated
         // i18n key so the UI can display a specific message instead of
         // the generic JS error string (which is often opaque like
         // "Failed to fetch" in Chrome or empty in Firefox).
@@ -235,7 +235,7 @@ async fn send_http_request<T: Serialize>(url: &str, body: &T) -> Result<AuthResp
 
   // Cancel the pending abort -- we finished in time.
   window.clear_timeout_with_handle(timeout_id);
-  // Explicitly drop the closure so WASM heap memory is reclaimed (Opt-C).
+  // Explicitly drop the closure so WASM heap memory is reclaimed.
   drop(timeout_cb);
 
   let response_value = fetch_result?;
@@ -260,7 +260,7 @@ async fn send_http_request<T: Serialize>(url: &str, body: &T) -> Result<AuthResp
 
 /// Parse a successful (2xx) auth response body into an `AuthResponse`.
 ///
-/// Extracted as a pure function for testability (T5 extraction).
+/// Extracted as a pure function for testability.
 fn parse_auth_success_response(body: &str) -> Result<AuthResponse, String> {
   serde_json::from_str::<AuthResponse>(body)
     .map_err(|e| format!("Failed to parse auth response: {} (body: {})", e, body))
@@ -268,7 +268,7 @@ fn parse_auth_success_response(body: &str) -> Result<AuthResponse, String> {
 
 /// Parse a non-2xx auth response body into an error message string.
 ///
-/// Extracted as a pure function for testability (T5 extraction).
+/// Extracted as a pure function for testability.
 fn parse_auth_error_response(body: &str, status: u16) -> String {
   let error_response = serde_json::from_str::<AuthErrorResponse>(body);
   error_response

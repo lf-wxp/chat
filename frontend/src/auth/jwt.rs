@@ -35,7 +35,7 @@ fn decode_jwt_payload(token: &str) -> Option<String> {
 /// Check whether a decoded JWT payload has expired.
 ///
 /// Pure Rust — does not depend on browser APIs and can be fully unit
-/// tested on native targets (Issue-3 fix).
+/// tested on native targets.
 ///
 /// # Arguments
 ///
@@ -48,7 +48,7 @@ fn decode_jwt_payload(token: &str) -> Option<String> {
 /// - Missing `exp` → treated as non-expiring (server has final say).
 /// - Non-numeric `exp` → treated as expired (fail-safe).
 /// - `nbf` claim is honoured with a [`JWT_CLOCK_SKEW_SECS`]-second grace
-///   window to tolerate minor client/server clock drift (P1-3 fix).
+///   window to tolerate minor client/server clock drift.
 pub(crate) fn is_payload_expired(payload: &str, now_secs: u64) -> bool {
   let parsed: serde_json::Value = match serde_json::from_str(payload) {
     Ok(v) => v,
@@ -59,7 +59,7 @@ pub(crate) fn is_payload_expired(payload: &str, now_secs: u64) -> bool {
   // not yet valid; treat it as "expired" so the caller clears it. We
   // allow up to `JWT_CLOCK_SKEW_SECS` of client clock drift to avoid
   // rejecting tokens simply because the browser clock is a few seconds
-  // ahead of the server (P1-3 fix).
+  // ahead of the server.
   if let Some(nbf_val) = parsed.get("nbf")
     && let Some(nbf_secs) = nbf_val
       .as_u64()
@@ -71,7 +71,7 @@ pub(crate) fn is_payload_expired(payload: &str, now_secs: u64) -> bool {
 
   // Only accept numeric `exp` claims. A string, boolean, or missing-but-
   // typed-wrong value is treated as expired so we never forward a token
-  // the server would certainly reject (R2-Issue-9 hardening).
+  // the server would certainly reject.
   match parsed.get("exp") {
     Some(v) => match v.as_u64().or_else(|| v.as_f64().map(|f| f as u64)) {
       Some(exp_secs) => exp_secs <= now_secs,

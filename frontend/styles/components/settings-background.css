@@ -1,0 +1,172 @@
+/**
+ * Settings → Background section (plan §7.3 / batch 7).
+ *
+ * Styles for the BackgroundSection component hosted inside the
+ * settings drawer. Built on top of the existing `.settings-*`
+ * layout primitives so the visual language stays consistent with
+ * AppearanceSection.
+ */
+
+/* ── Stacked row variant ──
+ * Most settings rows are two-column (label | control). The image
+ * upload group spans multiple lines (label, buttons, hint, error)
+ * so it needs a stacked layout. The `--stacked` modifier opts in
+ * without forking the base row class.
+ */
+.settings-row--stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2, 0.5rem);
+}
+
+/* ── Solid colour picker ── */
+.bg-section__color-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+}
+
+.bg-section__color-input {
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  padding: 0;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-md, 0.375rem);
+  background: transparent;
+  cursor: pointer;
+}
+
+.bg-section__color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.bg-section__color-input::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-md, 0.375rem) - 2px);
+}
+
+.bg-section__color-value {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-xs, 0.75rem);
+  color: var(--text-secondary, #475569);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* ── Image upload ── */
+.bg-section__upload-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+}
+
+.bg-section__upload-label {
+  position: relative;
+  /* The native file input sits on top of this label so clicking the
+   * label opens the picker. Visually, the label reads as a button. */
+}
+
+.bg-section__file-input {
+  /* Hide the default file control — the surrounding label is the
+   * styled button the user actually clicks. Keeping the input in
+   * the DOM (not display: none) preserves keyboard accessibility. */
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.bg-section__upload-error {
+  margin: 0;
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border-radius: var(--radius-md, 0.375rem);
+  background: color-mix(in oklch, var(--color-error, #ef4444) 12%, transparent);
+  color: var(--color-error, #ef4444);
+  font-size: var(--font-sm, 0.875rem);
+}
+
+/* ── Range sliders ── */
+.bg-section__slider-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+  inline-size: 100%;
+  max-inline-size: 20rem;
+}
+
+.bg-section__slider {
+  flex: 1 1 auto;
+  appearance: none;
+  block-size: 4px;
+  background: var(--bg-tertiary, #f1f5f9);
+  border-radius: var(--radius-full, 9999px);
+  cursor: pointer;
+  outline: none;
+}
+
+.bg-section__slider:focus-visible {
+  outline: 2px solid var(--color-primary, #3b82f6);
+  outline-offset: 4px;
+}
+
+.bg-section__slider::-webkit-slider-thumb {
+  appearance: none;
+  inline-size: 1rem;
+  block-size: 1rem;
+  border-radius: var(--radius-full, 9999px);
+  background: var(--color-primary, #3b82f6);
+  border: 2px solid var(--bg-primary, #ffffff);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition:
+    transform var(--duration-fast, 150ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    box-shadow var(--duration-fast, 150ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+
+.bg-section__slider::-moz-range-thumb {
+  inline-size: 1rem;
+  block-size: 1rem;
+  border-radius: var(--radius-full, 9999px);
+  background: var(--color-primary, #3b82f6);
+  border: 2px solid var(--bg-primary, #ffffff);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+
+.bg-section__slider:hover::-webkit-slider-thumb {
+  transform: scale(1.1);
+  box-shadow: var(--glow-primary);
+}
+
+.bg-section__slider-value {
+  min-inline-size: 3ch;
+  font-size: var(--font-sm, 0.875rem);
+  color: var(--text-secondary, #475569);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+/* ── Reset button ── */
+.bg-section__reset {
+  margin-inline-start: auto;
+  color: var(--color-error, #ef4444);
+}
+
+.bg-section__reset:hover {
+  background: color-mix(in oklch, var(--color-error, #ef4444) 10%, transparent);
+  color: var(--color-error, #ef4444);
+}
+
+/* ── Small-screen adjustments ── */
+@media (max-width: 640px) {
+  .bg-section__slider-wrapper {
+    max-inline-size: 100%;
+  }
+  .bg-section__reset {
+    margin-inline-start: 0;
+    inline-size: 100%;
+    justify-content: center;
+  }
+}

@@ -1,0 +1,237 @@
+/**
+ * Animation utilities.
+ *
+ * Two kinds of declarations live here:
+ *   1. `@keyframes` — named motion primitives. Four legacy names
+ *      (`fade-in-up`, `fade-in`, `slide-in-left`, `slide-in-bottom`)
+ *      are kept **byte-identical** to their previous definitions in
+ *      main.css so existing call-sites keep working after migration.
+ *   2. `.anim-*` utility classes — opt-in wrappers component CSS can
+ *      apply directly on elements.
+ *
+ * Accessibility:
+ *   - `prefers-reduced-motion: reduce` collapses every animation /
+ *     transition to a near-instant step.
+ *   - `html[data-motion="off"]` mirrors the in-app "Enable motion"
+ *     toggle, so users who opt out get the same treatment even if
+ *     their OS does not advertise a preference.
+ */
+
+/* ── Legacy keyframes (migrated from main.css — do not rename) ── */
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-bottom {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* ── New keyframes ── */
+
+@keyframes scale-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slide-up-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Primary-tinted ambient pulse for focus / selected indicators. */
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgb(59 130 246 / 0.0),
+      0 0 8px 0 rgb(59 130 246 / 0.20);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgb(59 130 246 / 0.25),
+      0 0 20px 4px rgb(59 130 246 / 0.45);
+  }
+}
+
+/* Gentle breathing for avatar status dots / live badges. */
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+/* Diagonal highlight sweep across the element. Pairs with
+ * `.anim-shimmer`; the ::after pseudo-element carries the gradient. */
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Vertical accent line sliding through a selected list item. Pairs
+ * with `.anim-stream-line`. */
+@keyframes stream-line {
+  0% {
+    background-position: 0% -100%;
+  }
+  100% {
+    background-position: 0% 200%;
+  }
+}
+
+/* Slow conic / radial drift used by the app background. */
+@keyframes bg-drift {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(0, -1%, 0) rotate(1deg); }
+  100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+}
+
+/* ── Utility classes ── */
+
+.anim-fade-in {
+  animation: fade-in var(--duration-normal) var(--ease-out-expo) both;
+}
+
+.anim-fade-in-up {
+  animation: fade-in-up var(--duration-slow) var(--ease-out-expo) both;
+}
+
+.anim-pop-in {
+  animation: scale-pop-in var(--duration-slow) var(--ease-spring) both;
+}
+
+.anim-slide-up {
+  animation: slide-up-in var(--duration-slow) var(--ease-out-expo) both;
+}
+
+.anim-slide-in-left {
+  animation: slide-in-left var(--duration-normal) var(--ease-out-expo) both;
+}
+
+.anim-slide-in-bottom {
+  animation: slide-in-bottom var(--duration-normal) var(--ease-out-expo) both;
+}
+
+.anim-glow-pulse {
+  animation: glow-pulse var(--duration-glow) ease-in-out infinite;
+}
+
+.anim-breathe {
+  animation: breathe 2400ms ease-in-out infinite;
+}
+
+/* Shimmer must sit on a positioned host. The `::after` carries the
+ * gradient strip so the host can still hold its own content. */
+.anim-shimmer {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.anim-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--shimmer-gradient);
+  background-size: 200% 100%;
+  animation: shimmer var(--duration-shimmer) linear infinite;
+  z-index: 1;
+}
+
+/* Flowing accent on the leading edge. Caller must provide
+ * `position: relative`; the ::before places a 2px vertical strip. */
+.anim-stream-line {
+  position: relative;
+}
+.anim-stream-line::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background:
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      var(--color-primary) 50%,
+      transparent 100%
+    );
+  background-size: 100% 300%;
+  animation: stream-line 3s linear infinite;
+  pointer-events: none;
+}
+
+/* ── Motion opt-out ──
+ * The `html[data-motion="off"]` selector reacts to the in-app toggle;
+ * the media query covers OS-level preferences.
+ */
+html[data-motion="off"] *,
+html[data-motion="off"] *::before,
+html[data-motion="off"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

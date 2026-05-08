@@ -20,11 +20,30 @@ use web_sys::{Blob, BlobPropertyBag, HtmlElement, Url};
 /// "preserving user preference settings"). Anything not prefixed by
 /// one of these is considered non-critical and will be purged.
 ///
-/// Note: the historical `user_settings` key (pre-`settings_` prefix
-/// migration) is intentionally **not** in this list — the settings
-/// module one-shot-imports it on startup and then drops it, so
-/// keeping it whitelisted here would only confuse readers into
-/// thinking we still write to it.
+/// ## Layout summary (Storage Audit S6)
+///
+/// | Prefix | Examples | Why preserved |
+/// |---|---|---|
+/// | `auth_` | `auth_token`, `auth_user_id`, `auth_username`, `auth_nickname`, `auth_avatar`, `auth_signature` | Login session — clearing would force re-login |
+/// | `theme` | `theme` (legacy), `settings_theme` matched via `settings_` | User-visible preference |
+/// | `locale` | `locale` (legacy), `settings_locale` matched via `settings_` | User-visible preference |
+/// | `blacklist` | `blacklist` | User intent — must survive cache wipes |
+/// | `pinned_` | (reserved for future) | Per-conversation pin metadata |
+/// | `settings_` | `settings_user`, `settings_theme`, `settings_locale`, `settings_theater_overlay` | Unified user-preferences namespace |
+///
+/// ## Intentionally NOT preserved
+///
+/// * `debug_*` — developer tooling state (debug mode flag, log
+///   buffer size, module filter). The "Clear cache" action exists
+///   precisely so users can reset to a known-good state, including
+///   developer overrides.
+/// * `conversations` — sidebar skeleton rebuilt from IDB on next
+///   sign-in.
+/// * `active_conversation_id` / `active_room_id` / `active_call` —
+///   transient navigation state, restored from server data after
+///   reconnect.
+/// * `user_settings` (legacy, pre-migration) — already deleted on
+///   first launch by the settings module.
 pub(super) const PRESERVED_STORAGE_PREFIXES: &[&str] = &[
   "auth_",
   "theme",
@@ -93,8 +112,7 @@ pub(super) fn trigger_download(filename: &str, mime: &str, content: &str) {
   link.click();
   let url_for_revoke = url.clone();
   // 5 s delay — Firefox initiates downloads asynchronously, so a
-  // 0 ms revoke can race and produce a "network error" download
-  // (Bug-2 from code review).
+  // 0 ms revoke can race and produce a "network error" download.
   let _ = crate::utils::set_timeout_once(5_000, move || {
     let _ = Url::revoke_object_url(&url_for_revoke);
   });
@@ -369,12 +387,25 @@ pub(super) async fn clear_all_history(
 }
 
 /// Refresh the storage-usage estimate via `navigator.storage.estimate()`.
+///
+/// Uses `try_set` because the async task may resolve after the
+/// calling component (`DataManagementSection`) has been unmounted —
+/// e.g. when the user closes the settings drawer while the
+/// `estimate()` promise is in flight. A plain `set()` on a disposed
+/// signal panics with `panic_already_borrowed` /
+/// `reactive_graph::traits::Get::get::{{closure}}` inside the
+/// `wasm_bindgen_futures` task; `try_set` silently skips the update
+/// when the signal is no longer valid.
 pub(super) fn refresh_storage_estimate(target: RwSignal<Option<(u64, u64)>>) {
   #[cfg(target_arch = "wasm32")]
   spawn_local(async move {
     match crate::persistence::idb::estimate_storage().await {
-      Ok(pair) => target.set(Some(pair)),
-      Err(_) => target.set(None),
+      Ok(pair) => {
+        let _ = target.try_set(Some(pair));
+      }
+      Err(_) => {
+        let _ = target.try_set(None);
+      }
     }
   });
   #[cfg(not(target_arch = "wasm32"))]
@@ -385,3 +416,5 @@ pub(super) fn refresh_storage_estimate(target: RwSignal<Option<(u64, u64)>>) {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod wasm_tests;

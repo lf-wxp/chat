@@ -21,6 +21,7 @@ mod announcement_editor;
 mod announcement_panel;
 pub(crate) mod confirm_dialog;
 mod create_room_modal;
+pub(crate) mod global_modal_context;
 mod incoming_room_invite_modal;
 mod invite_member_modal;
 mod member_context_menu;
@@ -42,6 +43,7 @@ mod tests;
 
 pub use announcement_panel::AnnouncementPanel;
 pub use create_room_modal::{CreateRoomModal, CreateRoomRequest};
+pub use global_modal_context::GlobalRoomModalState;
 pub use incoming_room_invite_modal::IncomingRoomInviteModal;
 pub use member_list::MemberListPanel;
 pub use muted_indicator::MutedIndicator;

@@ -139,8 +139,8 @@ pub async fn load_all(db: &IdbDatabase, limit: usize) -> IdbResult<Vec<MessageRe
 
 /// Load messages with `timestamp_ms` >= `from_ts` across every
 /// conversation, ordered ascending. Used for streaming index rebuild
-/// so the entire store is never materialised in memory at once
-/// (BUG-5 / OOM fix).  Callers must deduplicate the last record of
+/// so the entire store is never materialised in memory at once.
+/// Callers must deduplicate the last record of
 /// the previous batch since it will appear again as the first record
 /// of the next batch.
 pub async fn load_all_from(

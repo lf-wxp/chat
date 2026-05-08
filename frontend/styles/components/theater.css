@@ -34,26 +34,67 @@
 
 .theater-copyright__tooltip {
   position: absolute;
-  bottom: calc(100% + .5rem);
+  /* Anchor the tooltip beneath the icon. Copyright sits near the top
+     of the stage where the application top-bar would clip an
+     upward-opening tooltip, so we flip it to open downward. */
+  top: calc(100% + .5rem);
+  bottom: auto;
   left: 0;
   max-width: 20rem;
   padding: var(--space-2, .5rem) var(--space-3, .75rem);
-  background: var(--bg-elevated, #1f2937);
-  color: var(--text-inverse, #f8fafc);
+  /* Dark-only glass so the tooltip reads consistently against both
+   * the dark video surface and the lighter theater page chrome
+   * regardless of the user's theme preference. This is the reason
+   * we don't route this class through the glass.css bridge — the
+   * bridge's L4 tokens follow the active theme. */
+  background: rgb(15 23 42 / 0.82);
+  backdrop-filter: blur(var(--glass-blur-lg, 20px)) saturate(var(--glass-saturate, 180%));
+  -webkit-backdrop-filter: blur(var(--glass-blur-lg, 20px)) saturate(var(--glass-saturate, 180%));
+  color: #f8fafc;
+  border: 1px solid rgb(255 255 255 / 0.10);
   border-radius: var(--radius-md, 6px);
   font-size: var(--font-xs, .75rem);
   line-height: 1.4;
   white-space: normal;
   opacity: 0;
+  transform: translateY(-4px) scale(0.96);
   pointer-events: none;
-  transition: opacity var(--duration-fast, 150ms) ease;
+  transition:
+    opacity var(--duration-fast, 150ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    transform var(--duration-slow, 300ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
   z-index: var(--z-tooltip, 60);
-  box-shadow: var(--shadow-md, 0 4px 12px rgb(0 0 0 / .15));
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.08),
+    0 8px 24px -6px rgb(0 0 0 / 0.55);
 }
 
+/* Capability fallback for the tooltip — if backdrop-filter is
+ * unavailable, fall back to an opaque dark chrome so the tooltip
+ * never becomes unreadable. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .theater-copyright__tooltip {
+    background: #1f2937;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* User opt-out for the tooltip — mirrors the html[data-glass="off"]
+ * switch so users who disabled the glass effect still get a solid
+ * dark chrome instead of a translucent panel. */
+html[data-glass="off"] .theater-copyright__tooltip {
+  background: #1f2937;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Show the tooltip when the copyright icon is hovered or receives
+ * keyboard focus. Transform is nudged to its resting position to
+ * pair with the spring-easing transition declared above. */
 .theater-copyright:hover .theater-copyright__tooltip,
 .theater-copyright:focus-visible .theater-copyright__tooltip {
   opacity: 1;
+  transform: translateY(0) scale(1);
 }
 
 /* ── Create-theater hint (inside CreateRoomModal) ── */
@@ -97,7 +138,8 @@
 }
 
 .theater-video-player__waiting {
-  color: var(--text-inverse, #f8fafc);
+  /* Drawn on pure black stage — keep explicit light color. */
+  color: #f8fafc;
   font-size: var(--font-sm, .875rem);
   padding: var(--space-4, 1rem);
   text-align: center;
@@ -110,20 +152,23 @@
   margin: 0;
   padding: var(--space-1, .25rem) var(--space-2, .5rem);
   background: rgb(0 0 0 / .55);
-  color: var(--text-inverse, #f8fafc);
+  /* Overlayed on dark video — keep explicit light color. */
+  color: #f8fafc;
   font-size: var(--font-xs, .75rem);
   border-radius: var(--radius-sm, 4px);
 }
 
 /* ── Video source picker ── */
 .theater-source-picker {
-  inline-size: min(32rem, 100%);
+  inline-size: 100%;
+  max-inline-size: 32rem;
   display: flex;
   flex-direction: column;
   gap: var(--space-3, .75rem);
   padding: var(--space-4, 1rem);
-  background: var(--bg-elevated, #1f2937);
-  color: var(--text-inverse, #f8fafc);
+  background: var(--bg-secondary, #f1f5f9);
+  color: var(--text-primary, #0f172a);
+  border: 1px solid var(--border-color, #e2e8f0);
   border-radius: var(--radius-md, 6px);
 }
 
@@ -152,17 +197,19 @@
   align-items: center;
   gap: var(--space-1, .25rem);
   padding: var(--space-3, .75rem);
-  background: rgb(255 255 255 / .08);
+  background: var(--bg-primary, #ffffff);
   color: inherit;
-  border: 1px solid rgb(255 255 255 / .12);
+  border: 1px solid var(--border-color, #e2e8f0);
   border-radius: var(--radius-md, 6px);
   cursor: pointer;
-  transition: background-color var(--duration-fast, 150ms) ease;
+  transition: background-color var(--duration-fast, 150ms) ease,
+    border-color var(--duration-fast, 150ms) ease;
 }
 
 .theater-source-picker__option:hover,
 .theater-source-picker__option:focus-visible {
-  background: rgb(255 255 255 / .16);
+  background: color-mix(in oklch, var(--color-primary, #3b82f6) 8%, var(--bg-primary, #fff));
+  border-color: color-mix(in oklch, var(--color-primary, #3b82f6) 40%, var(--border-color, #e2e8f0));
 }
 
 .theater-source-picker__option svg {
@@ -196,8 +243,10 @@
   gap: var(--space-2, .5rem);
   padding: var(--space-2, .5rem) var(--space-3, .75rem);
   background: color-mix(in oklch, #000 70%, transparent);
-  color: var(--text-inverse, #f8fafc);
+  /* Overlayed on translucent dark bar — keep explicit light color. */
+  color: #f8fafc;
   border-radius: var(--radius-md, 6px);
+  flex-wrap: wrap;
 }
 
 .theater-playback-controls__time {
@@ -253,13 +302,15 @@
   white-space: pre-line;
 }
 
-/* ── Subtitle settings panel ── */
+/* ── Subtitle settings panel ──
+ * Background / border / shadow are owned by the `effects` layer
+ * (glass.css — `.glass-l4` bridge). Only layout tokens remain here.
+ */
 .subtitle-settings {
   display: flex;
   flex-direction: column;
   gap: var(--space-3, .75rem);
   padding: var(--space-4, 1rem);
-  background: var(--bg-secondary, #f1f5f9);
   border-radius: var(--radius-md, 6px);
 }
 
@@ -387,8 +438,9 @@
   flex-direction: column;
   gap: var(--space-2, .5rem);
   padding: var(--space-3, .75rem);
-  background: var(--bg-elevated, #1f2937);
-  color: var(--text-inverse, #f8fafc);
+  background: var(--bg-secondary, #f1f5f9);
+  color: var(--text-primary, #0f172a);
+  border: 1px solid var(--border-color, #e2e8f0);
   border-radius: var(--radius-md, 6px);
 }
 
@@ -446,13 +498,15 @@
   font-size: var(--font-sm, .875rem);
 }
 
-/* ── Danmaku settings panel ── */
+/* ── Danmaku settings panel ──
+ * Background / border / shadow are owned by the `effects` layer
+ * (glass.css — `.glass-l4` bridge). Only layout tokens remain here.
+ */
 .danmaku-settings {
   display: flex;
   flex-direction: column;
   gap: var(--space-3, .75rem);
   padding: var(--space-4, 1rem);
-  background: var(--bg-secondary, #f1f5f9);
   border-radius: var(--radius-md, 6px);
 }
 
@@ -568,12 +622,14 @@
   max-inline-size: 90%;
   padding: var(--space-2, .5rem) var(--space-3, .75rem);
   border-radius: var(--radius-md, 6px);
-  background: var(--bg-elevated, #1f2937);
-  color: var(--text-inverse, #f8fafc);
+  background: var(--bg-primary, #ffffff);
+  color: var(--text-primary, #0f172a);
+  border: 1px solid var(--border-color, #e2e8f0);
   align-self: flex-start;
   display: flex;
   flex-direction: column;
   gap: var(--space-1, .25rem);
+  overflow-wrap: anywhere;
 }
 
 .theater-chat-bubble--self {
@@ -676,7 +732,11 @@
   min-block-size: 0;
   padding: var(--space-4, 1rem);
   gap: var(--space-3, .75rem);
-  overflow: hidden;
+  /* Clip horizontal overflow only so the internal grid cannot widen
+     the viewport, while still letting vertical content scroll when
+     the stage + owner panels exceed the available height. */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .theater-page--fullscreen {
@@ -703,11 +763,29 @@
 }
 
 .theater-page__body {
-  flex: 1;
+  /* `flex: 1 0 auto` lets the grid grow past the viewport when panels
+     (subtitle/danmaku settings, chat list) are taller than the stage.
+     The outer .theater-page owns overflow-y: auto so the page keeps a
+     single, predictable scrollbar instead of nested clipping. */
+  flex: 1 0 auto;
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(18rem, 1fr);
+  /* Tracks size to content; without this the implicit single row would
+     be clamped to body’s box height and crush the stage column. */
+  grid-template-rows: auto;
+  grid-auto-rows: minmax(0, auto);
+  align-items: start;
   gap: var(--space-3, .75rem);
   min-block-size: 0;
+  /* Prevent grid tracks from being expanded by intrinsic min-content sizes. */
+  min-inline-size: 0;
+}
+
+.theater-page__body > * {
+  /* flex/grid items default to min-content; force shrink-to-fit on
+     narrow screens so children (video, source picker, chat list) can
+     properly clamp to the viewport instead of overflowing. */
+  min-inline-size: 0;
 }
 
 .theater-page--fullscreen .theater-page__body {
@@ -719,16 +797,93 @@
   flex-direction: column;
   gap: var(--space-2, .5rem);
   min-block-size: 0;
+  /* Allow the stage column to expand past the viewport — the ancestor
+     .theater-page owns the scroll — so composer / subtitle / danmaku
+     settings remain reachable on narrow layouts. */
+  min-inline-size: 0;
+  /* Host for the ambient-glow ::before layer below. `isolation:
+   * isolate` keeps the glow inside this stacking context so it
+   * cannot paint over the .theater-page__side column, and it stays
+   * strictly beneath .theater-page__surface (which already owns its
+   * own `isolation: isolate` and an opaque `background: #000`, so
+   * no glow pixels ever reach the decoded video frames — respecting
+   * the red-line in plan §2.2). */
+  position: relative;
+  isolation: isolate;
+}
+
+/* Theater ambient glow (MVP batch 10).
+ *
+ * A soft, slowly pulsing halo sits behind the stage column so the
+ * theater page has a "live performance" feel without touching the
+ * video surface. The glow is pointer-transparent and capped to the
+ * upper half of the stage so it never overlaps the composer area.
+ *
+ * Performance:
+ *   * `z-index: -1` so it stays behind all real content.
+ *   * `will-change: opacity` (not transform) — we only pulse alpha.
+ *   * Animation is disabled by the global `html[data-motion="off"]`
+ *     selector and `prefers-reduced-motion` rules in animations.css.
+ */
+.theater-page__stage::before {
+  content: '';
+  position: absolute;
+  inset: -6% -8% auto -8%;
+  block-size: 55%;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(
+      ellipse at 50% 0%,
+      rgb(59 130 246 / 0.22),
+      transparent 65%
+    ),
+    radial-gradient(
+      ellipse at 80% 20%,
+      rgb(168 85 247 / 0.16),
+      transparent 60%
+    );
+  filter: blur(12px);
+  opacity: 0.9;
+  animation: glow-pulse var(--duration-glow, 2400ms) ease-in-out infinite;
+  will-change: opacity;
+}
+
+/* Fullscreen mode: hide the ambient glow. In fullscreen the surface
+ * covers the stage column entirely and `.theater-page--fullscreen`
+ * already paints a pure-black backdrop — the halo would either be
+ * invisible or would leak a purple/blue tint around the video. */
+.theater-page--fullscreen .theater-page__stage::before {
+  display: none;
+}
+
+/* User motion opt-out — pair with the global data-motion="off"
+ * override so the halo stays static when the user disables ambient
+ * animation without also losing the colour wash. */
+html[data-motion="off"] .theater-page__stage::before {
+  animation: none;
+  opacity: 0.65;
 }
 
 .theater-page__surface {
   position: relative;
-  flex: 1;
+  /* Default to a reasonable intrinsic height so the surface does not
+     eat every pixel of the stage column and push subtitle/danmaku
+     settings below the fold. Fullscreen mode overrides this to fill
+     the viewport. */
+  flex: 0 0 auto;
+  block-size: clamp(18rem, 42vh, 34rem);
   min-block-size: 16rem;
   background: #000;
   border-radius: var(--radius-md, 6px);
   overflow: hidden;
   isolation: isolate;
+}
+
+.theater-page--fullscreen .theater-page__surface {
+  /* Fullscreen still wants the surface to dominate the viewport. */
+  flex: 1 1 auto;
+  block-size: auto;
 }
 
 .theater-page__composer {
@@ -840,13 +995,52 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Medium viewports: keep the main body grid (video + side panel) but
+   stack the owner-only subtitle/danmaku settings so neither box gets
+   squeezed below a readable width. 1024px matches the breakpoint at
+   which the side chat panel column starts to look cramped. */
+@media (max-width: 1024px) {
+  .theater-page__owner-panels {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 768px) {
+  .theater-page {
+    padding: var(--space-2, .5rem);
+  }
   .theater-page__body {
     grid-template-columns: 1fr;
     grid-auto-rows: minmax(0, auto);
   }
   .theater-page__owner-panels {
     grid-template-columns: 1fr;
+  }
+  .theater-source-picker {
+    max-inline-size: 100%;
+    padding: var(--space-3, .75rem);
+  }
+  .theater-source-picker__options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .theater-playback-controls {
+    padding: var(--space-1, .25rem) var(--space-2, .5rem);
+    gap: var(--space-1, .25rem);
+  }
+  .theater-playback-controls__volume {
+    inline-size: 4rem;
+  }
+  /* On phone-sized viewports the Chat/Viewers side column is tall and
+     pushes the settings off-screen. Force the video surface to a
+     reasonable height so the page-level scroll can reveal everything
+     below without collapsing the video. */
+  .theater-page__surface {
+    flex: 0 0 auto;
+    block-size: min(56vw, 18rem);
+    min-block-size: 12rem;
+  }
+  .theater-page__side {
+    min-block-size: 24rem;
   }
 }
 

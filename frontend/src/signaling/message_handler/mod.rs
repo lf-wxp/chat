@@ -17,7 +17,7 @@ use crate::state::AppState;
 /// callbacks (which run outside the Leptos reactive owner) can show
 /// error toasts without calling `use_error_toast_manager()` /
 /// `expect_context` (which would panic). The caller should pass the
-/// cached `SignalingClient::error_toast` reference (Review-P0 fix).
+/// cached `SignalingClient::error_toast` reference.
 pub fn handle_signaling_message(
   msg: SignalingMessage,
   app_state: AppState,
@@ -38,7 +38,7 @@ pub fn handle_signaling_message(
         if let Some(user) = users.iter_mut().find(|u| u.user_id == change.user_id) {
           user.status = change.status;
         } else {
-          // P1-8 fix: If the user is not in the list yet (e.g. due to
+          // If the user is not in the list yet (e.g. due to
           // message reordering where UserStatusChange arrives before
           // UserListUpdate), add a minimal placeholder entry so the
           // status is not lost. The next UserListUpdate from the server
@@ -107,7 +107,7 @@ pub fn handle_signaling_message(
     SignalingMessage::RoomCreated(created) => {
       log_debug(&format!("RoomCreated: room_id={}", created.room_id));
       // Persist the active room so page refreshes can auto-rejoin it
-      // (Req 10.4, R2-Issue-1 fix).
+      // (Req 10.4).
       crate::auth::save_active_room_id(Some(&created.room_id.to_string()));
       // The creator is automatically a member — materialise the room
       // conversation and switch to it so the chat view is shown.
@@ -116,13 +116,13 @@ pub fn handle_signaling_message(
     SignalingMessage::RoomJoined(joined) => {
       log_debug(&format!("RoomJoined: room_id={}", joined.room_id));
       // Persist the active room so the user is auto-rejoined after a
-      // refresh or reconnect (Req 10.4, R2-Issue-1 fix).
+      // refresh or reconnect (Req 10.4).
       crate::auth::save_active_room_id(Some(&joined.room_id.to_string()));
 
       // A successful rejoin closes the recovery window that was left
       // open by `handle_auth_success` when it sent `JoinRoom` on our
       // behalf. Hide the "Restoring connections..." banner now so the
-      // UX does not appear stuck (Req 10.11.42, R2-Issue-4 fix).
+      // UX does not appear stuck (Req 10.11.42).
       app_state.reconnecting.set(false);
 
       // Materialise the room conversation (if not yet present) and
@@ -135,7 +135,7 @@ pub fn handle_signaling_message(
         left.room_id, left.room_destroyed
       ));
       // Clear the persisted room pointer so we do not try to rejoin a
-      // room the user explicitly left (Req 10.4, R2-Issue-1 fix).
+      // room the user explicitly left (Req 10.4).
       crate::auth::save_active_room_id(None);
       // Remove the room conversation entry and clear the active
       // conversation so the UI falls back to the room list panel.
@@ -168,7 +168,7 @@ pub fn handle_signaling_message(
       // Any error from the Room (ROM) module indicates the previous room
       // state is no longer valid (room destroyed, permission denied,
       // server restart, etc.). Clear the pointers so we do not keep
-      // retrying with stale data (Review-P1 fix).
+      // retrying with stale data.
       let is_room_error = error.code.module == message::error::ErrorModule::Rom;
       let has_active_room = crate::auth::load_active_room_id().is_some();
       let code_str = error.code.to_code_string();
@@ -192,7 +192,7 @@ pub fn handle_signaling_message(
           error_toast.show_error(&error);
         }
       } else if code_str == "SIG004" {
-        // Bug-6 fix: dedicated copy explaining that the server still
+        // Dedicated copy explaining that the server still
         // remembers a pending invite from a prior session even though
         // our local UI no longer shows the "Inviting…" state.
         error_toast.show_error_message_with_key(
@@ -325,7 +325,7 @@ pub fn handle_signaling_message(
     // ── Peer Tracking ──
     SignalingMessage::PeerEstablished(peer) => {
       log_debug(&format!("PeerEstablished: {} <-> {}", peer.from, peer.to));
-      // Bug-1 fix (responder side): in a bidirectional merge the server
+      // In a bidirectional merge the server
       // sends `InviteAccepted` only to the elected initiator. The
       // responder receives `PeerEstablished` without ever seeing
       // `InviteAccepted`, so the outbound invite would remain in the
@@ -445,7 +445,7 @@ pub fn handle_signaling_message(
     SignalingMessage::NicknameChange(msg) => {
       log_debug(&format!("NicknameChange: user_id={}", msg.user_id));
       // Update the nickname in the online users list so the UI reflects
-      // the change immediately (P2-6 fix). Previously this was deferred
+      // the change immediately. Previously this was deferred
       // to task-17, but nickname is part of user info and should be kept
       // in sync as part of the user status management (Req 10.1.5/6).
       app_state.online_users.update(|users| {
@@ -508,14 +508,22 @@ pub fn handle_signaling_message(
     }
 
     // ── Auth messages handled in connection.rs ──
+    //
+    // The outer message loop already dispatches authentication and
+    // heartbeat traffic through `connection.rs`. When a copy bubbles
+    // up to this generic dispatcher it is simply a no-op — we swallow
+    // Ping/Pong silently (they arrive on a 30s timer and would flood
+    // the console otherwise) and only trace the genuinely unexpected
+    // auth frames at debug level.
+    SignalingMessage::Ping(_) | SignalingMessage::Pong(_) => {
+      // Heartbeat echoes — intentionally silent.
+    }
     SignalingMessage::TokenAuth(_)
     | SignalingMessage::AuthSuccess(_)
     | SignalingMessage::AuthFailure(_)
     | SignalingMessage::UserLogout(_)
-    | SignalingMessage::Ping(_)
-    | SignalingMessage::Pong(_)
     | SignalingMessage::SessionInvalidated(_) => {
-      log_debug("Unexpected auth/heartbeat message in dispatch");
+      log_debug("Unexpected auth message in dispatch");
     }
 
     // ── Room management (client → server) ──
@@ -567,11 +575,11 @@ where
 ///
 /// The `app_state` parameter is passed explicitly so that WebSocket callbacks
 /// (which run outside the Leptos reactive owner) can access it without calling
-/// `use_context` / `expect_context` (which would panic) (Review-P0 fix).
+/// `use_context` / `expect_context` (which would panic).
 ///
 /// `error_toast` is also passed in so we can surface a "video call is at
 /// capacity" notice when a recovery attempt is rejected by the mesh limit
-/// (Req 3.10 — P1 Bug-6 fix).
+/// (Req 3.10).
 fn recover_active_peers(
   peers: Vec<message::UserId>,
   app_state: AppState,
@@ -584,7 +592,7 @@ fn recover_active_peers(
     log_debug("[signaling] WebRtcManager not available for peer recovery");
     // Ensure the recovery banner does not stay on screen forever even
     // when the WebRtcManager has not been wired in yet (task 14
-    // stand-alone runs). R2-Issue-5 fix.
+    // stand-alone runs).
     app_state.reconnecting.set(false);
     return;
   };
@@ -595,7 +603,7 @@ fn recover_active_peers(
   // Attempting to connect to an offline peer wastes resources and produces
   // confusing console warnings.
   //
-  // Issue-3 fix: If the online_users list is empty (e.g. ActivePeersList
+  // If the online_users list is empty (e.g. ActivePeersList
   // arrived before the first UserListUpdate on a fast page refresh), skip
   // the filter entirely — assume all listed peers are potentially online
   // since the server just sent us this list. The WebRTC connection attempt
@@ -677,7 +685,7 @@ fn recover_active_peers(
 
       // Create a timeout promise that resolves after BATCH_TIMEOUT_MS.
       // We capture the setTimeout ID so we can cancel it once the
-      // batch completes early (Bug-C fix).
+      // batch completes early.
       let timeout_id: Rc<Cell<Option<i32>>> = Rc::new(Cell::new(None));
       let timeout_id_for_promise = Rc::clone(&timeout_id);
       let timeout_promise = js_sys::Promise::new(&mut |resolve, _reject| {
@@ -693,7 +701,7 @@ fn recover_active_peers(
       let race = js_sys::Promise::race(&js_sys::Array::of2(&batch_promise, &timeout_promise));
       let _ = wasm_bindgen_futures::JsFuture::from(race).await;
 
-      // Cancel the timeout if the batch finished first (Bug-C fix).
+      // Cancel the timeout if the batch finished first.
       if let Some(id) = timeout_id.get()
         && let Some(window) = web_sys::window()
       {
@@ -704,7 +712,7 @@ fn recover_active_peers(
     web_sys::console::log_1(&"[webrtc] Recovery complete".into());
 
     // Mark reconnecting as complete so the UI can hide the
-    // "Restoring connections…" banner (Req 10.11.42, P1 Bug-8 fix).
+    // "Restoring connections…" banner (Req 10.11.42).
     app_state.reconnecting.set(false);
 
     // After recovery, ECDH re-negotiation will happen automatically
@@ -712,7 +720,7 @@ fn recover_active_peers(
   });
 }
 
-// Re-export shared signaling log helpers (Opt-B).
+// Re-export shared signaling log helpers.
 use super::{log_debug, log_error, log_warn};
 
 /// Look up a display name for `user_id` in the online users directory,
@@ -825,7 +833,7 @@ fn handle_incoming_invite(invite: message::signaling::ConnectionInvite, app_stat
     && blacklist.is_blocked_untracked(&inviter)
   {
     // Reuse an already-armed timer for back-to-back invites from the
-    // same blocked inviter so we don't accumulate timers (P1 Bug-2 fix).
+    // same blocked inviter so we don't accumulate timers.
     if blacklist.has_pending_auto_decline(&inviter) {
       log_debug(&format!(
         "[invite] Auto-decline timer already armed for blocked user {inviter}, reusing"
@@ -857,7 +865,7 @@ fn handle_incoming_invite(invite: message::signaling::ConnectionInvite, app_stat
       {
         let now = chrono::Utc::now().timestamp_millis();
         // Resolve the display name from the online users directory
-        // (Opt-9 fix: previously this was `String::new()`, leaving
+        // (previously this was `String::new()`, leaving
         // the modal showing a bare user-id hash).
         let resolved_name = resolve_display_name(app_state_for_timer, &inviter_for_timer);
         // Only push to inbound queue if the inviter is still online

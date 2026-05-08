@@ -205,7 +205,7 @@ impl Default for LocalMediaState {
 /// post-accept (active) so [`crate::call::CallManager::resolve_recovery`]
 /// can restore the correct state machine node on refresh.
 ///
-/// Added for P1-New-2 fix: prior to this field the recovery path would
+/// Added for recovery: prior to this field the recovery path would
 /// blindly transition to `Active` even if the pre-refresh call was
 /// still ringing, which silently promoted an un-answered invite into
 /// a running call with no remote peers.
@@ -238,13 +238,56 @@ pub struct PersistedCallState {
   pub started_at_ms: i64,
   /// Whether the pre-refresh call was publishing a screen-share
   /// stream. The recovery flow uses this to restore the correct
-  /// media-state toggles on rejoin (P2-10 fix).
+  /// media-state toggles on rejoin.
   #[serde(default)]
   pub screen_sharing: bool,
   /// Pre-refresh call phase. `Active` for fully-accepted calls,
-  /// `Inviting` for pending outgoing invites (P1-New-2 fix).
+  /// `Inviting` for pending outgoing invites.
   #[serde(default)]
   pub phase: CallPhase,
+}
+
+/// Type of WebRTC connection underpinning a peer link.
+///
+/// Surfaced in the network-quality tooltip per Req 14.10.3 so users
+/// can distinguish a direct P2P path from a TURN-relayed fallback.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ConnectionType {
+  /// Connection candidate type could not be determined yet (e.g.
+  /// stats report did not yet include a nominated candidate pair).
+  #[default]
+  Unknown,
+  /// Direct host / srflx / prflx — packets flow peer-to-peer.
+  Direct,
+  /// Relayed via a TURN server — packets traverse the relay.
+  Relayed,
+}
+
+impl ConnectionType {
+  /// Map the `RTCIceCandidate.candidateType` string returned by
+  /// `getStats()` to a [`ConnectionType`]. Unknown values fall back
+  /// to [`ConnectionType::Unknown`].
+  #[must_use]
+  pub fn from_candidate_type(s: &str) -> Self {
+    match s {
+      "relay" => Self::Relayed,
+      "host" | "srflx" | "prflx" => Self::Direct,
+      _ => Self::Unknown,
+    }
+  }
+
+  /// Localisation-key suffix used by the network-quality tooltip.
+  /// The tooltip i18n key is composed as
+  /// `call.connection_type_<suffix>` so the locale files remain the
+  /// single source of truth for the user-facing label.
+  #[must_use]
+  pub const fn i18n_suffix(&self) -> &'static str {
+    match self {
+      Self::Direct => "direct",
+      Self::Relayed => "relayed",
+      Self::Unknown => "unknown",
+    }
+  }
 }
 
 /// A single `RTCPeerConnection::getStats()` sample for a peer.
@@ -257,6 +300,15 @@ pub struct NetworkStatsSample {
   pub rtt_ms: u64,
   /// Packet-loss percentage (0.0 – 100.0).
   pub loss_percent: f64,
+  /// Estimated outbound bandwidth in kilobits/second, or `None` when
+  /// the stats report does not yet include an available-bitrate
+  /// estimate (e.g. first sample after connection).
+  pub bandwidth_kbps: Option<u32>,
+  /// Connection topology (Direct / Relayed) inferred from the
+  /// nominated candidate pair. Defaults to
+  /// [`ConnectionType::Unknown`] when the candidate pair has not been
+  /// resolved yet.
+  pub connection_type: ConnectionType,
   /// Unix ms when this sample was taken.
   pub sampled_at_ms: i64,
 }
@@ -288,7 +340,7 @@ impl VideoProfile {
   /// 720p @ 30fps — the baseline profile mandated by Req 3.8c. Both
   /// `Excellent` and `Good` quality levels target this profile so the
   /// downgrader never speculatively pushes capture above what the
-  /// spec calls for (P2-4 fix; the previous `HIGH = 1080p` profile
+  /// spec calls for (the previous `HIGH = 1080p` profile
   /// was rejected on most mobile devices via `applyConstraints`,
   /// causing immediate fallback to `MEDIUM`).
   pub const HIGH: Self = Self {

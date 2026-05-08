@@ -96,7 +96,7 @@ pub fn CallControls() -> impl IntoView {
           }
           return;
         }
-        // P2-New-2 fix: pick the right `<video>` via the
+        // pick the right `<video>` via the
         // `data-pip-candidate` attribute set by `VideoTile`. The
         // selector priority is centralised in [`PIP_VIDEO_SELECTORS`]
         // so it stays resilient to styling changes and is testable.

@@ -79,7 +79,7 @@ impl OutgoingTransfer {
   }
 
   /// Update the per-peer progress entry after re-sending a chunk
-  /// during resume (P1-2 fix).
+  /// during resume.
   ///
   /// Unlike [`advance`](Self::advance), this does *not* add to
   /// `transferred_bytes` or `chunks_done` because those counters
@@ -128,7 +128,7 @@ impl OutgoingTransfer {
     self.progress.update(|p| {
       // Millisecond-precision instantaneous rate so we get a
       // meaningful speed reading even in the first second of a
-      // transfer (P0-2 fix from code review).
+      // transfer.
       let instantaneous = p.transferred_bytes * 1_000 / elapsed_ms;
       // EWMA: bytes_per_sec = α * instantaneous + (1 - α) * previous.
       // The smoothing factor α is configurable via `p.ewma_alpha`

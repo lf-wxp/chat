@@ -416,7 +416,7 @@ pub fn MemberListPanel(
             children=move |member: MemberInfo| {
               // Derive a reactive Signal<MemberInfo> from app state so
               // role / mute / nickname mutations reach this row even
-              // after the initial render (Req 15.5.39, BUG-02 fix).
+              // after the initial render (Req 15.5.39).
               let row_user_id = member.user_id.clone();
               let initial = member.clone();
               let row_user_id_for_member = row_user_id.clone();

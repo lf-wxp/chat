@@ -50,7 +50,7 @@ pub fn FileCard(
   message_id: MessageId,
   /// Whether the card belongs to an outgoing message.
   outgoing: bool,
-  /// Sender name for accessibility labels (P2-4 fix: String so
+  /// Sender name for accessibility labels. Uses `String` so
   /// dynamic names from `ChatMessage::sender_name` can be passed).
   #[prop(default = String::new())]
   sender_name: String,

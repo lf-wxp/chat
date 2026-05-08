@@ -4,7 +4,7 @@
 //! WebSocket alive and detects half-open connections when no `Pong`
 //! is received within the configured timeout window.
 //!
-//! Merging the two timers into one closure (P2-3 fix) avoids holding a
+//! Merging the two timers into one closure avoids holding a
 //! second WASM `Closure` on the JS heap and halves the interval bookkeeping.
 //! The earlier implementation used two separate intervals that both ran at
 //! [`HEARTBEAT_INTERVAL_MS`]; consolidating them has no behavioural impact
@@ -122,7 +122,7 @@ impl SignalingClient {
 
     // Clear the heartbeat interval so this callback won't fire again
     // during the short window before onclose. We don't drop the closure
-    // here because we're executing inside it (Bug-3 / Bug-A fix).
+    // here because we're executing inside it.
     {
       let mut inner = self.inner.borrow_mut();
       if let Some(id) = inner.heartbeat_id.take()
@@ -145,7 +145,7 @@ impl SignalingClient {
 
     // Drop the retained non-onclose closures from Inner so the WASM
     // heap memory is reclaimed immediately instead of waiting for the
-    // next connect() call to overwrite them (Bug-A fix).
+    // next connect() call to overwrite them.
     {
       let mut inner = self.inner.borrow_mut();
       inner.onopen = None;

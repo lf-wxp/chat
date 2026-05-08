@@ -43,6 +43,8 @@ pub fn detect_browser_locale() -> Locale {
 pub fn parse_locale(s: &str) -> Option<Locale> {
   if s.starts_with("zh") {
     Some(Locale::zh_CN)
+  } else if s.starts_with("es") {
+    Some(Locale::es)
   } else if s.starts_with("en") {
     Some(Locale::en)
   } else {
@@ -58,6 +60,7 @@ pub fn persist_locale(locale: Locale) {
     let locale_str = match locale {
       Locale::en => "en",
       Locale::zh_CN => "zh-CN",
+      Locale::es => "es",
     };
     let _ = storage.set_item("settings_locale", locale_str);
   }

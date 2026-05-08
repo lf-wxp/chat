@@ -4,6 +4,7 @@
 //! of the crate can import them via `crate::components::Foo` without
 //! needing to know the internal file layout.
 
+mod app_bg;
 mod auth;
 mod call;
 mod chat_view;
@@ -20,6 +21,7 @@ mod theater;
 mod toast_container;
 mod top_bar;
 
+pub use app_bg::AppBg;
 pub use auth::AuthPage;
 pub use call::CallOverlay;
 pub use chat_view::ChatView;
@@ -32,8 +34,8 @@ pub use home_page::HomePage;
 pub use modal_manager::ModalManager;
 pub use reconnect_banner::ReconnectBanner;
 pub use room::{
-  AnnouncementPanel, CreateRoomModal, MemberListPanel, MutedIndicator, NicknameEditor,
-  PasswordPromptModal, RoomListPanel,
+  AnnouncementPanel, CreateRoomModal, GlobalRoomModalState, MemberListPanel, MutedIndicator,
+  NicknameEditor, PasswordPromptModal, RoomListPanel,
 };
 pub use settings_page::SettingsPage;
 pub use sidebar::Sidebar;

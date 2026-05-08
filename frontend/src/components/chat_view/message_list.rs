@@ -15,6 +15,7 @@
 
 use crate::chat::use_chat_manager;
 use crate::components::chat_view::message_bubble::{BubbleCallbacks, MessageBubble};
+use crate::components::chat_view::scroll_perf::ScrollPerfController;
 use crate::components::chat_view::virtual_scroll::{
   LoadingSkeleton, VIRTUAL_THRESHOLD, VirtualMessageWindow, VirtualScrollState,
 };
@@ -66,6 +67,12 @@ pub fn MessageList(
   // Virtual scroll state (height cache + loading flags).
   let vs = VirtualScrollState::new();
 
+  // Scroll-performance controller (Req 14.11.6) — flips a CSS class
+  // on the scroll container while the user is scrolling, debounced
+  // to remove the hint after 2 s of idle so the browser can reclaim
+  // the GPU compositing layer.
+  let perf = ScrollPerfController::new();
+
   // Observed distance from the bottom (updated on every scroll event).
   let near_bottom = RwSignal::new(true);
   // Count of messages that arrived while the user was NOT near the
@@ -114,11 +121,16 @@ pub fn MessageList(
   {
     let conv_for_effect = conv;
     let vs_for_reset = vs.clone();
+    let perf_for_reset = perf.clone();
     Effect::new(move |_| {
       let _ = conv_for_effect.get();
       near_bottom.set(true);
       off_screen_new.set(0);
       vs_for_reset.reset();
+      perf_for_reset.reset();
+      if let Some(el) = scroll_ref.get() {
+        let _ = el.class_list().remove_1("message-list--scrolling");
+      }
       // Defer the scroll by one tick so the list has rendered.
       request_animation_frame_scroll(scroll_ref);
     });
@@ -128,11 +140,32 @@ pub fn MessageList(
   // AND trigger infinite-scroll when near the top.
   let vs_for_scroll = vs.clone();
   let manager_for_scroll = manager.clone();
+  let perf_for_scroll = perf.clone();
   let on_scroll = move |_: Event| {
     let Some(el) = scroll_ref.get() else { return };
     let scroll_top_val = el.scroll_top() as f64;
     let client_height = el.client_height() as f64;
     let scroll_height = el.scroll_height() as f64;
+
+    // Apply `will-change: transform` on the first scroll tick and
+    // schedule its removal after 2 s of idle (Req 14.11.6). We only
+    // touch the DOM when the controller transitions in/out of the
+    // scrolling state to avoid style recomputes on every tick.
+    if perf_for_scroll.note_scroll() {
+      let _ = el.class_list().add_1("message-list--scrolling");
+      // Arm a follow-up cleanup: when the idle timeout fires the
+      // controller flips `is_scrolling()` back to false; we react by
+      // removing the class on the next animation frame. Using a
+      // cheap rAF keeps the work off the scroll event path.
+      let el_clone = el.clone();
+      let perf_clone = perf_for_scroll.clone();
+      let cb = wasm_bindgen::closure::Closure::once_into_js(move || {
+        schedule_perf_cleanup(&el_clone, &perf_clone);
+      });
+      if let Some(window) = web_sys::window() {
+        let _ = window.request_animation_frame(cb.unchecked_ref::<js_sys::Function>());
+      }
+    }
 
     // Drive virtual-scroll signals from the single scroll handler
     // (deduplicates the native listener previously in VirtualMessageWindow).
@@ -353,6 +386,29 @@ fn request_animation_frame_scroll(node_ref: NodeRef<html::Div>) {
     scroll_to_bottom(&node_ref);
   });
   let _ = window.request_animation_frame(cb.unchecked_ref::<js_sys::Function>());
+}
+
+/// Poll the [`ScrollPerfController`] until it reports idle, then
+/// remove the `message-list--scrolling` class so the browser can free
+/// the compositing layer (Req 14.11.6).
+///
+/// The poll runs via `requestAnimationFrame` so we only touch the DOM
+/// on frames the browser already schedules; once the controller flips
+/// back to idle we bail out without re-arming.
+fn schedule_perf_cleanup(el: &HtmlElement, perf: &ScrollPerfController) {
+  if perf.is_scrolling() {
+    // Still scrolling — re-arm on the next animation frame.
+    let el_clone = el.clone();
+    let perf_clone = perf.clone();
+    let cb = wasm_bindgen::closure::Closure::once_into_js(move || {
+      schedule_perf_cleanup(&el_clone, &perf_clone);
+    });
+    if let Some(window) = web_sys::window() {
+      let _ = window.request_animation_frame(cb.unchecked_ref::<js_sys::Function>());
+    }
+    return;
+  }
+  let _ = el.class_list().remove_1("message-list--scrolling");
 }
 
 /// Try to scroll to a message in the DOM. Returns `true` if the

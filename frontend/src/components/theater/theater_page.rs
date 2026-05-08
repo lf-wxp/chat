@@ -307,14 +307,21 @@ pub fn TheaterPage(
 
   let raf_slot_inner = raf_slot;
   let raf_closure = Closure::wrap(Box::new(move |_ts: f64| {
+    // `raf_active` flips to false on component cleanup and acts as a
+    // one-way kill-switch. Check it up-front so a still-pending frame
+    // callback that fires during unmount is a no-op.
     if !raf_active.get_untracked() {
       return;
     }
     frame_counter.update(|n| *n = n.saturating_add(1));
-    // Re-arm: schedule the next animation frame.
+    // Re-arm: schedule the next animation frame. We use `try_borrow`
+    // so a concurrent cleanup that is mutably borrowing the slot to
+    // take the closure does not trip a runtime panic — it just
+    // declines to reschedule, which is the desired behaviour.
     let cell = raf_slot_inner.get_value();
-    if let Some(win) = web_sys::window()
-      && let Some(closure) = cell.borrow().as_ref()
+    if let Ok(borrowed) = cell.try_borrow()
+      && let Some(closure) = borrowed.as_ref()
+      && let Some(win) = web_sys::window()
       && let Err(err) =
         win.request_animation_frame(closure.as_ref().unchecked_ref::<js_sys::Function>())
     {
@@ -362,14 +369,21 @@ pub fn TheaterPage(
   if let Ok(handle) = drop_tick {
     on_cleanup(move || {
       handle.clear();
-      raf_active.set(false);
-      // Drop the closure so the browser releases the registered RAF
-      // callback reference; otherwise the circular reference would
-      // keep the counter alive past component unmount.
-      let cell = raf_slot.get_value();
-      cell.borrow_mut().take();
     });
   }
+  // Register RAF cleanup unconditionally — even when the 1 Hz sampler
+  // failed to install, the RAF closure itself has already been
+  // scheduled and must be dropped on unmount to release the browser
+  // reference; otherwise a late frame callback would invoke a
+  // now-dropped Rust closure (the "closure invoked recursively or
+  // after being dropped" WASM error).
+  on_cleanup(move || {
+    raf_active.set(false);
+    let cell = raf_slot.get_value();
+    if let Ok(mut borrowed) = cell.try_borrow_mut() {
+      borrowed.take();
+    }
+  });
 
   // ── Effect 4: auto-persist overlay settings on change ───────────────
   let persist_first_run = RwSignal::new(true);

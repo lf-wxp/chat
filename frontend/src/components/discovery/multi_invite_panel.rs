@@ -64,8 +64,7 @@ pub fn MultiInvitePanel(
       let added = invite_mgr.track_multi_outbound(payload, batch_id);
       if added.is_empty() {
         // All targets already had pending invites — nothing to send.
-        // Surface this to the user rather than silently no-op'ing
-        // (Opt-6 fix).
+        // Surface this to the user rather than silently no-op'ing.
         toast.show_info_message_with_key(
           "DSC904",
           "discovery.multi_invite_all_pending",

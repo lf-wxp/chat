@@ -179,6 +179,49 @@
   letter-spacing: 0.05em;
 }
 
+/* Collapsible variant — used by the Archived section (Req 7.7f).
+ * Renders the title as a button row with an inline chevron and a
+ * count badge so users can see how many archived chats exist
+ * without expanding. */
+.sidebar-section-title--toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  width: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.sidebar-section-title--toggle:hover,
+.sidebar-section-title--toggle:focus-visible {
+  color: var(--text-secondary, #475569);
+}
+
+.sidebar-section-title--toggle:focus-visible {
+  outline: 2px solid var(--color-primary, #3b82f6);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm, 0.25rem);
+}
+
+.sidebar-section-toggle-icon {
+  width: 0.75rem;
+  height: 0.75rem;
+  transition: transform var(--duration-fast, 150ms) var(--ease-default, ease);
+}
+
+.sidebar-section-count {
+  margin-left: auto;
+  padding: 0 var(--space-1, 0.25rem);
+  font-size: var(--font-xs, 0.75rem);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--text-tertiary, #94a3b8);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Sidebar item (shared base) ── */
 .sidebar-item-base {
   display: flex;
@@ -247,6 +290,48 @@
 .sidebar-conversation {
   composes: sidebar-item-base;
   padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  /* Host for the hover accent `::after` below. `relative` + a tiny
+   * `overflow: hidden` keep the 1px accent strip from bleeding over
+   * the rounded corner of the base class. */
+  position: relative;
+  overflow: hidden;
+}
+
+/* Hover accent: a soft primary-tinted vertical strip fades in on
+ * the trailing edge when the row is hovered or keyboard-focused,
+ * providing a subtle motion cue without competing with the
+ * `.sidebar-item-active::before` left-side stream-line added in
+ * batch 8. `transform` + `opacity` both transition so the accent
+ * glides in rather than popping.
+ *
+ * Intentionally inert on pointer events so it never intercepts
+ * clicks on the row.
+ */
+.sidebar-conversation::after {
+  content: '';
+  position: absolute;
+  top: 12%;
+  bottom: 12%;
+  right: 0;
+  width: 2px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--color-primary, #3b82f6) 50%,
+    transparent 100%
+  );
+  opacity: 0;
+  transform: translateX(2px);
+  transition:
+    opacity var(--duration-fast, 150ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    transform var(--duration-normal, 200ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  pointer-events: none;
+}
+
+.sidebar-conversation:hover::after,
+.sidebar-conversation:focus-within::after {
+  opacity: 0.9;
+  transform: translateX(0);
 }
 
 .sidebar-conversation-avatar {
@@ -463,4 +548,34 @@
   cursor: not-allowed;
   color: var(--text-tertiary, #94a3b8);
   border-color: var(--border-color, #e2e8f0);
+}
+
+/* ── Active-item stream-line accent (MVP batch 8) ──
+ * Adds a 2px vertical primary-tinted strip that slides along the
+ * leading edge of the active conversation / item. The motion
+ * respects `html[data-motion="off"]` and `prefers-reduced-motion`
+ * because the `stream-line` keyframes live in animations.css which
+ * already wires the global reduced-motion override.
+ */
+.sidebar-item-active {
+  position: relative;
+  overflow: hidden;
+}
+
+.sidebar-item-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--color-primary) 50%,
+    transparent 100%
+  );
+  background-size: 100% 300%;
+  animation: stream-line 3s linear infinite;
+  pointer-events: none;
 }

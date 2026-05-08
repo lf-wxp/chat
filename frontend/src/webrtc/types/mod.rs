@@ -85,7 +85,7 @@ pub struct PeerEncryptionStatus {
 
 impl PeerEncryptionStatus {
   // Intentionally no `new()` — use `PeerEncryptionStatus::default()` or
-  // explicit field construction to avoid diverging init paths (P2-13 fix).
+  // explicit field construction to avoid diverging init paths.
 }
 
 /// Tracks all WebRTC state for a single peer.

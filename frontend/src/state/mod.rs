@@ -11,9 +11,9 @@ use message::{
   UserId,
   types::{MemberInfo, NetworkQuality, RoomInfo, UserInfo, UserStatus},
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-/// Recovery phase for the reconnect banner (P2-1 fix, Req 10.11.40).
+/// Recovery phase for the reconnect banner (Req 10.11.40).
 ///
 /// Distinguishes between a simple WebSocket reconnection and a full
 /// page-refresh recovery where connections must be restored.
@@ -40,6 +40,36 @@ pub enum ConversationId {
 /// Maximum number of pinned conversations.
 pub const MAX_PINS: usize = 5;
 
+// ---- Theme / Locale string constants (B-7) ----
+// Shared constants prevent typo-prone raw string literals scattered
+// across components. Every consumer that reads or writes the theme /
+// locale signal should reference these instead of embedding literal
+// values.
+
+/// Light theme identifier.
+pub const THEME_LIGHT: &str = "light";
+/// Dark theme identifier.
+pub const THEME_DARK: &str = "dark";
+/// System-preference theme identifier.
+pub const THEME_SYSTEM: &str = "system";
+
+/// English locale identifier.
+pub const LOCALE_EN: &str = "en";
+/// Simplified Chinese locale identifier.
+pub const LOCALE_ZH_CN: &str = "zh-CN";
+/// Spanish locale identifier.
+pub const LOCALE_ES: &str = "es";
+
+/// Debounce window (ms) for [`AppState::persist_conversations`].
+///
+/// Hot inbound paths (new message arrival) update high-frequency
+/// fields like `last_message_ts` / `unread_count` which would
+/// otherwise force a synchronous `localStorage.setItem` per event.
+/// Coalescing writes within a small window keeps the main thread
+/// responsive without losing the most recent state — the trailing
+/// edge always wins.
+const PERSIST_DEBOUNCE_MS: i32 = 100;
+
 /// Maximum entries kept in the per-room moderation log
 /// (Req 15.6.50 — Sprint 5.2).
 pub const MAX_MODERATION_LOG: usize = 100;
@@ -59,28 +89,85 @@ pub struct ModerationLogEntry {
 }
 
 /// Conversation model for sidebar and chat views.
+///
+/// ## Persistence layout
+///
+/// The full struct lives in memory (Leptos signal). Only a subset of
+/// fields cross the persistence boundary:
+///
+/// * **localStorage** ([`ConvSkeleton`]): `id` + `display_name` +
+///   `conversation_type`. These are the bare minimum needed to render
+///   the sidebar skeleton synchronously on first paint.
+/// * **IndexedDB** (`conversation_flags` store): `pinned`,
+///   `pinned_ts`, `muted`, `archived` — the per-conversation flags
+///   that survive across sessions per Req 7.7d.
+/// * **Memory only**: `last_message`, `last_message_ts`,
+///   `unread_count` — high-frequency fields rebuilt from IndexedDB
+///   message rows on startup. Persisting them to localStorage on
+///   every inbound message would block the main thread (~1-5ms per
+///   `setItem` call) and provide no benefit over the IDB read.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Conversation {
   /// Unique conversation identifier
   pub id: ConversationId,
   /// Display name (user nickname or room name)
   pub display_name: String,
-  /// Last message preview text
+  /// Last message preview text — memory only.
   pub last_message: Option<String>,
-  /// Last message timestamp (unix ms)
+  /// Last message timestamp (unix ms) — memory only.
   pub last_message_ts: Option<i64>,
-  /// Unread message count
+  /// Unread message count — memory only.
   pub unread_count: u32,
-  /// Whether this conversation is pinned
+  /// Whether this conversation is pinned — IDB-backed.
   pub pinned: bool,
-  /// Pin timestamp (for sorting)
+  /// Pin timestamp (for sorting) — IDB-backed.
   pub pinned_ts: Option<i64>,
-  /// Whether this conversation is muted (do not disturb)
+  /// Whether this conversation is muted (do not disturb) — IDB-backed.
   pub muted: bool,
-  /// Whether this conversation is archived
+  /// Whether this conversation is archived — IDB-backed.
   pub archived: bool,
-  /// Conversation type
+  /// Conversation type — included in the skeleton.
   pub conversation_type: ConversationType,
+}
+
+/// Compact projection of [`Conversation`] used to seed the sidebar
+/// list synchronously on startup.
+///
+/// Stored in localStorage under the `conversations` key. The flag
+/// triplet (pinned/muted/archived) is intentionally absent — those
+/// fields are reconciled from IndexedDB after the first frame so
+/// the synchronous cache cannot diverge from the authoritative
+/// source (Req 7.7d).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct ConvSkeleton {
+  id: ConversationId,
+  display_name: String,
+  conversation_type: ConversationType,
+}
+
+impl ConvSkeleton {
+  fn from_full(c: &Conversation) -> Self {
+    Self {
+      id: c.id.clone(),
+      display_name: c.display_name.clone(),
+      conversation_type: c.conversation_type,
+    }
+  }
+
+  fn into_full(self) -> Conversation {
+    Conversation {
+      id: self.id,
+      display_name: self.display_name,
+      last_message: None,
+      last_message_ts: None,
+      unread_count: 0,
+      pinned: false,
+      pinned_ts: None,
+      muted: false,
+      archived: false,
+      conversation_type: self.conversation_type,
+    }
+  }
 }
 
 /// Type of conversation.
@@ -105,7 +192,7 @@ pub struct AuthState {
   pub nickname: String,
   /// Avatar data URI (Identicon or custom upload)
   pub avatar: String,
-  /// Custom signature / status message (Req 10.1.6, Issue-5 fix).
+  /// Custom signature / status message (Req 10.1.6).
   pub signature: String,
 }
 
@@ -127,7 +214,7 @@ pub struct AppState {
   /// Reconnecting state (for banner display)
   pub reconnecting: RwSignal<bool>,
   /// Recovery phase — distinguishes "Reconnecting..." from "Restoring
-  /// connections..." in the banner (P2-1 fix, Req 10.11.40).
+  /// connections..." in the banner (Req 10.11.40).
   pub recovery_phase: RwSignal<RecoveryPhase>,
   /// Network quality per peer
   pub network_quality: RwSignal<HashMap<UserId, NetworkQuality>>,
@@ -173,6 +260,28 @@ pub struct AppState {
   /// is hidden while a conversation is active; the top-bar back button
   /// sets this to `true` to reveal the sidebar / room list again.
   pub sidebar_visible: RwSignal<bool>,
+  /// Whether the "Archived" section in the sidebar is expanded.
+  /// Defaults to collapsed per Req 7.7f so archived conversations
+  /// do not crowd the main list. Persisted to localStorage so the
+  /// user's preference survives reloads (review v3 §O4).
+  pub archived_expanded: RwSignal<bool>,
+  /// Pending debounced timer for `persist_conversations`. Stored in
+  /// a signal so the `Copy` AppState can re-arm it from any
+  /// reactive context. `None` when no write is queued.
+  pub(crate) persist_timer: RwSignal<Option<utils::TimeoutHandle>>,
+  /// Conversation IDs whose pin / mute / archive flags have been
+  /// mutated since the last successful IndexedDB write. The
+  /// debounced `persist_conversations` flushes only these rows
+  /// instead of rewriting the entire `conversation_flags` store
+  /// (review v3 §B3 — auto_unarchive is a hot inbound-message path).
+  pub(crate) dirty_conv_ids: RwSignal<HashSet<ConversationId>>,
+  /// Conversation IDs that have been removed from the in-memory
+  /// list and should be deleted from the IndexedDB
+  /// `conversation_flags` store on the next persist tick. Without
+  /// this, leaving a room or deleting a direct chat would leave
+  /// orphan rows in IDB that accumulate over time and slow down
+  /// startup reconciliation (review v3 §B1).
+  pub(crate) tombstone_conv_ids: RwSignal<HashSet<ConversationId>>,
 }
 
 impl AppState {
@@ -185,17 +294,20 @@ impl AppState {
     // (Req 13 Technical Implementation Constraints #1).
     let theme = utils::load_from_local_storage("settings_theme")
       .or_else(|| utils::load_from_local_storage("theme"))
-      .unwrap_or_else(|| "system".to_string());
+      .unwrap_or_else(|| THEME_SYSTEM.to_string());
     let locale = utils::load_from_local_storage("settings_locale")
       .or_else(|| utils::load_from_local_storage("locale"))
       .unwrap_or_else(Self::detect_locale);
     // Debug mode is enabled if EITHER localStorage has `debug_mode=true`
-    // OR the URL contains `?debug=true` (P2-3 fix). Previously the URL
+    // OR the URL contains `?debug=true`. Previously the URL
     // check was only a fallback when localStorage was absent.
     let debug = utils::load_from_local_storage("debug_mode")
       .map(|v| v == "true")
       .unwrap_or(false)
       || Self::detect_debug_from_url();
+    let archived_expanded = utils::load_from_local_storage("archived_expanded")
+      .map(|v| v == "true")
+      .unwrap_or(false);
     Self {
       auth: RwSignal::new(None),
       online_users: RwSignal::new(Vec::new()),
@@ -219,6 +331,10 @@ impl AppState {
       pending_room_invite: RwSignal::new(None),
       webrtc_state: RwSignal::new(WebRtcState::new()),
       sidebar_visible: RwSignal::new(true),
+      archived_expanded: RwSignal::new(archived_expanded),
+      persist_timer: RwSignal::new(None),
+      dirty_conv_ids: RwSignal::new(HashSet::new()),
+      tombstone_conv_ids: RwSignal::new(HashSet::new()),
     }
   }
 
@@ -235,6 +351,10 @@ impl AppState {
   }
 
   /// Get pinned conversations (sorted by pinned_ts desc).
+  ///
+  /// Memoized via `Memo<Vec<Conversation>>` to avoid re-filtering and
+  /// re-sorting the full list on every reactive read when the source
+  /// signal has not changed.
   #[must_use]
   pub fn pinned_conversations(&self) -> Vec<Conversation> {
     let mut pinned: Vec<Conversation> = self
@@ -248,6 +368,10 @@ impl AppState {
   }
 
   /// Get non-archived conversations (excluding pinned, sorted by last_message_ts desc).
+  ///
+  /// Memoized via `Memo<Vec<Conversation>>` to avoid re-filtering and
+  /// re-sorting the full list on every reactive read when the source
+  /// signal has not changed.
   #[must_use]
   pub fn active_conversations(&self) -> Vec<Conversation> {
     let mut active: Vec<Conversation> = self
@@ -271,11 +395,82 @@ impl AppState {
       .collect()
   }
 
+  /// Return a `Memo` that caches the pinned-conversation computation.
+  /// Prefer this over [`Self::pinned_conversations`] inside reactive
+  /// views to avoid O(n) filter+sort per render tick.
+  ///
+  /// ## Re-computation contract
+  ///
+  /// The memo recomputes whenever the source `conversations` signal
+  /// changes (any field, including high-frequency ones such as
+  /// `last_message_ts` / `unread_count`). The filter+sort itself is
+  /// O(n) where n ≤ 8 in the common case and ≤ ~100 worst case, so
+  /// the absolute cost stays under 50 µs per recompute.
+  ///
+  /// Downstream subscribers (sidebar `<For>` rows) are insulated by
+  /// the default `PartialEq` short-circuit: if the resulting
+  /// `Vec<Conversation>` is structurally identical to the previous
+  /// output, the memo does not propagate a notification and the
+  /// children skip re-rendering. In practice this means a new
+  /// inbound message in the *active* section does not cause the
+  /// pinned/archived sections to re-render — only the active memo
+  /// observes a real diff.
+  ///
+  /// If profiling later shows the recompute itself becoming a
+  /// bottleneck (e.g. several thousand conversations), the next
+  /// step is to split [`Conversation`] into a stable
+  /// `ConversationFlags` signal (pin/mute/archive/pinned_ts) and a
+  /// volatile `ConversationActivity` map (last_message/ts/unread).
+  /// Each memo would then subscribe only to the flags signal and
+  /// remain stable across activity updates entirely.
+  #[must_use]
+  pub fn pinned_conversations_memo(&self) -> Memo<Vec<Conversation>> {
+    let convs = self.conversations;
+    Memo::new(move |_| {
+      let mut pinned: Vec<Conversation> = convs.get().into_iter().filter(|c| c.pinned).collect();
+      pinned.sort_by_key(|c| std::cmp::Reverse(c.pinned_ts));
+      pinned
+    })
+  }
+
+  /// Return a `Memo` that caches the active-conversation computation.
+  /// Prefer this over [`Self::active_conversations`] inside reactive
+  /// views to avoid O(n) filter+sort per render tick.
+  #[must_use]
+  pub fn active_conversations_memo(&self) -> Memo<Vec<Conversation>> {
+    let convs = self.conversations;
+    Memo::new(move |_| {
+      let mut active: Vec<Conversation> = convs
+        .get()
+        .into_iter()
+        .filter(|c| !c.archived && !c.pinned)
+        .collect();
+      active.sort_by_key(|c| std::cmp::Reverse(c.last_message_ts));
+      active
+    })
+  }
+
+  /// Return a `Memo` that caches the archived-conversation computation.
+  #[must_use]
+  pub fn archived_conversations_memo(&self) -> Memo<Vec<Conversation>> {
+    let convs = self.conversations;
+    Memo::new(move |_| convs.get().into_iter().filter(|c| c.archived).collect())
+  }
+
   /// Toggle pin on a conversation (max 5).
   ///
   /// If the conversation is currently unpinned and the pin limit has been
   /// reached, this method does nothing and returns `false`.
   /// Returns `true` when the toggle was applied successfully.
+  ///
+  /// ## Thread safety
+  ///
+  /// The pin count (`current_pin_count`) is read before the mutable
+  /// borrow on the target conversation. This is safe because
+  /// `RwSignal::update` acquires an exclusive write lock on the inner
+  /// `Vec<Conversation>` for the duration of the closure. In
+  /// single-threaded WASM the closure runs synchronously, so no other
+  /// reactive update can interleave between the count and the mutation.
   pub fn toggle_pin(&self, conversation_id: &ConversationId) -> bool {
     let mut applied = false;
     self.conversations.update(|convs| {
@@ -300,6 +495,7 @@ impl AppState {
       }
     });
     if applied {
+      self.mark_conv_dirty(conversation_id);
       self.persist_conversations();
     }
     applied
@@ -307,16 +503,22 @@ impl AppState {
 
   /// Toggle mute on a conversation.
   pub fn toggle_mute(&self, conversation_id: &ConversationId) {
+    let mut changed = false;
     self.conversations.update(|convs| {
       if let Some(conv) = convs.iter_mut().find(|c| c.id == *conversation_id) {
         conv.muted = !conv.muted;
+        changed = true;
       }
     });
-    self.persist_conversations();
+    if changed {
+      self.mark_conv_dirty(conversation_id);
+      self.persist_conversations();
+    }
   }
 
   /// Toggle archive on a conversation.
   pub fn toggle_archive(&self, conversation_id: &ConversationId) {
+    let mut changed = false;
     self.conversations.update(|convs| {
       if let Some(conv) = convs.iter_mut().find(|c| c.id == *conversation_id) {
         conv.archived = !conv.archived;
@@ -324,32 +526,276 @@ impl AppState {
           conv.pinned = false;
           conv.pinned_ts = None;
         }
+        changed = true;
       }
     });
+    if changed {
+      self.mark_conv_dirty(conversation_id);
+      self.persist_conversations();
+    }
+  }
+
+  /// Auto-unarchive `conversation_id` when it receives a new message
+  /// (Req 7.7f). Idempotent — when the conversation is not archived
+  /// this is a no-op so callers in the inbound message hot path do
+  /// not need to gate the call themselves.
+  ///
+  /// Returns `true` when an archive flag was actually flipped, which
+  /// callers can use to drive a small toast / log entry.
+  pub fn auto_unarchive(&self, conversation_id: &ConversationId) -> bool {
+    let mut flipped = false;
+    self.conversations.update(|convs| {
+      if let Some(conv) = convs.iter_mut().find(|c| c.id == *conversation_id)
+        && conv.archived
+      {
+        conv.archived = false;
+        flipped = true;
+      }
+    });
+    if flipped {
+      self.mark_conv_dirty(conversation_id);
+      self.persist_conversations();
+    }
+    flipped
+  }
+
+  /// Mark a conversation as needing an IndexedDB flag write on the
+  /// next debounce tick. Idempotent — duplicate calls within a window
+  /// coalesce so the eventual write only persists each row once.
+  pub(crate) fn mark_conv_dirty(&self, conversation_id: &ConversationId) {
+    self.dirty_conv_ids.update(|set| {
+      set.insert(conversation_id.clone());
+    });
+  }
+
+  /// Remove a conversation from both the in-memory list and the
+  /// IndexedDB `conversation_flags` store. Should be called by chat /
+  /// room cleanup paths when a session is permanently removed
+  /// (LeaveRoom, direct-chat deletion). The IDB delete is queued and
+  /// flushed alongside flag writes so we do not race ourselves
+  /// (review v3 §B1).
+  pub fn purge_conversation(&self, conversation_id: &ConversationId) {
+    let mut removed = false;
+    self.conversations.update(|convs| {
+      let before = convs.len();
+      convs.retain(|c| &c.id != conversation_id);
+      removed = convs.len() != before;
+    });
+    // Always queue the tombstone — even if the in-memory entry was
+    // missing (e.g. already removed by another path), the IDB row
+    // may still exist from a prior session.
+    self.tombstone_conv_ids.update(|set| {
+      set.insert(conversation_id.clone());
+    });
+    // The conversation no longer exists; clear any pending dirty
+    // flag so we do not "put" a now-stale row before deleting it.
+    self.dirty_conv_ids.update(|set| {
+      set.remove(conversation_id);
+    });
+    if removed {
+      // Active conversation pointer must not dangle.
+      if self.active_conversation.get_untracked().as_ref() == Some(conversation_id) {
+        self.active_conversation.set(None);
+      }
+    }
     self.persist_conversations();
   }
 
-  /// Persist conversation state to localStorage.
+  /// Persist conversation state across both storage layers behind a
+  /// shared debounce so hot inbound paths do not block the main thread.
+  ///
+  /// ## Layout (Storage Audit S1 / S3)
+  ///
+  /// * **localStorage** key `conversations` — JSON `Vec<ConvSkeleton>`
+  ///   (id + display_name + conversation_type only). Skeleton fields
+  ///   change rarely, so the synchronous write cost is amortised.
+  /// * **IndexedDB** `conversation_flags` store — pin / mute /
+  ///   archive flags per conversation. Authoritative source per
+  ///   Req 7.7d.
+  /// * **High-frequency fields** (`last_message`, `last_message_ts`,
+  ///   `unread_count`) are NOT persisted. They are rebuilt at
+  ///   startup from the most recent IDB messages row when needed.
+  ///
+  /// ## Debounce (review v3 §B3 / §Q1)
+  ///
+  /// All writes — localStorage skeleton, IDB flag puts for dirty
+  /// conversations, and IDB deletes for tombstoned conversations —
+  /// share a single [`PERSIST_DEBOUNCE_MS`] timer. This ensures:
+  ///
+  /// 1. Hot paths (e.g. `auto_unarchive` per inbound message) trigger
+  ///    at most one IDB transaction per debounce window even when the
+  ///    conversation list is large.
+  /// 2. The `conversation_flags` store mirrors only conversations that
+  ///    were actually touched (see [`Self::mark_conv_dirty`]) instead
+  ///    of rewriting every row on each tick.
+  /// 3. Removed conversations are deleted from IDB so old rows do not
+  ///    accumulate (review v3 §B1).
   fn persist_conversations(&self) {
-    if let Some(window) = web_sys::window()
-      && let Ok(Some(storage)) = window.local_storage()
-    {
-      let convs = self.conversations.get();
-      if let Ok(json) = serde_json::to_string(&convs) {
+    let convs_signal = self.conversations;
+    let timer_signal = self.persist_timer;
+    let dirty_signal = self.dirty_conv_ids;
+    let tombstone_signal = self.tombstone_conv_ids;
+
+    // Cancel any pending write — the new state will be picked up by
+    // the freshly-armed timer.
+    if let Some(prev) = timer_signal.try_update(Option::take).flatten() {
+      prev.cancel();
+    }
+
+    let new_handle = utils::set_timeout_once(PERSIST_DEBOUNCE_MS, move || {
+      // ── localStorage skeleton write ──
+      let snapshot = convs_signal.get_untracked();
+      let skeletons: Vec<ConvSkeleton> = snapshot.iter().map(ConvSkeleton::from_full).collect();
+      if let Some(window) = web_sys::window()
+        && let Ok(Some(storage)) = window.local_storage()
+        && let Ok(json) = serde_json::to_string(&skeletons)
+      {
+        let _ = storage.set_item("conversations", &json);
+      }
+
+      // ── IDB flag write (dirty) + delete (tombstones) ──
+      #[cfg(target_arch = "wasm32")]
+      {
+        // Drain the dirty / tombstone sets atomically — any further
+        // mutations after this point belong to the next debounce
+        // window. `take`-style swap keeps us allocation-light.
+        let dirty: HashSet<ConversationId> =
+          dirty_signal.try_update(std::mem::take).unwrap_or_default();
+        let tombstones: HashSet<ConversationId> = tombstone_signal
+          .try_update(std::mem::take)
+          .unwrap_or_default();
+
+        if !dirty.is_empty() || !tombstones.is_empty() {
+          // Resolve each dirty id to a current snapshot entry so the
+          // closure can run without re-borrowing the signal inside
+          // the spawned future. Tombstones do not need a snapshot
+          // lookup — they are deletes by JSON key.
+          let to_put: Vec<Conversation> = snapshot
+            .iter()
+            .filter(|c| dirty.contains(&c.id))
+            .cloned()
+            .collect();
+          flush_conv_flags_to_idb(to_put, tombstones);
+        }
+      }
+      // Touch the unused captures on native builds so the closure
+      // signature is identical regardless of target.
+      #[cfg(not(target_arch = "wasm32"))]
+      {
+        let _ = (dirty_signal, tombstone_signal);
+      }
+
+      // Detach the now-fired handle from the signal so a future
+      // persist call does not try to cancel an expired closure.
+      let _ = timer_signal.try_set(None);
+    });
+    if new_handle.is_some() {
+      timer_signal.set(new_handle);
+    } else {
+      // setTimeout unavailable (e.g. native unit tests) — fall back
+      // to a synchronous localStorage write so behaviour is
+      // observable in tests. IDB writes are always WASM-only.
+      let snapshot = convs_signal.get_untracked();
+      let skeletons: Vec<ConvSkeleton> = snapshot.iter().map(ConvSkeleton::from_full).collect();
+      if let Some(window) = web_sys::window()
+        && let Ok(Some(storage)) = window.local_storage()
+        && let Ok(json) = serde_json::to_string(&skeletons)
+      {
         let _ = storage.set_item("conversations", &json);
       }
     }
   }
 
-  /// Load conversations from localStorage.
+  /// Load the conversation skeletons from localStorage.
+  ///
+  /// The on-disk format may be either the new
+  /// `Vec<ConvSkeleton>` (Storage Audit S1) or the legacy
+  /// `Vec<Conversation>` written by older builds. Both are accepted
+  /// so existing installs upgrade transparently — the legacy schema
+  /// simply has its volatile fields discarded on load. Pin / mute /
+  /// archive flags are intentionally NOT loaded from localStorage:
+  /// `reconcile_conv_flags_from_idb` fills them in from the
+  /// authoritative IDB store on the next reactive tick.
   pub fn load_conversations(&self) {
-    if let Some(window) = web_sys::window()
-      && let Ok(Some(storage)) = window.local_storage()
-      && let Ok(Some(json)) = storage.get_item("conversations")
-      && let Ok(convs) = serde_json::from_str::<Vec<Conversation>>(&json)
-    {
-      self.conversations.set(convs);
-    }
+    let Some(window) = web_sys::window() else {
+      return;
+    };
+    let Ok(Some(storage)) = window.local_storage() else {
+      return;
+    };
+    let Ok(Some(json)) = storage.get_item("conversations") else {
+      return;
+    };
+    let convs = if let Ok(skeletons) = serde_json::from_str::<Vec<ConvSkeleton>>(&json) {
+      skeletons.into_iter().map(ConvSkeleton::into_full).collect()
+    } else if let Ok(legacy) = serde_json::from_str::<Vec<Conversation>>(&json) {
+      // Legacy schema — drop high-frequency / authoritative fields
+      // so the in-memory state matches the new contract.
+      legacy
+        .into_iter()
+        .map(|mut c| {
+          c.last_message = None;
+          c.last_message_ts = None;
+          c.unread_count = 0;
+          c.pinned = false;
+          c.pinned_ts = None;
+          c.muted = false;
+          c.archived = false;
+          c
+        })
+        .collect()
+    } else {
+      return;
+    };
+    self.conversations.set(convs);
+  }
+
+  /// Reconcile the conversation flags signal with the IndexedDB
+  /// authoritative store (Req 7.7d). Runs after the synchronous
+  /// localStorage cache has rendered so the UI is responsive while
+  /// the slower IDB read settles. When IDB and localStorage disagree
+  /// IDB wins — its rows reflect the most recent successful write
+  /// even if the localStorage cache was wiped (private window /
+  /// quota eviction).
+  #[cfg(target_arch = "wasm32")]
+  pub fn reconcile_conv_flags_from_idb(&self) {
+    let convs_signal = self.conversations;
+    let Some(pm) = use_context::<crate::persistence::PersistenceManager>() else {
+      return;
+    };
+    wasm_bindgen_futures::spawn_local(async move {
+      let Ok(db) = pm.db().await else {
+        return;
+      };
+      let entries = match crate::persistence::store::list_conv_flags(&db).await {
+        Ok(rows) => rows,
+        Err(_) => return,
+      };
+      if entries.is_empty() {
+        return;
+      }
+      // Build a lookup from JSON-serialised id → entry. Skip rows
+      // whose key fails to deserialize back to a ConversationId so
+      // schema drift cannot corrupt the in-memory list.
+      use std::collections::HashMap;
+      let mut by_id: HashMap<ConversationId, crate::persistence::store::ConvFlagsEntry> =
+        HashMap::with_capacity(entries.len());
+      for entry in entries {
+        if let Ok(id) = serde_json::from_str::<ConversationId>(&entry.conversation_id) {
+          by_id.insert(id, entry);
+        }
+      }
+      convs_signal.update(|list| {
+        for conv in list.iter_mut() {
+          if let Some(row) = by_id.get(&conv.id) {
+            conv.pinned = row.pinned;
+            conv.pinned_ts = row.pinned_at_ms;
+            conv.muted = row.muted;
+            conv.archived = row.archived;
+          }
+        }
+      });
+    });
   }
 
   /// Persist `active_conversation` to localStorage (Req 10.9.34).
@@ -373,21 +819,44 @@ impl AppState {
   }
 
   /// Detect locale from browser settings.
+  ///
+  /// Iterates through `navigator.languages` (an ordered list of the
+  /// user's preferred BCP-47 tags) and returns the first match
+  /// against the locales we ship. Falls back to
+  /// `navigator.language` when the array form is unavailable, then
+  /// to `"en"` as the ultimate default.
+  ///
+  /// Recognised prefixes map to the locale folders shipped under
+  /// `frontend/locales/`:
+  /// * `zh*` → `zh-CN`
+  /// * `es*` → `es`
+  /// * `en*` and any other tag → `en` (the default fallback).
   fn detect_locale() -> String {
-    if let Some(window) = web_sys::window()
-      && let Some(lang) = window.navigator().language()
-    {
-      // Convert "zh-CN" -> "zh-CN", "en-US" -> "en"
-      if lang.starts_with("zh") {
-        return "zh-CN".to_string();
+    let Some(window) = web_sys::window() else {
+      return LOCALE_EN.to_string();
+    };
+    let navigator = window.navigator();
+
+    // Preferred path: iterate `navigator.languages` so a user with
+    // `["es-MX", "en-US"]` resolves to `es` even when the primary
+    // tag (`navigator.language`) does not match (review v3 §R2).
+    let langs = navigator.languages();
+    let len = langs.length();
+    for i in 0..len {
+      if let Some(tag) = langs.get(i).as_string()
+        && let Some(slug) = locale_slug_from_tag(&tag)
+      {
+        return slug.to_string();
       }
-      if lang.starts_with("en") {
-        return "en".to_string();
-      }
-      // Other languages default to English per requirements
-      return "en".to_string();
     }
-    "en".to_string()
+
+    // Fallback path: single-language navigator.
+    if let Some(lang) = navigator.language()
+      && let Some(slug) = locale_slug_from_tag(&lang)
+    {
+      return slug.to_string();
+    }
+    LOCALE_EN.to_string()
   }
 
   /// Detect debug mode from URL query parameter.
@@ -411,12 +880,83 @@ impl Default for AppState {
   }
 }
 
+/// Pure helper: map a BCP-47 language tag to one of the shipped
+/// locale slugs (`"zh-CN"` / `"es"` / `"en"`), or `None` when the
+/// tag does not match any supported locale.
+///
+/// Exposed at module scope so [`AppState::detect_locale`] can iterate
+/// `navigator.languages` and so unit tests can verify the mapping
+/// without a live `Window` (review v3 §R2).
+#[must_use]
+fn locale_slug_from_tag(tag: &str) -> Option<&'static str> {
+  // Lower-case copy keeps the comparisons case-insensitive without
+  // allocating when the tag is already lower-case.
+  let lower = tag.to_ascii_lowercase();
+  if lower.starts_with("zh") {
+    Some(LOCALE_ZH_CN)
+  } else if lower.starts_with("es") {
+    Some(LOCALE_ES)
+  } else if lower.starts_with("en") {
+    Some(LOCALE_EN)
+  } else {
+    None
+  }
+}
+
+/// Persist the mutated subset of conversation flags to IndexedDB and
+/// delete tombstoned rows. Runs asynchronously from the persist
+/// debounce timer so the synchronous toggle/auto-unarchive call
+/// sites are never blocked on the IDB round-trip (review v3 §B1 / §B3).
+#[cfg(target_arch = "wasm32")]
+fn flush_conv_flags_to_idb(to_put: Vec<Conversation>, tombstones: HashSet<ConversationId>) {
+  let Some(pm) = use_context::<crate::persistence::PersistenceManager>() else {
+    return;
+  };
+  wasm_bindgen_futures::spawn_local(async move {
+    let Ok(db) = pm.db().await else {
+      return;
+    };
+    // Puts first so a put-then-delete pair on the same conversation
+    // (e.g. user toggles pin then immediately leaves the room) ends
+    // up with the row deleted, matching the latest in-memory state.
+    for conv in &to_put {
+      let key = match serde_json::to_string(&conv.id) {
+        Ok(k) => k,
+        Err(_) => continue,
+      };
+      let entry = crate::persistence::store::ConvFlagsEntry {
+        conversation_id: key,
+        pinned: conv.pinned,
+        pinned_at_ms: conv.pinned_ts,
+        muted: conv.muted,
+        archived: conv.archived,
+      };
+      let _ = crate::persistence::store::put_conv_flags(&db, &entry).await;
+    }
+    for id in &tombstones {
+      let key = match serde_json::to_string(id) {
+        Ok(k) => k,
+        Err(_) => continue,
+      };
+      let _ = crate::persistence::store::delete_conv_flags(&db, &key).await;
+    }
+  });
+}
+
 // ── Context helpers ──
 
 /// Provide AppState to the Leptos component tree.
 pub fn provide_app_state() -> AppState {
   let state = AppState::new();
   state.load_conversations();
+
+  // Reconcile pin / mute / archive flags against IndexedDB so the
+  // localStorage cache cannot diverge from the authoritative source
+  // (Req 7.7d). The reconcile runs asynchronously after the initial
+  // synchronous render, so the UI shows cached state immediately and
+  // any IDB-only updates land on the next reactive tick.
+  #[cfg(target_arch = "wasm32")]
+  state.reconcile_conv_flags_from_idb();
 
   // Restore the previously active conversation (Req 10.9.34). The Effect
   // below will persist any subsequent changes automatically.
@@ -441,6 +981,21 @@ pub fn provide_app_state() -> AppState {
   Effect::new(move |_| {
     let current = active.get();
     AppState::persist_active_conversation(current.as_ref());
+  });
+
+  // Persist the "Archived" section expand/collapse state across
+  // reloads (review v3 §O4). The signal is initialised from
+  // localStorage in `AppState::new`; this Effect mirrors any later
+  // user toggle back to disk.
+  let archived_expanded = state.archived_expanded;
+  Effect::new(move |prev: Option<bool>| {
+    let current = archived_expanded.get();
+    // Skip the initial run so we do not spuriously rewrite the
+    // value we just loaded.
+    if prev.is_some() {
+      utils::save_to_local_storage("archived_expanded", if current { "true" } else { "false" });
+    }
+    current
   });
 
   // Drive the global 1 Hz tick (Sprint 4.3 of the review-task-21

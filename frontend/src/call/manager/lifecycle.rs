@@ -23,7 +23,7 @@ impl CallManager {
 
     match media::acquire_user_media(media_type).await {
       Ok(stream) => {
-        // P1-New-3 fix: while the invite is still pending we only keep the
+        // while the invite is still pending we only keep the
         // stream as a local preview. Tracks are NOT yet attached to the
         // mesh PeerConnections — that would trigger `onnegotiationneeded`
         // on peers who never participate in this call and pollute their

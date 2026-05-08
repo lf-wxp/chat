@@ -8,11 +8,11 @@ use wasm_bindgen::JsValue;
 /// Attempts to read `.message` from the JS error object. Falls back to
 /// a plain string if possible and finally to `JSON.stringify` so that
 /// opaque JS objects still produce useful trace information instead of
-/// a generic "Unknown error" (Issue-6 fix; R2-Issue-8 hardening).
+/// a generic "Unknown error".
 pub(crate) fn format_js_error(e: &JsValue) -> String {
   // Explicit null / undefined branches so logs do not degrade to
   // "Unknown error" when a fetch() rejects with `undefined` (happens in
-  // Firefox when the page is navigated away mid-request) (P2-4 fix).
+  // Firefox when the page is navigated away mid-request).
   if e.is_null() {
     return "null".to_string();
   }

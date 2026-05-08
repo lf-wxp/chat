@@ -369,6 +369,40 @@
   background-color: rgba(148, 163, 184, 0.25);
 }
 
+/* Req 14.10.4 — Poor quality pulses to draw attention. The keyframe
+   targets opacity (compositor-only, no layout) and respects the
+   reduced-motion preference further down. The Poor classification
+   recolors the active bar(s) red so the four-bar metaphor still
+   reads as "1 of 4" while the pulse signals user-actionable trouble. */
+.network-indicator[data-quality="poor"] .network-indicator__bar.is-active {
+  background-color: var(--color-error, #ef4444);
+}
+
+.network-indicator[data-quality="poor"] {
+  animation: network-poor-pulse 1.2s ease-in-out infinite;
+}
+
+.network-indicator[data-quality="fair"] .network-indicator__bar.is-active {
+  background-color: var(--color-warning, #f59e0b);
+}
+
+@keyframes network-poor-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .network-indicator[data-quality="poor"] {
+    animation: none;
+    opacity: 1;
+  }
+}
+
 /* ── Responsive: mobile (<768px) ── */
 @media (max-width: 767px) {
   .video-grid {

@@ -8,7 +8,7 @@
 //! When the same user is also currently online, the row prefers the
 //! latest nickname / username from `app_state.online_users` over the
 //! snapshot stored at block time so a renamed user appears with their
-//! current display name (Opt-3 fix).
+//! current display name.
 
 use leptos::prelude::*;
 use leptos_i18n::{t, t_string};
@@ -27,7 +27,7 @@ pub fn BlacklistManagementPanel() -> impl IntoView {
   // Derive a sorted list that subscribes to the same underlying signal
   // as `blacklist.list()`. `Signal::derive` is the idiomatic Leptos 0.8
   // equivalent of the hand-rolled `Memo::new(|_| { let _ = sig.get(); list })`
-  // pattern — it drops one layer of reactive caching (Opt-4.2 fix).
+  // pattern — it drops one layer of reactive caching.
   let entries = {
     let bl = blacklist.clone();
     Signal::derive(move || bl.list())
@@ -67,8 +67,8 @@ pub fn BlacklistManagementPanel() -> impl IntoView {
 
                 // Resolve the freshest display name reactively so a
                 // user who renamed themselves after being blocked
-                // shows up with their current nickname / username
-                // (Opt-3 fix). Falls back to the snapshot stored on
+                // shows up with their current nickname / username.
+                // Falls back to the snapshot stored on
                 // the entry when the user is offline.
                 let entry_for_name = entry.clone();
                 let online_users = app_state.online_users;
@@ -128,7 +128,7 @@ pub fn BlacklistManagementPanel() -> impl IntoView {
 /// the value (which only happens for nonsense input).
 ///
 /// Uses `chrono::Utc` instead of `chrono::Local` so the output is
-/// deterministic across CI environments (Opt-8 / Opt-11 fix).
+/// deterministic across CI environments.
 fn format_blocked_at(ms: i64) -> String {
   use chrono::TimeZone;
   chrono::Utc

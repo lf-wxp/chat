@@ -41,6 +41,13 @@ use wasm_bindgen::prelude::wasm_bindgen;
 /// This function is automatically called by Trunk when the WASM module loads.
 #[wasm_bindgen(start)]
 pub fn init() {
+  // Route Rust panics through the browser console so `RuntimeError:
+  // unreachable` traces include the real panic message + Rust
+  // file/line origin — without this hook, panics inside
+  // `spawn_local` tasks are nearly impossible to diagnose from
+  // the stripped WASM stack trace alone.
+  console_error_panic_hook::set_once();
+
   // Mount the App component wrapped with I18nContextProvider.
   // Global states are provided inside mount_to_body so they live under
   // the correct reactive owner created by the mount call.
@@ -60,7 +67,7 @@ pub fn init() {
 
     // Initialize error toast manager BEFORE signaling client so that
     // any ErrorResponse received during connection setup can be
-    // displayed without a missing-context panic (P0 Bug-2 fix).
+    // displayed without a missing-context panic.
     let error_toast = error_handler::provide_error_toast_manager();
 
     // Wire the invite manager's cleanup tick to the toast surface so
@@ -91,7 +98,7 @@ pub fn init() {
 
     // Logout side-effect: cancel any pending blacklist auto-decline
     // timers and drop in-flight invites so they cannot fire after the
-    // WebSocket has been torn down (P1 Bug-2 / Bug-3 fix).
+    // WebSocket has been torn down.
     {
       let blacklist = blacklist.clone();
       let invite_mgr_for_effect = invite_mgr.clone();
@@ -122,7 +129,7 @@ pub fn init() {
 
     // Cache LoggerState so browser event callbacks in UserStatusManager
     // can log through the structured logger instead of falling back to
-    // console.warn (P1-3 fix).
+    // console.warn.
     if let Some(logger) = leptos::prelude::use_context::<logging::LoggerState>() {
       user_status.set_logger(logger);
     }

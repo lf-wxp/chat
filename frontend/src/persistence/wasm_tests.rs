@@ -21,6 +21,10 @@ use crate::persistence::store::{
   load_ack_queue, load_after, load_before, load_recent, load_search_index, put_ack_entries,
   put_message, put_search_entries,
 };
+use crate::persistence::store::{
+  KEY_USER_BG_DARK, KEY_USER_BG_LIGHT, delete_background_image, get_background_image,
+  has_background_image, put_background_image,
+};
 use crate::state::ConversationId;
 use message::UserId;
 use std::collections::BTreeMap;
@@ -454,4 +458,128 @@ async fn idb_search_index_clear_and_rebuild() {
   let loaded = load_search_index(&db).await.expect("load failed");
   assert_eq!(loaded.len(), 1);
   assert!(loaded.contains_key("new"));
+}
+
+// ---------------------------------------------------------------------------
+// background_image store (plan §7.2 / batch 6)
+// ---------------------------------------------------------------------------
+
+/// Build a tiny `image/png` Blob from a fixed byte buffer. Using a
+/// minimal payload keeps the test fast and the assertions focused
+/// on the round-trip itself rather than on image semantics.
+fn make_test_blob(bytes: &[u8], mime: &str) -> web_sys::Blob {
+  let array = js_sys::Uint8Array::from(bytes);
+  let parts = js_sys::Array::new();
+  parts.push(&array);
+  let options = web_sys::BlobPropertyBag::new();
+  options.set_type(mime);
+  web_sys::Blob::new_with_u8_array_sequence_and_options(&parts, &options)
+    .expect("failed to construct test Blob")
+}
+
+#[wasm_bindgen_test]
+async fn background_image_put_get_roundtrip() {
+  let db = open_db().await.expect("open_db failed");
+  let payload = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]; // PNG signature
+  let blob = make_test_blob(&payload, "image/png");
+
+  put_background_image(&db, KEY_USER_BG_LIGHT, &blob)
+    .await
+    .expect("put failed");
+
+  let fetched = get_background_image(&db, KEY_USER_BG_LIGHT)
+    .await
+    .expect("get failed")
+    .expect("blob should be present after put");
+
+  assert_eq!(
+    fetched.size() as usize,
+    payload.len(),
+    "round-tripped blob size must match the payload"
+  );
+  assert_eq!(fetched.type_(), "image/png");
+}
+
+#[wasm_bindgen_test]
+async fn background_image_get_missing_is_none() {
+  let db = open_db().await.expect("open_db failed");
+  // Ensure the dark slot is empty first (prior test runs in the
+  // same origin may have populated it).
+  delete_background_image(&db, KEY_USER_BG_DARK)
+    .await
+    .expect("delete failed");
+
+  let fetched = get_background_image(&db, KEY_USER_BG_DARK)
+    .await
+    .expect("get failed");
+  assert!(fetched.is_none());
+}
+
+#[wasm_bindgen_test]
+async fn background_image_has_probe_matches_existence() {
+  let db = open_db().await.expect("open_db failed");
+  let blob = make_test_blob(b"hello", "text/plain");
+
+  // Clean slate.
+  delete_background_image(&db, KEY_USER_BG_DARK)
+    .await
+    .expect("delete failed");
+  assert!(
+    !has_background_image(&db, KEY_USER_BG_DARK)
+      .await
+      .expect("has probe failed")
+  );
+
+  // Write and re-probe.
+  put_background_image(&db, KEY_USER_BG_DARK, &blob)
+    .await
+    .expect("put failed");
+  assert!(
+    has_background_image(&db, KEY_USER_BG_DARK)
+      .await
+      .expect("has probe failed")
+  );
+}
+
+#[wasm_bindgen_test]
+async fn background_image_put_overwrites_existing() {
+  let db = open_db().await.expect("open_db failed");
+  let first = make_test_blob(b"ABCDEF", "image/png");
+  let second = make_test_blob(b"XYZ", "image/png");
+
+  put_background_image(&db, KEY_USER_BG_LIGHT, &first)
+    .await
+    .expect("put 1 failed");
+  put_background_image(&db, KEY_USER_BG_LIGHT, &second)
+    .await
+    .expect("put 2 failed");
+
+  let fetched = get_background_image(&db, KEY_USER_BG_LIGHT)
+    .await
+    .expect("get failed")
+    .expect("blob should be present after second put");
+  assert_eq!(fetched.size() as usize, 3, "second put must overwrite");
+}
+
+#[wasm_bindgen_test]
+async fn background_image_delete_makes_entry_absent() {
+  let db = open_db().await.expect("open_db failed");
+  let blob = make_test_blob(b"bytes", "application/octet-stream");
+  put_background_image(&db, KEY_USER_BG_LIGHT, &blob)
+    .await
+    .expect("put failed");
+  assert!(
+    has_background_image(&db, KEY_USER_BG_LIGHT)
+      .await
+      .expect("has probe failed")
+  );
+
+  delete_background_image(&db, KEY_USER_BG_LIGHT)
+    .await
+    .expect("delete failed");
+  assert!(
+    !has_background_image(&db, KEY_USER_BG_LIGHT)
+      .await
+      .expect("has probe failed after delete")
+  );
 }

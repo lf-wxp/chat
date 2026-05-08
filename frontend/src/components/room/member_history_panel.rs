@@ -22,7 +22,7 @@ use leptos_icons::Icon;
 /// Resolve a target `UserId` to a human-readable display name, looking
 /// up the nickname from the current room's member list. Falls back to
 /// `UserId::to_string()` when the member has no nickname or has left
-/// the room (BUG-NEW-06 fix).
+/// the room.
 fn resolve_target_name(
   app_state: &crate::state::AppState,
   room_id: &RoomId,
@@ -44,7 +44,7 @@ fn resolve_target_name(
 }
 
 /// Format a nanosecond timestamp using a locale-aware date pattern
-/// (BUG-NEW-08 fix). The caller resolves the format string via
+/// locale-aware date pattern. The caller resolves the format string via
 /// `t_string!(i18n, room.date_format)` and passes it here; this
 /// avoids depending on the `I18nContext` type in a standalone function.
 fn format_timestamp(date_format: &str, nanos: i64) -> String {
@@ -52,7 +52,7 @@ fn format_timestamp(date_format: &str, nanos: i64) -> String {
 }
 
 /// Format a duration in seconds using locale-aware unit labels
-/// (BUG-NEW-08 fix). The caller resolves the three template strings
+/// fix). The caller resolves the three template strings
 /// via `t_string!` and passes them here; this avoids depending on
 /// the `I18nContext` type in a standalone function.
 fn format_duration(

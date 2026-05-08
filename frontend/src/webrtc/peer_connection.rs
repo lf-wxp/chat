@@ -31,7 +31,7 @@ pub struct PeerConnection {
   pc: JsValue,
   /// The peer's user ID.
   peer_id: UserId,
-  /// Unique identifier for this PeerConnection instance (P1-16 fix).
+  /// Unique identifier for this PeerConnection instance.
   ///
   /// Used to detect stale `onconnectionstatechange` callbacks from a
   /// previously-replaced connection. When `handle_incoming_offer` closes
@@ -44,11 +44,11 @@ pub struct PeerConnection {
   data_channel: Option<PeerDataChannel>,
   /// Whether we are the initiator (offer sender).
   is_initiator: bool,
-  /// Stored ICE candidate closure to prevent memory leak (P1-4 fix).
+  /// Stored ICE candidate closure to prevent memory leak.
   on_ice_candidate: Rc<RefCell<Option<IceCandidateClosure>>>,
-  /// Stored connection state change closure to prevent memory leak (P1-4 fix).
+  /// Stored connection state change closure to prevent memory leak.
   on_connection_state_change: Rc<RefCell<Option<EventClosure>>>,
-  /// Stored DataChannel incoming closure to prevent memory leak (P1-4 fix).
+  /// Stored DataChannel incoming closure to prevent memory leak.
   on_data_channel: Rc<RefCell<Option<DataChannelClosure>>>,
   /// Stored `ontrack` closure (call subsystem — remote media stream
   /// arrival). Retained in `Rc<RefCell<...>>` so it survives across
@@ -345,7 +345,7 @@ impl PeerConnection {
     self.is_initiator
   }
 
-  /// Get the unique instance identifier (P1-16 fix).
+  /// Get the unique instance identifier.
   ///
   /// Used to detect stale `onconnectionstatechange` callbacks from a
   /// previously-replaced connection for the same `peer_id`.
@@ -555,7 +555,7 @@ impl PeerConnection {
   /// Close the connection.
   ///
   /// Clears all JS event handlers and drops the stored closures to prevent
-  /// memory leaks (P1-4 fix). Also clears the `data_channel` field so that
+  /// memory leaks. Also clears the `data_channel` field so that
   /// subsequent `close()` calls on a replaced connection are no-ops (P1-18
   /// fix).
   pub fn close(&mut self) {

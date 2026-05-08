@@ -296,10 +296,9 @@ description = "Run unit tests for all workspace members"
 workspace = false
 
 [tasks.test-integration]
-args = ["test", "--test", "*"]
+args = ["test", "--workspace", "--test", "*", "--exclude", "chat-frontend"]
 command = "cargo"
-description = "Run integration tests"
-ignore_errors = true
+description = "Run integration tests (excludes frontend; its tests run via wasm-pack)"
 workspace = false
 
 [tasks.test-wasm]

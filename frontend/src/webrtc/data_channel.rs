@@ -59,11 +59,11 @@ pub struct PeerDataChannel {
   peer_id: message::UserId,
   /// Whether we created this channel (initiator).
   is_initiator: bool,
-  /// Stored message handler closure to prevent memory leak (P1-4 fix).
+  /// Stored message handler closure to prevent memory leak.
   on_message: Rc<RefCell<Option<MessageClosure>>>,
-  /// Stored open handler closure to prevent memory leak (P1-4 fix).
+  /// Stored open handler closure to prevent memory leak.
   on_open: Rc<RefCell<Option<EventClosure>>>,
-  /// Stored close handler closure to prevent memory leak (P1-4 fix).
+  /// Stored close handler closure to prevent memory leak.
   on_close: Rc<RefCell<Option<EventClosure>>>,
 }
 
@@ -346,7 +346,7 @@ impl PeerDataChannel {
     *self.on_close.borrow_mut() = Some(closure);
   }
 
-  /// Clear all event handlers and drop closures to prevent memory leaks (P1-4 fix).
+  /// Clear all event handlers and drop closures to prevent memory leaks.
   pub fn close(&self) {
     if let Ok(ch) = self.get_channel() {
       ch.set_onmessage(None);

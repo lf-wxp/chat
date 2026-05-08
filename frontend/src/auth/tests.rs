@@ -1,7 +1,7 @@
 //! Authentication module tests.
 //!
 //! Extracted from `mod.rs` to keep the main file focused on production
-//! code (Issue-7 fix). All tests run on native targets; WASM-only paths
+//! code. All tests run on native targets; WASM-only paths
 //! (e.g. `decode_jwt_payload`) are covered by integration tests.
 
 use super::*;
@@ -144,7 +144,7 @@ fn test_request_timeout_is_reasonable() {
   assert_eq!(REQUEST_TIMEOUT_MS, 10_000, "Timeout should be 10 seconds");
 }
 
-// ── JWT expiry check tests (Issue-3 fix) ──
+// ── JWT expiry check tests ──
 
 #[test]
 fn test_is_jwt_expired_malformed_token() {
@@ -163,7 +163,7 @@ fn test_is_jwt_expired_three_part_passes_count_gate() {
   );
 }
 
-// ── is_payload_expired pure-Rust tests (Issue-3 fix) ──
+// ── is_payload_expired pure-Rust tests ──
 
 #[test]
 fn test_payload_not_expired() {

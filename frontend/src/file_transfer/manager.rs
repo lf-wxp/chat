@@ -119,7 +119,7 @@ impl FileTransferManager {
   /// If a transfer for the same `(peer, transfer_id)` pair already
   /// exists and is still in progress (not terminal), the new
   /// registration is silently ignored to prevent overwriting an
-  /// active reassembly buffer with a fresh one (P2-3 fix). If the
+  /// active reassembly buffer with a fresh one. If the
   /// existing transfer is terminal (Failed / Cancelled / Completed /
   /// HashMismatch), it is replaced so a re-send can start fresh.
   pub fn register_inbound(&self, rx: IncomingTransfer) {
@@ -315,7 +315,7 @@ impl FileTransferManager {
   /// Request re-transmission of a file whose hash check failed.
   ///
   /// Resets the inbound transfer to `InProgress`, clears all
-  /// previously received chunks and the bitmap (P1-1 fix), and
+  /// previously received chunks and the bitmap, and
   /// sends a `FileResumeRequest` containing the full chunk range
   /// to the original sender, so they replay the entire file
   /// (Req 6.5a / Req 6.6).
@@ -333,7 +333,7 @@ impl FileTransferManager {
     let transfer_id = rx.info.transfer_id;
     let total_chunks = rx.info.total_chunks;
 
-    // P1-1 fix: clear old chunks + bitmap + reset progress so the
+    // Clear old chunks + bitmap + reset progress so the
     // retransmitted chunks are not silently skipped.
     self.with_inbound_mut(&rx.peer, &transfer_id, |rx| {
       rx.reset_for_resume();
@@ -370,7 +370,7 @@ impl FileTransferManager {
   }
 
   /// Pause all inbound transfers from a peer whose connection has
-  /// dropped (Req 6.6 / P1-1 fix).
+  /// dropped (Req 6.6).
   ///
   /// Transitions every non-terminal inbound transfer from the given
   /// peer to [`TransferStatus::Paused`] so that
@@ -389,7 +389,7 @@ impl FileTransferManager {
   /// transfers from them and automatically send a resume request
   /// for the missing chunks (Req 6.6).
   ///
-  /// P0-2 fix: resumes *all* paused transfers from the peer, not
+  /// Resumes *all* paused transfers from the peer, not
   /// just the first one found via `find()`.
   pub fn try_resume_inbound_from_peer(&self, peer_id: &UserId) {
     // Collect resume info inside the borrow, then release before

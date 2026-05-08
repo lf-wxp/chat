@@ -38,7 +38,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use wasm_bindgen::JsValue;
 
-/// Structured error for WebRTC operations (P1-10 fix).
+/// Structured error for WebRTC operations.
 ///
 /// Keeps `peer_id` as a separate field so callers can format messages
 /// with i18n keys instead of embedding the raw ID into a string.
@@ -99,7 +99,7 @@ impl WebRtcError {
 
   /// Whether this error represents a mesh-capacity rejection. Used by
   /// the call subsystem to surface a "video call is at capacity" toast
-  /// (Req 3.10 — P1 Bug-6 fix).
+  /// (Req 3.10).
   #[must_use]
   pub fn is_mesh_limit(&self) -> bool {
     self.code == ErrorCode::new(ErrorModule::E2e, ErrorCategory::Client, 3)
@@ -126,7 +126,7 @@ impl std::fmt::Display for WebRtcError {
 
 impl std::error::Error for WebRtcError {}
 
-/// Result of broadcasting an encrypted message to multiple peers (P1-17 fix).
+/// Result of broadcasting an encrypted message to multiple peers.
 ///
 /// Unlike the previous `Result<usize, WebRtcError>` return type which only
 /// reported how many peers succeeded, this struct provides per-peer failure
@@ -198,7 +198,7 @@ type PeerClosedHandler = Rc<dyn Fn(UserId)>;
 /// Callback invoked when a peer connection transitions to `Connected`.
 /// Routed to the call subsystem so mid-call arrivals (e.g. after a
 /// refresh recovery) receive the current local capture stream via
-/// `publish_local_stream_to` (Task 18 — P2-3 fix).
+/// `publish_local_stream_to` (Task 18).
 type PeerConnectedHandler = Rc<dyn Fn(UserId)>;
 
 /// Callback invoked when a remote peer broadcasts its local media
@@ -316,7 +316,7 @@ pub(super) struct InnerManager {
   /// pathological handshake hang from blowing the heap.
   pub(super) pending_broadcast:
     HashMap<UserId, std::collections::VecDeque<message::datachannel::DataChannelMessage>>,
-  /// Number of in-flight connection attempts (P1-6 fix).
+  /// Number of in-flight connection attempts.
   ///
   /// Counts concurrent `connect_to_peer` / `handle_incoming_offer` calls
   /// that have passed the mesh limit check but not yet stored their
@@ -324,7 +324,7 @@ pub(super) struct InnerManager {
   /// that could exceed `MAX_MESH_PEERS`.
   pub(super) in_flight: Rc<Cell<usize>>,
   /// Periodic `setInterval` handle that drives
-  /// [`WebRtcManager::prune_expired_ecdh`] (P1-11 fix). Retained so the
+  /// [`WebRtcManager::prune_expired_ecdh`]. Retained so the
   /// closure is not GC'd and so `Drop` on the manager cancels the timer.
   /// `None` in non-browser contexts (e.g. native unit tests).
   pub(super) prune_interval: Option<crate::utils::IntervalHandle>,
@@ -334,7 +334,7 @@ pub(super) struct InnerManager {
   pub(super) ice_restart_timers: HashMap<UserId, crate::utils::TimeoutHandle>,
 }
 
-/// RAII guard that decrements the in-flight connection counter on drop (P1-6 fix).
+/// RAII guard that decrements the in-flight connection counter on drop.
 struct InFlightGuard(Rc<Cell<usize>>);
 
 impl Drop for InFlightGuard {
@@ -502,7 +502,7 @@ impl WebRtcManager {
 
   /// Install an `onnegotiationneeded` handler that re-runs the SDP
   /// offer/answer round-trip whenever a track is added/removed on the
-  /// initiator side (Task 18 — P0 Bug-4 fix). Only the initiator wires
+  /// initiator side (Task 18). Only the initiator wires
   /// up the actual offer logic; the receiver side relies on the
   /// initiator to drive renegotiation, which avoids classic glare.
   ///
@@ -599,7 +599,7 @@ impl WebRtcManager {
   /// 4. Sends SdpOffer via signaling
   /// 5. Initiates ECDH key exchange (key sent when DataChannel opens)
   pub async fn connect_to_peer(&self, peer_id: UserId) -> Result<(), WebRtcError> {
-    // P1-6 fix: atomically check total occupied slots (existing + in-flight)
+    // Atomically check total occupied slots (existing + in-flight)
     // and reserve a slot before any async yield point.
     let in_flight_rc = {
       let inner = self.inner.borrow_mut();
@@ -656,7 +656,7 @@ impl WebRtcManager {
       self.wire_remote_track_handler(&pc, peer_id.clone());
 
       // Wire SDP renegotiation triggered by `addTrack`/`removeTrack`
-      // (Task 18 — P0 Bug-4 fix). Only initiators install the actual
+      // (Task 18). Only initiators install the actual
       // re-offer logic to avoid glare.
       self.wire_renegotiation_handler(&pc, peer_id.clone());
 
@@ -698,7 +698,7 @@ impl WebRtcManager {
       .connections
       .insert(peer_id.clone(), pc);
 
-    // P0-5 fix: register the peer in the reactive UI state so that
+    // Register the peer in the reactive UI state so that
     // subsequent `update_connection_state` / `update_data_channel_state`
     // calls can find it. Without this, the UI signal stays empty.
     self
@@ -768,7 +768,7 @@ impl WebRtcManager {
   /// (e.g., from a previous session that hasn't been cleaned up yet during
   /// page refresh recovery), close it before accepting the new offer.
   ///
-  /// **Renegotiation fast path** (P0 Bug-4 fix): if a connection already
+  /// **Renegotiation fast path**: if a connection already
   /// exists for this peer and is currently `stable`, treat the offer as
   /// a mid-session renegotiation (e.g. the initiator added a media
   /// track for a call) and apply it in-place via `setRemoteDescription`
@@ -850,7 +850,7 @@ impl WebRtcManager {
       return Ok(());
     }
 
-    // P2-9 fix: atomically replace any existing connection within a single
+    // Atomically replace any existing connection within a single
     // `borrow_mut`. The previous implementation called `is_connected()`
     // (borrow) immediately followed by `close_connection()` (borrow_mut),
     // which worked only because the first borrow was released before the
@@ -878,7 +878,7 @@ impl WebRtcManager {
         .update(|s| s.remove_peer(&peer_id));
     }
 
-    // P1-6 fix: atomically check total occupied slots and reserve a slot.
+    // Atomically check total occupied slots and reserve a slot.
     let in_flight_rc = {
       let inner = self.inner.borrow_mut();
       let total = inner.connections.len() + inner.in_flight.get();
@@ -982,7 +982,7 @@ impl WebRtcManager {
       .connections
       .insert(peer_id.clone(), pc);
 
-    // P0-5 fix: register the peer in the reactive UI state (receiver side,
+    // Register the peer in the reactive UI state (receiver side,
     // so `is_initiator` is false). See `connect_to_peer` for rationale.
     self
       .app_state
@@ -1043,7 +1043,7 @@ impl WebRtcManager {
         )
       })?;
 
-    // P2-12 fix: immediately sync an intermediate Connecting state so the
+    // Immediately sync an intermediate Connecting state so the
     // UI does not show stale data while waiting for the
     // onconnectionstatechange callback (which usually fires within ms).
     self
@@ -1215,7 +1215,7 @@ impl WebRtcManager {
   /// borrows from signal subscribers.
   ///
   /// Factored out so that `handle_incoming_offer` can atomically replace an
-  /// existing `PeerConnection` within a single `borrow_mut` (P2-9 fix): the
+  /// existing `PeerConnection` within a single `borrow_mut`: the
   /// previous implementation used two sequential `borrow()` + `borrow_mut()`
   /// calls, which were safe today only because the first borrow was
   /// released before the second, but was fragile against future refactors.
@@ -1345,7 +1345,7 @@ impl WebRtcManager {
   /// Clear the published track of a given kind on every peer connection
   /// by calling `sender.replaceTrack(null)`. Used by `toggle_camera(false)`
   /// to ensure remote sides render the avatar placeholder instead of a
-  /// frozen last frame (Req 3.6 / 7.1 — P1-New-1 fix).
+  /// frozen last frame (Req 3.6 / 7.1).
   ///
   /// Per-peer failures are logged but do not abort the sweep.
   pub async fn clear_local_track_of_kind(&self, kind: &str) {
@@ -1375,7 +1375,7 @@ impl WebRtcManager {
   pub async fn collect_stats(&self) -> Vec<(UserId, JsValue)> {
     /// Maximum number of concurrent in-flight `getStats()` promises
     /// per sweep. Keeps the main thread responsive on low-end devices
-    /// when the mesh is at capacity (P2-New-4 fix).
+    /// when the mesh is at capacity.
     ///
     /// The sweep walks `connections.chunks(STATS_CONCURRENCY)` and
     /// `join_all` the promises inside each chunk. On the single-threaded
@@ -1440,13 +1440,13 @@ impl WebRtcManager {
   /// Return a snapshot of all peer ids that currently have an active
   /// connection. Used by the call subsystem's refresh-recovery path to
   /// iterate peers without leaking internal `HashMap` / `RefCell`
-  /// references (P2-New-3 fix).
+  /// references.
   #[must_use]
   pub fn connected_peers(&self) -> Vec<UserId> {
     self.inner.borrow().connections.keys().cloned().collect()
   }
 
-  /// Handle connection state changes (P1-16 fix: stale callback guard).
+  /// Handle connection state changes (stale callback guard).
   ///
   /// When `handle_incoming_offer` replaces an existing PeerConnection for
   /// a `peer_id`, the old PC's `onconnectionstatechange` callback may still
@@ -1469,7 +1469,7 @@ impl WebRtcManager {
       &format!("[webrtc] Peer {} connection state: {:?}", peer_id, state).into(),
     );
 
-    // P1-16 fix: if the PeerConnection for this peer_id has been replaced
+    // If the PeerConnection for this peer_id has been replaced
     // since this callback was registered, the callback is stale — the
     // state change belongs to an old PC that is no longer tracked.
     let is_stale = self
@@ -1519,7 +1519,7 @@ impl WebRtcManager {
           ),
         );
         // Let the call subsystem publish its local capture stream to
-        // mid-call arrivals (Task 18 — P2-3 fix). Invoked outside any
+        // mid-call arrivals (Task 18). Invoked outside any
         // inner borrow so the callback can safely call back into the
         // manager.
         if let Some(handler) = self.on_peer_connected.borrow().clone() {
@@ -1613,8 +1613,8 @@ impl WebRtcManager {
           file_mgr.pause_inbound_transfers(&peer_id);
         }
         // Notify the call subsystem so it can drop the participant
-        // from the grid and detect "all peers left" (Task 18 — P1
-        // Bug-5 fix). We invoke the handler outside any inner borrow
+        // from the grid and detect "all peers left" (Task 18).
+        // We invoke the handler outside any inner borrow
         // (close_connection above already released them).
         if let Some(handler) = self.on_peer_closed.borrow().clone() {
           handler(peer_id.clone());
@@ -1761,7 +1761,7 @@ const PRUNE_INTERVAL_MS: i32 = 5_000;
 /// Also starts a periodic [`WebRtcManager::prune_expired_ecdh`] tick
 /// so expired ECDH handshakes surface the `handshake_timed_out` flag
 /// on the reactive UI state without requiring callers to manually
-/// drive pruning (P1-11 fix). The [`crate::utils::IntervalHandle`] is
+/// drive pruning. The [`crate::utils::IntervalHandle`] is
 /// stashed inside `InnerManager.prune_interval` so it lives as long
 /// as the manager and is cancelled automatically when the manager is
 /// dropped.

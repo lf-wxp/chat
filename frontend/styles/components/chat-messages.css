@@ -16,6 +16,26 @@
   overflow-y: auto;
   flex: 1;
   min-height: 0;
+  /* Req 14.11.6: layout containment so scrolling does not force
+     layout on the rest of the chat shell. */
+  contain: content;
+}
+
+/* Req 14.11.6: promote the scroll container to its own compositing
+   layer only while the user is actively scrolling. The `.message-list--
+   scrolling` class is toggled from the scroll handler and removed
+   after 2 s of idle so the browser can reclaim GPU memory. */
+.message-list--scrolling {
+  will-change: transform;
+}
+
+/* Req 14.11.6: off-screen message rows skip rendering work. The
+   intrinsic size hint tells the browser how much space to reserve
+   before measuring — tuned to the tallest common bubble height
+   (image / forwarded text). */
+.message-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 192px;
 }
 
 /* ── Message Row ── */
@@ -81,7 +101,13 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  transition: background-color var(--duration-fast, 150ms) var(--ease-default, ease);
+  /* Multiple animated properties: the `@starting-style` block below
+   * animates opacity / transform when a bubble is first inserted.
+   * `background-color` keeps its original snappy hover transition. */
+  transition:
+    background-color var(--duration-fast, 150ms) var(--ease-default, ease),
+    opacity var(--duration-slow, 300ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    transform var(--duration-slow, 300ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
 }
 
 /* ── Message Bubble ── */
@@ -111,14 +137,25 @@
   }
 }
 
-/* ── Entry Animation for new messages ── */
+/* ── Entry Animation for new messages ──
+ * `@starting-style` holds the pre-insertion snapshot. The
+ * transition declared on `.message-bubble-base` (above) drives the
+ * interpolation to the real values, so any newly mounted bubble
+ * gracefully fades and slides in. Offset is 12px (plan §6.3).
+ * Global `html[data-motion="off"]` / `prefers-reduced-motion`
+ * collapse the duration to ~0 so opt-out users see an instant
+ * paint without losing the final rest state. */
 @starting-style {
   .message-bubble {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(12px);
+  }
+  .message-bubble-incoming,
+  .message-bubble-outgoing {
+    opacity: 0;
+    transform: translateY(12px);
   }
 }
-
 /* ── Sticker in bubble: remove padding so sticker fills the bubble ── */
 .message-bubble-base:has(.message-sticker) {
   padding: 0;

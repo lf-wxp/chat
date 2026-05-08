@@ -41,7 +41,7 @@ pub struct UserStatusManager {
   /// Cached LoggerState reference so browser event callbacks (activity
   /// listener, idle check interval) can log through the structured logger
   /// instead of falling back to `console.warn` when the Leptos reactive
-  /// owner is unavailable (P1-3 fix). Set after construction via
+  /// owner is unavailable. Set after construction via
   /// `set_logger()` to avoid calling `use_context` outside the reactive
   /// owner.
   logger: Rc<RefCell<Option<crate::logging::LoggerState>>>,
@@ -55,12 +55,12 @@ struct StatusInner {
   /// Stored as a typed `Closure` instead of `JsValue` so that
   /// `remove_event_listener_with_callback` can borrow the inner
   /// `Function` via `as_ref().unchecked_ref()` without an unsafe
-  /// `JsValue::unchecked_ref()` cast (Opt-A).
+  /// `JsValue::unchecked_ref()` cast.
   activity_closure: Option<Closure<dyn Fn(JsValue)>>,
   /// Closure for idle check interval.
   ///
   /// Stored as a typed `Closure` so the Rust Drop runs deterministically
-  /// when the manager is stopped (Opt-A).
+  /// when the manager is stopped.
   idle_check_closure: Option<Closure<dyn Fn()>>,
   /// Timestamp of last user activity (ms since epoch).
   last_activity_ms: f64,
@@ -99,7 +99,7 @@ impl UserStatusManager {
     *self.signaling.borrow_mut() = Some(client);
   }
 
-  /// Set the LoggerState reference after construction (P1-3 fix).
+  /// Set the LoggerState reference after construction.
   ///
   /// Browser event callbacks run outside the Leptos reactive owner, so
   /// `use_context::<LoggerState>()` would return `None`. Caching the
@@ -130,7 +130,7 @@ impl UserStatusManager {
       window.clear_interval_with_handle(id);
     }
 
-    // Remove activity event listeners (Opt-A: typed Closure borrow).
+    // Remove activity event listeners.
     if let Some(ref closure) = inner.activity_closure
       && let Some(window) = web_sys::window()
       && let Some(document) = window.document()
@@ -217,7 +217,7 @@ impl UserStatusManager {
       }
     }
 
-    // Store typed Closure for cleanup (Opt-A).
+    // Store typed Closure for cleanup.
     self.inner.borrow_mut().activity_closure = Some(on_activity);
   }
 
@@ -237,7 +237,7 @@ impl UserStatusManager {
       self.inner.borrow_mut().idle_check_id = Some(id);
     }
 
-    // Store typed Closure to prevent GC (Opt-A).
+    // Store typed Closure to prevent GC.
     self.inner.borrow_mut().idle_check_closure = Some(on_check);
   }
 
@@ -273,7 +273,7 @@ impl UserStatusManager {
   fn send_status_change(&self, status: UserStatus) {
     let signaling = self.signaling.borrow().clone();
     let Some(client) = signaling else {
-      // W2 fix: Use console.error (not warn) and include a clear action item
+      // Use console.error (not warn) and include a clear action item
       // so developers know this is a configuration error, not a runtime
       // condition that can be ignored.
       web_sys::console::error_1(&JsValue::from_str(
@@ -319,8 +319,7 @@ impl UserStatusManager {
     if let Err(e) = client.send(&msg) {
       // Prefer the cached LoggerState so the warning lands in the
       // structured log stream; fall back to `console::warn_1` only
-      // when the logger has not been set yet (P1-3 fix, consolidates
-      // R2-Issue-11 fix).
+      // when the logger has not been set yet.
       let warn_msg = format!("Failed to send status change: {}", e);
       if let Some(logger) = *self.logger.borrow() {
         logger.warn("user-status", &warn_msg, None);

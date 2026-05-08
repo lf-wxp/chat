@@ -16,7 +16,7 @@ use crate::state::AppState;
 
 pub use connection::SignalingClient;
 
-// ── Shared logging helpers (Opt-B) ──
+// ── Shared logging helpers ──
 //
 // All signaling sub-modules route log messages through the structured
 // `LoggerState` logger when available, falling back to raw

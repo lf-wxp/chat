@@ -33,6 +33,7 @@ pub mod input_bar;
 pub mod message_bubble;
 pub mod message_list;
 pub mod reaction_picker;
+pub mod scroll_perf;
 pub mod sticker_cache;
 pub mod sticker_panel;
 pub mod typing_indicator;

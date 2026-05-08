@@ -27,7 +27,7 @@ pub fn LoginForm() -> impl IntoView {
     let password_val = password.get();
 
     // Client-side username validation (same as RegisterForm) to avoid
-    // unnecessary network requests for obviously invalid input (Issue-1 fix).
+    // unnecessary network requests for obviously invalid input.
     if let Err(err) = validate_username(&username_val) {
       set_error.set(Some(err.message));
       return;
@@ -36,7 +36,7 @@ pub fn LoginForm() -> impl IntoView {
       set_error.set(Some(t_string!(i18n, auth.password_required).to_string()));
       return;
     }
-    // P2-3 fix: Add client-side password length check consistent with
+    // Add client-side password length check consistent with
     // RegisterForm. While the server is the authoritative source for
     // password policy, a client-side check here avoids unnecessary
     // network requests for passwords that are obviously too short.

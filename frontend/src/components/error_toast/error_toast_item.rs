@@ -110,8 +110,10 @@ fn resolve_error_message(key: &str, fallback: &str) -> String {
       };
     }
     "call.network_poor" => t_string!(i18n, call.network_poor),
+    "call.quality_restored" => t_string!(i18n, call.quality_restored),
     "call.full_capacity" => t_string!(i18n, call.full_capacity),
     "call.auto_ended_all_left" => t_string!(i18n, call.auto_ended_all_left),
+    "sidebar.pin_limit_reached" => t_string!(i18n, sidebar.pin_limit_reached),
     _ => fallback,
   };
   resolved.to_string()
@@ -158,7 +160,7 @@ pub fn ErrorToastItem(
     is_expanded.update(|e| *e = !*e);
   };
 
-  // W4 fix: When this toast component is unmounted (e.g. the parent
+  // When this toast component is unmounted (e.g. the parent
   // ErrorToastContainer is removed or the page navigates away), we must
   // cancel the pending auto-remove timer so the JS closure is released
   // and does not try to mutate a dropped signal. This is done via
@@ -233,28 +235,31 @@ pub fn ErrorToastItem(
 #[cfg(test)]
 mod tests {
   /// Smoke-test the i18n key list to catch typos in the runtime
-  /// dispatcher: every `call.*` key recognised by
-  /// `resolve_error_message` must also exist in the locale JSON
-  /// catalogs (verified at compile time by `t_string!`). This test
-  /// exercises a representative subset to keep the regression cheap.
+  /// dispatcher: every key recognised by `resolve_error_message`
+  /// must also exist in the locale JSON catalogs (verified at
+  /// compile time by `t_string!`). This test exercises a
+  /// representative subset to keep the regression cheap.
   #[test]
-  fn known_call_keys_are_listed_in_dispatcher() {
-    // The list mirrors the `match` arms in `resolve_error_message`;
-    // when a new `call.*` key is added it must be recognised here.
+  fn known_keys_are_namespaced_and_listed_in_dispatcher() {
+    // Mirrors the `match` arms in `resolve_error_message`. When a
+    // new key is added it must be recognised here. Keys are grouped
+    // by namespace so each entry has the form "<domain>.<name>".
     let known = [
       "call.duration_summary",
       "call.network_poor",
+      "call.quality_restored",
       "call.full_capacity",
       "call.auto_ended_all_left",
+      "sidebar.pin_limit_reached",
     ];
     for key in known {
       // The key strings are simple identifiers; this test merely
-      // documents the dispatcher contract and would fail at compile
-      // time if a key was renamed in the JSON catalog.
-      assert!(
-        key.starts_with("call."),
-        "expected `call.*` namespace for {key}",
-      );
+      // documents the dispatcher contract. A key must contain a
+      // `<namespace>.<name>` structure so the JSON catalogs can
+      // organise translations consistently.
+      let (head, tail) = key.split_once('.').unwrap_or(("", ""));
+      assert!(!head.is_empty(), "expected namespace prefix for {key}");
+      assert!(!tail.is_empty(), "expected name component for {key}");
     }
   }
 }

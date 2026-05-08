@@ -43,8 +43,8 @@ pub use media::{
 };
 pub use stats::{QualityAction, QualityController, STATS_POLL_INTERVAL_MS, parse_stats_report};
 pub use types::{
-  CallEndReason, CallPhase, CallState, LocalMediaState, NetworkStatsSample, PersistedCallState,
-  VideoProfile,
+  CallEndReason, CallPhase, CallState, ConnectionType, LocalMediaState, NetworkStatsSample,
+  PersistedCallState, VideoProfile,
 };
 pub use vad::VoiceActivityDetector;
 

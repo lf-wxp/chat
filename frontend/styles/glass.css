@@ -1,0 +1,452 @@
+/**
+ * Glass (Windows 11 Mica) utility classes.
+ *
+ * Three layers — `glass-l2` / `glass-l3` / `glass-l4` — are exposed as
+ * utilities so component CSS can opt in without duplicating the
+ * filter / noise / highlight plumbing. All tints come from
+ * `tokens.css` so theme + a11y overrides propagate automatically.
+ *
+ * Layer guidance (kept in sync with `webrtc-chat-app/ui-enhance-plan.md`):
+ *   L2 — persistent chrome    (top-bar, sidebar, drawer)
+ *   L3 — transient overlays   (modal, popover, toast, menu)
+ *   L4 — theater small panels (subtitle / danmaku settings)
+ *
+ * Degradation order (highest priority wins):
+ *   1. OS "Reduce transparency" → handled in tokens.css (tints become solid).
+ *   2. `html[data-glass="off"]` → user opted out via settings.
+ *   3. `@supports not (backdrop-filter)` → browser cannot render blur.
+ *   4. Default Mica path.
+ */
+
+/* ── Shared glass plumbing ──
+ * All three layers share the same structural pieces (relative box,
+ * stacking context for the grain pseudo-element, rounded corners).
+ * The actual blur / tint / border differ per layer.
+ */
+.glass-l2,
+.glass-l3,
+.glass-l4 {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid var(--glass-border);
+}
+
+/* Noise grain — Mica's signature subtle texture. A tiny inline SVG
+ * fractal noise is tiled at a high frequency so it reads as grain,
+ * not pattern. `mix-blend-mode: overlay` keeps it theme-aware without
+ * any runtime theme switch. */
+.glass-l2::before,
+.glass-l3::before,
+.glass-l4::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--glass-noise-opacity);
+  mix-blend-mode: overlay;
+  border-radius: inherit;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.7'/></svg>");
+  background-size: 160px 160px;
+  z-index: 0;
+}
+
+/* Ensure real content sits above the grain layer. */
+.glass-l2 > *,
+.glass-l3 > *,
+.glass-l4 > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── L2 — persistent chrome ── */
+.glass-l2 {
+  background: var(--glass-bg-l2);
+  backdrop-filter:
+    blur(var(--glass-blur-md))
+    saturate(var(--glass-saturate));
+  -webkit-backdrop-filter:
+    blur(var(--glass-blur-md))
+    saturate(var(--glass-saturate));
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-highlight),
+    var(--shadow-md);
+}
+
+/* ── L3 — transient overlays ── */
+.glass-l3 {
+  background: var(--glass-bg-l3);
+  backdrop-filter:
+    blur(var(--glass-blur-lg))
+    saturate(var(--glass-saturate));
+  -webkit-backdrop-filter:
+    blur(var(--glass-blur-lg))
+    saturate(var(--glass-saturate));
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-highlight),
+    var(--shadow-xl);
+  border-radius: var(--radius-2xl);
+}
+
+/* ── L4 — theater small panels ── */
+.glass-l4 {
+  background: var(--glass-bg-l4);
+  backdrop-filter:
+    blur(var(--glass-blur-lg))
+    saturate(var(--glass-saturate));
+  -webkit-backdrop-filter:
+    blur(var(--glass-blur-lg))
+    saturate(var(--glass-saturate));
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-highlight),
+    0 10px 40px -10px rgb(0 0 0 / 0.55);
+  border-radius: var(--radius-xl);
+}
+
+/* ── Optional variants ── */
+/* Interactive lift on hover — intended for list items / buttons that
+ * adopt a glass panel look. Kept opt-in so non-interactive panels do
+ * not waste paint cycles. */
+.glass--interactive {
+  transition:
+    transform var(--duration-normal) var(--ease-smooth),
+    backdrop-filter var(--duration-normal) var(--ease-smooth),
+    background-color var(--duration-normal) var(--ease-smooth);
+}
+.glass--interactive:hover {
+  transform: translateY(-1px);
+  backdrop-filter:
+    blur(calc(var(--glass-blur-lg) + 2px))
+    saturate(calc(var(--glass-saturate) + 10%));
+}
+
+/* Hide the grain overlay when the caller wants a cleaner surface. */
+.glass--no-grain::before {
+  content: none;
+}
+
+/* Remove border when the glass sits inside another glass container
+ * (double borders look muddy). */
+.glass--no-border {
+  border: 0;
+}
+
+/* ── Browser capability fallback ──
+ * If `backdrop-filter` is not supported, swap the translucent tint
+ * for a bumped-up elevated surface mix so the component still has a
+ * visible card shape.
+ */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-l2,
+  .glass-l3,
+  .glass-l4 {
+    background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .glass-l2::before,
+  .glass-l3::before,
+  .glass-l4::before {
+    content: none;
+  }
+}
+
+/* ── User opt-out: html[data-glass="off"] ──
+ * Mirrors the "Enable glass effect" setting toggle. Falls through to
+ * the component's underlying surface so nothing becomes invisible.
+ */
+html[data-glass="off"] .glass-l2,
+html[data-glass="off"] .glass-l3,
+html[data-glass="off"] .glass-l4 {
+  background: var(--bg-elevated);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--shadow-md);
+}
+html[data-glass="off"] .glass-l2::before,
+html[data-glass="off"] .glass-l3::before,
+html[data-glass="off"] .glass-l4::before {
+  content: none;
+}
+
+/* ── Component bridges (MVP batch 8) ──
+ * These rules upgrade the three existing always-visible shell
+ * components to Mica L2 without touching their component CSS or
+ * their Rust JSX (no class churn). Because this file is loaded into
+ * the `effects` cascade layer — declared above `components` in
+ * main.css — these declarations reliably beat the component-layer
+ * `background-color` declarations while respecting the same
+ * degradation chain (reduced-transparency / data-glass="off" /
+ * @supports fallback) already defined above.
+ */
+.top-bar,
+.sidebar {
+  position: relative;
+  isolation: isolate;
+  background: var(--glass-bg-l2);
+  backdrop-filter:
+    blur(var(--glass-blur-md))
+    saturate(var(--glass-saturate));
+  -webkit-backdrop-filter:
+    blur(var(--glass-blur-md))
+    saturate(var(--glass-saturate));
+  border-color: var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-highlight),
+    var(--shadow-md);
+}
+
+/* Drawer keeps position: fixed (from drawer.css in the components
+ * layer) so it correctly overlays the viewport. We only apply
+ * isolation + glass visual properties here — no position override. */
+.drawer {
+  isolation: isolate;
+  background: var(--glass-bg-l2);
+  backdrop-filter:
+    blur(var(--glass-blur-md))
+    saturate(var(--glass-saturate));
+  -webkit-backdrop-filter:
+    blur(var(--glass-blur-md))
+    saturate(var(--glass-saturate));
+  border-color: var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-highlight),
+    var(--shadow-md);
+}
+
+/* Noise grain pseudo-element for the bridged components. Kept
+ * mirrorred from the .glass-l2::before declaration so the look
+ * matches one-to-one. Components that already own a `::before`
+ * for other purposes would need to opt out with a `content: none`
+ * override in their component CSS; none of the three do today. */
+.top-bar::before,
+.sidebar::before,
+.drawer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--glass-noise-opacity);
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.7'/></svg>");
+  background-size: 160px 160px;
+  z-index: 0;
+}
+
+/* Hoist real content above the grain layer on the bridged hosts. */
+.top-bar > *,
+.sidebar > *,
+.drawer > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Browser capability fallback for the bridged hosts. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .top-bar,
+  .sidebar,
+  .drawer {
+    background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .top-bar::before,
+  .sidebar::before,
+  .drawer::before {
+    content: none;
+  }
+}
+
+/* User opt-out for the bridged hosts. */
+html[data-glass="off"] .top-bar,
+html[data-glass="off"] .sidebar,
+html[data-glass="off"] .drawer {
+  background: var(--bg-elevated);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--shadow-md);
+}
+html[data-glass="off"] .top-bar::before,
+html[data-glass="off"] .sidebar::before,
+html[data-glass="off"] .drawer::before {
+  content: none;
+}
+
+/* ── Component bridges — L3 transient overlays (MVP batch 9) ──
+ * Mirrors the `.glass-l3` treatment onto the five L3 surfaces:
+ *   .modal .toast .error-toast .sidebar-conversation-menu .sticker-panel
+ * Kept separate from the `.glass-l3` utility so these components
+ * do not need to add an extra class in their JSX. Because this file
+ * is loaded into the `effects` cascade layer (above `components` in
+ * main.css), these rules reliably override component-layer
+ * `background-color` declarations — including the
+ * `[data-theme="dark"] .toast` overrides which, despite higher
+ * specificity, sit in the `components` layer and therefore lose to
+ * this layer.
+ *
+ * Box-shadow composition notes:
+ *   * `.error-toast` owns a distinctive `border-left: 4px` accent —
+ *     we deliberately only write to `background` / `backdrop-filter`
+ *     / `box-shadow` so the left stripe survives.
+ */
+.modal,
+.toast,
+.error-toast,
+.sidebar-conversation-menu,
+.sticker-panel {
+  position: relative;
+  isolation: isolate;
+  background: var(--glass-bg-l3);
+  backdrop-filter:
+    blur(var(--glass-blur-lg))
+    saturate(var(--glass-saturate));
+  -webkit-backdrop-filter:
+    blur(var(--glass-blur-lg))
+    saturate(var(--glass-saturate));
+  border-color: var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-highlight),
+    var(--shadow-xl);
+}
+
+/* Noise grain for L3 surfaces. We keep the per-host `::before`
+ * declarations flat (no nesting) so callers can opt out surgically
+ * with `content: none` if they already own the pseudo-element. */
+.modal::before,
+.toast::before,
+.error-toast::before,
+.sidebar-conversation-menu::before,
+.sticker-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--glass-noise-opacity);
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.7'/></svg>");
+  background-size: 160px 160px;
+  border-radius: inherit;
+  z-index: 0;
+}
+
+/* Lift real content above the grain layer. */
+.modal > *,
+.toast > *,
+.error-toast > *,
+.sidebar-conversation-menu > *,
+.sticker-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Browser capability fallback for the L3 bridged hosts. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .modal,
+  .toast,
+  .error-toast,
+  .sidebar-conversation-menu,
+  .sticker-panel {
+    background: color-mix(in srgb, var(--bg-elevated) 94%, transparent);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .modal::before,
+  .toast::before,
+  .error-toast::before,
+  .sidebar-conversation-menu::before,
+  .sticker-panel::before {
+    content: none;
+  }
+}
+
+/* User opt-out for the L3 bridged hosts. */
+html[data-glass="off"] .modal,
+html[data-glass="off"] .toast,
+html[data-glass="off"] .error-toast,
+html[data-glass="off"] .sidebar-conversation-menu,
+html[data-glass="off"] .sticker-panel {
+  background: var(--bg-elevated);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--shadow-xl);
+}
+html[data-glass="off"] .modal::before,
+html[data-glass="off"] .toast::before,
+html[data-glass="off"] .error-toast::before,
+html[data-glass="off"] .sidebar-conversation-menu::before,
+html[data-glass="off"] .sticker-panel::before {
+  content: none;
+}
+
+/* ── Component bridges — L4 theater panels (MVP batch 10) ──
+ * Mirrors the `.glass-l4` treatment onto the two theater setting
+ * panels. The copyright tooltip deliberately does **not** go through
+ * this bridge: it keeps a hand-rolled dark-only glass treatment
+ * (see theater.css) so it stays legible regardless of theme, in line
+ * with the rest of the video-area chrome.
+ *
+ * Red-line reminder (plan §2.2): L4 is approved for these small
+ * overlay panels because they sit outside the video surface. The
+ * video surface `.theater-page__surface` still owns
+ * `isolation: isolate` and must never receive a backdrop-filter.
+ */
+.subtitle-settings,
+.danmaku-settings {
+  position: relative;
+  isolation: isolate;
+  background: var(--glass-bg-l4);
+  backdrop-filter:
+    blur(var(--glass-blur-lg))
+    saturate(var(--glass-saturate));
+  -webkit-backdrop-filter:
+    blur(var(--glass-blur-lg))
+    saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-highlight),
+    0 10px 40px -10px rgb(0 0 0 / 0.45);
+}
+
+.subtitle-settings::before,
+.danmaku-settings::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--glass-noise-opacity);
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.7'/></svg>");
+  background-size: 160px 160px;
+  border-radius: inherit;
+  z-index: 0;
+}
+
+.subtitle-settings > *,
+.danmaku-settings > * {
+  position: relative;
+  z-index: 1;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .subtitle-settings,
+  .danmaku-settings {
+    background: color-mix(in srgb, var(--bg-secondary) 94%, transparent);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .subtitle-settings::before,
+  .danmaku-settings::before {
+    content: none;
+  }
+}
+
+html[data-glass="off"] .subtitle-settings,
+html[data-glass="off"] .danmaku-settings {
+  background: var(--bg-secondary);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+html[data-glass="off"] .subtitle-settings::before,
+html[data-glass="off"] .danmaku-settings::before {
+  content: none;
+}

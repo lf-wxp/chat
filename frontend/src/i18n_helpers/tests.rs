@@ -16,6 +16,14 @@ fn test_parse_locale_zh() {
 }
 
 #[test]
+fn test_parse_locale_es() {
+  assert_eq!(parse_locale("es"), Some(Locale::es));
+  assert_eq!(parse_locale("es-ES"), Some(Locale::es));
+  assert_eq!(parse_locale("es-MX"), Some(Locale::es));
+  assert_eq!(parse_locale("es-AR"), Some(Locale::es));
+}
+
+#[test]
 fn test_parse_locale_unknown() {
   assert_eq!(parse_locale("fr"), None);
   assert_eq!(parse_locale(""), None);
@@ -26,6 +34,8 @@ fn test_parse_locale_unknown() {
 fn test_locale_equality() {
   assert_eq!(Locale::en, Locale::en);
   assert_ne!(Locale::en, Locale::zh_CN);
+  assert_ne!(Locale::en, Locale::es);
+  assert_ne!(Locale::zh_CN, Locale::es);
 }
 
 #[test]

@@ -806,21 +806,24 @@
   left: var(--space-2, 0.5rem);
   width: min(340px, calc(100vw - var(--space-4, 1rem)));
   max-height: 360px;
-  background: var(--bg-elevated, #ffffff);
-  border: 1px solid var(--border-color, #e2e8f0);
+  /* Background / border / box-shadow are owned by the effects layer
+   * (glass.css). */
   border-radius: var(--radius-lg, 0.5rem);
-  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   z-index: var(--z-popover, 500);
-  animation: sticker-panel-in var(--duration-normal, 200ms) var(--ease-default, ease) both;
+  animation: sticker-panel-in var(--duration-slow, 300ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
 }
 
 @keyframes sticker-panel-in {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(0.97);
+    transform: translateY(12px) scale(0.94);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(0) scale(1.02);
   }
   to {
     opacity: 1;
@@ -1186,4 +1189,55 @@
 
 .message-resend-btn:hover {
   color: var(--color-error-hover, #dc2626);
+}
+
+/* ── Reconnect Banner (Req 10.11.40) ──
+ *
+ * The amber warning background (`--color-warning`) demands a *dark*
+ * foreground to satisfy WCAG 2.1 AA. The naive choice of
+ * `--text-inverse` would flip with the theme — light theme keeps it
+ * dark (#0f172a, fine), but dark theme inverts to #f8fafc which only
+ * yields ~1.9:1 contrast. Use a fixed dark color regardless of theme
+ * so the contrast is independent of the active palette.
+ */
+.reconnect-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-toast, 600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+  background-color: var(--color-warning, #d97706);
+  box-shadow: var(--shadow-lg);
+  color: #0f172a;
+}
+
+.reconnect-banner-text {
+  font-size: var(--font-sm, 0.875rem);
+}
+
+.reconnect-banner-btn {
+  appearance: none;
+  border: 1px solid currentcolor;
+  border-radius: var(--radius-sm, 0.25rem);
+  background: transparent;
+  color: inherit;
+  font-size: var(--font-xs, 0.75rem);
+  font-weight: var(--font-weight-semibold, 600);
+  padding: 2px var(--space-2, 0.5rem);
+  cursor: pointer;
+  opacity: 0.85;
+
+  &:hover {
+    opacity: 1;
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentcolor;
+    outline-offset: 2px;
+  }
 }

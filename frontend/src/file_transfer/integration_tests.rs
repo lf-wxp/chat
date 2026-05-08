@@ -173,7 +173,7 @@ fn disconnect_resume_with_missing_chunks() {
 
 /// Simulate the full re-receive flow after a hash mismatch:
 /// the user clicks "Re-receive", the buffer is reset, and the
-/// file is received again from scratch (P1-1 fix).
+/// file is received again from scratch.
 #[test]
 fn hash_mismatch_triggers_full_rereceive() {
   let chunk_size: usize = 48;
@@ -197,7 +197,7 @@ fn hash_mismatch_triggers_full_rereceive() {
   let actual_hash = hash::sha256_sync(&reassembled);
   assert_ne!(actual_hash, file_hash, "corrupted data must not match");
 
-  // User triggers "Re-receive" (P1-1 fix): reset the buffer.
+  // User triggers "Re-receive": reset the buffer.
   rx.reset_for_resume();
   assert!(!rx.is_complete());
   assert_eq!(rx.missing_chunks(), vec![0, 1]);

@@ -18,17 +18,19 @@
 
 mod ack_queue;
 mod avatars;
+mod background_image;
+mod conv_flags;
 mod cursor_helpers;
 mod messages;
-mod pinned;
 mod search_index;
 
 // Re-export everything so external `crate::persistence::store::*`
 // paths continue to work unchanged.
 pub use ack_queue::*;
 pub use avatars::*;
+pub use background_image::*;
+pub use conv_flags::*;
 pub use messages::*;
-pub use pinned::*;
 pub use search_index::*;
 
 // Re-export the page-size constant for convenience.

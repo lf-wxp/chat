@@ -94,7 +94,7 @@ pub(crate) fn nanos_now() -> u64 {
 /// ing the remaining recipients.
 pub async fn broadcast_file(tx: OutgoingTransfer, webrtc: WebRtcManager) {
   // Transition from Preparing to InProgress now that the hash has
-  // been computed and we are about to start sending (P1-3 fix).
+  // been computed and we are about to start sending.
   if matches!(tx.status.get_untracked(), TransferStatus::Preparing) {
     tx.status.set(TransferStatus::InProgress);
   }
@@ -376,7 +376,7 @@ async fn ship_to_peer(tx: &OutgoingTransfer, webrtc: &WebRtcManager, peer: &User
 ///
 /// Shared between the primary dispatch loop (`ship_to_peer`) and
 /// the resume re-transmit path (`on_file_resume_request`) so that
-/// progress signals are updated consistently (P1-3 fix).
+/// progress signals are updated consistently.
 ///
 /// Task 19.1 — routes the chunk through the application-layer E2EE
 /// envelope path (`send_encrypted_data_channel_message`) so Req 5.1.3

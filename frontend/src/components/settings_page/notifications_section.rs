@@ -1,6 +1,7 @@
 //! Notifications section (message / call toggles + DND window).
 
 use super::class_helpers::toggle_root_class;
+use super::notifications_helpers::{permission_state_label, subscribe_permission_change};
 use super::permission_badge::{PermissionBadge, PermissionState};
 use crate::i18n;
 use crate::settings::use_settings_state;
@@ -9,13 +10,47 @@ use leptos::prelude::*;
 use leptos_i18n::{t, t_string};
 use leptos_icons::Icon;
 use leptos_use::use_window;
+use std::sync::Mutex;
+
+/// Module-level global permission state signal backed by an
+/// `ArcRwSignal`. Unlike `RwSignal`, `ArcRwSignal` is NOT registered
+/// with the reactive owner arena and therefore survives every
+/// mount / unmount of `NotificationsSection` for the lifetime of the
+/// page. This matters because:
+///
+/// 1. The Permissions API `onchange` closure (leaked via `forget()`)
+///    captures this signal on first subscription and must remain
+///    able to write to it after the settings drawer has been closed.
+/// 2. Re-opening the drawer creates a *new* reactive owner scope, so
+///    any `RwSignal` created in the previous scope has already been
+///    disposed — accessing it would panic with
+///    "you tried to access a reactive value ... that has already
+///    been disposed".
+///
+/// `Mutex` is used only as a `Sync`-safe initialisation guard (we
+/// are single-threaded on WASM so contention is a non-issue).
+static PERMISSION_SIGNAL: Mutex<Option<ArcRwSignal<String>>> = Mutex::new(None);
 
 /// Module-level flag that prevents re-registering the Permissions API
 /// `onchange` listener every time the settings drawer re-opens.
-/// Without this, each open/close cycle would leak a new JS closure
-/// via `cb.forget()` (Bug-1 from code review).
 static PERMISSION_LISTENER_SUBSCRIBED: std::sync::atomic::AtomicBool =
   std::sync::atomic::AtomicBool::new(false);
+
+/// Initialise (or retrieve) the global permission-state `ArcRwSignal`.
+/// Returns a clone — `ArcRwSignal` is reference-counted so all clones
+/// observe the same underlying value.
+fn global_permission_signal(window: &leptos_use::UseWindow) -> ArcRwSignal<String> {
+  let mut guard = PERMISSION_SIGNAL
+    .lock()
+    .expect("permission signal mutex poisoned");
+  if guard.is_none() {
+    *guard = Some(ArcRwSignal::new(permission_state_label(window)));
+  }
+  guard
+    .as_ref()
+    .expect("permission signal initialised above")
+    .clone()
+}
 
 /// Notifications section.
 #[component]
@@ -39,6 +74,12 @@ pub fn NotificationsSection() -> impl IntoView {
     settings.update(|s| s.dnd.enabled = !s.dnd.enabled);
   };
 
+  // DND time-input validation state (B-9). When the user types an
+  // invalid time string the signal flips to `true` and a hint is
+  // shown beneath the inputs.
+  let dnd_start_invalid: RwSignal<bool> = RwSignal::new(false);
+  let dnd_end_invalid: RwSignal<bool> = RwSignal::new(false);
+
   // Reactive handle on the current notification permission  // badge + "Request" button stay in sync with browser state after
   // the user grants or denies the prompt (Req 13.4.6 / 13.4.7).
   //
@@ -50,7 +91,7 @@ pub fn NotificationsSection() -> impl IntoView {
   //      the `notifications` `PermissionStatus.onchange` event for
   //      an immediate update the moment the user flips the setting.
   let window = use_window();
-  let permission_state: RwSignal<String> = RwSignal::new(permission_state_label(&window));
+  let permission_state = global_permission_signal(&window);
 
   // Use minute_tick from app_state for periodic permission re-read.
   let app_state = crate::state::use_app_state();
@@ -59,11 +100,12 @@ pub fn NotificationsSection() -> impl IntoView {
 
   // Periodic re-read, gated on the minute tick.
   let window_for_tick = window.clone();
+  let ps_for_tick = permission_state.clone();
   Effect::new(move |_| {
     let _ = minute_tick.get();
     let latest = permission_state_label(&window_for_tick);
-    if latest != permission_state.get_untracked() {
-      permission_state.set(latest);
+    if latest != ps_for_tick.get_untracked() {
+      ps_for_tick.set(latest);
     }
   });
 
@@ -71,11 +113,12 @@ pub fn NotificationsSection() -> impl IntoView {
   // `forget()` to keep the JS closure alive for the page lifetime.
   // A module-level AtomicBool ensures we only register the listener
   // once, even if the component re-mounts across drawer open/close
-  // cycles (Bug-1 fix from code review).
+  // cycles.
   let window_for_subscribe = window.clone();
+  let ps_for_subscribe = permission_state.clone();
   Effect::new(move |_| {
     if !PERMISSION_LISTENER_SUBSCRIBED.swap(true, std::sync::atomic::Ordering::SeqCst) {
-      subscribe_permission_change(permission_state, &window_for_subscribe);
+      subscribe_permission_change(ps_for_subscribe.clone(), &window_for_subscribe);
     }
   });
 
@@ -149,10 +192,15 @@ pub fn NotificationsSection() -> impl IntoView {
             id="settings-dnd-start"
             type="time"
             class="settings-time-input"
+            class:settings-time-input-invalid=move || dnd_start_invalid.get()
             prop:value=move || minutes_to_time_string(dnd_start.get())
             on:input=move |ev| {
-              if let Some(minutes) = time_string_to_minutes(&event_target_value(&ev)) {
+              let value = event_target_value(&ev);
+              if let Some(minutes) = time_string_to_minutes(&value) {
+                dnd_start_invalid.set(false);
                 settings.update(|s| s.dnd.start_minutes = minutes);
+              } else if !value.is_empty() {
+                dnd_start_invalid.set(true);
               }
             }
           />
@@ -163,20 +211,33 @@ pub fn NotificationsSection() -> impl IntoView {
             id="settings-dnd-end"
             type="time"
             class="settings-time-input"
+            class:settings-time-input-invalid=move || dnd_end_invalid.get()
             prop:value=move || minutes_to_time_string(dnd_end.get())
             on:input=move |ev| {
-              if let Some(minutes) = time_string_to_minutes(&event_target_value(&ev)) {
+              let value = event_target_value(&ev);
+              if let Some(minutes) = time_string_to_minutes(&value) {
+                dnd_end_invalid.set(false);
                 settings.update(|s| s.dnd.end_minutes = minutes);
+              } else if !value.is_empty() {
+                dnd_end_invalid.set(true);
               }
             }
           />
         </div>
+        <Show when=move || dnd_start_invalid.get() || dnd_end_invalid.get()>
+          <p class="settings-error settings-dnd-validation">
+            {t!(i18n, settings.dnd_time_invalid)}
+          </p>
+        </Show>
       </Show>
 
       <p class="settings-hint">
         {t!(i18n, settings.dnd_permission_note)}
         " "
-        <PermissionBadge state=PermissionState::from_browser_str(&permission_state.get()) />
+        <PermissionBadge state=Signal::derive({
+          let ps = permission_state.clone();
+          move || PermissionState::from_browser_str(&ps.get())
+        }) />
       </p>
 
       // "Request Notification Permission" button (Req 13.4.6). Only
@@ -184,19 +245,26 @@ pub fn NotificationsSection() -> impl IntoView {
       // not yet answered the prompt (`default`). Once the permission
       // changes to `granted` or `denied` the button disappears; the
       // badge above conveys the resulting state.
-      <Show when=move || permission_state.get() == "default">
+      <Show when={
+        let ps = permission_state.clone();
+        move || ps.get() == "default"
+      }>
         <div class="settings-row">
           <button
             class="btn-primary settings-action"
-            on:click=move |_| {
-              let win_ref = window_for_request.get_value();
-              wasm_bindgen_futures::spawn_local(async move {
-                if let Ok(promise) = web_sys::Notification::request_permission()
-                  && let Ok(_value) = wasm_bindgen_futures::JsFuture::from(promise).await
-                {
-                  permission_state.set(permission_state_label(&win_ref));
-                }
-              });
+            on:click={
+              let ps = permission_state.clone();
+              move |_| {
+                let win_ref = window_for_request.get_value();
+                let ps_for_task = ps.clone();
+                wasm_bindgen_futures::spawn_local(async move {
+                  if let Ok(promise) = web_sys::Notification::request_permission()
+                    && let Ok(_value) = wasm_bindgen_futures::JsFuture::from(promise).await
+                  {
+                    ps_for_task.set(permission_state_label(&win_ref));
+                  }
+                });
+              }
             }
             data-testid="request-notification-permission"
           >
@@ -226,107 +294,6 @@ fn time_string_to_minutes(value: &str) -> Option<u32> {
     return None;
   }
   Some(hours * 60 + minutes)
-}
-
-/// Best-effort read of the current notification permission. Returns
-/// a stable lowercase keyword the caller can map to an i18n label.
-///
-/// Accepts a `UseWindow` reference (from `leptos_use::use_window`) so
-/// the caller does not need to reach into `web_sys::window()` directly.
-fn permission_state_label(window: &leptos_use::UseWindow) -> String {
-  let Some(window) = window.as_ref() else {
-    return "unsupported".to_string();
-  };
-  let has_api = js_sys::Reflect::get(window, &wasm_bindgen::JsValue::from_str("Notification"))
-    .map(|v| !v.is_undefined() && !v.is_null())
-    .unwrap_or(false);
-  if !has_api {
-    return "unsupported".to_string();
-  }
-  let permission = web_sys::Notification::permission();
-  match permission {
-    web_sys::NotificationPermission::Granted => "granted".to_string(),
-    web_sys::NotificationPermission::Denied => "denied".to_string(),
-    _ => "default".to_string(),
-  }
-}
-
-/// Subscribe to the browser's Permissions API so the UI reflects
-/// permission changes made outside the page (e.g. the user toggling
-/// the site setting in the browser UI). On runtimes that do not
-/// expose `navigator.permissions` (older Safari, some WebViews) this
-/// is a silent no-op and the `minute_tick` Effect in the caller
-/// still keeps the badge in sync within a minute (V2-S-5).
-///
-/// The JS closure is leaked via `forget()` — this is intentional in
-/// WASM single-threaded environments where the listener must live
-/// for the entire page session. The caller guards against duplicate
-/// subscriptions with a `subscribed` flag.
-fn subscribe_permission_change(state: RwSignal<String>, window: &leptos_use::UseWindow) {
-  use wasm_bindgen::closure::Closure;
-  use wasm_bindgen::{JsCast, JsValue};
-
-  let Some(window) = window.as_ref() else {
-    return;
-  };
-  let Ok(permissions_val) =
-    js_sys::Reflect::get(&window.navigator(), &JsValue::from_str("permissions"))
-  else {
-    return;
-  };
-  if permissions_val.is_undefined() || permissions_val.is_null() {
-    return;
-  }
-  let query_fn_val = match js_sys::Reflect::get(&permissions_val, &JsValue::from_str("query")) {
-    Ok(v) => v,
-    Err(_) => return,
-  };
-  let Ok(query_fn) = query_fn_val.dyn_into::<js_sys::Function>() else {
-    return;
-  };
-  let descriptor = js_sys::Object::new();
-  let _ = js_sys::Reflect::set(
-    &descriptor,
-    &JsValue::from_str("name"),
-    &JsValue::from_str("notifications"),
-  );
-  let promise_val = match query_fn.call1(&permissions_val, &descriptor) {
-    Ok(v) => v,
-    Err(_) => return,
-  };
-  let Ok(promise) = promise_val.dyn_into::<js_sys::Promise>() else {
-    return;
-  };
-
-  wasm_bindgen_futures::spawn_local(async move {
-    let Ok(status) = wasm_bindgen_futures::JsFuture::from(promise).await else {
-      return;
-    };
-    let cb = Closure::wrap(Box::new(move || {
-      // Read permission directly — this closure outlives any component
-      // scope so we cannot hold a UseWindow reference here.
-      let latest = {
-        let permission = web_sys::Notification::permission();
-        match permission {
-          web_sys::NotificationPermission::Granted => "granted".to_string(),
-          web_sys::NotificationPermission::Denied => "denied".to_string(),
-          _ => "default".to_string(),
-        }
-      };
-      if latest != state.get_untracked() {
-        state.set(latest);
-      }
-    }) as Box<dyn Fn()>);
-    let _ = js_sys::Reflect::set(
-      &status,
-      &JsValue::from_str("onchange"),
-      cb.as_ref().unchecked_ref(),
-    );
-    // Leak the closure so the JS callback stays alive for the page
-    // session. In WASM single-threaded environments this is the
-    // standard pattern for long-lived event listeners.
-    cb.forget();
-  });
 }
 
 #[cfg(test)]

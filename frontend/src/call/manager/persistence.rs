@@ -1,5 +1,5 @@
 //! LocalStorage-backed refresh recovery for [`super::CallManager`]
-//! (P2-New-1 split — Req 10.5).
+//! (Req 10.5).
 //!
 //! Stores the currently-active call (both `Inviting` and `Active`
 //! phases) in `localStorage` so a page refresh can offer to rejoin.

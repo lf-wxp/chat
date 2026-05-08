@@ -2,6 +2,11 @@
 dist = "dist"
 public_url = "/"
 target = "index.html"
+# Disable Subresource Integrity: SRI is ignored by browsers for preload
+# destinations that don't support it (notably `<link rel="preload"
+# as="fetch" type="application/wasm">`), which produces a noisy warning
+# on every dev page load. See https://crbug.com/981419.
+no_sri = true
 
 [watch]
 # Only watch src and index.html for WASM rebuilds.

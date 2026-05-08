@@ -62,7 +62,7 @@ pub const INVITE_TIMEOUT_MS: i32 = 30_000;
 
 /// Duration after which an unanswered incoming call (`Ringing`) is
 /// auto-declined locally so the modal does not stay on screen if the
-/// inviter crashes or loses connectivity (P1 Bug-4 fix). Spec'd at
+/// inviter crashes or loses connectivity. Spec'd at
 /// 60 seconds to match Req 9.5's invitation behaviour.
 pub const RINGING_TIMEOUT_MS: i32 = 60_000;
 
@@ -132,7 +132,7 @@ pub struct CallSignals {
   /// Whether a pending refresh-recovery prompt should be shown.
   pub recovery_prompt: RwSignal<Option<PersistedCallState>>,
   /// The video profile currently applied to the outgoing track by the
-  /// quality controller (P2-New-6 fix). The UI can observe this to
+  /// quality controller. The UI can observe this to
   /// display the current capture resolution or warn when degraded.
   pub self_video_profile: RwSignal<VideoProfile>,
   /// Most-recent network stats sample per peer, so the UI can display
@@ -190,13 +190,13 @@ pub(super) struct Inner {
   /// One-shot timer that elapses [`INVITE_TIMEOUT_MS`] after `Inviting`
   /// entry. Stored as a [`TimeoutHandle`] (not `IntervalHandle`) so the
   /// callback fires exactly once and cannot leak into a phantom retry
-  /// 30 s later (P0 Bug-2 fix).
+  /// 30 s later.
   pub(super) invite_timeout: Option<TimeoutHandle>,
   /// One-shot timer that elapses [`RINGING_TIMEOUT_MS`] after `Ringing`
   /// entry. If the local user has not accepted/declined within the
   /// window we automatically transition to `Ended { InviteTimeout }`
   /// so the modal does not stay on screen forever when the inviter
-  /// crashes mid-call (P1 Bug-4 fix).
+  /// crashes mid-call.
   pub(super) ringing_timeout: Option<TimeoutHandle>,
   /// 5-second `getStats()` poll, armed on `Active` entry (Req 3.8a).
   pub(super) stats_timer: Option<IntervalHandle>,
@@ -210,11 +210,21 @@ pub(super) struct Inner {
   /// Hysteresis controller governing automatic video-profile
   /// downgrade/restoration (Req 3.8c).
   pub(super) quality: QualityController,
-  /// Guard flag preventing re-entrant screen-share toggles (P2-4 fix).
+  /// Guard flag preventing re-entrant screen-share toggles.
   /// Set to `true` while a `toggle_screen_share` async path is in
   /// progress so the `onended` callback does not fire a second toggle
   /// concurrently.
   pub(super) screen_share_switching: Cell<bool>,
+  /// Wall-clock timestamp (ms) when the last "network quality is poor"
+  /// toast was emitted. Used to throttle the toast to at most one
+  /// occurrence per 30 seconds so a flapping connection does not
+  /// drown the user in duplicate notifications (Req 14.10.4).
+  pub(super) last_poor_toast_ms: Option<i64>,
+  /// Tracks whether the most recent quality classification was Poor,
+  /// used to detect Poor → Good/Excellent recovery transitions and
+  /// emit the "Network quality restored" toast exactly once per
+  /// recovery edge (Req 14.10.5).
+  pub(super) was_poor: bool,
 }
 
 impl CallManager {
@@ -237,6 +247,8 @@ impl CallManager {
         vad: HashMap::new(),
         quality: QualityController::new(),
         screen_share_switching: Cell::new(false),
+        last_poor_toast_ms: None,
+        was_poor: false,
       })),
     }
   }
@@ -260,7 +272,7 @@ impl CallManager {
   /// Also installs bridges for remote-track arrival, peer-connected
   /// and peer-closed events so mid-call peer joins see the current
   /// local stream (Task 18 — P2-3), and so peer drops drive the
-  /// `AllPeersLeft` end reason (P1 Bug-5).
+  /// `AllPeersLeft` end reason.
   pub fn set_webrtc(&self, webrtc: WebRtcManager) {
     let manager_for_track = self.clone();
     webrtc.set_on_remote_track(move |peer_id, stream| {

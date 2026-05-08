@@ -108,7 +108,7 @@ impl WebRtcManager {
       self.send_datachannel_ecdh_key_direct(peer_id.clone(), &our_public_key);
     }
 
-    // P1-8 fix: mirror the key-exchange completion into the reactive UI
+    // Mirror the key-exchange completion into the reactive UI
     // state. The raw key material stays inside `PeerCrypto` as a
     // non-extractable CryptoKey; we only expose the established flag and
     // a logical key_id counter for future rotation support.

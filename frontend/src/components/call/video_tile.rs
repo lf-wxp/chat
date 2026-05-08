@@ -5,7 +5,7 @@
 //! quality indicator in the footer. When no media stream is attached
 //! (camera off, audio-only call, peer not yet publishing) we render an
 //! Identicon-based avatar placeholder over the video element so the
-//! tile always shows *something* (Req 3.6 / 10.6.28 — P2-7 fix).
+//! tile always shows *something* (Req 3.6 / 10.6.28).
 //!
 //! Remote-peer tiles additionally render three status icons driven by
 //! the peer's `MediaStateUpdate` / `ReconnectingState` broadcasts
@@ -57,7 +57,7 @@ pub fn tile_class_parts(
 
 /// Classify a tile as a `data-pip-candidate` role ("hero" / "local" /
 /// "peer"), used by the control bar to pick a `<video>` element for
-/// Picture-in-Picture (Req 7.3 — P2-New-2 fix).
+/// Picture-in-Picture (Req 7.3).
 #[must_use]
 pub const fn pip_candidate_role(hero: bool, is_local: bool) -> &'static str {
   if hero {
@@ -153,7 +153,7 @@ pub fn VideoTile(
   let tile_class =
     move || tile_class_parts(hero, speaking, is_local, stream_present, reconnecting).join(" ");
 
-  // P2-New-2 fix: expose data attributes so `CallControls` can pick
+  // expose data attributes so `CallControls` can pick
   // the right `<video>` element for Picture-in-Picture without
   // reading CSS class names.
   let pip_candidate = pip_candidate_role(hero, is_local);
@@ -197,9 +197,7 @@ pub fn VideoTile(
             <Icon icon=i::LuVideoOff />
           </span>
         </Show>
-        <Show when=move || !is_local>
-          <NetworkIndicator peer_id=indicator_user.clone() />
-        </Show>
+        <NetworkIndicator peer_id=indicator_user.clone() />
       </footer>
     </div>
   }

@@ -85,7 +85,7 @@ impl FileTransferManager {
   /// invoked when a receiver detects a hash mismatch or reconnects
   /// after a disconnection and needs missing chunks replayed.
   ///
-  /// P1-3 fix: progress signals are updated during re-transmit so the
+  /// Progress signals are updated during re-transmit so the
   /// sender's progress bar / ETA remain live.
   pub fn on_file_resume_request(&self, peer: UserId, request: FileResumeRequest) {
     let Some(tx) = self.get_outbound_by_transfer(&request.transfer_id) else {
@@ -194,8 +194,8 @@ impl FileTransferManager {
           break;
         }
 
-        // Update progress signals during re-transmit (P1-3 fix).
-        // P1-2 fix: use `advance_resent` instead of `advance` so that
+        // Update progress signals during re-transmit.
+        // Use `advance_resent` instead of `advance` so that
         // `transferred_bytes` is not double-counted for chunks that were
         // already sent in the initial dispatch.
         tx.advance_resent(&peer_for_meta, slice.len() as u64);

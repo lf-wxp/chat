@@ -295,7 +295,7 @@ pub fn build_inverted_index(records: &[MessageRecord]) -> InvertedIndex {
 
 /// Incrementally extend an existing inverted index with additional
 /// records. Used by the streaming index rebuild path so the full
-/// corpus need not be held in memory at once (BUG-5 / OOM fix).
+/// corpus need not be held in memory at once.
 ///
 /// Duplicate `message_id`s are silently skipped so that overlapping
 /// paging batches (e.g. same `timestamp_ms` on the boundary) do not

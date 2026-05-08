@@ -124,7 +124,7 @@ fn test_ice_candidate_message() {
   }
 }
 
-/// Regression test for P0-3 fix: verify IceCandidate carries sdp_mid and
+/// Regression test: verify IceCandidate carries sdp_mid and
 /// sdp_m_line_index so that `handle_signaling_message` passes them to
 /// `handle_incoming_ice_candidate` instead of hard-coding `"0"` / `0`.
 #[test]

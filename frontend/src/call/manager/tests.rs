@@ -53,7 +53,7 @@ fn end_reason_key_is_stable() {
   assert_eq!(CallEndReason::RemoteEnded.as_key(), "remote_ended");
   assert_eq!(CallEndReason::Declined.as_key(), "declined");
   assert_eq!(CallEndReason::InviteTimeout.as_key(), "invite_timeout");
-  // P1 Bug-5 added the AllPeersLeft path; make sure its key stays
+  // make sure its key stays
   // stable (UI i18n tables key off it).
   assert_eq!(CallEndReason::AllPeersLeft.as_key(), "all_peers_left");
 }

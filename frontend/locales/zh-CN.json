@@ -253,7 +253,17 @@
 	"sidebar": {
 		"pinned": "置顶",
 		"active": "活跃",
-		"archived": "已归档"
+		"archived": "已归档",
+		"pin": "置顶会话",
+		"unpin": "取消置顶",
+		"mute": "免打扰",
+		"unmute": "取消免打扰",
+		"archive": "归档会话",
+		"unarchive": "取消归档",
+		"pin_limit_reached": "已达置顶上限（5 个），请先取消置顶其他会话。",
+		"open_conversation_actions": "会话操作",
+		"muted_aria_suffix": "已静音",
+		"unread_aria_suffix": "条未读"
 	},
 	"theater": {
 		"create": "创建影院",
@@ -373,12 +383,18 @@
 		"auto_ended_all_left": "通话结束 — 其他参与者均已离开。",
 		"duration_summary": "通话时长",
 		"network_poor": "网络连接较差，视频质量可能降低。",
+		"quality_restored": "网络质量已恢复。",
 		"network_quality_detail": "网络：{{quality}} · 延迟：{{rtt}}ms · 丢包：{{loss}}%",
 		"quality_excellent": "极佳",
 		"quality_good": "良好",
 		"quality_fair": "一般",
 		"quality_poor": "较差",
-		"quality_unknown": "未知"
+		"quality_unknown": "未知",
+		"connection_type_direct": "直连 (P2P)",
+		"connection_type_relayed": "中继 (TURN)",
+		"connection_type_unknown": "未知",
+		"bandwidth_label": "带宽",
+		"connection_type_label": "连接"
 	},
 	"file": {
 		"send_file": "发送文件",
@@ -417,6 +433,29 @@
 		"font_size_small": "小",
 		"font_size_medium": "中",
 		"font_size_large": "大",
+		"visual_effects": "视觉效果",
+		"enable_glass": "启用毛玻璃效果",
+		"enable_glass_hint": "为面板与浮层叠加 Windows 11 Mica 风格的半透明毛玻璃。",
+		"enable_motion": "启用动效氛围",
+		"enable_motion_hint": "开启界面呼吸、流光、渐变漂移等柔和动画。",
+		"background": "背景",
+		"background_mode": "背景模式",
+		"background_mode_preset": "预设",
+		"background_mode_solid": "纯色",
+		"background_mode_image": "图片",
+		"background_solid_color": "纯色颜色",
+		"background_upload": "自定义图片",
+		"background_upload_button": "选择图片",
+		"background_upload_clear": "移除",
+		"background_upload_hint": "支持 JPEG / PNG / WebP / AVIF，最大 4 MB，过大图片会自动缩放并重新压缩。",
+		"background_upload_empty": "所选文件为空。",
+		"background_upload_too_large": "所选文件超过 4 MB，请选择更小的图片。",
+		"background_upload_unsupported": "不支持的文件格式，请使用 JPEG、PNG、WebP 或 AVIF。",
+		"background_blur": "模糊度",
+		"background_overlay": "遮罩不透明度",
+		"background_theme_aware": "区分亮色与暗色",
+		"background_theme_aware_hint": "为亮色与暗色主题分别保存独立的背景。",
+		"background_reset": "恢复默认",
 		"privacy": "隐私",
 		"read_receipts": "发送已读回执",
 		"read_receipts_hint": "让联系人知道你已阅读其消息。",
@@ -430,6 +469,7 @@
 		"dnd_start": "从",
 		"dnd_end": "到",
 		"dnd_permission_note": "请在浏览器中允许桌面通知以接收提醒。",
+		"dnd_time_invalid": "请输入有效时间（00:00–23:59）。",
 		"dnd_active": "免打扰时段生效中",
 		"data_management": "数据管理",
 		"clear_chat_history": "清除聊天记录",
@@ -466,6 +506,12 @@
 		"microphone_volume": "麦克风音量",
 		"microphone_level": "麦克风电平",
 		"microphone_level_denied": "麦克风权限被拒绝 — 无法显示电平反馈。",
+		"test_microphone": "测试麦克风",
+		"stop_test_microphone": "停止测试",
+		"camera_preview": "摄像头预览",
+		"start_camera_preview": "预览摄像头",
+		"stop_camera_preview": "停止预览",
+		"camera_preview_denied": "摄像头访问被拒绝，请检查浏览器权限设置。",
 		"video_quality": "视频质量",
 		"video_quality_auto": "自动",
 		"video_quality_low": "省流量 (360p)",
@@ -513,7 +559,13 @@
 		"no": "否",
 		"enabled": "已启用",
 		"disabled": "已禁用",
-		"optional": "（可选）"
+		"optional": "（可选）",
+		"connected": "已连接",
+		"disconnected": "已断开",
+		"reconnecting": "正在重连..."
+	},
+	"a11y": {
+		"skip_to_content": "跳转到主要内容"
 	},
 	"error": {
 		"connection_lost": "连接丢失，正在重连...",
@@ -582,6 +634,9 @@
 		"server_restarted": "聊天服务器已重启，之前的房间和通话均已失效。",
 		"sys001": "浏览器离线",
 		"sys201": "内部意外错误",
-		"sys301": "浏览器不支持"
+		"sys301": "浏览器不支持",
+		"retry": "重试",
+		"retry_connection": "重新连接",
+		"dismiss_banner": "关闭"
 	}
 }

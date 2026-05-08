@@ -14,7 +14,6 @@ use crate::error_handler::use_error_toast_manager;
 use crate::i18n;
 use crate::signaling::use_signaling_client;
 use crate::state::use_app_state;
-use crate::utils;
 
 /// Nickname editor panel. Emits a real-time validation error beneath
 /// the input and only enables the Save button when the current value
@@ -80,13 +79,18 @@ pub fn NicknameEditor() -> impl IntoView {
       draft.set(final_nickname.clone());
     }
     // Update local auth signal so the new nickname renders immediately.
+    // The full auth state is then mirrored to localStorage via the
+    // canonical `auth_*` keys (Storage Audit S5 — replaces the old
+    // standalone `nickname` key which would diverge from
+    // `auth_nickname`).
     app_state.auth.update(|maybe_state| {
       if let Some(state) = maybe_state {
         state.nickname = final_nickname.clone();
       }
     });
-    // Persist to localStorage so a refresh retains the change (R10.9).
-    utils::save_to_local_storage("nickname", &final_nickname);
+    if let Some(auth_snapshot) = app_state.auth.get_untracked() {
+      crate::auth::save_auth_to_storage(&auth_snapshot);
+    }
 
     if let Err(e) = signaling.send_nickname_change(final_nickname) {
       web_sys::console::warn_1(&format!("[room] Failed to broadcast nickname change: {e}").into());

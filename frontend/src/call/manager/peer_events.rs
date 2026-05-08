@@ -78,7 +78,7 @@ impl CallManager {
     self.persist();
     self.arm_active_timers();
 
-    // P1-New-3 fix: now that the remote side has accepted, publish our
+    // now that the remote side has accepted, publish our
     // locally-prepared stream to every connected peer. This drives the
     // browser's `onnegotiationneeded` callback (`wire_renegotiation_handler`)
     // which in turn sends a fresh SDP offer. Before this point the
@@ -173,13 +173,13 @@ impl CallManager {
     }
   }
 
-  /// Handle a peer connection closing (Task 18 — P1 Bug-5 fix).
+  /// Handle a peer connection closing (Task 18).
   ///
   /// * In `Active`, removes the peer from the participant grid; when
   ///   the last peer leaves, transitions to
   ///   `CallEndReason::AllPeersLeft` and tears down local media.
   /// * In `Inviting`, treats the closure as a failed invite delivery
-  ///   when the closed peer matches the target room (P1-New-4 fix).
+  ///   when the closed peer matches the target room.
   ///   The call ends with `CallEndReason::InviteTimeout` so the UI
   ///   does not stay stuck until the 30 s wall-clock timer.
   /// * In `Ringing` or `Idle`, simply drops the VAD detector and
@@ -201,7 +201,7 @@ impl CallManager {
         self.clear_persist();
       }
       CallState::Inviting { .. } => {
-        // P1-New-4 fix: if the only peer we were trying to reach has
+        // if the only peer we were trying to reach has
         // dropped, fail the invite fast. Mesh callers with multiple
         // connected peers stay in `Inviting` because any one remaining
         // peer can still accept. This mirrors the "at least one
@@ -224,8 +224,7 @@ impl CallManager {
     }
   }
 
-  /// Handle a peer connection transitioning to `Connected` (Task 18 —
-  /// P2-3 fix).
+  /// Handle a peer connection transitioning to `Connected` (Task 18).
   ///
   /// If the local client is in an active call, publish the current
   /// local capture stream to the newly-connected peer so mid-call
@@ -349,7 +348,7 @@ impl CallManager {
   /// On accept, re-acquires the local capture stream, publishes it to
   /// every recovered peer connection, transitions back to the phase
   /// recorded in [`PersistedCallState`] (`Inviting` or `Active`) and
-  /// re-arms the corresponding timers (P1 Bug-2 / P1-New-2 fix).
+  /// re-arms the corresponding timers.
   ///
   /// If the user denies the media permission prompt the call is
   /// recovered in text-only mode (Req 10.5.23) — UI still shows the
@@ -358,7 +357,7 @@ impl CallManager {
   /// If the persisted payload is an `Inviting` snapshot whose invite
   /// has already exceeded [`INVITE_TIMEOUT_MS`] at recovery time, we
   /// refuse to resurrect it and clear the localStorage entry so the
-  /// user is not dropped into a stale invite UI (P1-New-2 fix).
+  /// user is not dropped into a stale invite UI.
   pub async fn resolve_recovery(&self, accept: bool) {
     let pending = self.signals.recovery_prompt.get_untracked();
     self.signals.recovery_prompt.set(None);
@@ -371,7 +370,7 @@ impl CallManager {
     };
 
     // Discard stale inviting payloads whose invite window has already
-    // expired (P1-New-2 fix).
+    // expired.
     if state.phase == CallPhase::Inviting {
       let elapsed_ms = now_ms().saturating_sub(state.started_at_ms).max(0);
       if elapsed_ms > i64::from(INVITE_TIMEOUT_MS) {
@@ -389,7 +388,7 @@ impl CallManager {
     match media::acquire_user_media(state.media_type).await {
       Ok(stream) => {
         self.install_local_stream(state.media_type, stream);
-        // P2-New-3 fix: explicitly publish the freshly-acquired stream
+        // explicitly publish the freshly-acquired stream
         // to every recovered peer connection. `install_local_stream`
         // already fans out via `webrtc.publish_local_stream`, but we
         // keep the call explicit here so future refactors of the

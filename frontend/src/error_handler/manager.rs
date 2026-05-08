@@ -30,8 +30,14 @@ pub(crate) const MAX_TOASTS: usize = 5;
 ///
 /// Extracted as a named constant (previously the magic number `8000`) so
 /// that the timing is easy to audit and can later be sourced from a user
-/// setting if needed (R2-Issue-10 fix).
+/// setting if needed.
 pub(crate) const AUTO_REMOVE_MS: i32 = 8_000;
+
+/// Duration for the "Network quality restored" toast (Req 14.10.5 —
+/// "auto-dismiss after 2 seconds"). Defined here next to the default
+/// so the call subsystem can reuse it without knowing the millisecond
+/// constant directly.
+pub const QUALITY_RESTORED_DURATION_MS: i32 = 2_000;
 
 /// Generate a unique ID for an error toast.
 pub(crate) fn next_toast_id() -> u64 {
@@ -59,7 +65,7 @@ pub struct ErrorToast {
   pub expanded: bool,
   /// Cancel handle for the auto-remove timer. `dismiss()` /
   /// `clear_all()` call `.cancel()` on this to release the JS closure
-  /// and stop the pending `setTimeout` (Bug-B fix, P2-5 refactor).
+  /// and stop the pending `setTimeout`.
   ///
   /// Wrapped in `Option` so the toast can also be constructed before
   /// the timer is scheduled and updated in-place once the handle is
@@ -123,7 +129,7 @@ impl ErrorToastManager {
     // Only construct the detail key when the server provides context
     // entries. This suppresses the "Learn more" button for errors that
     // have no additional detail, avoiding an empty expansion panel when
-    // the `.detail` i18n key is missing (Opt-3 fix).
+    // the `.detail` i18n key is missing.
     let detail_i18n_key = if error.details.is_empty() {
       String::new()
     } else {
@@ -189,11 +195,38 @@ impl ErrorToastManager {
   /// Used by the call subsystem to surface the "call duration" summary
   /// when an active call ends (Req 7.5).
   pub fn show_info_message_with_key(&self, code: &str, i18n_key: &str, message: &str) {
-    self.push_simple_toast(code, i18n_key, message);
+    self.push_simple_toast_with_duration(code, i18n_key, message, AUTO_REMOVE_MS);
+  }
+
+  /// Variant of [`Self::show_info_message_with_key`] that lets the
+  /// caller specify a custom auto-dismiss duration in milliseconds.
+  ///
+  /// Used for short acknowledgement toasts such as the
+  /// "Network quality restored" notice (Req 14.10.5 — 2 s).
+  pub fn show_info_message_with_key_and_duration(
+    &self,
+    code: &str,
+    i18n_key: &str,
+    message: &str,
+    duration_ms: i32,
+  ) {
+    self.push_simple_toast_with_duration(code, i18n_key, message, duration_ms);
   }
 
   /// Internal helper used by `show_error_message*` variants.
   fn push_simple_toast(&self, code: &str, i18n_key: &str, message: &str) {
+    self.push_simple_toast_with_duration(code, i18n_key, message, AUTO_REMOVE_MS);
+  }
+
+  /// Internal helper that pushes a simple toast and schedules the
+  /// auto-remove timer with the given duration.
+  fn push_simple_toast_with_duration(
+    &self,
+    code: &str,
+    i18n_key: &str,
+    message: &str,
+    duration_ms: i32,
+  ) {
     let toast = ErrorToast {
       id: next_toast_id(),
       code: code.to_string(),
@@ -211,7 +244,7 @@ impl ErrorToastManager {
       Self::enforce_max_toasts(toasts);
       toasts.push(toast);
     });
-    self.schedule_auto_remove(toast_id);
+    self.schedule_auto_remove_with_duration(toast_id, duration_ms);
   }
 
   /// Evict the oldest non-expanded toast when the list is at capacity.
@@ -231,20 +264,22 @@ impl ErrorToastManager {
   ///
   /// The toast is retained if the user has expanded it (to keep
   /// details visible while reading). Uses the shared
-  /// [`crate::utils::set_timeout_once`] helper (P2-5 fix) which holds
+  /// [`crate::utils::set_timeout_once`] helper which holds
   /// the JS closure via `Rc<RefCell<Option<Closure>>>` so it drops
   /// itself once fired — the previous `Closure::forget()` approach
-  /// permanently leaked closures (P0 Bug-1 fix). The timeout ID is
+  /// permanently leaked closures. The timeout ID is
   /// saved on the toast so `dismiss()` can `clearTimeout` and avoid
-  /// orphaned closures when a toast is manually dismissed (Bug-B fix).
+  /// orphaned closures when a toast is manually dismissed.
   fn schedule_auto_remove(&self, toast_id: u64) {
+    self.schedule_auto_remove_with_duration(toast_id, AUTO_REMOVE_MS);
+  }
+
+  /// Variant of [`Self::schedule_auto_remove`] that uses a custom
+  /// auto-dismiss duration in milliseconds. Used by short
+  /// acknowledgement toasts (e.g. quality restored — Req 14.10.5).
+  fn schedule_auto_remove_with_duration(&self, toast_id: u64, duration_ms: i32) {
     let toasts_signal = self.toasts;
-    // `set_timeout_once` returns a cancel handle whose inner `id` is
-    // private; we mirror it via a separate `setTimeout` probe so
-    // `dismiss()` can still call `clearTimeout`. Instead of maintaining
-    // two timers, store the handle on the toast itself and let
-    // `dismiss()` / `clear_all()` invoke `.cancel()` directly.
-    let Some(handle) = crate::utils::set_timeout_once(AUTO_REMOVE_MS, move || {
+    let Some(handle) = crate::utils::set_timeout_once(duration_ms, move || {
       toasts_signal.update(|toasts| {
         toasts.retain(|t| t.id != toast_id || t.expanded);
       });
@@ -252,9 +287,6 @@ impl ErrorToastManager {
       return;
     };
 
-    // Store the cancel handle on the toast so dismiss() / clear_all()
-    // can tear it down. We swap the `Option<TimeoutHandle>` into the
-    // toast entry matching `toast_id`.
     self.toasts.update(|toasts| {
       if let Some(toast) = toasts.iter_mut().find(|t| t.id == toast_id) {
         toast.auto_remove_handle = Some(handle);
@@ -265,7 +297,7 @@ impl ErrorToastManager {
   /// Dismiss an error toast by ID.
   ///
   /// Cancels the pending auto-remove timer so the orphaned closure
-  /// is released by the JS runtime (Bug-B fix).
+  /// is released by the JS runtime.
   pub fn dismiss(&self, id: u64) {
     self.toasts.update(|toasts| {
       if let Some(pos) = toasts.iter().position(|t| t.id == id) {
@@ -289,7 +321,7 @@ impl ErrorToastManager {
   /// Clear all toasts and cancel pending auto-remove timers.
   ///
   /// Should be called when the toast container unmounts to prevent
-  /// orphaned closures and console warnings (W4 fix).
+  /// orphaned closures and console warnings.
   pub fn clear_all(&self) {
     self.toasts.update(|toasts| {
       for mut toast in toasts.drain(..) {

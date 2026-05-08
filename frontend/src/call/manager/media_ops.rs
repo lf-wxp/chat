@@ -39,15 +39,9 @@ impl CallManager {
   /// round-trip so the remote side actually receives the video (Req
   /// 3.4 / 7.2 — voice → video without re-establishing the connection).
   ///
-  /// When turning the camera **off** (P1-New-1 fix) the video track is
+  /// When turning the camera **off** the video track is
   /// stopped and `sender.replaceTrack(null)` is called on every peer
-  /// so the remote `<video>` element clears and the tile falls back to
-  /// the avatar placeholder instead of freezing on the last frame (Req
-  /// 3.6 — remote SHALL display an avatar placeholder).
-  ///
-  /// # Errors
-  /// Returns `Err` if the camera permission is denied or the user
-  /// cancels the picker.
+  /// so the remote `<video>` element clears
   pub async fn toggle_camera(&self) -> Result<bool, String> {
     let new_enabled = !self.signals.local_media.get_untracked().camera_enabled;
     self
@@ -58,8 +52,8 @@ impl CallManager {
     let stream = self.signals.local_stream.get_untracked();
 
     // Turn-off path: stop the capture track and clear the remote sender
-    // so the remote tile falls back to the avatar placeholder (Req 3.6 /
-    // P1-New-1 fix). We also broadcast the new media state so remote
+    // so the remote tile falls back to the avatar placeholder (Req 3.6).
+    // We also broadcast the new media state so remote
     // UIs can show a "camera off" icon (Req 3.5 / 7.1).
     if !new_enabled {
       if let Some(ref stream) = stream
@@ -172,11 +166,11 @@ impl CallManager {
   /// Start or stop screen-sharing. Toggles to the opposite of the
   /// current state; on switch-on this prompts the user via
   /// `getDisplayMedia` and publishes the resulting stream to every
-  /// connected peer (P0 Bug-3 fix). When the user stops the share via
+  /// connected peer. When the user stops the share via
   /// the browser's system dialog, the `MediaStreamTrack.onended` hook
   /// installed below transparently switches back to the camera+mic.
   ///
-  /// A `screen_share_switching` guard flag (P2-4 fix) prevents
+  /// A `screen_share_switching` guard flag prevents
   /// re-entrant calls — e.g. when the `onended` callback fires while
   /// a manual toggle is already in progress.
   ///
@@ -195,9 +189,9 @@ impl CallManager {
   /// # Errors
   /// Returns `Err` if the display picker is cancelled or denied. On
   /// failure the previous local-media state is restored so the UI
-  /// does not get stuck (P1 Bug-3 fix).
+  /// does not get stuck.
   pub async fn toggle_screen_share(&self) -> Result<(), String> {
-    // P2-4 fix: bail out if a previous toggle is still in flight.
+    // bail out if a previous toggle is still in flight.
     if self.inner.borrow().screen_share_switching.get() {
       return Ok(());
     }
@@ -250,7 +244,7 @@ impl CallManager {
           // local media and a frozen last frame on the remote side.
           // Degrade to an explicit "off" state so the UI renders a
           // muted/no-camera placeholder and unpublish so the remote
-          // tile falls back to the avatar (P1 Bug-3 fix).
+          // tile falls back to the avatar.
           self.signals.local_media.set(LocalMediaState::off());
           if let Some(webrtc) = self.webrtc.borrow().as_ref() {
             webrtc.unpublish_local_media();
@@ -299,7 +293,7 @@ impl CallManager {
       self.signals.local_stream.set(Some(display.clone()));
       self.signals.local_media.update(|s| s.screen_sharing = true);
 
-      // P0 Bug-3 fix: actually publish the screen capture to every
+      // actually publish the screen capture to every
       // connected peer. Without this the remote side keeps seeing the
       // previous camera frames (or nothing).
       if let Some(webrtc) = self.webrtc.borrow().as_ref() {
@@ -354,8 +348,8 @@ impl CallManager {
   ///
   /// Splits into [`Self::prepare_local_stream`] (preview only — used
   /// while the call is still `Inviting`) and the publish step. The
-  /// publish step is deferred until the remote side accepts (P1-New-3
-  /// fix); sending `addTrack` earlier would pollute the mesh SDP for
+  /// publish step is deferred until the remote side accepts;
+  /// sending `addTrack` earlier would pollute the mesh SDP for
   /// peers who never ultimately participate in the call.
   pub(super) fn install_local_stream(&self, media_type: MediaType, stream: MediaStream) {
     self.prepare_local_stream(media_type, stream.clone());
@@ -365,7 +359,7 @@ impl CallManager {
   /// Install the local capture stream as the UI preview only, without
   /// pushing any track to peer connections. Used by the `Inviting`
   /// path so the caller sees their own preview while waiting for the
-  /// callee to accept (P1-New-3 fix).
+  /// callee to accept.
   pub(super) fn prepare_local_stream(&self, media_type: MediaType, stream: MediaStream) {
     self
       .signals
@@ -373,12 +367,12 @@ impl CallManager {
       .set(LocalMediaState::initial_for(media_type));
     self.signals.local_stream.set(Some(stream));
     // Reset the video profile to the baseline when a fresh stream is
-    // installed (P2-New-6).
+    // installed.
     self.signals.self_video_profile.set(VideoProfile::HIGH);
   }
 
   /// Publish the currently-installed local stream to every connected
-  /// peer. Called from the `Active`-transition path (P1-New-3 fix).
+  /// peer. Called from the `Active`-transition path.
   ///
   /// The WebRTC manager iterates its mesh snapshot internally; per-peer
   /// failures are logged but do not abort the call.

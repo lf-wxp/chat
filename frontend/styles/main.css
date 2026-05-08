@@ -5,7 +5,7 @@
  */
 
 /* ── Cascade Layers (low → high priority) ── */
-@layer reset, tokens, base, components, utilities;
+@layer reset, tokens, base, components, utilities, effects;
 
 /* ── Layer: Reset ── */
 @import url("./reset.css") layer(reset);
@@ -16,6 +16,15 @@
 /* ── Layer: Base ── */
 @import url("./base.css") layer(base);
 
+/* ── Layer: Effects (glass / animations / background) ──
+ * Lives above `components` and `utilities` so opt-in utility classes
+ * like `.glass-l2` can override component backgrounds without
+ * individual components reaching into the effects layer themselves.
+ */
+@import url("./glass.css") layer(effects);
+@import url("./animations.css") layer(effects);
+@import url("./background.css") layer(effects);
+
 /* ── Layer: Components ── */
 @import url("./components/buttons.css") layer(components);
 @import url("./components/inputs.css") layer(components);
@@ -23,8 +32,10 @@
 @import url("./components/chat-messages.css") layer(components);
 @import url("./components/chat-view.css") layer(components);
 @import url("./components/sidebar.css") layer(components);
+@import url("./components/conversation-menu.css") layer(components);
 @import url("./components/top-bar.css") layer(components);
 @import url("./components/drawer.css") layer(components);
+@import url("./components/settings-background.css") layer(components);
 @import url("./components/modal.css") layer(components);
 @import url("./components/toast.css") layer(components);
 @import url("./components/auth.css") layer(components);
@@ -48,12 +59,16 @@ html {
               color var(--duration-normal, 200ms) var(--ease-default, ease);
 }
 
-/* ── App Layout ── */
+/* ── App Layout ──
+ * Background color is intentionally owned by `background.css`
+ * (effects layer) so the user-customisable background shines
+ * through. Do not re-assert `background-color` here.
+ */
 .app {
+  width: 100%;
   height: 100dvh;
   display: flex;
   flex-direction: row;
-  background-color: var(--bg-primary, #ffffff);
   color: var(--text-primary, #0f172a);
   /* Enable View Transitions for page-level navigation */
   view-transition-name: app-root;
@@ -115,56 +130,13 @@ html {
   margin: 0;
 }
 
-/* ── Animations ── */
-@keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slide-in-left {
-  from {
-    transform: translateX(-100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slide-in-bottom {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: translateY(0);
-  }
-}
-
-/* Reduced motion: disable all custom animations */
-@media (prefers-reduced-motion: reduce) {
-  .home-empty {
-    animation: none;
-  }
-
-  .sidebar,
-  .modal-backdrop,
-  .modal {
-    transition: none !important;
-    animation: none !important;
-  }
-}
+/* ── Animations ──
+ * Shared keyframes (fade-in-up / fade-in / slide-in-left /
+ * slide-in-bottom) and the global reduced-motion override now live
+ * in `animations.css` (imported into the `effects` layer above).
+ * Component-specific animation tweaks can still be declared here
+ * when needed.
+ */
 
 /* ── Scroll Behavior ── */
 html {

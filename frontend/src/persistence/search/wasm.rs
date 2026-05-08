@@ -56,7 +56,7 @@ pub async fn full_scan_search(
   let on_success: OnSuccessSlot = Rc::new(RefCell::new(None));
   // After accumulating enough hits we scan one extra batch so that
   // high-scoring records that straddle the batch boundary are not
-  // missed (BUG-4 fix).
+  // missed.
   let extra_batches: Rc<RefCell<usize>> = Rc::new(RefCell::new(0));
 
   let promise = {

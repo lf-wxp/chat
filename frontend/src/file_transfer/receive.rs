@@ -18,7 +18,7 @@ pub struct IncomingTransfer {
   pub info: FileInfo,
   /// Peer the file is coming from.
   pub peer: UserId,
-  /// Chunk buffer keyed by chunk index (P2-5 fix: uses a `HashMap`
+  /// Chunk buffer keyed by chunk index. Uses a `HashMap`
   /// instead of `Vec<Option<Vec<u8>>>` so that memory is only
   /// allocated for chunks that have actually been received, rather
   /// than pre-allocating `None` slots for every chunk in the file.
@@ -165,7 +165,7 @@ impl IncomingTransfer {
 
   /// Reset the reassembly buffer so all chunks must be received
   /// again. Used when a hash-mismatch is detected and the user
-  /// requests a full re-receive (P1-1 fix).
+  /// requests a full re-receive.
   ///
   /// Clears the chunk buffer, resets the bitmap, and zeroes the
   /// progress counters so the sender's retransmission lands on a
@@ -301,7 +301,7 @@ mod tests {
     assert_eq!(rx.progress.get_untracked().chunks_done, 3);
     assert_eq!(rx.progress.get_untracked().transferred_bytes, 9);
 
-    // Reset for a full re-receive (P1-1 fix).
+    // Reset for a full re-receive.
     rx.reset_for_resume();
     assert!(!rx.is_complete());
     assert_eq!(rx.missing_chunks(), vec![0, 1, 2]);

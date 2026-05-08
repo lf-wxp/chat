@@ -121,7 +121,7 @@ pub fn estimate_height(msg: &ChatMessage) -> f64 {
 /// entries with the lowest access counts are evicted first. This
 /// avoids the previous issue where recent entries could be evicted
 /// simply because they happened to sit near the front of the
-/// HashMap iteration order (BUG-3 fix).
+/// HashMap iteration order.
 #[derive(Clone, Default)]
 pub struct HeightCache {
   map: Rc<RefCell<HashMap<MessageId, (f64, u64)>>>,
@@ -213,7 +213,7 @@ fn prefix_heights(messages: &[ChatMessage], cache: &HeightCache) -> Vec<f64> {
 /// current `scrollTop` / viewport `height`.
 ///
 /// Uses binary search on prefix height sums for O(log n) window
-/// start lookup instead of O(n) linear scan (OPT-5 fix).
+/// start lookup instead of O(n) linear scan.
 ///
 /// Returns `(start_index, end_index, offset_y)` where `offset_y` is
 /// the CSS `translateY` for the first rendered row.
@@ -390,7 +390,7 @@ pub fn VirtualMessageWindow(
 
       messages.with(|list| {
       // Only clone the visible window (~10-20 messages) rather than the
-      // entire list (R5 + OPT-1 fix).
+      // entire list.
       let visible: Vec<_> = list[start..end].to_vec();
 
       view! {

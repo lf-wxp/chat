@@ -286,7 +286,7 @@ fn UserRow(
     }
   };
 
-  // Bug-5 fix: provide a tooltip on the row button so the reason a
+  // Provide a tooltip on the row button so the reason a
   // user cannot be invited is discoverable without opening the card.
   let display_for_title = display_for_card.clone();
   let row_title = move || -> String {

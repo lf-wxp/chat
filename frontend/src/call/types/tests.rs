@@ -70,6 +70,8 @@ fn network_stats_sample_classifies_via_shared_rule() {
   let sample = NetworkStatsSample {
     rtt_ms: 50,
     loss_percent: 0.2,
+    bandwidth_kbps: None,
+    connection_type: ConnectionType::Unknown,
     sampled_at_ms: 0,
   };
   assert_eq!(sample.classify(), NetworkQuality::Excellent);
@@ -77,6 +79,8 @@ fn network_stats_sample_classifies_via_shared_rule() {
   let sample_poor = NetworkStatsSample {
     rtt_ms: 500,
     loss_percent: 12.0,
+    bandwidth_kbps: None,
+    connection_type: ConnectionType::Unknown,
     sampled_at_ms: 0,
   };
   assert_eq!(sample_poor.classify(), NetworkQuality::Poor);

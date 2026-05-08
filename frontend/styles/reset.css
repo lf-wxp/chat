@@ -100,4 +100,31 @@ table {
   outline-offset: 2px;
 }
 
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  z-index: var(--z-max, 9999);
+  background-color: var(--color-primary, #3b82f6);
+  color: #fff;
+  padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+  border-radius: var(--radius-md, 0.375rem);
+  font-size: var(--font-sm, 0.875rem);
+  font-weight: var(--font-weight-semibold, 600);
+  text-decoration: none;
+  white-space: nowrap;
+
+  &:focus {
+    left: var(--space-4, 1rem);
+    top: var(--space-4, 1rem);
+    width: auto;
+    height: auto;
+    outline: 2px solid var(--color-primary, #3b82f6);
+    outline-offset: 2px;
+  }
+}
+
 /* Scroll behavior is defined in main.css to avoid duplication */

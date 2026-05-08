@@ -129,7 +129,7 @@ pub fn ChatView() -> impl IntoView {
     if let Some(file) = files.item(0) {
       // Pre-check file size before reading into memory.
       // Use the multi-peer limit when the conversation has ≥2 peers
-      // (P0-1 fix from code review — drag-drop now mirrors the picker).
+      // (drag-drop now mirrors the picker).
       let file_size = file.size() as u64;
       let ft_mgr = use_file_transfer_manager();
       let peer_count = ft_mgr.peers_for_conversation(&conv_id).len();

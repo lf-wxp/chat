@@ -126,7 +126,7 @@ impl WebRtcManager {
   /// Encrypts the plaintext individually for each peer and sends it over
   /// their respective DataChannels. Partial failures are collected in
   /// [`BroadcastResult::failed_peers`] so callers (e.g. chat UI) can
-  /// display per-peer delivery status (P1-17 fix).
+  /// display per-peer delivery status.
   ///
   /// # ⚠️ Input contract (Task 19.1 D-1)
   ///
@@ -163,7 +163,7 @@ impl WebRtcManager {
       ));
     }
 
-    // P1-9 fix: fan out encryption + send across all peers concurrently.
+    // Fan out encryption + send across all peers concurrently.
     // Each peer gets its own pairwise-encrypted copy (Req 5.2.10);
     // independent futures let the JS event loop interleave AES-GCM
     // and `send()` per peer instead of awaiting them sequentially.

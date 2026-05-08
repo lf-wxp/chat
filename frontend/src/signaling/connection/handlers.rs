@@ -27,8 +27,8 @@ impl SignalingClient {
       console_log("[signaling] WebSocket connected");
       client.app_state.connected.set(true);
       // NOTE: Do not clear `reconnecting` here — the UI banner should stay
-      // visible across the entire recovery window (Req 10.11.40/42, Issue
-      // R2-Issue-4). It is cleared once `handle_auth_success` decides no
+      // visible across the entire recovery window (Req 10.11.40/42).
+      // It is cleared once `handle_auth_success` decides no
       // room rejoin is pending, or once `recover_active_peers` finishes /
       // early-returns.
       client.inner.borrow_mut().reconnect.reset();
@@ -59,11 +59,11 @@ impl SignalingClient {
       // stop_heartbeat clears the shared heartbeat+watchdog interval.
       // stop_pong_watchdog is no longer needed here since it delegates
       // to the same stop_heartbeat, making the second call redundant
-      // (P1-1 fix, Review-R3).
+      // making the second call redundant.
       client.stop_heartbeat();
       client.inner.borrow_mut().ws = None;
 
-      // P1-12 (Review Round 4, Req 1.5): tear down every active
+      // Tear down every active
       // PeerConnection the moment the signalling channel is gone.
       // ICE/SDP traffic cannot continue without the signalling server,
       // and leaving stale PCs around means their ICE / connection-state
@@ -96,7 +96,7 @@ impl SignalingClient {
   }
 
   /// Decide whether to schedule a reconnect based on the close code
-  /// (Optimisation 1).
+  /// (Optimisation).
   ///
   /// - 1000 / 4001 / 4003 are *terminal* -- never retry.
   /// - Everything else (1001 going-away, 1006 abnormal closure, network
@@ -111,7 +111,7 @@ impl SignalingClient {
           "[signaling] Auth failure close code {}, clearing session",
           code
         ));
-        // P2-5 fix: Removed redundant stop_heartbeat/stop_pong_watchdog
+        // Removed redundant stop_heartbeat/stop_pong_watchdog
         // calls here — they are already executed in the onclose callback
         // which invokes handle_close_code.
         self.inner.borrow_mut().reconnect.stop();
@@ -119,7 +119,7 @@ impl SignalingClient {
         crate::auth::clear_auth_storage();
         // Release retained event closures to prevent WASM heap leak.
         // The WebSocket is already closed (we're inside onclose), so
-        // pass `None` to skip the close call (Issue-4 fix).
+        // pass `None` to skip the close call.
         self.close_and_cleanup_ws(None);
       }
       _ => self.schedule_reconnect(),
@@ -152,9 +152,12 @@ impl SignalingClient {
     };
 
     match &msg {
-      SignalingMessage::Pong(_) => {
-        // Refresh the liveness timestamp so the pong watchdog can tell
-        // the connection is still bidirectional (Optimisation 2).
+      SignalingMessage::Ping(_) | SignalingMessage::Pong(_) => {
+        // Any heartbeat frame (Ping from server, Pong as reply)
+        // refreshes the liveness timestamp so the pong watchdog can
+        // tell the connection is still bidirectional. Both are
+        // consumed here to keep noisy 30s heartbeats off the
+        // generic dispatch log.
         self.inner.borrow_mut().last_pong_ms = now_ms();
         return;
       }
@@ -195,7 +198,7 @@ impl SignalingClient {
       auth_success.user_id
     ));
 
-    // P1-1 fix: Guard against auth being None. If auth is None at this
+    // Guard against auth being None. If auth is None at this
     // point, it means the auth signal was cleared between `send_token_auth`
     // and receiving AuthSuccess (e.g. a race with logout). Continuing with
     // a missing token would leave the client in an inconsistent state —
@@ -220,7 +223,7 @@ impl SignalingClient {
       }
     };
 
-    // Review-M2 fix: Detect user_id mismatch between the locally stored
+    // Detect user_id mismatch between the locally stored
     // auth and the server's AuthSuccess response. This should never happen
     // in normal operation but could indicate a bug or token mix-up.
     if auth.user_id != auth_success.user_id {
@@ -229,7 +232,7 @@ impl SignalingClient {
         auth.user_id, auth_success.user_id
       ));
     }
-    // W1 fix: Use the nickname returned by the server so that a nickname
+    // Use the nickname returned by the server so that a nickname
     // change made on another device is reflected here. Fall back to the
     // locally stored nickname if the server returns an empty string (for
     // backward compatibility with older server versions).
@@ -239,7 +242,7 @@ impl SignalingClient {
       auth_success.nickname.clone()
     };
     // Preserve the existing avatar and signature instead of overwriting
-    // them (C2 fix, Issue-5 fix).
+    // them.
     let avatar = auth.avatar.clone();
     let signature = auth.signature.clone();
     self.app_state.auth.set(Some(crate::state::AuthState {
@@ -254,7 +257,7 @@ impl SignalingClient {
     utils::save_to_local_storage(crate::auth::KEY_USER_ID, &auth_success.user_id.to_string());
     utils::save_to_local_storage(crate::auth::KEY_USERNAME, &auth_success.username);
 
-    // P2-1 fix: If we are in a reconnection flow (banner visible), switch
+    // If we are in a reconnection flow (banner visible), switch
     // the recovery phase to "Restoring connections..." now that auth has
     // succeeded, so the banner text changes from "Reconnecting..." to
     // "Restoring connections..." (Req 10.11.40).
@@ -269,8 +272,8 @@ impl SignalingClient {
 
     // Persist the updated auth state (including the potentially-changed
     // nickname from the server and the preserved avatar) to localStorage
-    // so that a subsequent page refresh does not revert to stale values
-    // (P0-3 fix). This must happen after the auth signal is set because
+    // so that a subsequent page refresh does not revert to stale values.
+    // This must happen after the auth signal is set because
     // `save_auth_to_storage` reads the avatar from `auth.avatar`.
     if let Some(updated_auth) = self.app_state.auth.with_untracked(|a| a.clone()) {
       crate::auth::save_auth_to_storage(&updated_auth);
@@ -278,16 +281,16 @@ impl SignalingClient {
 
     // Start user status management (activity tracking + auto-away)
     // Use the cached reference instead of calling use_user_status_manager()
-    // which would require the Leptos reactive context (Bug-signaling-context).
+    // which would require the Leptos reactive context.
     self.user_status.start();
 
-    // Recover room state from localStorage (Req 10.4, Issue-1 fix).
+    // Recover room state from localStorage (Req 10.4).
     // If the user was in a room before the page refresh, automatically
     // rejoin that room so the UX continues seamlessly. We keep the
     // `reconnecting` banner visible while the rejoin is in-flight — it
     // is cleared either by `recover_active_peers` (success path) or by
     // `handle_signaling_error` when the server reports the room as gone
-    // (Req 10.10 server-restart handling, R2-Issue-2 fix).
+    // (Req 10.10 server-restart handling).
     let mut rejoin_pending = false;
     if let Some(room_id_str) = crate::auth::load_active_room_id()
       && let Ok(uuid) = uuid::Uuid::parse_str(&room_id_str)
@@ -315,14 +318,14 @@ impl SignalingClient {
     }
 
     // If no recovery work is outstanding, hide the reconnect banner now
-    // so the user sees "connected" UI immediately (Req 10.11.42,
-    // R2-Issue-4 fix). When a rejoin is pending the banner remains until
+    // so the user sees "connected" UI immediately (Req 10.11.42).
+    // When a rejoin is pending the banner remains until
     // the JoinRoom round-trip completes (success → `RoomJoined` handler;
     // failure → `ErrorResponse` ROM105 handler).
     if !rejoin_pending {
       self.app_state.reconnecting.set(false);
     } else {
-      // P1-2 fix: Guard against the server never responding to our
+      // Guard against the server never responding to our
       // `JoinRoom` request (network loss mid-flight, server bug, message
       // silently dropped). Without this, the reconnect banner would
       // remain visible forever. After REJOIN_TIMEOUT_MS, force the
@@ -364,7 +367,7 @@ impl SignalingClient {
     // causes (signature mismatch after a server key rotation, unknown
     // user, revoked session, etc.). Route through `auth.failure_generic`
     // so the locale file can render the server-supplied reason verbatim
-    // without misrepresenting it as a token-expiry case (R2-Issue-3 fix).
+    // without misrepresenting it as a token-expiry case.
     // The code string remains AUTH001 for logging / analytics parity.
     // Use the cached ErrorToastManager instead of calling
     // use_error_toast_manager() which requires Leptos reactive context
@@ -377,13 +380,13 @@ impl SignalingClient {
 
     // Stop heartbeat and pong watchdog before closing the connection to
     // prevent stale interval timers from firing on a closed socket
-    // (Review-P0 fix; same pattern as `disconnect()`).
+    // (same pattern as `disconnect()`).
     self.stop_heartbeat();
     self.stop_pong_watchdog();
     self.app_state.auth.set(None);
     // Clear stale UI state so the login page does not briefly show
     // the previous session's user list / rooms. This aligns with
-    // `handle_session_invalidated` (P3-4 fix).
+    // `handle_session_invalidated`.
     self.app_state.online_users.set(Vec::new());
     self.app_state.rooms.set(Vec::new());
     crate::auth::clear_auth_storage();
@@ -408,7 +411,7 @@ impl SignalingClient {
 
     // Stop heartbeat and pong watchdog before closing the connection to
     // prevent stale interval timers from firing on a closed socket
-    // (Review-P0 fix; same pattern as `disconnect()`).
+    // (same pattern as `disconnect()`).
     self.stop_heartbeat();
     self.stop_pong_watchdog();
     self.app_state.auth.set(None);

@@ -1,0 +1,68 @@
+/**
+ * Application background layer.
+ *
+ * Renders three stacked full-viewport elements behind the main
+ * app shell:
+ *   .app-bg           → positioned container (`fixed`, full viewport)
+ *   .app-bg__image    → paint layer (gradient / image / solid)
+ *   .app-bg__overlay  → contrast-compensation tint
+ *
+ * All values are driven by the `--app-bg-*` tokens in tokens.css, so
+ * the follow-up "user customisable background" feature can mutate the
+ * visual without touching this file.
+ *
+ * The companion Rust component lives at
+ * `src/components/app_bg.rs` and emits exactly this DOM.
+ */
+
+.app-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  /* `isolation: isolate` guards against accidental ancestor filters
+   * (e.g. backdrop-filter stacking contexts) pulling the layer out
+   * from behind the shell. */
+  isolation: isolate;
+}
+
+.app-bg__image {
+  position: absolute;
+  /* Slight oversize so the bg-drift animation never reveals an edge. */
+  inset: -2%;
+  background-image: var(--app-bg-gradient);
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  filter: blur(var(--app-bg-blur));
+  will-change: transform;
+  animation: bg-drift var(--duration-drift) ease-in-out infinite;
+}
+
+/* When the user has picked a solid colour or an image (future
+ * feature) the mode attribute switches which property wins. */
+[data-app-bg="solid"] .app-bg__image {
+  background-image: none;
+  background-color: var(--app-bg-solid);
+}
+[data-app-bg="image"] .app-bg__image {
+  background-image: var(--app-bg-image);
+}
+
+.app-bg__overlay {
+  position: absolute;
+  inset: 0;
+  background-color: var(--app-bg-overlay);
+  pointer-events: none;
+}
+
+/* ── Host transparency ──
+ * The main shell defaults to an opaque theme surface. Flip it to
+ * transparent so the `.app-bg` layer is visible behind it. Any
+ * nested component that needs a filled surface should use its own
+ * background (most already do via `--bg-primary` etc).
+ */
+.app {
+  background-color: transparent;
+}

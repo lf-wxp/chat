@@ -16,7 +16,7 @@ use js_sys::{Object, Reflect};
 use message::types::NetworkQuality;
 use wasm_bindgen::{JsCast, JsValue};
 
-use super::types::{NetworkStatsSample, VideoProfile};
+use super::types::{ConnectionType, NetworkStatsSample, VideoProfile};
 
 /// Poll interval for `getStats()` samples (5 s — Req 14.10).
 pub const STATS_POLL_INTERVAL_MS: i32 = 5_000;
@@ -152,7 +152,7 @@ impl Default for QualityController {
 /// Rank quality so comparisons work ("higher rank = better").
 ///
 /// Exposed `pub(crate)` so the call manager can compare per-peer
-/// samples without re-implementing the same lookup table (P2-1 fix).
+/// samples without re-implementing the same lookup table.
 pub(crate) const fn quality_rank(q: NetworkQuality) -> u8 {
   match q {
     NetworkQuality::Poor => 0,
@@ -179,7 +179,12 @@ const fn step_up(q: NetworkQuality) -> NetworkQuality {
 /// walk the map and look for:
 ///
 /// * `candidate-pair` with `nominated: true` → `currentRoundTripTime`
-///   (seconds, convert to ms).
+///   (seconds, convert to ms), `availableOutgoingBitrate` (bits/s,
+///   convert to kbps), and the `localCandidateId` so we can infer the
+///   connection topology by joining against the matching
+///   `local-candidate` entry.
+/// * `local-candidate` → `candidateType` (`host` / `srflx` / `prflx`
+///   / `relay`) used to classify the peer as Direct or Relayed.
 /// * Any `inbound-rtp` entry → `packetsLost` / `packetsReceived` for
 ///   loss estimation. We sum across all inbound streams.
 ///
@@ -196,6 +201,12 @@ pub fn parse_stats_report(report: &JsValue, sampled_at_ms: i64) -> Option<Networ
   let mut rtt_ms: u64 = 0;
   let mut packets_lost: f64 = 0.0;
   let mut packets_received: f64 = 0.0;
+  let mut bandwidth_kbps: Option<u32> = None;
+  let mut local_candidate_id: Option<String> = None;
+  // Keyed by the candidate's `id` so we can join against the
+  // candidate-pair's `localCandidateId` after the walk completes.
+  let mut local_candidate_types: std::collections::HashMap<String, String> =
+    std::collections::HashMap::new();
   // Track which signal sources actually contributed so a wholly-empty
   // report can be distinguished from one that legitimately reports
   // zero RTT and zero loss.
@@ -241,6 +252,34 @@ pub fn parse_stats_report(report: &JsValue, sampled_at_ms: i64) -> Option<Networ
             rtt_ms = ms as u64;
           }
         }
+        if let Some(bps) = Reflect::get(&value, &JsValue::from_str("availableOutgoingBitrate"))
+          .ok()
+          .and_then(|v| v.as_f64())
+          && bps.is_finite()
+          && bps > 0.0
+        {
+          // Convert bits/s → kbps; clamp to u32 to avoid overflow on
+          // pathological readings.
+          let kbps = (bps / 1_000.0).round().clamp(0.0, f64::from(u32::MAX));
+          bandwidth_kbps = Some(kbps as u32);
+        }
+        if let Some(id) = Reflect::get(&value, &JsValue::from_str("localCandidateId"))
+          .ok()
+          .and_then(|v| v.as_string())
+        {
+          local_candidate_id = Some(id);
+        }
+      }
+      "local-candidate" => {
+        let id = Reflect::get(&value, &JsValue::from_str("id"))
+          .ok()
+          .and_then(|v| v.as_string());
+        let cand_type = Reflect::get(&value, &JsValue::from_str("candidateType"))
+          .ok()
+          .and_then(|v| v.as_string());
+        if let (Some(id), Some(t)) = (id, cand_type) {
+          local_candidate_types.insert(id, t);
+        }
       }
       "inbound-rtp" => {
         saw_inbound_rtp = true;
@@ -274,9 +313,17 @@ pub fn parse_stats_report(report: &JsValue, sampled_at_ms: i64) -> Option<Networ
     0.0
   };
 
+  let connection_type = local_candidate_id
+    .as_deref()
+    .and_then(|id| local_candidate_types.get(id))
+    .map(|t| ConnectionType::from_candidate_type(t))
+    .unwrap_or(ConnectionType::Unknown);
+
   Some(NetworkStatsSample {
     rtt_ms,
     loss_percent,
+    bandwidth_kbps,
+    connection_type,
     sampled_at_ms,
   })
 }

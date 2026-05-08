@@ -6,11 +6,17 @@
 //! assembles them.
 
 mod appearance_section;
+mod av_helpers;
 mod av_section;
+mod background_section;
+mod background_section_helpers;
+mod camera_preview;
 mod class_helpers;
 mod data_management_helpers;
 mod data_management_section;
 mod device_select;
+mod mic_level_feedback;
+mod notifications_helpers;
 mod notifications_section;
 mod page;
 mod permission_badge;

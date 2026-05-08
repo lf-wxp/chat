@@ -25,11 +25,18 @@ pub fn TheaterChatBubble(
   let i18n = i18n::use_i18n();
   let is_self = message.is_self;
 
-  let sender_name = if is_self {
-    t_string!(i18n, theater.you_label).to_string()
-  } else {
-    message.sender_name.clone()
+  // Clone peer name once; resolve the localised "You" label inside a
+  // reactive closure so locale changes refresh the bubble (Leptos
+  // rejects naked `t_string!` calls in non-reactive component bodies).
+  let peer_name = message.sender_name.clone();
+  let sender_name = move || {
+    if is_self {
+      t_string!(i18n, theater.you_label).to_string()
+    } else {
+      peer_name.clone()
+    }
   };
+
   let content = message.content.clone();
   let sent_at_ms = message.sent_at_ms;
 
@@ -50,6 +57,8 @@ pub fn TheaterChatBubble(
     "theater-chat-bubble theater-chat-bubble--peer"
   };
 
+  // `aria-label` is itself reactive — we reuse the same closure but
+  // through a fresh binding so `view!` can own its copy.
   let aria_name = sender_name.clone();
 
   view! {

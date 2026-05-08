@@ -50,7 +50,7 @@ pub struct VoiceActivityDetector {
   bin_count: u32,
   /// Reusable frequency buffer. Pre-allocated in `attach` so polling
   /// at 10 Hz across an 8-peer mesh does not generate ~80 allocations
-  /// per second (P2-New-5 fix).
+  /// per second.
   buffer: Vec<u8>,
   /// Number of remaining hang-over windows.
   hang_over: u32,

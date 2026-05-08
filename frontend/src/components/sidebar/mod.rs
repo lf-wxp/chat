@@ -1,6 +1,8 @@
 //! Sidebar navigation component.
 
+mod sidebar_connection_status;
 mod sidebar_conversation_item;
+mod sidebar_conversation_menu;
 mod sidebar_room_section;
 mod sidebar_section;
 
@@ -12,6 +14,7 @@ use leptos::prelude::*;
 use leptos_i18n::{t, t_string};
 use leptos_icons::Icon;
 use message::UserId;
+use sidebar_connection_status::SidebarConnectionStatus;
 use sidebar_room_section::SidebarRoomSection;
 use sidebar_section::SidebarSection;
 
@@ -31,6 +34,15 @@ pub fn Sidebar() -> impl IntoView {
   // the selected user). Lives in the sidebar so it survives navigation
   // inside the chat area without remounting the modal.
   let selected_user = RwSignal::new(Option::<UserId>::None);
+
+  // Memoised section views. Reading the conversation list directly
+  // would re-filter and re-sort on every reactive update — three times
+  // (pinned/active/archived) per render. The `*_memo` accessors cache
+  // the result and only recompute when `app_state.conversations`
+  // actually changes (Req 7.7 — performance follow-up from Task 24).
+  let pinned_memo = app_state.pinned_conversations_memo();
+  let active_memo = app_state.active_conversations_memo();
+  let archived_memo = app_state.archived_conversations_memo();
 
   // On desktop the sidebar is always visible. On mobile, it is hidden
   // unless the user has explicitly opened it via the menu button.
@@ -59,6 +71,7 @@ pub fn Sidebar() -> impl IntoView {
         <div class="sidebar-brand">
           <Icon icon=i::LuMessageCircle attr:class="sidebar-brand-icon" />
           <span class="sidebar-brand-title">{t!(i18n, app.title)}</span>
+          <SidebarConnectionStatus />
         </div>
         // Close button: mobile only, closes the sidebar overlay
         <button
@@ -86,15 +99,17 @@ pub fn Sidebar() -> impl IntoView {
       <div class="sidebar-scroll">
         <SidebarSection
           title=move || t_string!(i18n, sidebar.pinned)
-          conversations=Signal::derive(move || app_state.pinned_conversations())
+          conversations=pinned_memo.into()
         />
         <SidebarSection
           title=move || t_string!(i18n, sidebar.active)
-          conversations=Signal::derive(move || app_state.active_conversations())
+          conversations=active_memo.into()
         />
         <SidebarSection
           title=move || t_string!(i18n, sidebar.archived)
-          conversations=Signal::derive(move || app_state.archived_conversations())
+          conversations=archived_memo.into()
+          collapsible=true
+          expanded=app_state.archived_expanded
         />
 
         // Room list: browse/join/create rooms

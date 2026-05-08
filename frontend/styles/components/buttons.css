@@ -18,13 +18,35 @@
   border: 1px solid transparent;
   border-radius: var(--radius-md, 0.375rem);
   cursor: pointer;
-  transition: all var(--duration-fast, 150ms) var(--ease-default, ease);
+  /* Separate transitions so transform / shadow / colour each animate
+   * with curves that match their visual role: colour swaps use
+   * ease-smooth (snappy), lift uses ease-out-expo (snappy out),
+   * shadow follows the lift timing for a coherent "pop". */
+  transition:
+    background-color var(--duration-fast, 150ms) var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1)),
+    border-color var(--duration-fast, 150ms) var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1)),
+    color var(--duration-fast, 150ms) var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1)),
+    transform var(--duration-normal, 200ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    box-shadow var(--duration-normal, 200ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
   user-select: none;
   white-space: nowrap;
 
   &:focus-visible {
     outline: 2px solid var(--color-primary, #3b82f6);
     outline-offset: 2px;
+  }
+
+  /* Shared hover-lift: every button variant rises 1px on hover and
+   * drops back on press. Variants then layer coloured glow on top
+   * via their own `:hover` rules below. Skipped when disabled so
+   * the "unclickable" affordance stays honest. */
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+    transition-duration: var(--duration-instant, 75ms);
   }
 
   &:disabled {
@@ -44,12 +66,14 @@
   background-color: var(--color-primary, #3b82f6);
   color: #ffffff;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background-color: var(--color-primary-hover, #2563eb);
+    box-shadow: var(--glow-primary);
   }
 
-  &:active {
+  &:active:not(:disabled) {
     background-color: var(--color-primary-pressed, color-mix(in oklch, var(--color-primary), black 20%));
+    box-shadow: none;
   }
 }
 
@@ -60,9 +84,10 @@
   color: var(--text-primary, #0f172a);
   border-color: var(--border-color, #e2e8f0);
 
-  &:hover {
+  &:hover:not(:disabled) {
     background-color: var(--bg-secondary, #f8fafc);
     border-color: var(--border-color-hover, #cbd5e1);
+    box-shadow: var(--shadow-md);
   }
 }
 
@@ -72,7 +97,7 @@
   background-color: transparent;
   color: var(--text-secondary, #475569);
 
-  &:hover {
+  &:hover:not(:disabled) {
     background-color: var(--bg-tertiary, #f1f5f9);
     color: var(--text-primary, #0f172a);
   }
@@ -84,8 +109,17 @@
   background-color: var(--color-error, #ef4444);
   color: #ffffff;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background-color: var(--color-error-hover, color-mix(in oklch, var(--color-error), black 12%));
+    /* Red-tinted glow mirrors the primary glow shape but uses the
+     * error colour so danger affordance is unmistakable. */
+    box-shadow:
+      0 0 0 1px rgb(239 68 68 / 0.35),
+      0 0 16px 2px rgb(239 68 68 / 0.45);
+  }
+
+  &:active:not(:disabled) {
+    box-shadow: none;
   }
 }
 
