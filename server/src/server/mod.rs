@@ -1,5 +1,7 @@
 //! Server implementation module.
 
+mod health;
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -15,6 +17,8 @@ use crate::auth::UserStore;
 use crate::auth::handlers;
 use crate::config::Config;
 use crate::ws::{WebSocketState, ws_handler};
+
+pub use health::{HealthResponse, health_check, spa_fallback};
 
 /// WebRTC Chat signaling server.
 pub struct Server {
@@ -39,8 +43,12 @@ impl Server {
   /// This creates the shared state (UserStore, WebSocketState) and
   /// constructs the Axum router with:
   /// - `/ws` WebSocket upgrade route
+  /// - `/api/health` liveness probe (used by Docker / Kubernetes)
   /// - `/api/register` and `/api/login` HTTP auth endpoints
-  /// - Static file serving as fallback
+  /// - Static file serving via `ServeDir`, with an SPA fallback that
+  ///   serves `index.html` for navigation requests that do not match
+  ///   any static file. This ensures PWA deep links survive a full
+  ///   refresh without 404-ing the client.
   /// - CORS support for local development
   /// - Request tracing layer
   pub fn build_router(&self) -> (Router, Arc<WebSocketState>) {
@@ -56,19 +64,32 @@ impl Server {
       .allow_methods(Any)
       .allow_headers(Any);
 
+    // SPA fallback router: matched only when `ServeDir` cannot locate
+    // a file. Serves `index.html` for navigation requests so the
+    // frontend router can take over; returns 404 for asset-like URLs
+    // (paths ending with a file extension) so broken links remain
+    // honest.
+    let spa_router = Router::new()
+      .fallback(spa_fallback)
+      .with_state(self.config.static_dir.clone());
+
+    let static_service = ServeDir::new(&self.config.static_dir)
+      .append_index_html_on_directories(true)
+      .fallback(spa_router);
+
     // Build the application router
     let app = Router::new()
       // WebSocket route
       .route("/ws", get(ws_handler))
+      // Liveness probe — used by Docker / Kubernetes / load balancers
+      .route("/api/health", get(health_check))
       // HTTP auth endpoints
       .route("/api/register", post(handlers::register))
       .route("/api/login", post(handlers::login))
       // Shared state
       .with_state(ws_state.clone())
-      // Static file serving for frontend
-      .fallback_service(
-        ServeDir::new(&self.config.static_dir).append_index_html_on_directories(true),
-      )
+      // Static file serving (with SPA fallback) for frontend
+      .fallback_service(static_service)
       // CORS (must be before trace layer)
       .layer(cors)
       // Request tracing

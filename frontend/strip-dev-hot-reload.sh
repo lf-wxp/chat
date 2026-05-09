@@ -1,16 +1,16 @@
 #!/bin/bash
-# Strip the CSS hot-reload <script> block from dist/index.html in release builds.
+# Strip environment-specific blocks from dist/index.html after Trunk builds.
 #
-# Runs as a Trunk post_build hook. The block to remove is delimited by the
-# HTML sentinel comments:
+# Runs as a Trunk post_build hook. Blocks to remove are delimited by HTML
+# sentinel comments:
 #
-#   <!-- CSS_HOT_RELOAD_BEGIN -->
-#   ...
-#   <!-- CSS_HOT_RELOAD_END -->
+#   <!-- PWA_SW_BEGIN --> ... <!-- PWA_SW_END -->
+#     Service Worker registration — stripped in DEBUG builds to avoid SW
+#     caching interference during development; kept in RELEASE for PWA.
 #
-# In debug builds (trunk serve / trunk build) the block is kept intact so the
-# hot-reload works locally. In release builds (trunk build --release) the block
-# is physically removed, so the shipped index.html contains zero dev-only JS.
+#   <!-- CSS_HOT_RELOAD_BEGIN --> ... <!-- CSS_HOT_RELOAD_END -->
+#     CSS hot-reload script — kept in DEBUG for live CSS reload; stripped
+#     in RELEASE so zero dev-only JS ships to users.
 #
 # Trunk exposes the profile via TRUNK_PROFILE ("debug" | "release"); the staging
 # directory via TRUNK_STAGING_DIR. Both have sensible fallbacks.
@@ -22,24 +22,33 @@ PROFILE="${TRUNK_PROFILE:-debug}"
 STAGING_DIR="${TRUNK_STAGING_DIR:-$SCRIPT_DIR/dist}"
 TARGET="$STAGING_DIR/index.html"
 
-if [ "$PROFILE" != "release" ]; then
-  echo "[strip-dev-hot-reload] Profile=$PROFILE; keeping hot-reload block."
-  exit 0
-fi
-
 if [ ! -f "$TARGET" ]; then
   echo "[strip-dev-hot-reload] $TARGET not found; nothing to strip."
   exit 0
 fi
 
-if ! grep -q 'CSS_HOT_RELOAD_BEGIN' "$TARGET"; then
-  echo "[strip-dev-hot-reload] No CSS_HOT_RELOAD_BEGIN sentinel in $TARGET; already stripped?"
-  exit 0
+strip_block() {
+  local begin_sentinel="$1"
+  local end_sentinel="$2"
+  local label="$3"
+
+  if ! grep -q "$begin_sentinel" "$TARGET"; then
+    echo "[strip-dev-hot-reload] No $begin_sentinel sentinel in $TARGET; already stripped?"
+    return 0
+  fi
+
+  local tmp
+  tmp=$(mktemp)
+  # Portable (BSD/GNU sed): delete from BEGIN to END sentinel, inclusive.
+  sed "/$begin_sentinel/,/$end_sentinel/d" "$TARGET" > "$tmp"
+  mv "$tmp" "$TARGET"
+  echo "[strip-dev-hot-reload] Removed $label block from $TARGET (profile=$PROFILE)."
+}
+
+if [ "$PROFILE" = "release" ]; then
+  # Release: strip CSS hot-reload, keep PWA Service Worker.
+  strip_block 'CSS_HOT_RELOAD_BEGIN' 'CSS_HOT_RELOAD_END' 'CSS hot-reload'
+else
+  # Debug: strip PWA Service Worker, keep CSS hot-reload.
+  strip_block 'PWA_SW_BEGIN' 'PWA_SW_END' 'PWA Service Worker'
 fi
-
-TMP=$(mktemp)
-# Portable (BSD/GNU sed): delete from BEGIN to END sentinel, inclusive.
-sed '/<!-- CSS_HOT_RELOAD_BEGIN -->/,/<!-- CSS_HOT_RELOAD_END -->/d' "$TARGET" > "$TMP"
-mv "$TMP" "$TARGET"
-
-echo "[strip-dev-hot-reload] Removed dev hot-reload block from $TARGET (profile=release)."

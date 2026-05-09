@@ -100,7 +100,7 @@ pub fn SidebarConversationMenu(
     leptos_use::use_window(),
     ev::keydown,
     move |ev: web_sys::KeyboardEvent| {
-      if ev.key() == "Escape" && open.get_untracked() {
+      if crate::utils::safe_key(&ev) == "Escape" && open.get_untracked() {
         open.set(false);
         ev.stop_propagation();
       }

@@ -45,6 +45,7 @@
 @import url("./components/discovery.css") layer(components);
 @import url("./components/room.css") layer(components);
 @import url("./components/theater.css") layer(components);
+@import url("./components/pwa.css") layer(components);
 
 /* ── Layer: Utilities ── */
 @import url("./utilities.css") layer(utilities);

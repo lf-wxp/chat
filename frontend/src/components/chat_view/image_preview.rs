@@ -23,7 +23,7 @@ pub fn ImagePreviewOverlay(url: RwSignal<Option<String>>) -> impl IntoView {
             data-testid="image-preview"
             on:click=move |_| url.set(None)
             on:keydown=move |ev: web_sys::KeyboardEvent| {
-              if ev.key() == "Escape" {
+              if crate::utils::safe_key(&ev) == "Escape" {
                 url.set(None);
               }
             }

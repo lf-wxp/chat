@@ -255,7 +255,7 @@ fn register_keyboard_shortcut(visible: RwSignal<bool>) {
   let _cleanup = use_event_listener(window(), keydown, move |ev: web_sys::KeyboardEvent| {
     // Ctrl+Shift+D (Windows/Linux) or Cmd+Shift+D (macOS)
     let is_mod = ev.ctrl_key() || ev.meta_key();
-    if is_mod && ev.shift_key() && ev.key() == "D" {
+    if is_mod && ev.shift_key() && crate::utils::safe_key(&ev) == "D" {
       ev.prevent_default();
       visible.update(|v| *v = !*v);
     }

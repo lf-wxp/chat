@@ -638,5 +638,18 @@
 		"retry": "Reintentar",
 		"retry_connection": "Reintentar conexión",
 		"dismiss_banner": "Descartar"
+	},
+	"pwa": {
+		"offline_title": "Sin conexión",
+		"offline_message": "Algunas funciones pueden no estar disponibles. Verifica tu conexión a internet.",
+		"online_title": "Conexión restaurada",
+		"online_message": "La conexión se ha restablecido.",
+		"install_title": "Instalar aplicación",
+		"install_message": "Instala esta aplicación para una mejor experiencia.",
+		"install_button": "Instalar",
+		"dismiss_install": "Ahora no",
+		"update_available": "Hay una nueva versión disponible",
+		"update_button": "Actualizar",
+		"cache_name": "webrtc-chat-v1"
 	}
 }

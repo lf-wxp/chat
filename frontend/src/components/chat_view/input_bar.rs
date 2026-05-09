@@ -139,7 +139,7 @@ pub fn InputBar(
   let on_keydown = {
     let do_send = do_send.clone();
     move |ev: leptos::ev::KeyboardEvent| {
-      if ev.key() == "Enter" && !ev.shift_key() && !ev.is_composing() {
+      if crate::utils::safe_key(&ev) == "Enter" && !ev.shift_key() && !ev.is_composing() {
         ev.prevent_default();
         if can_send.get_untracked() {
           do_send();

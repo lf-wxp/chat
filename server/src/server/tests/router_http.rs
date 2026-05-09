@@ -28,27 +28,65 @@ async fn test_router_ws_route_exists() {
 }
 
 #[tokio::test]
-async fn test_router_unknown_route_falls_back_to_static() {
+async fn test_router_unknown_asset_returns_404() {
+  // Paths that look like asset requests (have a file extension in the
+  // last segment) must remain an honest 404 when the file is missing,
+  // so broken asset links surface loudly in tooling instead of being
+  // silently swallowed by the SPA fallback.
   let config = Config::default();
   let server = Server::new(config);
   let (router, _ws_state) = server.build_router();
 
-  // Request a non-existent path; the fallback ServeDir handles it.
-  // Since the static_dir likely doesn't exist in test, we expect a 404
-  // from ServeDir (not from the router itself — the route IS matched by fallback).
   let request = axum::http::Request::builder()
-    .uri("/nonexistent-path")
+    .uri("/does-not-exist.png")
     .method("GET")
     .body(Body::empty())
     .unwrap();
 
   let response = router.oneshot(request).await.unwrap();
-  // ServeDir returns 404 for missing files, which is expected behavior
   assert_eq!(
     response.status().as_u16(),
     404,
-    "Non-existent static file should return 404"
+    "Non-existent asset path (with file extension) should return 404"
   );
+}
+
+#[tokio::test]
+async fn test_router_spa_deep_link_serves_index_html() {
+  // Navigation-style deep-link URLs (no file extension) must fall back
+  // to the SPA shell so the frontend router can handle them after a
+  // hard refresh. This is the contract that keeps PWA `start_url`
+  // deep links working.
+  let temp_dir = std::env::temp_dir().join("server_test_spa_fallback");
+  std::fs::create_dir_all(&temp_dir).unwrap();
+  std::fs::write(temp_dir.join("index.html"), "<html>spa-shell</html>").unwrap();
+
+  let config = Config {
+    static_dir: temp_dir.clone(),
+    ..Default::default()
+  };
+
+  let server = Server::new(config);
+  let (router, _ws_state) = server.build_router();
+
+  let request = axum::http::Request::builder()
+    .uri("/room/some-uuid")
+    .method("GET")
+    .body(Body::empty())
+    .unwrap();
+
+  let response = router.oneshot(request).await.unwrap();
+  assert_eq!(
+    response.status().as_u16(),
+    200,
+    "SPA deep link should be answered by the index.html shell"
+  );
+
+  let body = response.into_body().collect().await.unwrap().to_bytes();
+  assert_eq!(body.as_ref(), b"<html>spa-shell</html>");
+
+  // Cleanup
+  let _ = std::fs::remove_dir_all(&temp_dir);
 }
 
 #[tokio::test]
@@ -120,6 +158,38 @@ async fn test_router_index_html_on_directory() {
 
   // Cleanup
   let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[tokio::test]
+async fn test_router_health_endpoint_returns_200() {
+  // The /api/health liveness probe is consumed by Docker / Kubernetes
+  // healthchecks (see Dockerfile + docker-compose.yml). It must stay
+  // registered and respond 200 with a JSON body so those integrations
+  // stay green.
+  let config = Config::default();
+  let server = Server::new(config);
+  let (router, _ws_state) = server.build_router();
+
+  let request = axum::http::Request::builder()
+    .uri("/api/health")
+    .method("GET")
+    .body(Body::empty())
+    .unwrap();
+
+  let response = router.oneshot(request).await.unwrap();
+  assert_eq!(
+    response.status().as_u16(),
+    200,
+    "Health endpoint must respond 200 OK"
+  );
+
+  let body = response.into_body().collect().await.unwrap().to_bytes();
+  let text = std::str::from_utf8(&body).unwrap();
+  assert!(text.contains("\"status\":\"ok\""), "body was: {text}");
+  assert!(
+    text.contains("\"service\":\"webrtc-chat-signaling\""),
+    "body was: {text}"
+  );
 }
 
 #[tokio::test]

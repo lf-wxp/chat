@@ -71,7 +71,7 @@ pub fn IncomingInviteModal() -> impl IntoView {
     use_document(),
     keydown,
     move |ev: web_sys::KeyboardEvent| {
-      if ev.key() != "Escape" {
+      if crate::utils::safe_key(&ev) != "Escape" {
         return;
       }
       let Some(invite) = front.get_untracked() else {

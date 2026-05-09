@@ -34,7 +34,7 @@ pub fn PopoverWrapper(
     use_document(),
     keydown,
     move |ev: web_sys::KeyboardEvent| {
-      if ev.key() == "Escape" {
+      if crate::utils::safe_key(&ev) == "Escape" {
         close_for_esc.run(());
       }
     },

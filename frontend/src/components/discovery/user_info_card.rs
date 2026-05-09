@@ -56,7 +56,7 @@ pub fn UserInfoCard(
     use_document(),
     keydown,
     move |ev: web_sys::KeyboardEvent| {
-      if ev.key() == "Escape" && target.get_untracked().is_some() {
+      if crate::utils::safe_key(&ev) == "Escape" && target.get_untracked().is_some() {
         target.set(None);
       }
     },

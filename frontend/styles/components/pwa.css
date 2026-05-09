@@ -1,0 +1,226 @@
+/* ---------------------------------------------------------------------------
+ * PWA UI components.
+ * ---------------------------------------------------------------------------
+ * - .pwa-update-banner   : shown when a newer service-worker version has
+ *                          installed in the background and is waiting to
+ *                          activate. Mirrors the offline/reconnect banner
+ *                          palette so all top-of-page status bars feel
+ *                          visually consistent, but sits on top of them
+ *                          (higher z-index) because an update takes
+ *                          priority over a transient network blip.
+ *
+ * - .pwa-install-prompt  : a toast-style "Add to Home Screen" card that
+ *                          slides up from the bottom on mobile / bottom-
+ *                          right on desktop. Dismissable, non-blocking.
+ * --------------------------------------------------------------------------- */
+
+/* ─── Update banner ────────────────────────────────────────────────────── */
+
+.pwa-update-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* Sits above the offline/reconnect banners since app updates are the
+   * most important top-of-page status. */
+  z-index: calc(var(--z-toast, 600) + 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+  background-color: var(--color-primary, #3b82f6);
+  color: #fff;
+  font-size: var(--font-sm, 0.875rem);
+  box-shadow: var(--shadow-lg);
+  animation: pwa-banner-slide-down 0.2s ease-out;
+}
+
+.pwa-update-banner__icon {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+}
+
+.pwa-update-banner__text {
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.pwa-update-banner__btn {
+  appearance: none;
+  border: 1px solid currentcolor;
+  border-radius: var(--radius-sm, 0.25rem);
+  background: transparent;
+  color: inherit;
+  font-size: var(--font-xs, 0.75rem);
+  font-weight: var(--font-weight-semibold, 600);
+  padding: 2px var(--space-2, 0.5rem);
+  cursor: pointer;
+  opacity: 0.9;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+
+  &:hover {
+    opacity: 1;
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentcolor;
+    outline-offset: 2px;
+  }
+}
+
+.pwa-update-banner__btn--primary {
+  background-color: rgb(255 255 255 / 15%);
+
+  &:hover {
+    background-color: rgb(255 255 255 / 25%);
+  }
+}
+
+/* ─── Install prompt ──────────────────────────────────────────────────── */
+
+.pwa-install-prompt {
+  position: fixed;
+  /* Floating card rather than a full-width banner so it feels like an
+   * opt-in suggestion, not a modal interruption. */
+  right: var(--space-4, 1rem);
+  bottom: var(--space-4, 1rem);
+  left: auto;
+  /* Sit just below toasts so a fresh error still reads above this. */
+  z-index: calc(var(--z-toast, 600) - 1);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3, 0.75rem);
+  max-width: 22rem;
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  /* Surface token reacts to `[data-theme="dark"]` via tokens.css so
+   * the card flips between light-on-dark and dark-on-light without
+   * any component-level conditionals. */
+  background-color: var(--bg-elevated, #fff);
+  color: var(--text-primary, #0f172a);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-lg, 0.5rem);
+  box-shadow: var(--shadow-xl, 0 10px 25px rgb(0 0 0 / 15%));
+  animation: pwa-prompt-slide-up 0.25s ease-out;
+}
+
+.pwa-install-prompt__icon {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--color-primary, #3b82f6);
+  margin-top: 0.125rem;
+}
+
+.pwa-install-prompt__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.pwa-install-prompt__title {
+  font-weight: var(--font-weight-semibold, 600);
+  font-size: var(--font-sm, 0.875rem);
+  color: var(--text-primary, #0f172a);
+}
+
+.pwa-install-prompt__message {
+  font-size: var(--font-xs, 0.75rem);
+  color: var(--text-secondary, #64748b);
+  line-height: 1.4;
+}
+
+.pwa-install-prompt__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 0.25rem);
+  flex-shrink: 0;
+}
+
+.pwa-install-prompt__btn {
+  appearance: none;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: var(--radius-sm, 0.25rem);
+  background: transparent;
+  color: var(--text-primary, #0f172a);
+  font-size: var(--font-xs, 0.75rem);
+  font-weight: var(--font-weight-semibold, 600);
+  padding: 0.25rem 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    /* Derive a subtle hover wash from the current text colour so the
+     * effect works consistently in both light and dark themes without
+     * needing a dedicated `--surface-hover` token. */
+    background-color: color-mix(in oklch, currentcolor 8%, transparent);
+    border-color: var(--border-color-hover, #cbd5e1);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary, #3b82f6);
+    outline-offset: 2px;
+  }
+}
+
+.pwa-install-prompt__btn--primary {
+  background-color: var(--color-primary, #3b82f6);
+  /* Primary button always sits on a saturated blue background, so
+   * white text reads correctly in both themes. */
+  color: #fff;
+  border-color: var(--color-primary, #3b82f6);
+
+  &:hover {
+    background-color: var(--color-primary-hover, #2563eb);
+    border-color: var(--color-primary-hover, #2563eb);
+    color: #fff;
+  }
+}
+
+/* On narrow viewports, span the full width so fingers have a clear
+ * target and the actions stack horizontally at the bottom. */
+@media (width < 640px) {
+  .pwa-install-prompt {
+    left: var(--space-3, 0.75rem);
+    right: var(--space-3, 0.75rem);
+    max-width: none;
+  }
+
+  .pwa-install-prompt__actions {
+    flex-direction: row;
+  }
+}
+
+/* ─── Animations ──────────────────────────────────────────────────────── */
+
+@keyframes pwa-banner-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pwa-prompt-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Respect the user's motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  .pwa-update-banner,
+  .pwa-install-prompt {
+    animation: none;
+  }
+}

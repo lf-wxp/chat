@@ -5,11 +5,19 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="theme-color" content="#3b82f6" />
 		<meta name="description" content="WebRTC Multi-User Chat Application" />
+
+		<!-- PWA manifest -->
+		<link rel="manifest" href="/manifest.json" />
+		<link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+		<link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+
 		<title>WebRTC Chat</title>
 
 		<!-- Copy preprocessed styles directory to dist (Trunk asset pipeline) -->
 		<!-- css-hook.sh runs css-processor: styles/ -> styles-dist/ (expands composes) -->
 		<link data-trunk rel="copy-dir" href="styles-dist" data-target-path="styles" />
+		<!-- PWA public assets (manifest.json, sw.js, icons/) -->
+		<link data-trunk rel="copy-dir" href="public" data-target-path="/" />
 		<!-- CSS Stylesheet (loaded from copied directory) -->
 		<link rel="stylesheet" href="styles/main.css" />
 
@@ -58,6 +66,39 @@
 
 		<!-- Leptos WASM mount point -->
 		<div id="leptos"></div>
+
+		<!-- PWA_SW_BEGIN -->
+		<!-- Service Worker registration for PWA offline support.
+		     Stripped in debug builds (trunk serve) to avoid SW caching interference
+		     during development. Kept intact in release builds for production PWA. -->
+		<script type="text/javascript">
+			(function () {
+				if ('serviceWorker' in navigator) {
+					window.addEventListener('load', function () {
+						navigator.serviceWorker.register('/sw.js').then(function (registration) {
+							console.log('[SW] Registered:', registration.scope);
+
+							// Listen for updates
+							registration.addEventListener('updatefound', function () {
+								var newWorker = registration.installing;
+								newWorker.addEventListener('statechange', function () {
+									if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+										// New content available — notify the app
+										console.log('[SW] New version available');
+										if (window.__pwaUpdateAvailable) {
+											window.__pwaUpdateAvailable();
+										}
+									}
+								});
+							});
+						}).catch(function (error) {
+							console.warn('[SW] Registration failed:', error);
+						});
+					});
+				}
+			})();
+		</script>
+		<!-- PWA_SW_END -->
 
 		<!-- Trunk will inject WASM loader and CSS here -->
 

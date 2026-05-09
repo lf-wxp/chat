@@ -5,8 +5,8 @@
 
 use crate::components::{
   AppBg, AuthPage, CallOverlay, DebugPanel, ErrorToastContainer, GlobalRoomModalState, HomePage,
-  IncomingInviteModal, ModalManager, ReconnectBanner, SettingsPage, Sidebar, ToastContainer,
-  TopBar,
+  IncomingInviteModal, ModalManager, OfflineBanner, PwaInstallPrompt, PwaUpdateBanner,
+  ReconnectBanner, SettingsPage, Sidebar, ToastContainer, TopBar,
 };
 use crate::i18n::{self, Locale};
 use crate::i18n_helpers;
@@ -158,7 +158,7 @@ pub fn App() -> impl IntoView {
     leptos_use::use_window(),
     leptos::ev::keydown,
     move |ev: web_sys::KeyboardEvent| {
-      if ev.key() != "Escape" {
+      if utils::safe_key(&ev) != "Escape" {
         return;
       }
       if settings_open.get_untracked() {
@@ -191,6 +191,9 @@ pub fn App() -> impl IntoView {
       // (Code Quality 1 fix).
       <ErrorToastContainer />
       <ReconnectBanner />
+      <OfflineBanner />
+      <PwaUpdateBanner />
+      <PwaInstallPrompt />
 
       // Skip-to-content link (WCAG 2.4.1, Req 14.6). Visually hidden
       // until focused; jumps to #main-content so keyboard-only users

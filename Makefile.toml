@@ -194,6 +194,30 @@ install_crate = {crate_name = "wasm-pack", binary = "wasm-pack", test_arg = ["--
 description = "Install cargo-watch for development watching"
 install_crate = {crate_name = "cargo-watch", binary = "cargo-watch", test_arg = ["watch", "--version"]}
 
+[tasks.setup-docker]
+description = "Verify and setup Docker buildx plugin (optional, for Docker builds)"
+workspace = false
+script = '''
+#!/bin/bash
+set -euo pipefail
+
+if ! command -v docker &> /dev/null; then
+  echo "[setup-docker] ⚠️  Docker not found; skipping buildx setup"
+  exit 0
+fi
+
+if docker buildx version &> /dev/null; then
+  echo "[setup-docker] ✅ docker buildx already available"
+  exit 0
+fi
+
+echo "[setup-docker] ❌ docker buildx not found"
+echo "[setup-docker] Please install it manually:"
+echo "  macOS:   brew install docker-buildx && ln -sf $(brew --prefix)/bin/docker-buildx ~/.docker/cli-plugins/docker-buildx"
+echo "  Linux:   See https://github.com/docker/buildx#installing"
+exit 1
+'''
+
 # ============================================================================
 # CSS Preprocessing Tasks
 # ============================================================================
@@ -413,20 +437,205 @@ workspace = false
 # Docker Tasks
 # ============================================================================
 
-[tasks.docker]
-args = ["build", "-t", "webrtc-chat:latest", "."]
-command = "docker"
-description = "Build Docker image"
+# --- Docker Compose V1/V2 auto-detection helper ---
+# Source this in any task that needs $DC set to the correct compose command.
+#
+# Usage inside a script:
+#   eval "$(cargo make --print-step-overrides 2>/dev/null)"  # not needed
+#   Simply inline the detection block, or use the shared function below.
+
+[tasks.docker-build]
+description = "Build Docker image (webrtc-chat:latest)"
+workspace = false
+script = '''
+#!/bin/bash
+set -euo pipefail
+docker build -t webrtc-chat:latest .
+'''
+
+# --- Docker Compose tasks (auto-detect V1/V2) ---
 
 [tasks.docker-compose]
-args = ["up", "-d"]
-command = "docker-compose"
-description = "Run with docker-compose"
+description = "Build and run with docker compose (auto-detects V1/V2)"
+workspace = false
+script = '''
+#!/bin/bash
+set -euo pipefail
+
+# Auto-detect: prefer V2 plugin ("docker compose"), fall back to
+# V1 standalone ("docker-compose").
+if docker compose version &>/dev/null; then
+  DC="docker compose"
+elif command -v docker-compose &>/dev/null; then
+  DC="docker-compose"
+else
+  echo "[docker-compose] ❌ Neither 'docker compose' (V2) nor 'docker-compose' (V1) found"
+  exit 1
+fi
+
+echo "[docker-compose] Using: $DC"
+$DC up -d --build
+'''
 
 [tasks.docker-stop]
-args = ["down"]
-command = "docker-compose"
-description = "Stop docker-compose services"
+description = "Stop docker compose services (auto-detects V1/V2)"
+workspace = false
+script = '''
+#!/bin/bash
+set -euo pipefail
+
+if docker compose version &>/dev/null; then
+  DC="docker compose"
+elif command -v docker-compose &>/dev/null; then
+  DC="docker-compose"
+else
+  echo "[docker-stop] ❌ Neither 'docker compose' (V2) nor 'docker-compose' (V1) found"
+  exit 1
+fi
+
+$DC down
+'''
+
+[tasks.docker-logs]
+description = "Follow docker compose logs (auto-detects V1/V2)"
+workspace = false
+script = '''
+#!/bin/bash
+set -euo pipefail
+
+if docker compose version &>/dev/null; then
+  DC="docker compose"
+elif command -v docker-compose &>/dev/null; then
+  DC="docker-compose"
+else
+  echo "[docker-logs] ❌ Neither 'docker compose' (V2) nor 'docker-compose' (V1) found"
+  exit 1
+fi
+
+$DC logs -f
+'''
+
+[tasks.docker-restart]
+dependencies = ["docker-stop", "docker-compose"]
+description = "Restart docker compose services"
+
+# --- Direct container run tasks (without compose) ---
+
+[tasks.docker-run]
+description = "Run container directly (builds image only if not present, without compose)"
+workspace = false
+script = '''
+#!/bin/bash
+set -euo pipefail
+
+IMAGE_NAME="webrtc-chat"
+IMAGE_TAG="latest"
+CONTAINER_NAME="webrtc-chat"
+HOST_PORT="${DOCKER_HOST_PORT:-3000}"
+CONTAINER_PORT=3000
+
+# Stop and remove existing container if running
+if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+  echo "[docker-run] Stopping existing container: ${CONTAINER_NAME}"
+  docker stop "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+  docker rm "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+fi
+
+# Build only if image does not exist locally
+if docker image inspect "${IMAGE_NAME}:${IMAGE_TAG}" &>/dev/null; then
+  echo "[docker-run] ✅ Image ${IMAGE_NAME}:${IMAGE_TAG} already exists, skipping build"
+else
+  echo "[docker-run] Image not found, building: ${IMAGE_NAME}:${IMAGE_TAG}"
+  docker build -t "${IMAGE_NAME}:${IMAGE_TAG}" .
+fi
+
+# Run the container
+echo "[docker-run] Starting container on port ${HOST_PORT} -> ${CONTAINER_PORT}"
+docker run -d \
+  --name "${CONTAINER_NAME}" \
+  -p "${HOST_PORT}:${CONTAINER_PORT}" \
+  -e PORT="${CONTAINER_PORT}" \
+  -e RUST_LOG=info \
+  --health-cmd="curl -f http://localhost:${CONTAINER_PORT}/api/health || exit 1" \
+  --health-interval=30s \
+  --health-timeout=5s \
+  --health-retries=3 \
+  "${IMAGE_NAME}:${IMAGE_TAG}"
+
+echo "[docker-run] ✅ Container started: ${CONTAINER_NAME}"
+echo "[docker-run] 🌐 http://localhost:${HOST_PORT}"
+echo "[docker-run] Use 'cargo make docker-run-stop' to stop"
+echo "[docker-run] Use 'cargo make docker-run-build' to force rebuild and run"
+'''
+
+[tasks.docker-run-build]
+description = "Force rebuild Docker image and run container directly (without compose)"
+dependencies = ["docker-build", "docker-run-stop"]
+workspace = false
+script = '''
+#!/bin/bash
+set -euo pipefail
+
+IMAGE_NAME="webrtc-chat"
+IMAGE_TAG="latest"
+CONTAINER_NAME="webrtc-chat"
+HOST_PORT="${DOCKER_HOST_PORT:-3000}"
+CONTAINER_PORT=3000
+
+# Run the container (image already built by docker-build dependency,
+# container already stopped by docker-run-stop dependency)
+echo "[docker-run-build] Starting container on port ${HOST_PORT} -> ${CONTAINER_PORT}"
+docker run -d \
+  --name "${CONTAINER_NAME}" \
+  -p "${HOST_PORT}:${CONTAINER_PORT}" \
+  -e PORT="${CONTAINER_PORT}" \
+  -e RUST_LOG=info \
+  --health-cmd="curl -f http://localhost:${CONTAINER_PORT}/api/health || exit 1" \
+  --health-interval=30s \
+  --health-timeout=5s \
+  --health-retries=3 \
+  "${IMAGE_NAME}:${IMAGE_TAG}"
+
+echo "[docker-run-build] ✅ Container started: ${CONTAINER_NAME}"
+echo "[docker-run-build] 🌐 http://localhost:${HOST_PORT}"
+echo "[docker-run-build] Use 'cargo make docker-run-stop' to stop"
+'''
+
+[tasks.docker-run-stop]
+description = "Stop and remove the direct-run Docker container"
+workspace = false
+script = '''
+#!/bin/bash
+set -euo pipefail
+
+CONTAINER_NAME="webrtc-chat"
+
+if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+  echo "[docker-run-stop] Stopping container: ${CONTAINER_NAME}"
+  docker stop "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+  docker rm "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+  echo "[docker-run-stop] ✅ Container removed"
+else
+  echo "[docker-run-stop] No container named '${CONTAINER_NAME}' found"
+fi
+'''
+
+[tasks.docker-run-logs]
+description = "Follow logs from the direct-run Docker container"
+workspace = false
+script = '''
+#!/bin/bash
+set -euo pipefail
+
+CONTAINER_NAME="webrtc-chat"
+
+if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+  docker logs -f "${CONTAINER_NAME}"
+else
+  echo "[docker-run-logs] ❌ Container '${CONTAINER_NAME}' is not running"
+  exit 1
+fi
+'''
 
 # ============================================================================
 # WASM Tasks

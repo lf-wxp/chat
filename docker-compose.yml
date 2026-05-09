@@ -1,0 +1,67 @@
+# ============================================================================
+# docker-compose.yml — WebRTC Chat Application
+# ============================================================================
+# Usage:
+#   docker compose up -d        # Start in detached mode
+#   docker compose logs -f      # Follow logs
+#   docker compose down         # Stop and remove containers
+#   docker compose up --build   # Rebuild and start
+# ============================================================================
+
+services:
+  webrtc-chat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: webrtc-chat
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      # Server configuration
+      - PORT=3000
+      - JWT_SECRET=${JWT_SECRET:-change-this-secret-in-production}
+      - STUN_TURN_SERVERS=${STUN_TURN_SERVERS:-stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302}
+
+      # Logging
+      - RUST_LOG=${RUST_LOG:-info}
+      - RUST_LOG_FORMAT=${RUST_LOG_FORMAT:-json}
+      - LOG_OUTPUT=stdout
+
+      # Static files
+      - STATIC_DIR=/app/frontend/dist
+      - STICKERS_DIR=/app/assets/stickers
+
+      # WebSocket configuration
+      - HEARTBEAT_INTERVAL_SECS=${HEARTBEAT_INTERVAL_SECS:-30}
+      - HEARTBEAT_TIMEOUT_SECS=${HEARTBEAT_TIMEOUT_SECS:-60}
+      - MAX_MESSAGE_SIZE=${MAX_MESSAGE_SIZE:-1048576}
+
+      # TLS (optional — mount cert/key and uncomment)
+      # - TLS_CERT_PATH=/app/certs/cert.pem
+      # - TLS_KEY_PATH=/app/certs/key.pem
+    volumes:
+      # Persist logs
+      - chat-logs:/app/logs
+      # Persist sticker assets
+      - chat-assets:/app/assets/stickers
+      # Mount TLS certificates (if using TLS)
+      # - ./certs:/app/certs:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    networks:
+      - chat-network
+
+volumes:
+  chat-logs:
+    driver: local
+  chat-assets:
+    driver: local
+
+networks:
+  chat-network:
+    driver: bridge

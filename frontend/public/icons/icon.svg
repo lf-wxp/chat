@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-label="WebRTC Chat icon">
+  <!-- Background rounded square -->
+  <rect width="512" height="512" rx="96" fill="#3b82f6"/>
+
+  <!-- Chat bubble 1 (left, speaker) -->
+  <path
+    d="M128 176c0-26.5 21.5-48 48-48h112c26.5 0 48 21.5 48 48v80c0 26.5-21.5 48-48 48h-40l-52 44c-7 6-17 1-17-8v-36h-3c-26.5 0-48-21.5-48-48v-80z"
+    fill="#ffffff"/>
+
+  <!-- Chat bubble 2 (right, replier) -->
+  <path
+    d="M176 296c0-26.5 21.5-48 48-48h112c26.5 0 48 21.5 48 48v80c0 26.5-21.5 48-48 48h-3v36c0 9-10 14-17 8l-52-44h-40c-26.5 0-48-21.5-48-48v-80z"
+    fill="#ffffff"
+    fill-opacity="0.72"/>
+</svg>

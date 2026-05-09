@@ -230,6 +230,29 @@ impl Drop for IntervalHandle {
   }
 }
 
+/// Safely read `KeyboardEvent.key` without panicking on `undefined`.
+///
+/// In certain edge cases (synthetic events, IME composition, or browser
+/// quirks), `KeyboardEvent.key` may return `undefined` from the JS side.
+/// The `web_sys` binding `ev.key()` calls `passStringToWasm0` internally,
+/// which reads `.length` on the value — causing a
+/// `Cannot read properties of undefined (reading 'length')` TypeError
+/// that crashes the WASM module.
+///
+/// This helper uses `js_sys::Reflect` to fetch the property and falls
+/// back to an empty string when the value is not a JS string, preventing
+/// the crash while keeping the rest of the key-handling logic intact.
+#[must_use]
+pub fn safe_key(ev: &web_sys::KeyboardEvent) -> String {
+  let raw = js_sys::Reflect::get(ev.as_ref(), &wasm_bindgen::JsValue::from_str("key"))
+    .unwrap_or(wasm_bindgen::JsValue::UNDEFINED);
+  if raw.is_string() {
+    raw.as_string().unwrap_or_default()
+  } else {
+    String::new()
+  }
+}
+
 /// Format a total-seconds duration as a human-friendly string.
 ///
 /// Examples:

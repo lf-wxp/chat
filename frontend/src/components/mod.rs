@@ -13,6 +13,9 @@ mod discovery;
 mod error_toast;
 mod home_page;
 mod modal_manager;
+mod offline_banner;
+mod pwa_install_prompt;
+mod pwa_update_banner;
 mod reconnect_banner;
 mod room;
 mod settings_page;
@@ -32,6 +35,9 @@ pub use discovery::{
 pub use error_toast::ErrorToastContainer;
 pub use home_page::HomePage;
 pub use modal_manager::ModalManager;
+pub use offline_banner::OfflineBanner;
+pub use pwa_install_prompt::PwaInstallPrompt;
+pub use pwa_update_banner::PwaUpdateBanner;
 pub use reconnect_banner::ReconnectBanner;
 pub use room::{
   AnnouncementPanel, CreateRoomModal, GlobalRoomModalState, MemberListPanel, MutedIndicator,

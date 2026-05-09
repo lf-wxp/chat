@@ -638,5 +638,18 @@
 		"retry": "重试",
 		"retry_connection": "重新连接",
 		"dismiss_banner": "关闭"
+	},
+	"pwa": {
+		"offline_title": "您已离线",
+		"offline_message": "部分功能可能不可用，请检查网络连接。",
+		"online_title": "已恢复连接",
+		"online_message": "网络连接已恢复。",
+		"install_title": "安装应用",
+		"install_message": "安装此应用以获得更好的体验。",
+		"install_button": "安装",
+		"dismiss_install": "以后再说",
+		"update_available": "有新版本可用",
+		"update_button": "更新",
+		"cache_name": "webrtc-chat-v1"
 	}
 }

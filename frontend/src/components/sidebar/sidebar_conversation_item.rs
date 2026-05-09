@@ -159,7 +159,7 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
       on:keydown={
         let conv_id_key = conv_id.clone();
         move |ev: web_sys::KeyboardEvent| {
-          let key = ev.key();
+          let key = crate::utils::safe_key(&ev);
           // Activate row.
           if key == "Enter" || key == " " {
             ev.prevent_default();
@@ -230,7 +230,8 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
           menu_open.update(|open| *open = !*open);
         }
         on:keydown=move |ev: web_sys::KeyboardEvent| {
-          if ev.key() == "Enter" || ev.key() == " " {
+          let key = crate::utils::safe_key(&ev);
+          if key == "Enter" || key == " " {
             ev.prevent_default();
             menu_open.update(|open| *open = !*open);
           }

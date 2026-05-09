@@ -45,8 +45,8 @@ chrono = {version = "0.4.44", features = ["wasmbind"]}
 # Base64 decoding (JWT payload) — replaces window.atob() for correct UTF-8 handling
 base64 = "0.22.1"
 
-# UUID generation (js feature enables wasm-bindgen support)
-uuid = {version = "1.23.1", features = ["js", "v4"]}
+# UUID generation (js feature enables wasm-bindgen support for WASM targets)
+uuid = {workspace = true, features = ["v4"]}
 
 # Bitcode codec for binary WebSocket messages
 bitcode = "0.6.9"
@@ -223,3 +223,6 @@ locales = ["en", "zh-CN", "es"]
 [features]
 csr = ["leptos/csr", "leptos_i18n/csr"]
 default = ["csr"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+uuid = {workspace = true, features = ["js", "v4"]}

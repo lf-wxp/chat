@@ -1,0 +1,51 @@
+# ============================================================================
+# .dockerignore — Exclude files from Docker build context
+# ============================================================================
+
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Rust build artifacts (rebuilt inside Docker)
+target/
+
+# Node.js (not used in this project)
+node_modules/
+
+# Docker files
+docker-compose.yml
+Dockerfile
+
+# Documentation
+README.md
+LICENSE
+.codebuddy/
+
+# CSS processed output (rebuilt inside Docker)
+frontend/styles-dist/
+
+# Frontend dist (rebuilt inside Docker)
+frontend/dist/
+
+# Logs
+logs/
+*.log
+
+# Environment files
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test and coverage artifacts
+coverage.xml
+lcov.info

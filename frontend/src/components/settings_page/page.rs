@@ -79,7 +79,7 @@ pub fn SettingsPage() -> impl IntoView {
     if !open.get_untracked() {
       return;
     }
-    if ev.key() == "Escape" {
+    if crate::utils::safe_key(&ev) == "Escape" {
       ev.stop_propagation();
       open.set(false);
     }

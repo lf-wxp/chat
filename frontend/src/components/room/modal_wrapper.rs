@@ -129,7 +129,10 @@ pub fn ModalWrapper(
     use_document(),
     keydown,
     move |ev: web_sys::KeyboardEvent| {
-      if ev.key() == "Escape" && visible.get_untracked() && !closing.get_untracked() {
+      if crate::utils::safe_key(&ev) == "Escape"
+        && visible.get_untracked()
+        && !closing.get_untracked()
+      {
         ev.stop_propagation();
         if open.is_some() {
           // In controlled mode, trigger exit animation.

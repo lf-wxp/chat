@@ -455,7 +455,7 @@
 
 > 前后端联调，验证完整的用户流程，确保所有功能端到端可用。
 
-- [ ] 25. 前后端联调与 PWA 配置
+- [x] 25. 前后端联调与 PWA 配置
   - 联调信令通信：WebSocket 连接 → TokenAuth → 用户列表同步 → 房间管理
   - 联调 WebRTC 连接：邀请 → SDP/ICE 交换 → PeerConnection 建立 → DataChannel 通信
   - 联调聊天功能：文本/Sticker/语音/图片消息端到端收发、消息 ACK、已读回执
@@ -463,9 +463,12 @@
   - 联调剧场模式：创建/加入/视频播放/弹幕/字幕/Owner 管理
   - 联调刷新恢复：页面刷新 → TokenAuth → ActivePeersList → 连接重建 → 消息补发
   - 联调权限系统：踢出/禁言/封禁/提升/降级/转让所有权
-  - 实现 PWA 配置：`manifest.json`、Service Worker（静态资源 cache-first）、离线 Banner
-  - 实现 Dockerfile 多阶段构建 + docker-compose.yml
+  - 实现 PWA 配置：`manifest.json`（SVG + PNG 多尺寸图标，maskable purpose）、Service Worker（静态资源 cache-first、i18n locale JSON cache-first、API network-first、HTML stale-while-revalidate）、`OfflineBanner`（`navigator.onLine` 监听 + 3s 轮询兜底 + "Back online" 确认提示）、`PwaUpdateBanner`（sw statechange → 用户确认 → `SKIP_WAITING` + reload）、`PwaInstallPrompt`（`beforeinstallprompt` 捕获 → 品牌化 "Add to Home Screen" 卡片 → 14 天冷却）
+  - 新增后端 `/api/health` 健康检查端点（供 Docker/K8s healthcheck 使用）
+  - 新增后端 SPA fallback handler：navigation 请求（无扩展名路径）回退到 `index.html`，带扩展名请求保持 404，让 PWA 深链接刷新后能正确加载
+  - 实现 Dockerfile 多阶段构建（server-builder + css-builder + frontend-builder + distroless-like runtime）+ docker-compose.yml（含 healthcheck、volume 持久化、TLS mount 占位）
   - _需求：所有需求的端到端验证_
+
 
 - [ ] 26. E2E 测试与最终验收
   - 编写 Playwright E2E 测试用例：
