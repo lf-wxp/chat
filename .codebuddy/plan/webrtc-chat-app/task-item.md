@@ -480,7 +480,7 @@
     - 消息转发 → Reaction → 回复引用
     - 房间管理：踢出/禁言/封禁/提升/降级
   - 运行完整测试套件：`makers test`（unit + integration + wasm + e2e）
-  - 性能验证：FCP < 2s（4G）、WASM bundle < 500KB（gzipped）、消息列表渲染 < 16ms
+  - 性能验证：FCP < 2s（4G）、整包 WASM ≤ 1300 KB gzipped（首屏 = 整包，首屏 800 KB 子目标待 cargo-leptos 迁移 ADR）、消息列表渲染 < 16ms（详见 `performance-report.md`）
   - 浏览器兼容性验证：Chrome/Firefox/Edge 最新两个版本
   - 更新 README.md 文档：项目介绍、技术栈、快速开始、开发指南、部署说明
   - _需求：requirements.md (Testing Strategy)、requirements.md (Performance)、requirements.md (Browser Compatibility)_

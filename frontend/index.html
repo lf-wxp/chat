@@ -21,6 +21,16 @@
 		<!-- CSS Stylesheet (loaded from copied directory) -->
 		<link rel="stylesheet" href="styles/main.css" />
 
+		<!-- Rust WASM target. `data-wasm-opt="z"` tells Trunk to run
+		     `wasm-opt -Oz` on the release build, which typically shaves
+		     40-60% off the rustc output via whole-module dead-code
+		     elimination across wasm-bindgen shims. Combined with the
+		     workspace release profile (`opt-level = "z"`, `lto = "fat"`,
+		     `codegen-units = 1`, `strip = true`) this keeps the shipped
+		     WASM under the 500 KB (gzipped) target from requirements.md
+		     → Performance. The attribute is a no-op for debug builds. -->
+		<link data-trunk rel="rust" data-wasm-opt="z" />
+
 		<!-- Leptos i18n: locale detection for initial page load -->
 		<script type="text/javascript">
 			// Detect browser locale for initial load

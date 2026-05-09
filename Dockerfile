@@ -70,9 +70,13 @@ RUN cargo build --release -p css-processor
 # ---------------------------------------------------------------------------
 FROM rust-base AS frontend-builder
 
-# Install additional frontend build dependencies
+# Install additional frontend build dependencies:
+# - binaryen    : wasm-opt for release-mode WASM size reduction
+# - librsvg2-bin: provides rsvg-convert for PWA icon rasterisation
+#                 (converts icons/icon.svg → icon-<size>x<size>.png)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     binaryen \
+    librsvg2-bin \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy built CSS preprocessor
@@ -88,6 +92,21 @@ COPY frontend/ frontend/
 COPY frontend/css-hook.sh frontend/css-hook.sh
 COPY frontend/strip-dev-hot-reload.sh frontend/strip-dev-hot-reload.sh
 
+# Generate PWA icon PNGs from the source SVG.
+#
+# manifest.json advertises PNG icons in 8 sizes (72, 96, 128, 144, 152,
+# 192, 384, 512). Rather than committing binary artefacts, the SVG
+# source lives under version control and the PNGs are rasterised at
+# build time. `rsvg-convert` is deterministic and honours the SVG's
+# maskable safe-zone so Android launchers crop cleanly.
+RUN set -eu; \
+    cd frontend/public/icons; \
+    for size in 72 96 128 144 152 192 384 512; do \
+      rsvg-convert -w "$size" -h "$size" icon.svg \
+        -o "icon-${size}x${size}.png"; \
+    done; \
+    ls -lh icon-*.png
+
 # Run CSS preprocessor to expand composes
 RUN css-processor frontend/styles frontend/styles-dist
 
@@ -95,7 +114,8 @@ RUN css-processor frontend/styles frontend/styles-dist
 RUN find frontend/src -type f -exec touch {} + \
     && find message/src -type f -exec touch {} +
 
-# Build frontend with Trunk
+# Build frontend with Trunk (index.html's `copy-dir public` picks up
+# the freshly generated PNG icons into dist/icons/).
 WORKDIR /app/frontend
 RUN trunk build --release
 

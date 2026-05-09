@@ -1,51 +1,63 @@
 # PWA Icons
 
-This folder holds the Progressive Web App icons referenced by `manifest.json`.
+This folder holds the Progressive Web App icons referenced by
+`manifest.json` (one level up).
 
-## What ships today
+## Source of truth
 
-- `icon.svg` — Source vector icon (512×512 viewBox). Used as the
-  fallback and the authoritative artwork. `manifest.json` lists PNG
-  variants that are expected to be generated from this SVG at build
-  time.
+- `icon.svg` — the authoritative artwork (512×512 viewBox, maskable
+  safe-zone designed-in). Kept under version control.
+- `icon-{72,96,128,144,152,192,384,512}x{size}.png` — rasterised at
+  build time from `icon.svg`. These files **do not live in git**;
+  they are produced by either the Dockerfile or the local helper
+  script below.
 
-## Regenerating the PNG variants
+## How the PNGs are produced
 
-Browsers that honour the `manifest.json` need raster PNGs in the
-following sizes: **72, 96, 128, 144, 152, 192, 384, 512**. Generate
-them from `icon.svg` using any rasteriser you prefer; two common
-options are below.
+### In CI / production
 
-### Using ImageMagick
+The Dockerfile's `frontend-builder` stage installs `librsvg2-bin` and
+rasterises all eight sizes before `trunk build`. Trunk's
+`copy-dir public` directive then picks them up into `dist/icons/`.
+No manual step is required to ship to production.
+
+### Locally (for dev preview)
 
 ```bash
-cd frontend/public/icons
-for size in 72 96 128 144 152 192 384 512; do
-  magick -background none -density 400 icon.svg \
-    -resize ${size}x${size} icon-${size}x${size}.png
-done
+cargo make pwa-icons       # Preferred
+# or directly:
+./scripts/generate-pwa-icons.sh
 ```
 
-### Using rsvg-convert (librsvg)
+Both invocations require `rsvg-convert` from librsvg:
 
 ```bash
-cd frontend/public/icons
-for size in 72 96 128 144 152 192 384 512; do
-  rsvg-convert -w ${size} -h ${size} icon.svg -o icon-${size}x${size}.png
-done
+# macOS
+brew install librsvg
+
+# Debian / Ubuntu
+apt-get install librsvg2-bin
+
+# Fedora / RHEL
+dnf install librsvg2-tools
 ```
 
 ## Why PNGs are not committed
 
-Binary PNG assets churn the repository noisily and double-encode the
-SVG's geometry. Keep the SVG source under version control and
-regenerate PNGs in CI / at packaging time. The `Dockerfile` build
-stage is a good home for the regeneration step.
+1. Binary churn — regenerating them shouldn't pollute git diffs.
+2. Reproducibility — the SVG is canonical; the PNGs are a derived
+   artefact, like a build output.
+3. Docker layer efficiency — regenerating PNGs inside the build
+   stage keeps them in a cache layer that invalidates only when
+   `icon.svg` changes.
 
-## Maskable variants
+## Maskable safe zone
 
-The 192×192 and 512×512 entries in `manifest.json` declare
-`purpose: "any maskable"`. Make sure the produced PNGs honour the
-safe zone (80% centred) so Android launchers can crop the icon
-without clipping the chat bubbles. The source SVG is already
-designed with that safe zone in mind.
+`manifest.json` marks the 192/512 entries as
+`"purpose": "any maskable"`. `icon.svg` already reserves an 80%
+centred safe zone so Android launchers can apply their circular /
+rounded-square masks without clipping the chat bubbles.
+
+If you edit `icon.svg`, keep all meaningful pixels inside a
+circle of radius ≈205px centred at (256, 256) to preserve the safe
+zone.

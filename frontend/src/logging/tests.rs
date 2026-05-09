@@ -418,6 +418,216 @@ fn test_max_recent_errors_constant() {
   assert_eq!(LoggerState::MAX_RECENT_ERRORS, 50);
 }
 
+// ── Diagnostic report privacy whitelist ──
+//
+// The diagnostic report is downloaded by users and frequently attached
+// to bug reports, so it MUST NEVER leak sensitive information. These
+// tests pin the data-shape contract so that any future field added to
+// `DiagnosticReport`, `PerformanceMetrics`, or `DiagnosticConfig`
+// forces the developer to explicitly acknowledge it here.
+
+/// Exhaustive list of top-level JSON keys the report may contain.
+/// Adding a new field requires updating this list AND reviewing it
+/// for privacy implications (see requirements.md → Observability →
+/// Diagnostic Report).
+const ALLOWED_REPORT_KEYS: &[&str] = &[
+  "timestamp",
+  "user_agent",
+  "connected",
+  "performance",
+  "recent_errors",
+  "configuration",
+];
+
+/// Fields inside `PerformanceMetrics` — purely numeric metrics.
+const ALLOWED_PERFORMANCE_KEYS: &[&str] = &[
+  "page_load_ms",
+  "ws_latency_ms",
+  "memory_usage_bytes",
+  "peer_count",
+];
+
+/// Fields inside `DiagnosticConfig` — user-facing, non-sensitive
+/// preferences only.
+const ALLOWED_CONFIG_KEYS: &[&str] = &["debug_mode", "locale", "theme", "log_buffer_size"];
+
+/// Substrings that, if present in any struct field name, indicate a
+/// privacy regression. This is a defence-in-depth guard — the
+/// whitelist above is the primary contract.
+const SENSITIVE_FIELD_SUBSTRINGS: &[&str] = &[
+  "token",
+  "password",
+  "secret",
+  "jwt",
+  "credential",
+  "session_id",
+  "api_key",
+  "private_key",
+  "shared_secret",
+];
+
+/// Recursively collect every JSON object key from a `serde_json::Value`.
+fn collect_json_keys(value: &serde_json::Value, out: &mut std::collections::BTreeSet<String>) {
+  match value {
+    serde_json::Value::Object(map) => {
+      for (k, v) in map {
+        out.insert(k.clone());
+        collect_json_keys(v, out);
+      }
+    }
+    serde_json::Value::Array(items) => {
+      for item in items {
+        collect_json_keys(item, out);
+      }
+    }
+    _ => {}
+  }
+}
+
+#[test]
+fn diagnostic_report_top_level_fields_are_whitelisted() {
+  // Construct a fully populated report so serde_json::to_value emits
+  // every field (Option::None fields are still serialised with null
+  // under serde defaults, but we populate them anyway for rigour).
+  let report = DiagnosticReport {
+    timestamp: "2026-05-09T00:00:00Z".to_string(),
+    user_agent: "TestAgent/1.0".to_string(),
+    connected: true,
+    performance: PerformanceMetrics {
+      page_load_ms: Some(1.0),
+      ws_latency_ms: Some(2.0),
+      memory_usage_bytes: Some(3.0),
+      peer_count: 4,
+    },
+    recent_errors: vec![],
+    configuration: DiagnosticConfig {
+      debug_mode: false,
+      locale: "en".to_string(),
+      theme: "light".to_string(),
+      log_buffer_size: 1000,
+    },
+  };
+
+  let value = serde_json::to_value(&report).expect("report must serialise");
+  let top_level_keys: Vec<String> = value
+    .as_object()
+    .expect("report must serialise as an object")
+    .keys()
+    .cloned()
+    .collect();
+
+  for key in &top_level_keys {
+    assert!(
+      ALLOWED_REPORT_KEYS.contains(&key.as_str()),
+      "unexpected top-level field `{key}` — update ALLOWED_REPORT_KEYS \
+       and review for privacy implications before merging"
+    );
+  }
+  // Also ensure we didn't silently drop a field on either side.
+  for expected in ALLOWED_REPORT_KEYS {
+    assert!(
+      top_level_keys.iter().any(|k| k == expected),
+      "whitelisted field `{expected}` disappeared from DiagnosticReport"
+    );
+  }
+}
+
+#[test]
+fn diagnostic_performance_fields_are_whitelisted() {
+  let metrics = PerformanceMetrics {
+    page_load_ms: Some(1.0),
+    ws_latency_ms: Some(2.0),
+    memory_usage_bytes: Some(3.0),
+    peer_count: 4,
+  };
+  let value = serde_json::to_value(&metrics).expect("metrics must serialise");
+  let keys: Vec<String> = value.as_object().unwrap().keys().cloned().collect();
+
+  for key in &keys {
+    assert!(
+      ALLOWED_PERFORMANCE_KEYS.contains(&key.as_str()),
+      "unexpected PerformanceMetrics field `{key}`"
+    );
+  }
+  for expected in ALLOWED_PERFORMANCE_KEYS {
+    assert!(
+      keys.iter().any(|k| k == expected),
+      "whitelisted PerformanceMetrics field `{expected}` disappeared"
+    );
+  }
+}
+
+#[test]
+fn diagnostic_configuration_fields_are_whitelisted() {
+  let config = DiagnosticConfig {
+    debug_mode: false,
+    locale: "en".to_string(),
+    theme: "light".to_string(),
+    log_buffer_size: 1000,
+  };
+  let value = serde_json::to_value(&config).expect("config must serialise");
+  let keys: Vec<String> = value.as_object().unwrap().keys().cloned().collect();
+
+  for key in &keys {
+    assert!(
+      ALLOWED_CONFIG_KEYS.contains(&key.as_str()),
+      "unexpected DiagnosticConfig field `{key}`"
+    );
+  }
+  for expected in ALLOWED_CONFIG_KEYS {
+    assert!(
+      keys.iter().any(|k| k == expected),
+      "whitelisted DiagnosticConfig field `{expected}` disappeared"
+    );
+  }
+}
+
+#[test]
+fn diagnostic_report_field_names_never_contain_sensitive_substrings() {
+  // Belt-and-braces: even if a future PR sneaks a field past the
+  // whitelist reviewer, this smoke test catches obvious leaks like
+  // `jwt_token`, `user_password`, `session_secret`, etc.
+  let report = DiagnosticReport {
+    timestamp: String::new(),
+    user_agent: String::new(),
+    connected: false,
+    performance: PerformanceMetrics {
+      page_load_ms: None,
+      ws_latency_ms: None,
+      memory_usage_bytes: None,
+      peer_count: 0,
+    },
+    recent_errors: vec![LogEntry {
+      timestamp: 0,
+      level: LogLevel::Error,
+      module: "m".to_string(),
+      message: "msg".to_string(),
+      data: None,
+    }],
+    configuration: DiagnosticConfig {
+      debug_mode: false,
+      locale: String::new(),
+      theme: String::new(),
+      log_buffer_size: 0,
+    },
+  };
+
+  let value = serde_json::to_value(&report).expect("report must serialise");
+  let mut all_keys = std::collections::BTreeSet::new();
+  collect_json_keys(&value, &mut all_keys);
+
+  for key in &all_keys {
+    let lower = key.to_lowercase();
+    for needle in SENSITIVE_FIELD_SUBSTRINGS {
+      assert!(
+        !lower.contains(needle),
+        "field `{key}` contains sensitive-looking substring `{needle}` — \
+         diagnostic reports MUST NOT embed credentials or secrets"
+      );
+    }
+  }
+}
+
 // ── Filter combined level + module tests ──
 
 #[test]

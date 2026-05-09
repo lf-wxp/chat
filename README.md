@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/badge/P2P-WebRTC-critical?logo=webrtc" alt="WebRTC P2P" />
     <img src="https://img.shields.io/badge/PWA-Installable-9cf?logo=pwa" alt="PWA" />
     <img src="https://img.shields.io/badge/a11y-WCAG_2.1_AA-blue" alt="WCAG 2.1 AA" />
-    <img src="https://img.shields.io/badge/tests-1324%20passing-success" alt="1324 tests passing" />
+    <img src="https://img.shields.io/badge/tests-1939%20passing-success" alt="1939 tests passing" />
   </p>
 </p>
 
@@ -276,11 +276,25 @@ Every error includes `code`, `message`, `i18n_key`, `details`, `timestamp`, and 
 
 | Feature | Details |
 |---------|---------|
-| **Install** | `manifest.json` with 192×192 + 512×512 icons, standalone display mode |
-| **Offline** | Service Worker cache-first for static assets, stickers, and i18n files |
+| **Install** | `manifest.json` with SVG source + 8 PNG sizes (72 → 512 px), maskable purpose, standalone display mode |
+| **Install prompt** | Custom `PwaInstallPrompt` component captures `beforeinstallprompt`, shows a branded "Add to Home Screen" card, 14-day dismissal cool-down |
+| **Update banner** | `PwaUpdateBanner` reacts to Service Worker `statechange`; user-initiated `SKIP_WAITING` + reload for zero-disruption upgrades |
+| **Offline banner** | `OfflineBanner` reacts to `navigator.onLine` with a 3 s polling fallback; "Back online" confirmation toast |
+| **Service Worker strategies** | Cache-first for static assets, i18n JSON, and `manifest.json`; network-first for `/api/*`; stale-while-revalidate for HTML navigation |
+| **SPA deep links** | Backend `spa_fallback` serves `index.html` for extension-less paths; asset-looking paths still return 404 |
+| **Health endpoint** | `GET /api/health` JSON liveness probe consumed by Docker / Kubernetes |
 | **Persistence** | IndexedDB for chat history, settings, avatar cache — readable offline |
-| **Banner** | "You are offline" banner when connectivity drops |
 | **Notifications** | Browser Notification API for incoming messages/calls (opt-in) |
+
+### PWA icon generation
+
+`icon.svg` is the source of truth; PNG variants are produced at build time (Dockerfile runs them inline). To preview locally:
+
+```bash
+cargo make pwa-icons        # or: ./scripts/generate-pwa-icons.sh
+```
+
+Requires `rsvg-convert` from librsvg (`brew install librsvg` / `apt-get install librsvg2-bin`). See [frontend/public/icons/README.md](./frontend/public/icons/README.md).
 
 ## 🔄 Error Handling & Degradation
 
@@ -467,9 +481,11 @@ cargo make test-e2e            # Playwright E2E tests
 | Crate | Type | Count |
 |-------|------|-------|
 | `message` | Unit + WASM | 484 + 108 |
-| `server` | Unit + Integration | 597 |
-| `frontend` | WASM lib + Integration | 116 + 19 |
-| **Total** | | **1 324** |
+| `server` | Unit + Integration | 601 |
+| `frontend` | Unit (lib) + WASM lib + WASM integration | 854 + 116 + 19 |
+| **Total** | | **2 182** |
+
+All suites run green under `cargo make test`. Clippy pedantic is enforced with `-D warnings` — zero warnings across the workspace.
 
 ### Quality gate
 

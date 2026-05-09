@@ -71,8 +71,18 @@ console_error_panic_hook = "0.1.7"
 message = {path = "../message", features = ["wasm"]}
 
 # Web APIs (WebRTC, IndexedDB, etc.)
+#
+# Feature selection discipline: every entry here is verified to be
+# referenced in frontend/src somewhere — via `grep -rE "\bFoo\b"`
+# against the feature's type name. Features enabled transitively by
+# other web-sys methods we call do NOT need to be listed (web-sys
+# handles that internally), which is why e.g. `AesGcmParams` is
+# absent: we call `.encrypt_with_object_and_buffer_source(...)`
+# which takes a `&js_sys::Object`, not the typed `AesGcmParams`
+# constructor.
 [dependencies.web-sys]
 features = [
+  # Core DOM & window
   "Window",
   "Document",
   "Element",
@@ -80,27 +90,32 @@ features = [
   "Navigator",
   "Location",
   "Storage",
-  "MediaQueryList",
-  "MediaQueryListEvent",
   "Performance",
-  "PerformanceEntry",
-  "PerformanceNavigation",
   "Blob",
   "BlobPropertyBag",
   "Url",
-  "KeyboardEvent", # WebSocket & Signaling
+
+  # Events
+  "Event",
+  "KeyboardEvent",
+  "MessageEvent",
+  "CloseEvent",
+  "DragEvent",
+  "PointerEvent",
+  "MouseEvent",
+
+  # WebSocket & Signaling
   "WebSocket",
   "BinaryType",
-  "CloseEvent",
-  "MessageEvent",
-  "ErrorEvent",
-  "Event",
-  "DomException", # HTTP Fetch API
+  "DomException",
+
+  # HTTP Fetch API
   "Request",
   "RequestInit",
-  "RequestMode",
   "Response",
-  "Headers", # WebRTC
+  "Headers",
+
+  # WebRTC
   "RtcPeerConnection",
   "RtcConfiguration",
   "RtcDataChannel",
@@ -115,49 +130,48 @@ features = [
   "RtcDataChannelEvent",
   "RtcStatsReport",
   "RtcSdpType",
-  "MediaStream",
-  "MediaStreamConstraints",
-  "MediaStreamTrack",
-  "RtcRtpSender",
-  "MediaDevices",
-  "MediaDeviceInfo",
-  "DisplayMediaStreamConstraints",
-  "MediaTrackConstraints",
-  "ConstrainDoubleRange",
-  "ConstrainDomStringParameters",
-  "HtmlVideoElement",
-  "CssStyleDeclaration", # Web Audio (call VAD, Req 7.3)
-  "AudioContext",
-  "AudioContextOptions",
-  "AnalyserNode",
-  "AudioNode",
-  "AudioDestinationNode",
-  "AudioParam",
-  "MediaStreamAudioSourceNode", # Voice recording (Task 16 — Opus capture + waveform)
-  "MediaRecorder",
-  "MediaRecorderOptions",
-  "BlobEvent",
-  "RecordingState", # RtcRtpReceiver & transceiver API (Req 3: seamless audio/video switch)
-  "RtcRtpReceiver",
-  "RtcRtpTransceiver",
-  "RtcTrackEvent", # Web Crypto API
-  "Crypto",
-  "CryptoKey",
-  "SubtleCrypto",
-  "Algorithm",
-  "AesKeyGenParams",
-  "AesGcmParams",
-  "EcKeyGenParams",
-  "EcdhKeyDeriveParams",
-  "HkdfParams", # Additional WebRTC features needed for methods
   "RtcDataChannelState",
   "RtcSignalingState",
   "RtcPeerConnectionState",
   "RtcOfferOptions",
-  "console", # Chat UI (Task 16)
+  "RtcRtpSender",
+  "RtcTrackEvent",
+
+  # Media streams (call + screen share)
+  "MediaStream",
+  "MediaStreamConstraints",
+  "MediaStreamTrack",
+  "MediaDevices",
+  "MediaDeviceInfo",
+  "DisplayMediaStreamConstraints",
+  "MediaTrackConstraints",
+  "HtmlVideoElement",
+
+  # Web Audio (call VAD, Req 7.3)
+  "AudioContext",
+  "AnalyserNode",
+  "AudioNode",
+  "MediaStreamAudioSourceNode",
+
+  # Voice recording (Task 16 — Opus capture + waveform)
+  "MediaRecorder",
+  "MediaRecorderOptions",
+  "BlobEvent",
+  "RecordingState",
+
+  # Web Crypto API
+  "Crypto",
+  "CryptoKey",
+  "SubtleCrypto",
+  "Algorithm",
+  "EcKeyGenParams",
+  "EcdhKeyDeriveParams",
+
+  "console",
+
+  # Chat UI (Task 16)
   "HtmlTextAreaElement",
   "HtmlInputElement",
-  "HtmlAudioElement",
   "HtmlMediaElement",
   "HtmlImageElement",
   "HtmlCanvasElement",
@@ -166,26 +180,23 @@ features = [
   "ScrollIntoViewOptions",
   "ScrollBehavior",
   "ScrollLogicalPosition",
+
+  # Clipboard & drag-and-drop
   "Clipboard",
   "DataTransfer",
-  "DataTransferItem",
-  "DataTransferItemList",
   "File",
   "FileList",
   "FileReader",
-  "ClipboardEvent",
-  "DragEvent",
-  "InputEvent",
-  "FocusEvent",
-  "PointerEvent",
-  "MouseEvent", # Cache API (sticker asset caching, Task 16 P8)
+
+  # Cache API (sticker asset caching, Task 16 P8)
   "Cache",
-  "CacheStorage", # IndexedDB (Task 17 — message persistence)
+  "CacheStorage",
+
+  # IndexedDB (Task 17 — message persistence)
   "IdbFactory",
   "IdbDatabase",
   "IdbOpenDbRequest",
   "IdbRequest",
-  "IdbRequestReadyState",
   "IdbTransaction",
   "IdbTransactionMode",
   "IdbObjectStore",
@@ -194,14 +205,19 @@ features = [
   "IdbIndexParameters",
   "IdbVersionChangeEvent",
   "IdbKeyRange",
-  "IdbCursor",
   "IdbCursorDirection",
   "IdbCursorWithValue",
+
+  # Storage quota API
   "StorageManager",
   "StorageEstimate",
+
+  # Resize observer (virtual scroll height measurement)
   "ResizeObserver",
   "ResizeObserverEntry",
-  "DomRectReadOnly", # Browser Notification API (Req 7.4 — incoming-call OS notification)
+  "DomRectReadOnly",
+
+  # Browser Notification API (Req 7.4 — incoming-call OS notification)
   "Notification",
   "NotificationOptions",
   "NotificationPermission",

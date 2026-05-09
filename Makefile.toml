@@ -249,6 +249,19 @@ set -euo pipefail
 workspace = false
 
 # ============================================================================
+# PWA Icon Generation
+# ============================================================================
+
+[tasks.pwa-icons]
+description = "Generate PWA icon PNGs from frontend/public/icons/icon.svg (requires librsvg)"
+workspace = false
+script = '''
+#!/usr/bin/env bash
+set -euo pipefail
+./scripts/generate-pwa-icons.sh
+'''
+
+# ============================================================================
 # Build Tasks
 # ============================================================================
 

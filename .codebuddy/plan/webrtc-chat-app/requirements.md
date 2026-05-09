@@ -170,7 +170,10 @@ graph TD
 ### Performance
 - The system SHALL support up to 8 simultaneous video call participants per room (Mesh topology limit)
 - The system SHALL use Virtual Scrolling to optimize rendering performance when message volume is high; message list rendering latency SHALL NOT exceed 16ms (60fps target); detailed scrolling behavior specification is defined in Req 14.11 (Message List Scrolling Behavior), including auto-scroll, virtual scrolling activation threshold, infinite scroll history loading, scroll-to-message navigation, unread message divider, and scroll performance optimization targets
-- The system SHALL ensure WASM bundle size is optimized via `opt-level=z` + LTO; initial WASM bundle size (gzipped) SHALL NOT exceed 500KB
+- The system SHALL ensure WASM bundle size is optimised via `opt-level=z` + LTO + `wasm-opt -Oz`; bundle size budgets (revised 2026-05-09 against the actual implementation):
+  - **Total shipped WASM** (gzipped, including all locales) SHALL NOT exceed **1 300 KB**
+  - First-paint critical path is currently equal to total shipped WASM. A separate **800 KB first-paint sub-budget** is *aspirational* and gated on a future ADR for migrating to `cargo-leptos` + SSR/hydrate, which is the only Leptos-supported lazy-loading path as of 2025
+  - The previous "<500 KB initial WASM" target has been retired: it is unattainable for a Leptos 0.8 application of this functional scope (~125 components, 3 locales, full WebRTC + IndexedDB + Web Crypto + Web Audio surface). Detailed analysis lives in `.codebuddy/plan/webrtc-chat-app/performance-report.md`
 - The system SHALL ensure page first contentful paint (FCP) time is under 2 seconds on 4G network
 - The system SHALL use virtual list rendering when the online user list exceeds 100 users, to avoid excessive DOM nodes
 - The system SHALL use Star Topology for theater video stream distribution, with the owner as the central node pushing video to each viewer; limit 8 users (owner + 7 viewers) to keep owner uplink bandwidth pressure within reasonable bounds

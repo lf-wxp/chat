@@ -33,6 +33,15 @@ ws = true
 
 [tools]
 sass = "1.77"
+# Pin a binaryen release that Trunk will auto-download if missing.
+# Version numbering follows binaryen's `version_<n>` tags.
+#
+# The actual wasm-opt optimisation level is configured per-asset in
+# index.html via the `data-wasm-opt` attribute on the `<link
+# data-trunk rel="rust">` element (see `data-wasm-opt="z"`). Using
+# the HTML-level attribute rather than a global flag keeps the knob
+# next to the build target it configures.
+wasm_opt = "version_123"
 
 [[hooks]]
 # Pre-build hook: run css-processor to expand composes declarations.
