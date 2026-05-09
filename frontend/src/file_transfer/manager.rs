@@ -519,6 +519,9 @@ impl FileTransferManager {
 pub fn provide_file_transfer_manager() -> FileTransferManager {
   let app_state = use_app_state();
   let manager = FileTransferManager::new(app_state);
+  FILE_TRANSFER_MANAGER_FALLBACK.with(|cell| {
+    cell.borrow_mut().replace(manager.clone());
+  });
   provide_context(manager.clone());
   manager
 }
@@ -529,14 +532,36 @@ pub fn provide_file_transfer_manager() -> FileTransferManager {
 /// Panics if [`provide_file_transfer_manager`] has not been called.
 #[must_use]
 pub fn use_file_transfer_manager() -> FileTransferManager {
-  expect_context::<FileTransferManager>()
+  if let Some(mgr) = use_context::<FileTransferManager>() {
+    return mgr;
+  }
+  FILE_TRANSFER_MANAGER_FALLBACK
+    .with(|cell| cell.borrow().clone())
+    .expect("FileTransferManager has not been provided yet")
 }
 
 /// Non-panicking lookup used by signalling code paths that may run
-/// before bootstrap wiring completes.
+/// before bootstrap wiring completes, **or from outside any reactive
+/// owner** (e.g. WebSocket / DataChannel callbacks). Falls back to
+/// the thread-local registry populated by
+/// [`provide_file_transfer_manager`].
 #[must_use]
 pub fn try_use_file_transfer_manager() -> Option<FileTransferManager> {
-  use_context::<FileTransferManager>()
+  if let Some(mgr) = use_context::<FileTransferManager>() {
+    return Some(mgr);
+  }
+  FILE_TRANSFER_MANAGER_FALLBACK.with(|cell| cell.borrow().clone())
+}
+
+thread_local! {
+  /// Best-effort fallback registry mirroring the pattern used by
+  /// `WebRtcManager` / `ChatManager` so callers running outside the
+  /// Leptos reactive owner (notably the file-picker change handler
+  /// dispatched from a `Closure::wrap`) can still resolve the
+  /// manager. Single-threaded WASM means there is exactly one
+  /// `FileTransferManager` per app instance, so this is safe.
+  static FILE_TRANSFER_MANAGER_FALLBACK: RefCell<Option<FileTransferManager>> =
+    const { RefCell::new(None) };
 }
 
 #[cfg(test)]

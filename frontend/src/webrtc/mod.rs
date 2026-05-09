@@ -1631,8 +1631,35 @@ impl WebRtcManager {
   }
 
   /// Get default ICE servers (Google STUN).
+  /// Get default ICE servers (Google STUN), unless we are running on
+  /// `localhost` / `127.0.0.1` — in that case both peers can reach
+  /// each other via host ICE candidates and the public STUN lookup
+  /// is unnecessary (and can stall the handshake under headless
+  /// browser sandboxes used by E2E tests). Returns an empty list in
+  /// loopback contexts so [`PeerConnection::build_configuration`]
+  /// skips the `iceServers` field entirely.
   fn default_ice_servers() -> Vec<IceServerConfig> {
+    if Self::is_loopback_origin() {
+      return Vec::new();
+    }
     vec![IceServerConfig::stun("stun:stun.l.google.com:19302")]
+  }
+
+  /// Best-effort detection of a loopback origin (`localhost`,
+  /// `127.0.0.1`, `[::1]`). Falls back to `false` in non-browser
+  /// contexts (native unit tests) so the production STUN list is
+  /// preserved.
+  fn is_loopback_origin() -> bool {
+    let Some(window) = web_sys::window() else {
+      return false;
+    };
+    let Ok(hostname) = window.location().hostname() else {
+      return false;
+    };
+    matches!(
+      hostname.as_str(),
+      "localhost" | "127.0.0.1" | "::1" | "[::1]"
+    )
   }
 
   /// Initiate ICE restart for a peer by creating a new offer with
@@ -1756,6 +1783,18 @@ crate::wasm_send_sync!(WebRtcManager);
 /// negligible on the main thread.
 const PRUNE_INTERVAL_MS: i32 = 5_000;
 
+thread_local! {
+  /// Best-effort fallback registry for `try_use_webrtc_manager`. Populated
+  /// by `provide_webrtc_manager` so that callers running outside the Leptos
+  /// reactive owner (notably the WebSocket `onmessage` callback installed
+  /// by `SignalingClient`, and the various `Closure::wrap` callbacks for
+  /// RTCPeerConnection / RTCDataChannel events) can still resolve the
+  /// manager. Single-threaded WASM means there is exactly one
+  /// `WebRtcManager` per app instance, so this is safe.
+  static WEBRTC_MANAGER_FALLBACK: std::cell::RefCell<Option<WebRtcManager>> =
+    const { std::cell::RefCell::new(None) };
+}
+
 /// Provide WebRtcManager via Leptos context.
 ///
 /// Also starts a periodic [`WebRtcManager::prune_expired_ecdh`] tick
@@ -1767,6 +1806,9 @@ const PRUNE_INTERVAL_MS: i32 = 5_000;
 /// dropped.
 pub fn provide_webrtc_manager(app_state: AppState) -> WebRtcManager {
   let manager = WebRtcManager::new(app_state);
+  WEBRTC_MANAGER_FALLBACK.with(|cell| {
+    cell.borrow_mut().replace(manager.clone());
+  });
 
   // P1-11: drive `prune_expired_ecdh` periodically so Req 5.1.5 is
   // observable at runtime (previously the method was only exercised
@@ -1798,10 +1840,16 @@ pub fn use_webrtc_manager() -> WebRtcManager {
 ///
 /// Prefer this over [`use_webrtc_manager`] when called from code paths
 /// that may execute before `provide_webrtc_manager` (e.g. signaling
-/// handlers during the auth bootstrap window).
+/// handlers during the auth bootstrap window) **or from outside any
+/// reactive owner** (e.g. WebSocket `onmessage` closures). For the
+/// non-reactive path the function falls back to the thread-local
+/// registry populated by `provide_webrtc_manager`.
 #[must_use]
 pub fn try_use_webrtc_manager() -> Option<WebRtcManager> {
-  use_context::<WebRtcManager>()
+  if let Some(mgr) = use_context::<WebRtcManager>() {
+    return Some(mgr);
+  }
+  WEBRTC_MANAGER_FALLBACK.with(|cell| cell.borrow().clone())
 }
 
 /// Build the UI placeholder `ChatMessage` that represents an inbound

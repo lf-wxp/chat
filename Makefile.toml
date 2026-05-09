@@ -801,3 +801,80 @@ workspace = false
 [tasks.ci]
 dependencies = ["fmt-check", "check", "clippy", "test-unit", "test-wasm", "test-wasm-frontend", "build"]
 description = "Run all CI checks (including WASM tests)"
+
+# ============================================================================
+# End-to-End (Playwright) Tests
+# ============================================================================
+#
+# E2E tests live in `./e2e` (TypeScript + Playwright). They drive a real
+# Chromium browser against a freshly-built signaling server + frontend bundle.
+#
+# Workflow:
+#   1. `e2e-build` builds the release server binary and the release frontend
+#      so Playwright always exercises production-like artefacts.
+#   2. `e2e-install` installs Node.js dependencies and the Chromium browser
+#      bundle inside `./e2e/node_modules`.
+#   3. `test-e2e` runs the full Playwright test suite headless.
+#
+# Run `cargo make test-e2e-headed` to debug locally with a visible browser.
+
+[tasks.e2e-build]
+description = "Build release artefacts required by the Playwright E2E suite"
+dependencies = ["build-server-release", "build-frontend-release"]
+workspace = false
+
+[tasks.e2e-install]
+description = "Install Node.js dependencies and Chromium for Playwright"
+workspace = false
+script = '''
+#!/bin/bash
+set -euo pipefail
+cd e2e
+if [ ! -d node_modules ]; then
+  npm ci 2>/dev/null || npm install
+fi
+npx --yes playwright install --with-deps chromium
+'''
+
+[tasks.test-e2e]
+description = "Run the full Playwright E2E suite (headless Chromium) — Requirement 16"
+dependencies = ["e2e-build", "e2e-install"]
+workspace = false
+script = '''
+#!/bin/bash
+set -euo pipefail
+cd e2e
+npx playwright test
+'''
+
+[tasks.test-e2e-headed]
+description = "Run the Playwright E2E suite with a visible browser window"
+dependencies = ["e2e-build", "e2e-install"]
+workspace = false
+script = '''
+#!/bin/bash
+set -euo pipefail
+cd e2e
+npx playwright test --headed
+'''
+
+[tasks.test-e2e-ui]
+description = "Open Playwright's interactive UI mode"
+dependencies = ["e2e-build", "e2e-install"]
+workspace = false
+script = '''
+#!/bin/bash
+set -euo pipefail
+cd e2e
+npx playwright test --ui
+'''
+
+[tasks.e2e-report]
+description = "Open the most recent Playwright HTML report"
+workspace = false
+script = '''
+#!/bin/bash
+set -euo pipefail
+cd e2e
+npx playwright show-report
+'''

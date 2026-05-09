@@ -272,6 +272,8 @@ pub fn MessageList(
       class="chat-view-scroll message-list"
       on:scroll=on_scroll
       data-testid="message-list"
+      aria-live="polite"
+      aria-relevant="additions"
     >
       {move || {
         let list = messages.get();

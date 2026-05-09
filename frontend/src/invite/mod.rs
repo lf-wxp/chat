@@ -533,10 +533,23 @@ impl CleanupOutcome {
   }
 }
 
+thread_local! {
+  /// Best-effort fallback registry for `try_use_invite_manager`. Populated by
+  /// `provide_invite_manager` so that callers running *outside* the Leptos
+  /// reactive owner (notably the WebSocket `onmessage` callback installed by
+  /// `SignalingClient`) can still resolve the manager. This is safe because
+  /// the application is single-threaded WASM and there is exactly one
+  /// `InviteManager` per app instance.
+  static INVITE_MANAGER_FALLBACK: RefCell<Option<InviteManager>> = const { RefCell::new(None) };
+}
+
 /// Provide an `InviteManager` to the Leptos context.
 pub fn provide_invite_manager() -> InviteManager {
   let manager = InviteManager::new();
   provide_context(manager.clone());
+  INVITE_MANAGER_FALLBACK.with(|cell| {
+    cell.borrow_mut().replace(manager.clone());
+  });
   manager
 }
 
@@ -549,8 +562,15 @@ pub fn use_invite_manager() -> InviteManager {
   expect_context::<InviteManager>()
 }
 
-/// Best-effort accessor — safe to call from non-reactive callbacks.
+/// Best-effort accessor — safe to call from non-reactive callbacks
+/// (e.g. WebSocket `onmessage` handlers, browser event closures) where
+/// `use_context` returns `None` because there is no active reactive owner.
+/// Falls back to the thread-local registry populated by
+/// [`provide_invite_manager`].
 #[must_use]
 pub fn try_use_invite_manager() -> Option<InviteManager> {
-  use_context::<InviteManager>()
+  if let Some(mgr) = use_context::<InviteManager>() {
+    return Some(mgr);
+  }
+  INVITE_MANAGER_FALLBACK.with(|cell| cell.borrow().clone())
 }

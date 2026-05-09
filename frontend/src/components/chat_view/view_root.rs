@@ -40,6 +40,33 @@ pub fn ChatView() -> impl IntoView {
 
   let conv = Signal::derive(move || app_state.active_conversation.get());
 
+  // Reactive E2EE readiness flag for the current conversation's peer.
+  // Exposed as `data-encryption-ready` on the chat view root so E2E
+  // tests can deterministically wait for the ECDH handshake to
+  // complete before attempting to send application frames (pre-ECDH
+  // frames are dropped at the encryption layer).
+  //
+  // For direct conversations, readiness is true iff the peer's
+  // `PeerEncryptionStatus::established` flag is set. For rooms, the
+  // flag is true iff at least one peer is established (the room view
+  // only surfaces once the first mesh edge completes — individual
+  // peer readiness is rendered per-participant elsewhere).
+  let encryption_ready = Signal::derive(move || {
+    let Some(conv_id) = app_state.active_conversation.get() else {
+      return false;
+    };
+    let state = app_state.webrtc_state.get();
+    match conv_id {
+      crate::state::ConversationId::Direct(ref peer) => state
+        .get_peer(peer)
+        .map(|p| p.encryption.established)
+        .unwrap_or(false),
+      crate::state::ConversationId::Room(_) => {
+        state.peers.values().any(|p| p.encryption.established)
+      }
+    }
+  });
+
   // Parent-owned transient state.
   let reply_target: RwSignal<Option<ReplySnippet>> = RwSignal::new(None);
   let forward_source: RwSignal<Option<ChatMessage>> = RwSignal::new(None);
@@ -166,6 +193,21 @@ pub fn ChatView() -> impl IntoView {
         on:dragleave=on_dragleave
         on:drop=on_drop
       >
+        // Always-mounted E2EE readiness sentinel. Its `data-ready`
+        // attribute flips from `"false"` to `"true"` once the ECDH
+        // handshake for the current conversation's peer(s) completes.
+        // E2E tests poll this attribute via `.toHaveAttribute(...,
+        // "true")` to deterministically wait for the handshake
+        // without resorting to a fragile fixed `waitForTimeout`.
+        <span
+          data-testid="e2ee-ready-sentinel"
+          data-ready=move || {
+            if encryption_ready.get() { "true" } else { "false" }
+          }
+          hidden=true
+          style="display:none"
+          aria-hidden="true"
+        ></span>
         <MessageList
           conv=conv
           cbs=cbs

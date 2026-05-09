@@ -258,6 +258,7 @@ pub fn InputBar(
         <textarea
           node_ref=textarea_ref
           class="chat-input-textarea"
+          data-testid="chat-input-textarea"
           rows="1"
           maxlength=MAX_TEXT_LENGTH as i64
           placeholder=move || {
@@ -276,6 +277,7 @@ pub fn InputBar(
         <button
           type="button"
           class="chat-input-btn primary"
+          data-testid="chat-input-send"
           aria-label=move || t_string!(i18n, chat.send)
           title=move || t_string!(i18n, chat.send)
           prop:disabled=move || !can_send.get()

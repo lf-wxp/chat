@@ -55,11 +55,11 @@ pub fn LoginForm() -> impl IntoView {
   };
 
   view! {
-    <form class="auth-form" on:submit=on_submit>
+    <form class="auth-form" on:submit=on_submit data-testid="login-form">
       <h2 class="auth-form-title">{t!(i18n, auth.login)}</h2>
 
       <Show when=move || error.get().is_some()>
-        <div class="auth-form-error" role="alert" id="login-error">
+        <div class="auth-form-error" role="alert" id="login-error" data-testid="login-error">
           {move || error.get().unwrap_or_default()}
         </div>
       </Show>
@@ -68,6 +68,7 @@ pub fn LoginForm() -> impl IntoView {
         <label for="login-username">{t!(i18n, auth.username)}</label>
         <input
           id="login-username"
+          data-testid="login-username"
           type="text"
           class="input"
           placeholder=move || t_string!(i18n, auth.username_placeholder)
@@ -86,6 +87,7 @@ pub fn LoginForm() -> impl IntoView {
         <label for="login-password">{t!(i18n, auth.password)}</label>
         <input
           id="login-password"
+          data-testid="login-password"
           type="password"
           class="input"
           placeholder=move || t_string!(i18n, auth.password_placeholder)
@@ -101,6 +103,7 @@ pub fn LoginForm() -> impl IntoView {
       <button
         type="submit"
         class="btn btn-primary btn-block"
+        data-testid="login-submit"
         disabled=move || loading.get()
       >
         {move || if loading.get() { t_string!(i18n, auth.logging_in) } else { t_string!(i18n, auth.login) }}

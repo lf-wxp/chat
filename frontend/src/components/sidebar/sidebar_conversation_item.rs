@@ -80,12 +80,31 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
   let i18n = i18n::use_i18n();
   let conv_id = conversation.id.clone();
   let display_name = conversation.display_name.clone();
-  let last_message = conversation.last_message.clone();
   let pinned = conversation.pinned;
   let muted = conversation.muted;
   let archived = conversation.archived;
   let unread_count = conversation.unread_count;
   let first_char = display_name.chars().next().unwrap_or('?');
+
+  // Reactive last-message preview. The component is keyed by
+  // `conversation.id` in the parent `<For>`, which means new
+  // `Conversation` snapshots from the parent vector do NOT re-mount
+  // the component — so we cannot simply consume the prop's
+  // `last_message` field once. Instead, derive the preview live from
+  // the global `app_state.conversations` signal so any update (new
+  // inbound message, revocation, edit) is reflected without reload.
+  let last_message_preview = {
+    let conv_id_for_pv = conv_id.clone();
+    Signal::derive(move || {
+      app_state
+        .conversations
+        .get()
+        .into_iter()
+        .find(|c| c.id == conv_id_for_pv)
+        .and_then(|c| c.last_message)
+        .unwrap_or_default()
+    })
+  };
 
   let conv_id_active = conv_id.clone();
   let is_active =
@@ -198,7 +217,7 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
           <span>{display_name.clone()}</span>
         </div>
         <div class="sidebar-conversation-preview truncate">
-          {last_message.unwrap_or_default()}
+          {move || last_message_preview.get()}
         </div>
       </div>
 

@@ -287,10 +287,36 @@ where
           // Send current online user list to the newly authenticated user
           let online_users = ws_state.user_store.get_online_users();
           let user_list_msg = SignalingMessage::UserListUpdate(UserListUpdate {
-            users: online_users,
+            users: online_users.clone(),
           });
           if let Ok(encoded) = encode_signaling_message(&user_list_msg) {
             let _ = socket_tx.send(Message::Binary(Bytes::from(encoded))).await;
+          }
+
+          // Also broadcast the refreshed UserListUpdate to all OTHER users so
+          // their online list contains the new user's full profile (username,
+          // nickname, avatar). Without this, peers receiving only
+          // `UserStatusChange` end up with placeholder rows that have empty
+          // usernames until the next full list refresh.
+          if let Ok(encoded) =
+            encode_signaling_message(&SignalingMessage::UserListUpdate(UserListUpdate {
+              users: online_users,
+            }))
+          {
+            let mut broadcast_count = 0_usize;
+            for entry in ws_state.connections.iter() {
+              let other_user_id = entry.key();
+              if other_user_id != &user_id {
+                let sender = entry.value();
+                let _ = sender.send(encoded.clone()).await;
+                broadcast_count += 1;
+              }
+            }
+            debug!(
+              user_id = %user_id,
+              recipients = broadcast_count,
+              "Broadcast post-auth UserListUpdate to peers"
+            );
           }
 
           // Send active peers list to the newly authenticated user

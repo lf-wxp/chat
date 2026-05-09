@@ -18,21 +18,41 @@ pub fn TypingIndicator(conv: Signal<Option<ConversationId>>) -> impl IntoView {
 
   // Derived signal that returns the rendered label or an empty string
   // when nobody is typing.
-  let label = Signal::derive(move || {
+  let label = {
+    let manager = manager.clone();
+    Signal::derive(move || {
+      let Some(id) = conv.get() else {
+        return String::new();
+      };
+      let state = manager.conversation_state(&id);
+      let names = state.typing.get();
+      match names.len() {
+        0 => String::new(),
+        1 => format!("{}{}", names[0], t_string!(i18n, chat.typing_indicator)),
+        _ => t_string!(i18n, chat.typing_multiple).to_string(),
+      }
+    })
+  };
+
+  // Reactive signal: `true` while at least one peer in the active
+  // conversation is typing. Drives the `hidden` attribute on the
+  // outer `<div>` so the indicator collapses to zero height (and
+  // becomes "hidden" from Playwright's `toBeHidden` perspective)
+  // when nobody is typing.
+  let is_typing = Signal::derive(move || {
     let Some(id) = conv.get() else {
-      return String::new();
+      return false;
     };
     let state = manager.conversation_state(&id);
-    let names = state.typing.get();
-    match names.len() {
-      0 => String::new(),
-      1 => format!("{}{}", names[0], t_string!(i18n, chat.typing_indicator)),
-      _ => t_string!(i18n, chat.typing_multiple).to_string(),
-    }
+    !state.typing.get().is_empty()
   });
 
   view! {
-    <div class="typing-indicator" data-testid="typing-indicator">
+    <div
+      class="typing-indicator"
+      data-testid="typing-indicator"
+      hidden=move || !is_typing.get()
+    >
       {move || label.get()}
     </div>
   }

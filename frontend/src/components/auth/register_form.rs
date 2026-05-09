@@ -56,11 +56,11 @@ pub fn RegisterForm() -> impl IntoView {
   };
 
   view! {
-    <form class="auth-form" on:submit=on_submit>
+    <form class="auth-form" on:submit=on_submit data-testid="register-form">
       <h2 class="auth-form-title">{t!(i18n, auth.register)}</h2>
 
       <Show when=move || error.get().is_some()>
-        <div class="auth-form-error" role="alert" id="register-error">
+        <div class="auth-form-error" role="alert" id="register-error" data-testid="register-error">
           {move || error.get().unwrap_or_default()}
         </div>
       </Show>
@@ -69,6 +69,7 @@ pub fn RegisterForm() -> impl IntoView {
         <label for="register-username">{t!(i18n, auth.username)}</label>
         <input
           id="register-username"
+          data-testid="register-username"
           type="text"
           class="input"
           placeholder=move || t_string!(i18n, auth.username_placeholder)
@@ -88,6 +89,7 @@ pub fn RegisterForm() -> impl IntoView {
         <label for="register-password">{t!(i18n, auth.password)}</label>
         <input
           id="register-password"
+          data-testid="register-password"
           type="password"
           class="input"
           placeholder=move || t_string!(i18n, auth.password_placeholder)
@@ -104,6 +106,7 @@ pub fn RegisterForm() -> impl IntoView {
         <label for="register-confirm">{t!(i18n, auth.confirm_password)}</label>
         <input
           id="register-confirm"
+          data-testid="register-confirm-password"
           type="password"
           class="input"
           placeholder=move || t_string!(i18n, auth.confirm_password_placeholder)
@@ -119,6 +122,7 @@ pub fn RegisterForm() -> impl IntoView {
       <button
         type="submit"
         class="btn btn-primary btn-block"
+        data-testid="register-submit"
         disabled=move || loading.get()
       >
         {move || if loading.get() { t_string!(i18n, auth.registering) } else { t_string!(i18n, auth.register) }}

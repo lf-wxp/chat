@@ -37,23 +37,15 @@ pub fn handle_signaling_message(
       app_state.online_users.update(|users: &mut Vec<_>| {
         if let Some(user) = users.iter_mut().find(|u| u.user_id == change.user_id) {
           user.status = change.status;
-        } else {
-          // If the user is not in the list yet (e.g. due to
-          // message reordering where UserStatusChange arrives before
-          // UserListUpdate), add a minimal placeholder entry so the
-          // status is not lost. The next UserListUpdate from the server
-          // will replace this with full user info.
-          users.push(message::types::UserInfo {
-            user_id: change.user_id,
-            username: String::new(),
-            nickname: String::new(),
-            status: change.status,
-            avatar_url: None,
-            bio: String::new(),
-            created_at_nanos: 0,
-            last_seen_nanos: 0,
-          });
         }
+        // If the user is not in the list yet, do NOT push a placeholder
+        // entry: a placeholder with empty `username` would cause the
+        // `<For>` keyed UserRow to be instantiated with empty profile
+        // fields, and a subsequent full `UserListUpdate` set on the same
+        // user_id would not re-instantiate the row (the row's display
+        // string is captured once at mount). Leaving the entry out lets
+        // the trailing `UserListUpdate` populate it for the first time
+        // with correct fields.
       });
     }
 
@@ -221,6 +213,14 @@ pub fn handle_signaling_message(
       // The accepting user materialises a direct conversation locally
       // so the chat UI is ready before the DataChannel opens.
       ensure_direct_conversation(&accepted.from, app_state);
+      // Mirror the acceptee's behaviour (set in `IncomingInviteModal`)
+      // by switching the inviter to the freshly-created conversation
+      // so both sides land on the chat view in one go (Req 16.3.3).
+      app_state
+        .active_conversation
+        .set(Some(crate::state::ConversationId::Direct(
+          accepted.from.clone(),
+        )));
 
       // The original inviter (us) initiates the WebRTC handshake.
       if let Some(manager) = crate::webrtc::try_use_webrtc_manager() {
@@ -747,12 +747,13 @@ fn ensure_direct_conversation(peer: &message::UserId, app_state: AppState) {
   use crate::state::{Conversation, ConversationId, ConversationType};
   let conv_id = ConversationId::Direct(peer.clone());
   let display_name = resolve_display_name(app_state, peer);
+  let mut inserted = false;
   app_state.conversations.update(|list| {
     if list.iter().any(|c| c.id == conv_id) {
       return;
     }
     list.push(Conversation {
-      id: conv_id,
+      id: conv_id.clone(),
       display_name,
       last_message: None,
       last_message_ts: Some(chrono::Utc::now().timestamp_millis()),
@@ -763,7 +764,18 @@ fn ensure_direct_conversation(peer: &message::UserId, app_state: AppState) {
       archived: false,
       conversation_type: ConversationType::Direct,
     });
+    inserted = true;
   });
+  // Persist the new conversation skeleton so it survives a page
+  // reload (Req 16.5.2). The flag-setter methods in `AppState`
+  // debounce-write `localStorage.conversations` on dirty-mark, but
+  // this early-creation path bypasses those setters and would
+  // otherwise lose the skeleton if the user refreshes immediately
+  // after accepting an invite.
+  if inserted {
+    app_state.mark_conv_dirty(&conv_id);
+    app_state.persist_conversations();
+  }
 }
 
 /// Materialise a `ConversationId::Room` entry for `room_id` in

@@ -323,6 +323,9 @@ pub fn preview_for(msg: &ChatMessage) -> String {
 pub fn provide_chat_manager() -> ChatManager {
   let app_state = use_app_state();
   let manager = ChatManager::new(app_state);
+  CHAT_MANAGER_FALLBACK.with(|cell| {
+    cell.borrow_mut().replace(manager.clone());
+  });
   provide_context(manager.clone());
   manager
 }
@@ -333,5 +336,32 @@ pub fn provide_chat_manager() -> ChatManager {
 /// Panics if [`provide_chat_manager`] has not been called.
 #[must_use]
 pub fn use_chat_manager() -> ChatManager {
-  expect_context::<ChatManager>()
+  if let Some(mgr) = use_context::<ChatManager>() {
+    return mgr;
+  }
+  CHAT_MANAGER_FALLBACK
+    .with(|cell| cell.borrow().clone())
+    .expect("ChatManager has not been provided yet")
+}
+
+/// Non-panicking lookup for code paths that may execute outside the
+/// Leptos reactive owner (e.g. WebSocket / DataChannel callbacks, or
+/// `spawn_local` tasks scheduled from such callbacks). Falls back to
+/// the thread-local registry populated by
+/// [`provide_chat_manager`].
+#[must_use]
+pub fn try_use_chat_manager() -> Option<ChatManager> {
+  if let Some(mgr) = use_context::<ChatManager>() {
+    return Some(mgr);
+  }
+  CHAT_MANAGER_FALLBACK.with(|cell| cell.borrow().clone())
+}
+
+thread_local! {
+  /// Best-effort fallback registry so callers running outside the
+  /// Leptos reactive owner (e.g. DataChannel callbacks, file picker
+  /// `on:change` handlers) can still resolve the manager. Mirrors
+  /// the pattern used by `WebRtcManager` / `FileTransferManager`.
+  static CHAT_MANAGER_FALLBACK: std::cell::RefCell<Option<ChatManager>> =
+    const { std::cell::RefCell::new(None) };
 }

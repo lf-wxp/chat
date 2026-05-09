@@ -23,7 +23,7 @@ pub fn AuthPage() -> impl IntoView {
   let (mode, set_mode) = signal(AuthMode::Login);
 
   view! {
-    <div class="auth-page flex items-center justify-center min-h-screen">
+    <div class="auth-page flex items-center justify-center min-h-screen" data-testid="auth-page">
       <div class="auth-card">
         <div class="auth-card-header">
           <h1 class="auth-card-title">{t!(i18n, app.title)}</h1>
@@ -46,6 +46,7 @@ pub fn AuthPage() -> impl IntoView {
                 <span class="auth-switch-text">{t!(i18n, auth.has_account)}</span>
                 <button
                   class="btn btn-link"
+                  data-testid="auth-switch-to-login"
                   on:click=move |_| set_mode.set(AuthMode::Login)
                 >
                   {t!(i18n, auth.login)}
@@ -56,6 +57,7 @@ pub fn AuthPage() -> impl IntoView {
             <span class="auth-switch-text">{t!(i18n, auth.no_account)}</span>
             <button
               class="btn btn-link"
+              data-testid="auth-switch-to-register"
               on:click=move |_| set_mode.set(AuthMode::Register)
             >
               {t!(i18n, auth.register)}

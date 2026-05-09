@@ -84,7 +84,7 @@ pub struct SignalingClient {
   /// Cached ErrorToastManager reference so WebSocket callbacks can show
   /// error toasts without calling `expect_context` from outside the
   /// reactive owner (which would panic).
-  error_toast: crate::error_handler::ErrorToastManager,
+  pub(super) error_toast: crate::error_handler::ErrorToastManager,
 }
 
 crate::wasm_send_sync!(SignalingClient);

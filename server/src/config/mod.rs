@@ -112,6 +112,13 @@ impl Config {
       env::var("JWT_SECRET").unwrap_or_else(|_| "dev-secret-change-in-production".to_string());
 
     // ICE servers configuration
+    //
+    // `STUN_TURN_SERVERS` is a comma-separated list of ICE URLs. An
+    // *empty* value (`STUN_TURN_SERVERS=`) is treated as "no ICE
+    // servers" rather than `vec![""]`, which matters for E2E tests
+    // that run both peers on `127.0.0.1` — host candidates alone are
+    // enough and reaching out to a public STUN server can stall ICE
+    // gathering in sandboxed CI environments.
     let ice_servers = env::var("STUN_TURN_SERVERS").map_or_else(
       |_| {
         vec![
@@ -119,7 +126,13 @@ impl Config {
           "stun:stun1.l.google.com:19302".to_string(),
         ]
       },
-      |s| s.split(',').map(String::from).collect(),
+      |s| {
+        s.split(',')
+          .map(str::trim)
+          .filter(|part| !part.is_empty())
+          .map(String::from)
+          .collect()
+      },
     );
 
     // TLS configuration

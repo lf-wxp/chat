@@ -267,15 +267,23 @@ pub fn random_auto_decline_delay_ms() -> u32 {
   }
 }
 
-/// Provide a fresh `BlacklistState` to the Leptos context. Returns the
-/// state so the caller can keep a non-context handle if needed.
+thread_local! {
+  /// Fallback registry for callers outside the Leptos reactive owner — see
+  /// `crate::invite::INVITE_MANAGER_FALLBACK` for the rationale.
+  static BLACKLIST_FALLBACK: std::cell::RefCell<Option<BlacklistState>> =
+    const { std::cell::RefCell::new(None) };
+}
+
 pub fn provide_blacklist_state() -> BlacklistState {
   let state = BlacklistState::new();
   provide_context(state.clone());
+  BLACKLIST_FALLBACK.with(|cell| {
+    cell.borrow_mut().replace(state.clone());
+  });
   state
 }
 
-/// Retrieve the current `BlacklistState` from Leptos context.
+/// Retrieve the `BlacklistState` from Leptos context.
 ///
 /// # Panics
 /// Panics if `provide_blacklist_state` has not been called.
@@ -284,11 +292,15 @@ pub fn use_blacklist_state() -> BlacklistState {
   expect_context::<BlacklistState>()
 }
 
-/// Best-effort variant of [`use_blacklist_state`] safe to call from
-/// non-reactive callbacks; returns `None` outside the Leptos owner.
+/// Best-effort accessor that also resolves the thread-local fallback,
+/// so non-reactive WebSocket callbacks can route auto-decline timers
+/// through the same shared instance.
 #[must_use]
 pub fn try_use_blacklist_state() -> Option<BlacklistState> {
-  use_context::<BlacklistState>()
+  if let Some(state) = use_context::<BlacklistState>() {
+    return Some(state);
+  }
+  BLACKLIST_FALLBACK.with(|cell| cell.borrow().clone())
 }
 
 #[cfg(target_arch = "wasm32")]

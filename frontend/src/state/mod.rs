@@ -630,7 +630,7 @@ impl AppState {
   ///    of rewriting every row on each tick.
   /// 3. Removed conversations are deleted from IDB so old rows do not
   ///    accumulate (review v3 §B1).
-  fn persist_conversations(&self) {
+  pub(crate) fn persist_conversations(&self) {
     let convs_signal = self.conversations;
     let timer_signal = self.persist_timer;
     let dirty_signal = self.dirty_conv_ids;

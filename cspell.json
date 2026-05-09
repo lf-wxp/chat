@@ -1,9 +1,11 @@
 {
 	"words": [
+		"affordances",
 		"amortised",
 		"Analyser",
 		"AQID",
 		"arraybuffer",
+		"artefacts",
 		"audioinput",
 		"audiooutput",
 		"Autolinks",
@@ -106,6 +108,7 @@
 		"initialised",
 		"initialises",
 		"inputmode",
+		"interactable",
 		"isinstance",
 		"jank",
 		"jklm",

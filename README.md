@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/badge/P2P-WebRTC-critical?logo=webrtc" alt="WebRTC P2P" />
     <img src="https://img.shields.io/badge/PWA-Installable-9cf?logo=pwa" alt="PWA" />
     <img src="https://img.shields.io/badge/a11y-WCAG_2.1_AA-blue" alt="WCAG 2.1 AA" />
-    <img src="https://img.shields.io/badge/tests-1939%20passing-success" alt="1939 tests passing" />
+    <img src="https://img.shields.io/badge/tests-2186%20passing-success" alt="2186 tests passing" />
   </p>
 </p>
 
@@ -473,8 +473,45 @@ cargo make test-unit           # Unit tests (all crates)
 cargo make test-integration    # Integration tests (server + message)
 cargo make test-wasm           # WASM tests (message crate, headless Chrome)
 cargo make test-wasm-frontend  # WASM tests (frontend, headless browser)
-cargo make test-e2e            # Playwright E2E tests
+cargo make test-e2e            # Playwright E2E tests (Chromium headless)
+cargo make test-e2e-headed     # Playwright E2E tests with a visible browser
+cargo make test-e2e-ui         # Playwright interactive UI mode
+cargo make e2e-report          # Open the most recent HTML report
 ```
+
+### End-to-End Tests (Playwright)
+
+The `e2e/` directory holds the Playwright test suite that fulfils
+**Requirement 16** (E2E Messaging Test). Each spec file boots its own
+release-build signaling server on a random free port, drives two
+isolated Chromium browser contexts (simulating two separate users), and
+exercises the full stack — frontend WASM → WebSocket signaling →
+WebRTC PeerConnection + DataChannel.
+
+```text
+e2e/
+├── fixtures/    # Server lifecycle, double browser context, helpers
+├── specs/       # One spec per Req 16 sub-section
+│   ├── smoke.spec.ts             (Req 16.1)
+│   ├── auth.spec.ts              (Req 16.2)
+│   ├── invitation.spec.ts        (Req 16.3)
+│   ├── text-messaging.spec.ts    (Req 16.4)
+│   ├── persistence.spec.ts       (Req 16.5)
+│   ├── conversation-list.spec.ts (Req 16.12)
+│   ├── message-actions.spec.ts   (Req 16.9 / 16.10 / 16.15)
+│   ├── reaction.spec.ts          (Req 16.11)
+│   ├── file-transfer.spec.ts     (Req 16.14)
+│   ├── disconnect.spec.ts        (Req 16.16)
+│   ├── theme-a11y.spec.ts        (Req 16.18)
+│   └── e2ee.spec.ts              (Req 16.20)
+├── utils/       # Selector catalogue, unique-username generator, waiters
+└── assets/      # Test fixtures (small.txt, etc.)
+```
+
+The first run downloads Chromium via Playwright's installer
+(`cargo make test-e2e` triggers this automatically). Subsequent runs
+reuse the cached browser bundle. See [`e2e/README.md`](./e2e/README.md)
+for the full layout, design notes, and troubleshooting tips.
 
 ### Test Statistics
 
@@ -482,8 +519,9 @@ cargo make test-e2e            # Playwright E2E tests
 |-------|------|-------|
 | `message` | Unit + WASM | 484 + 108 |
 | `server` | Unit + Integration | 601 |
-| `frontend` | Unit (lib) + WASM lib + WASM integration | 854 + 116 + 19 |
-| **Total** | | **2 182** |
+| `frontend` | Unit (lib) + WASM lib + WASM integration | 858 + 116 + 19 |
+| `e2e` | Playwright spec files | 12 (25 cases) |
+| **Total Rust tests** | | **2 186** |
 
 All suites run green under `cargo make test`. Clippy pedantic is enforced with `-D warnings` — zero warnings across the workspace.
 

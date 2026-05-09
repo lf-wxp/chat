@@ -264,6 +264,7 @@ pub fn MessageBubble(
         <button
           type="button"
           class="message-action-btn"
+          data-testid="message-action-reply"
           aria-label=move || t_string!(i18n, chat.reply)
           title=move || t_string!(i18n, chat.reply)
           on:click={
@@ -284,6 +285,7 @@ pub fn MessageBubble(
         <button
           type="button"
           class="message-action-btn"
+          data-testid="message-action-react"
           aria-label=move || t_string!(i18n, chat.add_reaction)
           title=move || t_string!(i18n, chat.add_reaction)
           on:click=move |_| picker_open.update(|v| *v = !*v)
@@ -294,6 +296,7 @@ pub fn MessageBubble(
         <button
           type="button"
           class="message-action-btn"
+          data-testid="message-action-forward"
           aria-label=move || t_string!(i18n, chat.forward)
           title=move || t_string!(i18n, chat.forward)
           on:click={
@@ -308,6 +311,7 @@ pub fn MessageBubble(
           <button
             type="button"
             class="message-action-btn danger"
+            data-testid="message-action-revoke"
             aria-label=move || t_string!(i18n, chat.revoke)
             title=move || t_string!(i18n, chat.revoke)
             on:click={
@@ -327,6 +331,7 @@ pub fn MessageBubble(
         <button
           type="button"
           class="message-action-btn"
+          data-testid="message-action-copy"
           aria-label=move || t_string!(i18n, chat.copy)
           title=move || t_string!(i18n, chat.copy)
           on:click={

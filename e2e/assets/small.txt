@@ -1,0 +1,5 @@
+E2E test fixture: small UTF-8 text file used to validate the file transfer
+flow over DataChannel without exercising the large-file pipeline.
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod
+tempor incididunt ut labore et dolore magna aliqua.
