@@ -238,6 +238,8 @@ pub fn MemberRow(
       class:room-member-row--self=move || is_self_signal.get()
       class:room-member-row--muted=move || member.with(is_currently_muted)
       data-testid="room-member-row"
+      data-user-id=move || member.with(|m| m.user_id.to_string())
+      data-nickname=move || member.with(|m| m.nickname.clone())
     >
       <button
         type="button"

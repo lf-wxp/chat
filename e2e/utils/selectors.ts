@@ -119,6 +119,17 @@ export const sel = {
   videoTile: '[data-testid="video-tile"]',
   videoTileLocal: '[data-testid="video-tile-local"]',
   videoTileRemote: '[data-testid="video-tile-remote"]',
+
+  // ---- Room member list ----
+  roomMemberList: '[data-testid="room-member-list"]',
+  roomMemberRow: '[data-testid="room-member-row"]',
+  roomMemberMenu: '[data-testid="room-member-menu"]',
+  roomMemberMenuItem: '[data-testid="room-member-menu-item"]',
+  roomMemberMenuItemMention: '[data-testid="room-member-menu-item"][data-action="mention"]',
+
+  // ---- @Mention rendering ----
+  mentionHighlight: '[data-testid="mention-highlight"]',
+  messageRowMentionsMe: '[data-testid="message-row"][data-mentions-me="true"]',
 } as const;
 
 /** Build a `data-testid` selector dynamically. */
@@ -129,4 +140,9 @@ export function testid(id: string): string {
 /** Build a selector for a specific message bubble by its message id. */
 export function messageRowById(messageId: string): string {
   return `[data-testid="message-row"][data-message-id="${messageId}"]`;
+}
+
+/** Build a selector for a room member row by display nickname. */
+export function roomMemberRowByNickname(nickname: string): string {
+  return `[data-testid="room-member-row"][data-nickname="${nickname}"]`;
 }

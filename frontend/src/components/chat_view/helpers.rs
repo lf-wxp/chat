@@ -42,7 +42,7 @@ pub fn render_text_with_mentions(source: &str, self_nickname: Option<&str>) -> S
     return html;
   }
   let replacement = format!(
-    "<span class=\"mention-highlight\">@{}</span>",
+    "<span class=\"mention-highlight\" data-testid=\"mention-highlight\">@{}</span>",
     markdown::escape_html(nick)
   );
   html.replace(&needle, &replacement)

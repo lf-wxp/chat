@@ -64,6 +64,7 @@ pub fn MessageBubble(
     "message-row message-row-incoming"
   };
   let mention_class = if msg.mentions_me { " has-mention" } else { "" };
+  let mentions_me_attr = if msg.mentions_me { "true" } else { "false" };
   let bubble_class = if outgoing {
     format!("message-bubble-outgoing{mention_class}")
   } else {
@@ -229,7 +230,7 @@ pub fn MessageBubble(
   };
 
   view! {
-    <div class=row_class data-message-id=msg_id.to_string() data-testid="message-row" node_ref=bubble_ref>
+    <div class=row_class data-message-id=msg_id.to_string() data-mentions-me=mentions_me_attr data-testid="message-row" node_ref=bubble_ref>
       <Show when=move || !outgoing fallback=|| ()>
         <div class="message-sender" aria-hidden="true">
           {sender_label.clone()}

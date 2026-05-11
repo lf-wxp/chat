@@ -12,8 +12,10 @@ fn format_duration_ms_rounds_to_seconds() {
 fn mention_wraps_nickname_only_once() {
   let out = render_text_with_mentions("hello @Alice!", Some("Alice"));
   assert!(out.contains("class=\"mention-highlight\""));
-  // Ensure only one replacement was performed.
-  assert_eq!(out.matches("mention-highlight").count(), 1);
+  assert!(out.contains("data-testid=\"mention-highlight\""));
+  // Ensure only one replacement was performed — the substring
+  // `mention-highlight` appears exactly twice per wrap (class + testid).
+  assert_eq!(out.matches("mention-highlight").count(), 2);
 }
 
 #[test]

@@ -259,3 +259,35 @@ export async function joinRoomByName(page: Page, roomName: string): Promise<void
   // The chat view is auto-active once the server confirms the join.
   await expect(page.locator(sel.chatView)).toBeVisible({ timeout: 15_000 });
 }
+
+/**
+ * From `page`, open the room member list's context menu for the row
+ * matching `nickname` and click the "Mention in chat" action. Resolves
+ * once the composer textarea contains `@nickname ` as the new suffix.
+ *
+ * Prerequisite: `page` is viewing a room conversation whose
+ * `room-member-list` is rendered.
+ */
+export async function mentionMemberViaMenu(page: Page, nickname: string): Promise<void> {
+  const memberList = page.locator(sel.roomMemberList);
+  await expect(memberList).toBeVisible({ timeout: 10_000 });
+
+  const row = memberList.locator(`${sel.roomMemberRow}[data-nickname="${nickname}"]`);
+  await expect(row).toBeVisible({ timeout: 10_000 });
+  // The whole row is a button that toggles the context menu.
+  await row.locator('button.room-member-row__button').first().click();
+
+  const mentionItem = memberList.locator(sel.roomMemberMenuItemMention);
+  await expect(mentionItem).toBeVisible({ timeout: 5_000 });
+  await mentionItem.click();
+
+  // After the click, the composer receives `@<nickname> ` appended to
+  // its current value. Wait until the textarea value ends with the
+  // expected mention token so timing is deterministic.
+  const textarea = page.locator(sel.chatInputTextarea);
+  await expect
+    .poll(async () => (await textarea.inputValue()).includes(`@${nickname} `), {
+      timeout: 5_000,
+    })
+    .toBeTruthy();
+}

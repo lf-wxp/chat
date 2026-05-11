@@ -94,6 +94,20 @@ pub fn MemberContextMenu(
             each=move || actions.get()
             key=|action: &MemberAction| format!("{action:?}")
             children=move |action: MemberAction| {
+              let action_kind = match action {
+                MemberAction::Kick => "kick",
+                MemberAction::Mute => "mute",
+                MemberAction::Unmute => "unmute",
+                MemberAction::Ban => "ban",
+                MemberAction::Unban => "unban",
+                MemberAction::Promote => "promote",
+                MemberAction::Demote => "demote",
+                MemberAction::TransferOwnership => "transfer-ownership",
+                MemberAction::Leave => "leave",
+                MemberAction::ViewProfile => "view-profile",
+                MemberAction::StartDirectMessage => "start-direct-message",
+                MemberAction::Mention => "mention",
+              };
               let label = match action {
                 MemberAction::Kick => t_string!(i18n, room.kick),
                 MemberAction::Mute => t_string!(i18n, room.mute),
@@ -134,6 +148,7 @@ pub fn MemberContextMenu(
                     on_close.run(());
                   }
                   data-testid="room-member-menu-item"
+                  data-action=action_kind
                 >
                   {label}
                 </button>
