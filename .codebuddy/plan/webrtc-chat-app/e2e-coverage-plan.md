@@ -246,7 +246,7 @@ needed). When a wave item lands, replace its status emoji:
 - [x] P0-3 reaction-sync (extend reaction.spec.ts) — commit f35ecb8
 - [x] P0-4 invitation-edge.spec.ts — commit 4a8b85b
 - [ ] P0-5 av-call-happy.spec.ts
-- [x] P0-6 room.spec.ts — commit pending
+- [x] P0-6 room.spec.ts — commit 7bc1bc9
 - [ ] P1-1 mention.spec.ts
 - [ ] P1-2 persistence-extended.spec.ts
 - [ ] P1-3 scroll.spec.ts
