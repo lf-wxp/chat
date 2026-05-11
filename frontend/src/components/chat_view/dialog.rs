@@ -123,9 +123,9 @@ pub fn Dialog(
 
   view! {
     <Show when=move || state.visible.get() fallback=|| ()>
-      <div class="dialog-overlay">
-        <div class="dialog-box" role="dialog" aria-modal="true">
-          <p class="dialog-message">{move || state.message.get()}</p>
+      <div class="dialog-overlay" data-testid="dialog-overlay">
+        <div class="dialog-box" role="dialog" aria-modal="true" data-testid="dialog">
+          <p class="dialog-message" data-testid="dialog-message">{move || state.message.get()}</p>
           <div class="dialog-actions">
             <Show when=move || state.show_cancel.get() fallback=|| ()>
               <button
@@ -134,6 +134,7 @@ pub fn Dialog(
                 aria-label=move || t_string!(i18n, common.cancel)
                 title=move || t_string!(i18n, common.cancel)
                 on:click=move |_| on_cancel.run(())
+                data-testid="dialog-cancel"
               >
                 <Icon icon=i::LuX />
               </button>
@@ -144,6 +145,7 @@ pub fn Dialog(
               aria-label=move || t_string!(i18n, common.ok)
               title=move || t_string!(i18n, common.ok)
               on:click=move |_| on_ok.run(())
+              data-testid="dialog-ok"
             >
               <Icon icon=i::LuCheck />
             </button>

@@ -44,12 +44,76 @@ use web_sys::{File, FileReader, HtmlInputElement, Url};
 pub fn provide_file_dialog_state() -> DialogState {
   let state = DialogState::new();
   provide_context(state.clone());
+  // Register a thread-local fallback so callers that run outside
+  // the Leptos reactive owner (e.g. `wasm_bindgen_futures::spawn_local`
+  // tasks spawned from the file-picker `on:change` handler) can
+  // still resolve the shared dialog. Mirrors the pattern used by
+  // `ChatManager` / `FileTransferManager` — see the comment on
+  // `DIALOG_STATE_FALLBACK` below.
+  DIALOG_STATE_FALLBACK.with(|cell| {
+    *cell.borrow_mut() = Some(state.clone());
+  });
   state
 }
 
 /// Retrieve the shared dialog state.
 fn use_dialog_state() -> DialogState {
-  use_context::<DialogState>().unwrap_or_default()
+  if let Some(state) = use_context::<DialogState>() {
+    return state;
+  }
+  DIALOG_STATE_FALLBACK.with(|cell| cell.borrow().clone().unwrap_or_default())
+}
+
+thread_local! {
+  /// Best-effort fallback registry for the file-picker confirm/alert
+  /// dialog. `begin_transfer_async` is spawned via
+  /// `wasm_bindgen_futures::spawn_local` from the `<input>`
+  /// `on:change` handler, which in some Leptos builds detaches
+  /// the async future from the owner scope and causes
+  /// `use_context::<DialogState>()` to return `None`. Without a
+  /// fallback the confirm/alert path silently constructs a fresh
+  /// hidden `DialogState` and the dialog is never visible to the
+  /// user — making the dangerous-extension confirm + oversize-alert
+  /// flows unreachable. Mirrors `CHAT_MANAGER_FALLBACK`.
+  static DIALOG_STATE_FALLBACK: std::cell::RefCell<Option<DialogState>> =
+    const { std::cell::RefCell::new(None) };
+}
+
+/// Snapshot of the i18n strings needed by `begin_transfer_async`.
+///
+/// Captured synchronously while the Leptos reactive owner is alive
+/// (i.e. inside the `FilePicker` component body or the chat-view
+/// drop handler). The async transfer pipeline runs detached via
+/// `wasm_bindgen_futures::spawn_local` and therefore cannot itself
+/// call `i18n::use_i18n()` — that would panic with
+/// "I18n context is missing". Holding owned `String`s here avoids
+/// cross-boundary lifetime headaches.
+#[derive(Debug, Clone)]
+pub(crate) struct PickerStrings {
+  pub security_risk_detail: String,
+  pub file_too_large: String,
+  pub no_peers: String,
+  pub transfer_failed: String,
+  pub multi_recipient_prefix: String,
+  pub multi_recipient_suffix: String,
+}
+
+impl PickerStrings {
+  /// Capture the currently-active locale strings. MUST be called
+  /// from a reactive owner scope (e.g. component body or event
+  /// handler). The returned struct is `Clone` and `'static`, safe
+  /// to move into a `spawn_local` future.
+  pub(crate) fn capture() -> Self {
+    let i18n = i18n::use_i18n();
+    Self {
+      security_risk_detail: t_string!(i18n, file.security_risk_detail).to_string(),
+      file_too_large: t_string!(i18n, file.file_too_large).to_string(),
+      no_peers: t_string!(i18n, file.no_peers).to_string(),
+      transfer_failed: t_string!(i18n, file.transfer_failed).to_string(),
+      multi_recipient_prefix: t_string!(i18n, file.multi_recipient_prefix).to_string(),
+      multi_recipient_suffix: t_string!(i18n, file.multi_recipient_suffix).to_string(),
+    }
+  }
 }
 
 /// Picker component.
@@ -86,9 +150,13 @@ pub fn FilePicker(
     let Some(conv_id) = conv.get_untracked() else {
       return;
     };
+    // Snapshot i18n strings synchronously — the async path cannot
+    // call `use_i18n()` because `spawn_local` detaches it from the
+    // Leptos owner.
+    let strings = PickerStrings::capture();
     // Kick off the async transfer pipeline.
     wasm_bindgen_futures::spawn_local(async move {
-      if let Err(e) = begin_transfer_async(conv_id, file).await {
+      if let Err(e) = begin_transfer_async(conv_id, file, strings).await {
         web_sys::console::warn_1(&format!("[file] picker failed: {e:?}").into());
       }
     });
@@ -116,6 +184,7 @@ pub fn FilePicker(
 pub(crate) async fn begin_transfer_async(
   conv: ConversationId,
   file: File,
+  strings: PickerStrings,
 ) -> Result<(), wasm_bindgen::JsValue> {
   let dialog = use_dialog_state();
   let filename = file.name();
@@ -132,9 +201,7 @@ pub(crate) async fn begin_transfer_async(
   // Dangerous-extension confirmation (Req 6.8b, P2-7).
   let danger = is_dangerous_name(&filename);
   if danger {
-    let i18n = i18n::use_i18n();
-    let prompt = t_string!(i18n, file.security_risk_detail);
-    let msg = format!("{prompt} ({filename})");
+    let msg = format!("{} ({filename})", strings.security_risk_detail);
     if !dialog.confirm(msg).await {
       return Ok(());
     }
@@ -146,7 +213,7 @@ pub(crate) async fn begin_transfer_async(
   // without peeking at the `FileTransferManager::peers_for_conversation`
   // output, but we can bail fast when the file blows past the
   // highest cap (single-peer, 100 MB).
-  if early_size_guard(size) {
+  if early_size_guard_with(size, &strings) {
     return Ok(());
   }
 
@@ -155,12 +222,12 @@ pub(crate) async fn begin_transfer_async(
   let peer_count = manager.peers_for_conversation(&conv).len();
   let limit = size_limit_for_peers(peer_count);
   if size > limit {
-    show_too_large_alert(limit);
+    show_too_large_alert_with(limit, &strings);
     return Ok(());
   }
   if peer_count >= 2 && size >= 20 * 1024 * 1024 {
     let eta = estimate_transfer_seconds(size, peer_count);
-    let confirm_msg = multi_recipient_confirm_msg(peer_count, eta);
+    let confirm_msg = multi_recipient_confirm_msg_with(peer_count, eta, &strings);
     if !dialog.confirm(confirm_msg).await {
       return Ok(());
     }
@@ -216,11 +283,11 @@ pub(crate) async fn begin_transfer_async(
     // memory is not leaked when the transfer fails to start.
     StartTransferOutcome::NoPeers => {
       let _ = Url::revoke_object_url(&url);
-      show_no_peers_alert();
+      show_no_peers_alert_with(&strings);
     }
     StartTransferOutcome::TooLarge { limit } => {
       let _ = Url::revoke_object_url(&url);
-      show_too_large_alert(*limit);
+      show_too_large_alert_with(*limit, &strings);
     }
     StartTransferOutcome::Empty => {
       let _ = Url::revoke_object_url(&url);
@@ -228,7 +295,7 @@ pub(crate) async fn begin_transfer_async(
     StartTransferOutcome::Failed(reason) => {
       let _ = Url::revoke_object_url(&url);
       web_sys::console::warn_1(&format!("[file] transfer failed to start: {reason}").into());
-      show_transfer_failed_alert(reason);
+      show_transfer_failed_alert_with(reason, &strings);
     }
   }
 
@@ -243,14 +310,16 @@ pub(crate) fn begin_transfer(
   conv: ConversationId,
   file: File,
 ) -> Result<(), wasm_bindgen::JsValue> {
+  // Capture strings synchronously while the owner is alive.
+  let strings = PickerStrings::capture();
   // Quick synchronous size check before entering the async path.
   let size = file.size() as u64;
-  if early_size_guard(size) {
+  if early_size_guard_with(size, &strings) {
     return Ok(());
   }
 
   wasm_bindgen_futures::spawn_local(async move {
-    if let Err(e) = begin_transfer_async(conv, file).await {
+    if let Err(e) = begin_transfer_async(conv, file, strings).await {
       web_sys::console::warn_1(&format!("[file] drop failed: {e:?}").into());
     }
   });
@@ -262,9 +331,9 @@ pub(crate) fn begin_transfer(
 ///
 /// Returns `true` when the file is too large and an alert has been
 /// shown; the caller should abort.
-fn early_size_guard(size: u64) -> bool {
+fn early_size_guard_with(size: u64, strings: &PickerStrings) -> bool {
   if size > size_limit_for_peers(0) {
-    show_too_large_alert(size_limit_for_peers(0));
+    show_too_large_alert_with(size_limit_for_peers(0), strings);
     return true;
   }
   false
@@ -336,35 +405,40 @@ fn push_placeholder_message(placeholder: FilePlaceholder<'_>) {
   chat.push_outgoing(conv, ui_msg);
 }
 
+/// Public wrapper for callers that still hold an `i18n` context (e.g.
+/// the chat-view drop handler). Captures strings synchronously and
+/// shows the oversize alert.
 pub(crate) fn show_too_large_alert(limit: u64) {
+  let strings = PickerStrings::capture();
+  show_too_large_alert_with(limit, &strings);
+}
+
+fn show_too_large_alert_with(limit: u64, strings: &PickerStrings) {
   let dialog = use_dialog_state();
-  let i18n = i18n::use_i18n();
-  let prefix = t_string!(i18n, file.file_too_large);
-  let msg = format!("{prefix} {}", format_bytes(limit));
+  let msg = format!("{} {}", strings.file_too_large, format_bytes(limit));
   dialog.alert(msg);
 }
 
-fn show_no_peers_alert() {
+fn show_no_peers_alert_with(strings: &PickerStrings) {
   let dialog = use_dialog_state();
-  let i18n = i18n::use_i18n();
-  let msg = t_string!(i18n, file.no_peers);
+  dialog.alert(strings.no_peers.clone());
+}
+
+fn show_transfer_failed_alert_with(reason: &str, strings: &PickerStrings) {
+  let dialog = use_dialog_state();
+  let msg = format!("{}: {reason}", strings.transfer_failed);
   dialog.alert(msg);
 }
 
-fn show_transfer_failed_alert(reason: &str) {
-  let dialog = use_dialog_state();
-  let i18n = i18n::use_i18n();
-  let prefix = t_string!(i18n, file.transfer_failed);
-  let msg = format!("{prefix}: {reason}");
-  dialog.alert(msg);
-}
-
-fn multi_recipient_confirm_msg(peer_count: usize, eta_secs: u64) -> String {
-  let i18n = i18n::use_i18n();
-  let prefix = t_string!(i18n, file.multi_recipient_prefix);
-  let suffix = t_string!(i18n, file.multi_recipient_suffix);
+fn multi_recipient_confirm_msg_with(
+  peer_count: usize,
+  eta_secs: u64,
+  strings: &PickerStrings,
+) -> String {
   format!(
-    "{prefix} {peer_count} {suffix} {}.",
+    "{} {peer_count} {} {}.",
+    strings.multi_recipient_prefix,
+    strings.multi_recipient_suffix,
     crate::utils::format_duration(eta_secs)
   )
 }

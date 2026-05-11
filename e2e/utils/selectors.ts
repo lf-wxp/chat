@@ -75,6 +75,21 @@ export const sel = {
   reactionPicker: '[data-testid="reaction-picker"]',
   reactionPickerEmoji: '[data-testid="reaction-picker-emoji"]',
 
+  // ---- File transfer card internals ----
+  fileProgress: '[data-testid="file-progress"]',
+  fileCancel: '[data-testid="file-cancel"]',
+  fileDownload: '[data-testid="file-download"]',
+  fileReReceive: '[data-testid="file-re-receive"]',
+  fileHashMismatch: '[data-testid="file-hash-mismatch"]',
+  fileDangerBadge: '[data-testid="file-danger-badge"]',
+  fileExtDanger: '[data-testid="file-ext-danger"]',
+
+  // ---- Dialog (custom confirm / alert modal) ----
+  dialog: '[data-testid="dialog"]',
+  dialogMessage: '[data-testid="dialog-message"]',
+  dialogOk: '[data-testid="dialog-ok"]',
+  dialogCancel: '[data-testid="dialog-cancel"]',
+
   // ---- Rendered reactions on message bubbles ----
   messageReactions: '[data-testid="message-reactions"]',
   reactionChip: '[data-testid="reaction-chip"]',

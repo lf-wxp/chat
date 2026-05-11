@@ -19,7 +19,8 @@ import {
   sendAndVerifyMessage,
 } from '../fixtures/helpers.ts';
 import { waitForOnlineUser } from '../utils/wait-helpers.ts';
-import { expect, test, type Page } from '../fixtures/test-base.ts';
+import { expect, test } from '../fixtures/test-base.ts';
+import type { Page } from '@playwright/test';
 
 /**
  * Open the multi-select panel on `page`, tick the given usernames,

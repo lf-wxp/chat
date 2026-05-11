@@ -244,8 +244,8 @@ pub fn FileCard(
                 let (stem, ext) = name.split_at(ext_start);
                 view! {
                   {stem.to_string()}
-                  <span class="message-file-ext-danger">{ext.to_string()}</span>
-                  <span class="message-file-danger" title=move || t_string!(i18n, file.security_risk)>
+                  <span class="message-file-ext-danger" data-testid="file-ext-danger">{ext.to_string()}</span>
+                  <span class="message-file-danger" data-testid="file-danger-badge" title=move || t_string!(i18n, file.security_risk)>
                     " ⚠️ "
                     {t_string!(i18n, file.security_risk)}
                   </span>
@@ -265,6 +265,7 @@ pub fn FileCard(
             aria-valuemin="0"
             aria-valuemax="100"
             aria-valuenow=move || percent.get()
+            data-testid="file-progress"
           >
             <div class="message-file-progress-bar" style=move || format!("width: {}%", percent.get())></div>
           </div>
@@ -292,7 +293,7 @@ pub fn FileCard(
           when=move || matches!(status.get(), TransferStatus::HashMismatch)
           fallback=|| ()
         >
-          <div class="message-file-hash-mismatch">
+          <div class="message-file-hash-mismatch" data-testid="file-hash-mismatch">
             <span class="message-file-hash-mismatch-text">
               {move || t_string!(i18n, file.hash_mismatch)}
             </span>
