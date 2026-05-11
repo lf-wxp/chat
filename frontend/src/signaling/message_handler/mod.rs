@@ -3,7 +3,7 @@
 //! Routes incoming signaling messages to the appropriate handler
 //! and updates the application state accordingly.
 
-use leptos::prelude::{Set, Update, With, WithUntracked};
+use leptos::prelude::{GetUntracked, Set, Update, With, WithUntracked};
 use message::signaling::SignalingMessage;
 
 use crate::state::AppState;
@@ -350,6 +350,19 @@ pub fn handle_signaling_message(
         // Ensure a direct conversation entry exists so the chat UI is
         // ready (mirrors the `InviteAccepted` path).
         ensure_direct_conversation(&other, app_state);
+        // Symmetry with `InviteAccepted`: on the responder side of a
+        // bidirectional-merge handshake we never receive
+        // `InviteAccepted` (the server sends it only to the elected
+        // initiator), so we have to switch `active_conversation` here
+        // too — otherwise both sides land on the empty-home view even
+        // though the peer connection is live (Req 16.3.3 symmetry).
+        // No-op when the user has already navigated elsewhere
+        // (`active_conversation` stays whatever the user picked).
+        if app_state.active_conversation.get_untracked().is_none() {
+          app_state
+            .active_conversation
+            .set(Some(crate::state::ConversationId::Direct(other)));
+        }
       }
     }
     SignalingMessage::PeerClosed(peer) => {
