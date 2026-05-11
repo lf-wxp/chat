@@ -196,13 +196,22 @@ pub fn MessageBubble(
           "reaction-chip"
         };
         let emoji_s = emoji.clone();
+        let emoji_for_attr = emoji.clone();
         let count = entry.count();
         let manager = manager.clone();
+        // aria-pressed must be the literal string "true" / "false"
+        // (per WAI-ARIA), not a boolean attribute — Leptos renders
+        // booleans as empty attribute / missing attribute, which
+        // fails both screen-reader semantics and the E2E assertion.
+        let aria_pressed = if is_me { "true" } else { "false" };
         view! {
           <button
             type="button"
             class=cls
-            aria-pressed=is_me
+            aria-pressed=aria_pressed
+            data-testid="reaction-chip"
+            data-emoji=emoji_for_attr
+            data-count=count.to_string()
             on:click={
               let emoji = emoji_s.clone();
               move |_| { let _ = manager.toggle_reaction(msg_id, emoji.clone()); }
@@ -214,7 +223,9 @@ pub fn MessageBubble(
         }
       })
       .collect_view();
-    Some(view! { <div class="message-reactions">{chips}</div> })
+    Some(view! {
+      <div class="message-reactions" data-testid="message-reactions">{chips}</div>
+    })
   };
 
   view! {

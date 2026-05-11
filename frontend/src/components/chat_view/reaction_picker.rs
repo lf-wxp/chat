@@ -38,11 +38,14 @@ pub fn ReactionPicker(
           let emoji = (*emoji).to_string();
           let label = t_string!(i18n, chat.add_reaction).to_string();
           let emoji_for_click = emoji.clone();
+          let emoji_for_attr = emoji.clone();
           let emoji_for_display = emoji.clone();
           view! {
             <button
               type="button"
               aria-label=label
+              data-testid="reaction-picker-emoji"
+              data-emoji=emoji_for_attr
               on:click={
                 let emoji = emoji_for_click.clone();
                 let manager = manager.clone();

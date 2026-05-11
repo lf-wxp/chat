@@ -73,6 +73,11 @@ export const sel = {
   filePickerInput: '[data-testid="file-picker-input"]',
   imagePickerInput: '[data-testid="image-picker-input"]',
   reactionPicker: '[data-testid="reaction-picker"]',
+  reactionPickerEmoji: '[data-testid="reaction-picker-emoji"]',
+
+  // ---- Rendered reactions on message bubbles ----
+  messageReactions: '[data-testid="message-reactions"]',
+  reactionChip: '[data-testid="reaction-chip"]',
 
   // ---- Forward / image preview ----
   forwardModal: '[data-testid="forward-modal"]',
