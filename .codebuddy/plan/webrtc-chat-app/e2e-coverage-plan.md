@@ -230,10 +230,10 @@ needed). When a wave item lands, replace its status emoji:
 
 ### Status board
 
-- [ ] P0-1 multi-user.spec.ts
+- [x] P0-1 multi-user.spec.ts — commit (next)
 - [ ] P0-2 file-transfer-advanced.spec.ts
 - [x] P0-3 reaction-sync (extend reaction.spec.ts) — commit f35ecb8
-- [ ] P0-4 invitation-edge.spec.ts
+- [x] P0-4 invitation-edge.spec.ts — commit 4a8b85b
 - [ ] P0-5 av-call-happy.spec.ts
 - [ ] P0-6 room.spec.ts
 - [ ] P1-1 mention.spec.ts

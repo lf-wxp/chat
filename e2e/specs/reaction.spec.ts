@@ -21,8 +21,8 @@ import {
   registerAndLogin,
   sendAndVerifyMessage,
 } from '../fixtures/helpers.ts';
-import { expect, test, type Page } from '../fixtures/test-base.ts';
-import type { Locator } from '@playwright/test';
+import { expect, test } from '../fixtures/test-base.ts';
+import type { Locator, Page } from '@playwright/test';
 
 /**
  * Click the react action on a message row and wait for the picker
