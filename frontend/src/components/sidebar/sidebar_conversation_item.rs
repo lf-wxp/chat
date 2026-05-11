@@ -86,6 +86,15 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
   let unread_count = conversation.unread_count;
   let first_char = display_name.chars().next().unwrap_or('?');
 
+  // Stable identifier strings for E2E selectors. `data-room-id` is
+  // populated only when the conversation is a Room; direct
+  // conversations get `data-conversation-type="direct"` instead so a
+  // single locator can target either kind without splitting on text.
+  let (data_room_id, data_conv_type) = match &conv_id {
+    crate::state::ConversationId::Room(rid) => (Some(rid.to_string()), "room".to_string()),
+    crate::state::ConversationId::Direct(_) => (None, "direct".to_string()),
+  };
+
   // Reactive last-message preview. The component is keyed by
   // `conversation.id` in the parent `<For>`, which means new
   // `Conversation` snapshots from the parent vector do NOT re-mount
@@ -198,6 +207,8 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
         }
       }
       data-testid="sidebar-conversation-item"
+      data-conversation-type=data_conv_type.clone()
+      data-room-id=data_room_id.clone().unwrap_or_default()
     >
       // Avatar
       <div class="sidebar-conversation-avatar" aria-hidden="true">

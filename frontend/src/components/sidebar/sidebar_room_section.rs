@@ -111,6 +111,7 @@ pub fn SidebarRoomSection() -> impl IntoView {
           on:click=move |_| create_open.set(true)
           aria-label=move || t_string!(i18n, room.create)
           title=move || t_string!(i18n, room.create)
+          data-testid="sidebar-room-create-btn"
         >
           <Icon icon=i::LuPlus />
         </button>
@@ -165,7 +166,13 @@ pub fn SidebarRoomSection() -> impl IntoView {
             let label_for_title = label;
 
             view! {
-              <div class="sidebar-room-item" data-testid="sidebar-room-item">
+              <div
+                class="sidebar-room-item"
+                data-testid="sidebar-room-item"
+                data-room-id=room.room_id.to_string()
+                data-room-name=room.name.clone()
+                data-joined=move || if already_joined.get() { "true" } else { "false" }
+              >
                 <div class="sidebar-room-item__info">
                   <div class="sidebar-room-item__name-row">
                     <span class="sidebar-room-item__name">{room.name.clone()}</span>
@@ -195,6 +202,7 @@ pub fn SidebarRoomSection() -> impl IntoView {
                       handle_join.run((room_for_join.clone(), None));
                     }
                   }
+                  data-testid="sidebar-room-join-btn"
                 >
                   <Icon icon=i::LuLogIn />
                 </button>

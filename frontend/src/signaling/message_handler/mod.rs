@@ -104,6 +104,27 @@ pub fn handle_signaling_message(
       // The creator is automatically a member — materialise the room
       // conversation and switch to it so the chat view is shown.
       ensure_room_conversation(&created.room_id, Some(&created.room_info), app_state);
+      // Seed `room_members` with the creator as the Owner. The server
+      // does NOT broadcast a follow-up `RoomMemberUpdate` for the
+      // creator on the create path (only `RoomListUpdate`), so without
+      // this local seeding the sidebar would show the creator's own
+      // room as not-yet-joined and would let the user click their
+      // own join button (which the server then rejects with ROM205).
+      // The next real `RoomMemberUpdate` (e.g. another user joining)
+      // overwrites the seed authoritatively.
+      let auth_snapshot = app_state.auth.with_untracked(|a| a.clone());
+      if let Some(auth) = auth_snapshot {
+        let creator = message::types::MemberInfo::new(
+          auth.user_id,
+          auth.nickname,
+          message::types::RoomRole::Owner,
+        );
+        app_state.room_members.update(|map| {
+          map
+            .entry(created.room_id.clone())
+            .or_insert_with(|| vec![creator]);
+        });
+      }
     }
     SignalingMessage::RoomJoined(joined) => {
       log_debug(&format!("RoomJoined: room_id={}", joined.room_id));

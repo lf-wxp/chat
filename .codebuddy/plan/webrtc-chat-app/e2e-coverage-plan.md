@@ -89,6 +89,17 @@
 
 ---
 
+## 2.1 Discovered feature gaps (NOT E2E flakiness)
+
+These are real product bugs uncovered while writing the P0 specs. The
+specs are scoped around them; a follow-up engineering ticket should
+land the fix and then a thin "round-trip" E2E test to lock it down.
+
+| # | Surface | Gap | Discovered in |
+|---|---------|-----|---------------|
+| G1 | Room messaging | `DataChannelMessage::ChatText` (and siblings: `ChatSticker`, `ChatVoice`, `ChatImage`, `MessageReaction`, …) carry no `Option<RoomId>`. Inbound chat frames are unconditionally attributed to the direct conversation with the sender (`raw_frame.rs:219`). Result: messages typed inside a Chat-room conversation reach the receiver but appear in their direct-with-sender thread, not the room. The fix is to add `room_id: Option<RoomId>` to each Chat* variant, set it from `ConversationId::Room` on the send path (`chat::manager::wire::send_wire_out`), and honour it at the dispatch site. The existing `FileMetadata.room_id` is a working precedent. | P0-6 |
+| G2 | Room creation membership | Server's `handle_create_room` only emits `RoomCreated` + `RoomListUpdate`, never a follow-up `RoomMemberUpdate` for the creator. Fixed locally for now by seeding `app_state.room_members` inside the frontend's `RoomCreated` handler so the creator's own join button reports `data-joined="true"` immediately. The proper fix is a server-side `RoomMemberUpdate` broadcast on create, identical to the join path. | P0-6 |
+
 ## 3. Rollout plan
 
 Three waves, each wave independently shippable (all tests green + pre-existing
@@ -235,7 +246,7 @@ needed). When a wave item lands, replace its status emoji:
 - [x] P0-3 reaction-sync (extend reaction.spec.ts) — commit f35ecb8
 - [x] P0-4 invitation-edge.spec.ts — commit 4a8b85b
 - [ ] P0-5 av-call-happy.spec.ts
-- [ ] P0-6 room.spec.ts
+- [x] P0-6 room.spec.ts — commit pending
 - [ ] P1-1 mention.spec.ts
 - [ ] P1-2 persistence-extended.spec.ts
 - [ ] P1-3 scroll.spec.ts

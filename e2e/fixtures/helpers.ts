@@ -191,3 +191,71 @@ export async function sendAndVerifyMessage(
   // Unreachable: the catch above either returns or throws.
   return { senderRow, receiverRow };
 }
+
+/** Result of `createRoom`. */
+export interface CreatedRoom {
+  /** The display name typed into the create-room form. */
+  name: string;
+  /** Locator for the matching `sidebar-room-item` (resolves on B's side
+   *  once the server pushes `RoomListUpdate`). */
+  itemSelector: string;
+}
+
+/**
+ * Open the create-room modal in `page` and submit a new Chat-type room
+ * with the given (or auto-generated) name. Resolves once the room is
+ * visible in the page's own sidebar room section AND the page has been
+ * auto-switched into the room conversation (the `RoomCreated` handler
+ * sets `active_conversation` for the creator, so the chat input bar is
+ * available immediately on return).
+ */
+export async function createRoom(
+  page: Page,
+  options: { name?: string; description?: string } = {},
+): Promise<CreatedRoom> {
+  const name = options.name ?? `e2e-room-${Math.random().toString(36).slice(2, 8)}`;
+
+  await page.locator(sel.sidebarRoomCreateBtn).click();
+  const modal = page.locator(sel.createRoomModal);
+  await expect(modal).toBeVisible({ timeout: 10_000 });
+
+  await modal.locator(sel.createRoomName).fill(name);
+  if (options.description !== undefined) {
+    await modal.locator(sel.createRoomDescription).fill(options.description);
+  }
+  // Default RoomType is Chat — no extra clicks needed.
+  await modal.locator(sel.createRoomSubmit).click();
+  await expect(modal).toBeHidden({ timeout: 10_000 });
+
+  // Sidebar room item appears on the creator's side once `RoomListUpdate`
+  // arrives. Use the `data-room-name` attribute to disambiguate from
+  // any rooms left over by previous tests in the same worker server.
+  const itemSelector = `${sel.sidebarRoomItem}[data-room-name="${name}"]`;
+  await expect(page.locator(itemSelector)).toBeVisible({ timeout: 15_000 });
+
+  // The creator is auto-switched into the room conversation by the
+  // `RoomCreated` handler — wait for the chat view to be live.
+  await expect(page.locator(sel.chatView)).toBeVisible({ timeout: 15_000 });
+
+  return { name, itemSelector };
+}
+
+/**
+ * From `page`, click the join button on the sidebar room item that
+ * matches `roomName`. Resolves once the page is auto-switched into
+ * the room conversation (`RoomJoined` handler sets
+ * `active_conversation`).
+ */
+export async function joinRoomByName(page: Page, roomName: string): Promise<void> {
+  const itemSelector = `${sel.sidebarRoomItem}[data-room-name="${roomName}"]`;
+  const item = page.locator(itemSelector);
+  await expect(item).toBeVisible({ timeout: 15_000 });
+  await item.locator(sel.sidebarRoomJoinBtn).click();
+
+  // After RoomJoined, the join button on the same item flips disabled
+  // (already_joined → true).
+  await expect(item).toHaveAttribute('data-joined', 'true', { timeout: 15_000 });
+
+  // The chat view is auto-active once the server confirms the join.
+  await expect(page.locator(sel.chatView)).toBeVisible({ timeout: 15_000 });
+}

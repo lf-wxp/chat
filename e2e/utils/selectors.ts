@@ -29,7 +29,18 @@ export const sel = {
   sidebarConnectionStatus: '[data-testid="sidebar-connection-status"]',
   sidebarRoomSection: '[data-testid="sidebar-room-section"]',
   sidebarRoomItem: '[data-testid="sidebar-room-item"]',
+  sidebarRoomJoinBtn: '[data-testid="sidebar-room-join-btn"]',
+  sidebarRoomCreateBtn: '[data-testid="sidebar-room-create-btn"]',
   homeEmpty: '[data-testid="home-empty"]',
+
+  // ---- Room create modal ----
+  createRoomModal: '[data-testid="create-room-modal"]',
+  createRoomName: '[data-testid="create-room-name"]',
+  createRoomDescription: '[data-testid="create-room-description"]',
+  createRoomTypeChat: '[data-testid="room-type-chat"]',
+  createRoomTypeTheater: '[data-testid="room-type-theater"]',
+  createRoomSubmit: '[data-testid="create-room-submit"]',
+  createRoomCancel: '[data-testid="create-room-cancel"]',
 
   // ---- Online users / discovery ----
   onlineUsersPanel: '[data-testid="online-users-panel"]',
