@@ -68,6 +68,16 @@ pub fn provide_call_manager(app_state: AppState) -> CallManager {
   let manager = CallManager::new(app_state, signals);
   provide_context(signals);
   provide_context(manager.clone());
+  // Register a thread-local fallback so signaling-message handlers
+  // running outside the Leptos reactive owner (e.g. via
+  // `wasm_bindgen_futures::spawn_local` from the WebSocket onmessage
+  // bridge) can still resolve the manager. Without this fallback an
+  // incoming `CallInvite` would be silently dropped because
+  // `try_use_call_manager()` returns `None` in detached scopes.
+  // Mirrors `CHAT_MANAGER_FALLBACK` / `FILE_TRANSFER_MANAGER_FALLBACK`.
+  CALL_MANAGER_FALLBACK.with(|cell| {
+    *cell.borrow_mut() = Some(manager.clone());
+  });
   if let Some(toast) = use_context::<crate::error_handler::ErrorToastManager>() {
     manager.set_error_toast(toast);
   }
@@ -81,7 +91,12 @@ pub fn provide_call_manager(app_state: AppState) -> CallManager {
 /// Panics if [`provide_call_manager`] has not been called.
 #[must_use]
 pub fn use_call_manager() -> CallManager {
-  expect_context::<CallManager>()
+  if let Some(mgr) = use_context::<CallManager>() {
+    return mgr;
+  }
+  CALL_MANAGER_FALLBACK
+    .with(|cell| cell.borrow().clone())
+    .expect("CallManager not initialised — call `provide_call_manager` first")
 }
 
 /// Fetch the `CallSignals` from the Leptos context (no manager needed).
@@ -96,5 +111,16 @@ pub fn use_call_signals() -> CallSignals {
 /// Non-panicking variant of [`use_call_manager`].
 #[must_use]
 pub fn try_use_call_manager() -> Option<CallManager> {
-  use_context::<CallManager>()
+  if let Some(mgr) = use_context::<CallManager>() {
+    return Some(mgr);
+  }
+  CALL_MANAGER_FALLBACK.with(|cell| cell.borrow().clone())
+}
+
+thread_local! {
+  /// Best-effort fallback registry for the call manager. Mirrors
+  /// `CHAT_MANAGER_FALLBACK` — see [`provide_call_manager`] for
+  /// rationale.
+  static CALL_MANAGER_FALLBACK: std::cell::RefCell<Option<CallManager>> =
+    const { std::cell::RefCell::new(None) };
 }

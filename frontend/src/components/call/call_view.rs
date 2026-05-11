@@ -33,7 +33,17 @@ pub fn CallView() -> impl IntoView {
 
   view! {
     <Show when=move || should_render.get()>
-      <section class="call-view" role="region" aria-label=move || t_string!(i18n, call.call)>
+      <section
+        class="call-view"
+        role="region"
+        aria-label=move || t_string!(i18n, call.call)
+        data-testid="call-view"
+        data-call-state=move || match signals.call_state.get() {
+          CallState::Inviting { .. } => "inviting",
+          CallState::Active { .. } => "active",
+          _ => "other",
+        }
+      >
         <header class="call-view__header">
           <span class="call-view__status">{move || status_label.get()}</span>
         </header>

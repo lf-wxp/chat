@@ -163,13 +163,22 @@ pub fn VideoTile(
   let show_remote_media_icons = should_show_remote_media_icons(is_local);
 
   view! {
-    <div class=tile_class role="group" aria-label=label.clone() data-pip-candidate=pip_candidate>
+    <div
+      class=tile_class
+      role="group"
+      aria-label=label.clone()
+      data-pip-candidate=pip_candidate
+      data-testid="video-tile"
+      data-is-local=if is_local { "true" } else { "false" }
+      data-stream-attached=if stream_present { "true" } else { "false" }
+    >
       <video
         node_ref=video_ref
         class="video-tile__video"
         autoplay=true
         playsinline=true
         muted=is_local
+        data-testid=if is_local { "video-tile-local" } else { "video-tile-remote" }
       ></video>
       <Show when=move || !stream_present>
         <div class="video-tile__placeholder" aria-hidden="true">

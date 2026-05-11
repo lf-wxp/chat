@@ -190,6 +190,7 @@ pub fn CallControls() -> impl IntoView {
         class="call-controls__btn call-controls__btn--danger"
         on:click=on_end
         aria-label=move || t_string!(i18n, call.end)
+        data-testid="call-end-btn"
       >
         <Icon icon=i::LuPhoneOff />
       </button>

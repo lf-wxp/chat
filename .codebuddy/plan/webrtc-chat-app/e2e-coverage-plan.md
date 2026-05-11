@@ -99,6 +99,8 @@ land the fix and then a thin "round-trip" E2E test to lock it down.
 |---|---------|-----|---------------|
 | G1 | Room messaging | `DataChannelMessage::ChatText` (and siblings: `ChatSticker`, `ChatVoice`, `ChatImage`, `MessageReaction`, …) carry no `Option<RoomId>`. Inbound chat frames are unconditionally attributed to the direct conversation with the sender (`raw_frame.rs:219`). Result: messages typed inside a Chat-room conversation reach the receiver but appear in their direct-with-sender thread, not the room. The fix is to add `room_id: Option<RoomId>` to each Chat* variant, set it from `ConversationId::Room` on the send path (`chat::manager::wire::send_wire_out`), and honour it at the dispatch site. The existing `FileMetadata.room_id` is a working precedent. | P0-6 |
 | G2 | Room creation membership | Server's `handle_create_room` only emits `RoomCreated` + `RoomListUpdate`, never a follow-up `RoomMemberUpdate` for the creator. Fixed locally for now by seeding `app_state.room_members` inside the frontend's `RoomCreated` handler so the creator's own join button reports `data-joined="true"` immediately. The proper fix is a server-side `RoomMemberUpdate` broadcast on create, identical to the join path. | P0-6 |
+| G3 | A/V call has no entry point | The frontend shipped a complete call subsystem (`CallManager`, `IncomingCallModal`, `CallView`, `CallControls`, `VideoGrid`, `VideoTile`) but **no UI surface ever invoked `CallManager::initiate_call`**. Users could never start a call. Fixed in P0-5 by adding a `CallStartButton` rendered inside the chat view for `ConversationId::Room` conversations only, plus a `CALL_MANAGER_FALLBACK` thread-local mirroring the chat / file-transfer pattern (the WebSocket onmessage bridge runs detached from the Leptos owner so the previous `try_use_call_manager()` lookup silently dropped every incoming `CallInvite`). | P0-5 |
+| G4 | Mid-call addTrack renegotiation drops the remote video | When a call is initiated on top of an existing data-channel-only `RTCPeerConnection`, `publish_to_peers` calls `addTrack(video)` which triggers `onnegotiationneeded`. The resulting offer fails on the caller's side with `InvalidAccessError: order of m-lines in subsequent offer doesn't match order from previous offer/answer`. The signaling layer eventually retries and SDP completes, but the remote `<video>` tile's `videoWidth` never crosses 0 in our 30 s window — `ontrack` either never fires or fires after the test gives up. P0-5's "Active" test asserts only the local preview path; a follow-up ticket should investigate the m-line ordering bug (likely missing transceiver pre-allocation when the peer connection was first created) and add the cross-peer remote-frame assertion. | P0-5 |
 
 ## 3. Rollout plan
 
@@ -245,7 +247,7 @@ needed). When a wave item lands, replace its status emoji:
 - [x] P0-2 file-transfer-advanced.spec.ts — commit 43433c8
 - [x] P0-3 reaction-sync (extend reaction.spec.ts) — commit f35ecb8
 - [x] P0-4 invitation-edge.spec.ts — commit 4a8b85b
-- [ ] P0-5 av-call-happy.spec.ts
+- [x] P0-5 av-call-happy.spec.ts — commit pending
 - [x] P0-6 room.spec.ts — commit 7bc1bc9
 - [ ] P1-1 mention.spec.ts
 - [ ] P1-2 persistence-extended.spec.ts

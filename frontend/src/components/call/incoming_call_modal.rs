@@ -76,6 +76,7 @@ pub fn IncomingCallModal() -> impl IntoView {
         role="dialog"
         aria-modal="true"
         aria-labelledby="call-modal-title"
+        data-testid="incoming-call-modal"
       >
         <div class="call-modal">
           <header class="call-modal__header">
@@ -96,6 +97,7 @@ pub fn IncomingCallModal() -> impl IntoView {
                 move |_| manager.decline_call()
               }
               aria-label=move || t_string!(i18n, call.decline)
+              data-testid="call-decline-btn"
             >
               {move || t_string!(i18n, call.decline)}
             </button>
@@ -116,6 +118,7 @@ pub fn IncomingCallModal() -> impl IntoView {
                 }
               }
               aria-label=move || t_string!(i18n, call.accept)
+              data-testid="call-accept-btn"
             >
               {move || t_string!(i18n, call.accept)}
             </button>

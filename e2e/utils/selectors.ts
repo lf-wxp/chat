@@ -108,6 +108,17 @@ export const sel = {
   // ---- Forward / image preview ----
   forwardModal: '[data-testid="forward-modal"]',
   imagePreview: '[data-testid="image-preview"]',
+
+  // ---- Call (audio / video) ----
+  callStartBtn: '[data-testid="call-start-btn"]',
+  incomingCallModal: '[data-testid="incoming-call-modal"]',
+  callAcceptBtn: '[data-testid="call-accept-btn"]',
+  callDeclineBtn: '[data-testid="call-decline-btn"]',
+  callView: '[data-testid="call-view"]',
+  callEndBtn: '[data-testid="call-end-btn"]',
+  videoTile: '[data-testid="video-tile"]',
+  videoTileLocal: '[data-testid="video-tile-local"]',
+  videoTileRemote: '[data-testid="video-tile-remote"]',
 } as const;
 
 /** Build a `data-testid` selector dynamically. */

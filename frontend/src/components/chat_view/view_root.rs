@@ -10,6 +10,7 @@
 //! active (Req 4.10.x).
 
 use crate::chat::{ChatMessage, ReplySnippet, use_chat_manager};
+use crate::components::chat_view::call_start_btn::CallStartButton;
 use crate::components::chat_view::dialog::Dialog;
 use crate::components::chat_view::file_picker::{
   FilePicker, begin_transfer, provide_file_dialog_state,
@@ -208,6 +209,7 @@ pub fn ChatView() -> impl IntoView {
           style="display:none"
           aria-hidden="true"
         ></span>
+        <CallStartButton conv=conv />
         <MessageList
           conv=conv
           cbs=cbs
