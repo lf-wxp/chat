@@ -258,7 +258,7 @@ needed). When a wave item lands, replace its status emoji:
 - [x] P0-6 room.spec.ts — commit 7bc1bc9
 - [x] P1-1 mention.spec.ts — commit 0b0362c
 - [x] P1-2 persistence-extended.spec.ts — commit 763189d
-- [ ] P1-3 scroll.spec.ts
+- [x] P1-3 scroll.spec.ts — commit 72e1276
 - [ ] P1-4 disconnect-advanced.spec.ts
 - [ ] P1-5 file-transfer-flow.spec.ts
 - [ ] P1-6 e2ee-rotation.spec.ts
