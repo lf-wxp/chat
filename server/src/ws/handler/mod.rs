@@ -83,7 +83,7 @@ where
 }
 
 /// Handle binary message using message crate protocol.
-async fn handle_binary_message<S>(
+pub(crate) async fn handle_binary_message<S>(
   socket_tx: &mut S,
   ws_state: &Arc<WebSocketState>,
   conn_state: &mut ConnectionState,

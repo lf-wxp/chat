@@ -201,6 +201,9 @@ impl std::fmt::Debug for ChatManager {
 
 crate::wasm_send_sync!(ChatManager);
 
+#[cfg(test)]
+mod tests;
+
 impl ChatManager {
   /// Build a new manager wired to the given app state.
   #[must_use]

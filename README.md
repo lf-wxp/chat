@@ -291,7 +291,7 @@ Every error includes `code`, `message`, `i18n_key`, `details`, `timestamp`, and 
 `icon.svg` is the source of truth; PNG variants are produced at build time (Dockerfile runs them inline). To preview locally:
 
 ```bash
-cargo make pwa-icons        # or: ./scripts/generate-pwa-icons.sh
+cargo make pwa-icons        # or: ./frontend/generate-pwa-icons.sh
 ```
 
 Requires `rsvg-convert` from librsvg (`brew install librsvg` / `apt-get install librsvg2-bin`). See [frontend/public/icons/README.md](./frontend/public/icons/README.md).

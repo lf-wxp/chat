@@ -3,6 +3,30 @@
 # This file configures build settings for different targets.
 
 # =============================================================================
+# macOS Native Target Configuration
+# =============================================================================
+
+# Use rust-lld (LLVM's lld) instead of macOS's default ld64 linker.
+#
+# macOS ld64 has an internal symbol-name length limit that causes an assertion
+# failure when linking cdylib/rlib crates with deeply-nested Rust generics
+# (common with Leptos + icondata):
+#
+#   ld: Assertion failed: (name.size() <= maxLength),
+#       function makeSymbolStringInPlace, file SymbolString.cpp, line 74
+#
+# rust-lld is bundled with every Rust toolchain (under
+# $sysroot/lib/rustlib/<target>/bin/rust-lld) and has no such limit.
+# This setting only affects native macOS builds (cargo check/test/clippy);
+# WASM builds (trunk build / wasm-pack) use the wasm32-unknown-unknown
+# target and are unaffected.
+[target.aarch64-apple-darwin]
+linker = "rust-lld"
+
+[target.x86_64-apple-darwin]
+linker = "rust-lld"
+
+# =============================================================================
 # WASM Target Configuration
 # =============================================================================
 

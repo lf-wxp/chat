@@ -258,7 +258,7 @@ workspace = false
 script = '''
 #!/usr/bin/env bash
 set -euo pipefail
-./scripts/generate-pwa-icons.sh
+./frontend/generate-pwa-icons.sh
 '''
 
 # ============================================================================

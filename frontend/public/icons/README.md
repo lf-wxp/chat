@@ -26,7 +26,7 @@ No manual step is required to ship to production.
 ```bash
 cargo make pwa-icons       # Preferred
 # or directly:
-./scripts/generate-pwa-icons.sh
+./frontend/generate-pwa-icons.sh
 ```
 
 Both invocations require `rsvg-convert` from librsvg:
