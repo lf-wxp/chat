@@ -45,6 +45,7 @@ pub fn SidebarConnectionStatus() -> impl IntoView {
       aria-label=label
       title=label
       data-testid="sidebar-connection-status"
+      data-state=move || state.get()
     >
       {move || if state.get() == "disconnected" {
         view! { <Icon icon=i::LuWifiOff /> }.into_any()
