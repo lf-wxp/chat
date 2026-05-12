@@ -20,6 +20,13 @@ use leptos_icons::Icon;
 pub fn SidebarSection(
   #[prop(into)] title: Signal<String>,
   conversations: Signal<Vec<crate::state::Conversation>>,
+  /// Stable identifier used for `data-testid="sidebar-section-<kind>"`
+  /// and as a `data-section` attribute on contained conversation rows.
+  /// Tests target sections by this string instead of the localised
+  /// title. Defaults to `"unnamed"` for back-compat with any future
+  /// callers.
+  #[prop(optional, into)]
+  kind: Option<&'static str>,
   /// Whether this section can be collapsed by the user. When `false`
   /// (the default) the section is always rendered in the open state
   /// and the header is plain text.
@@ -38,10 +45,16 @@ pub fn SidebarSection(
 
   let expanded_signal = expanded.unwrap_or_else(|| RwSignal::new(false));
   let is_open = move || !collapsible || expanded_signal.get();
+  let kind_attr = kind.unwrap_or("unnamed");
 
   view! {
     <Show when=move || visible.get() fallback=|| ()>
-      <div class="sidebar-section" class:sidebar-section--collapsed=move || collapsible && !expanded_signal.get()>
+      <div
+        class="sidebar-section"
+        class:sidebar-section--collapsed=move || collapsible && !expanded_signal.get()
+        data-testid=format!("sidebar-section-{kind_attr}")
+        data-section=kind_attr
+      >
         {move || {
           if collapsible {
             let open = expanded_signal.get();

@@ -132,10 +132,39 @@ mod wasm;
 
 use leptos::prelude::*;
 
+#[cfg(target_arch = "wasm32")]
+thread_local! {
+  /// Tab-scoped mirror of the `PersistenceManager` installed by
+  /// [`provide_persistence_manager`]. Several hot code paths run
+  /// detached from the Leptos reactive owner that originally called
+  /// [`provide_context`] — most notably the debounced
+  /// `persist_conversations` closure armed by `set_timeout_once`,
+  /// which fires from the browser's timer queue with no surrounding
+  /// owner. Without this fallback, [`try_use_persistence_manager`]
+  /// would observe `None` and every queued `conversation_flags`
+  /// write would be silently dropped, which in turn means pin /
+  /// mute / archive flags never reach IndexedDB and do not survive
+  /// a page reload.
+  ///
+  /// Mirrors the [`CHAT_MANAGER_FALLBACK`] /
+  /// [`FILE_TRANSFER_MANAGER_FALLBACK`] / [`CALL_MANAGER_FALLBACK`]
+  /// pattern used elsewhere in the frontend for the same root cause.
+  static PERSISTENCE_MANAGER_FALLBACK: RefCell<Option<PersistenceManager>> = const {
+    RefCell::new(None)
+  };
+}
+
 /// Install the persistence manager as a Leptos context.
 pub fn provide_persistence_manager() -> PersistenceManager {
   let manager = PersistenceManager::new();
   provide_context(manager.clone());
+  #[cfg(target_arch = "wasm32")]
+  {
+    let mirror = manager.clone();
+    PERSISTENCE_MANAGER_FALLBACK.with(|cell| {
+      *cell.borrow_mut() = Some(mirror);
+    });
+  }
   manager
 }
 
@@ -144,6 +173,19 @@ pub fn provide_persistence_manager() -> PersistenceManager {
 #[must_use]
 pub fn use_persistence_manager() -> PersistenceManager {
   use_context::<PersistenceManager>().unwrap_or_default()
+}
+
+/// Retrieve the persistence manager from context, falling back to the
+/// thread-local mirror installed by [`provide_persistence_manager`].
+/// Returns `None` only when the manager has never been provided yet,
+/// e.g. early during bootstrap.
+#[cfg(target_arch = "wasm32")]
+#[must_use]
+pub fn try_use_persistence_manager() -> Option<PersistenceManager> {
+  if let Some(pm) = use_context::<PersistenceManager>() {
+    return Some(pm);
+  }
+  PERSISTENCE_MANAGER_FALLBACK.with(|cell| cell.borrow().clone())
 }
 
 #[cfg(test)]

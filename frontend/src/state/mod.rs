@@ -760,7 +760,7 @@ impl AppState {
   #[cfg(target_arch = "wasm32")]
   pub fn reconcile_conv_flags_from_idb(&self) {
     let convs_signal = self.conversations;
-    let Some(pm) = use_context::<crate::persistence::PersistenceManager>() else {
+    let Some(pm) = crate::persistence::try_use_persistence_manager() else {
       return;
     };
     wasm_bindgen_futures::spawn_local(async move {
@@ -909,7 +909,7 @@ fn locale_slug_from_tag(tag: &str) -> Option<&'static str> {
 /// sites are never blocked on the IDB round-trip (review v3 §B1 / §B3).
 #[cfg(target_arch = "wasm32")]
 fn flush_conv_flags_to_idb(to_put: Vec<Conversation>, tombstones: HashSet<ConversationId>) {
-  let Some(pm) = use_context::<crate::persistence::PersistenceManager>() else {
+  let Some(pm) = crate::persistence::try_use_persistence_manager() else {
     return;
   };
   wasm_bindgen_futures::spawn_local(async move {
@@ -950,13 +950,16 @@ pub fn provide_app_state() -> AppState {
   let state = AppState::new();
   state.load_conversations();
 
-  // Reconcile pin / mute / archive flags against IndexedDB so the
-  // localStorage cache cannot diverge from the authoritative source
-  // (Req 7.7d). The reconcile runs asynchronously after the initial
-  // synchronous render, so the UI shows cached state immediately and
-  // any IDB-only updates land on the next reactive tick.
-  #[cfg(target_arch = "wasm32")]
-  state.reconcile_conv_flags_from_idb();
+  // Note: pin / mute / archive flags are reconciled against the
+  // IndexedDB `conversation_flags` store from `lib.rs::init` once
+  // `provide_persistence_manager()` has installed the
+  // `PersistenceManager` context. Calling
+  // `reconcile_conv_flags_from_idb` here would short-circuit because
+  // the PM context is not yet available — the lookup runs lazily
+  // inside `wasm_bindgen_futures::spawn_local`, by which time the
+  // synchronous `provide_*` chain has already built every other
+  // context, but the reconciler captures the result of `use_context`
+  // synchronously and would otherwise observe `None`.
 
   // Restore the previously active conversation (Req 10.9.34). The Effect
   // below will persist any subsequent changes automatically.

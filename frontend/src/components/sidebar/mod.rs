@@ -100,14 +100,17 @@ pub fn Sidebar() -> impl IntoView {
         <SidebarSection
           title=move || t_string!(i18n, sidebar.pinned)
           conversations=pinned_memo.into()
+          kind="pinned"
         />
         <SidebarSection
           title=move || t_string!(i18n, sidebar.active)
           conversations=active_memo.into()
+          kind="active"
         />
         <SidebarSection
           title=move || t_string!(i18n, sidebar.archived)
           conversations=archived_memo.into()
+          kind="archived"
           collapsible=true
           expanded=app_state.archived_expanded
         />

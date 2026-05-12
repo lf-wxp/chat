@@ -82,6 +82,8 @@ pub mod schema;
 pub mod search;
 pub mod store;
 
+#[cfg(target_arch = "wasm32")]
+pub use manager::try_use_persistence_manager;
 pub use manager::{PersistenceManager, provide_persistence_manager, use_persistence_manager};
 pub use record::{MessageRecord, RetentionPolicy};
 pub use search::{SearchHit, SearchQuery, SearchResult};

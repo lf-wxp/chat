@@ -177,6 +177,7 @@ pub fn SidebarConversationMenu(
         role="menuitem"
         aria-label=pin_label
         aria-disabled=move || if pin_at_cap.get() { "true" } else { "false" }
+        data-testid="sidebar-conversation-menu-pin"
         title=move || {
           if pin_at_cap.get() {
             t_string!(i18n, sidebar.pin_limit_reached)
@@ -218,6 +219,7 @@ pub fn SidebarConversationMenu(
         role="menuitem"
         aria-label=mute_label
         title=mute_label
+        data-testid="sidebar-conversation-menu-mute"
         on:click={
           let id = id_for_mute;
           move |_| {
@@ -236,6 +238,7 @@ pub fn SidebarConversationMenu(
         role="menuitem"
         aria-label=archive_label
         title=archive_label
+        data-testid="sidebar-conversation-menu-archive"
         on:click={
           let id = id_for_archive;
           move |_| {

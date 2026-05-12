@@ -150,6 +150,17 @@ pub fn init() {
     let pm = persistence::provide_persistence_manager();
     chat_manager.set_persistence(pm.clone());
 
+    // Reconcile pin / mute / archive flags against the IndexedDB
+    // `conversation_flags` store now that the `PersistenceManager`
+    // context has been provided (Req 7.7d). The reconcile runs
+    // asynchronously inside `spawn_local`, so the UI shows the
+    // localStorage-cached state on first paint and any IDB-only
+    // updates land on the next reactive tick. Calling this from
+    // `provide_app_state()` would no-op because that runs before
+    // the PM context is installed.
+    #[cfg(target_arch = "wasm32")]
+    app_state.reconcile_conv_flags_from_idb();
+
     // Mirror the user-configured retention policy (Task 23 / Req 13.5)
     // into the persistence manager so the 72 h / 24 h / 7 d window
     // stays in sync with the UI selector.

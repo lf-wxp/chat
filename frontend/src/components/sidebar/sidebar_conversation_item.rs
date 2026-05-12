@@ -209,6 +209,9 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
       data-testid="sidebar-conversation-item"
       data-conversation-type=data_conv_type.clone()
       data-room-id=data_room_id.clone().unwrap_or_default()
+      data-pinned=if pinned { "true" } else { "false" }
+      data-archived=if archived { "true" } else { "false" }
+      data-muted=if muted { "true" } else { "false" }
     >
       // Avatar
       <div class="sidebar-conversation-avatar" aria-hidden="true">

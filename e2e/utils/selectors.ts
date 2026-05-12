@@ -31,6 +31,14 @@ export const sel = {
   sidebarRoomItem: '[data-testid="sidebar-room-item"]',
   sidebarRoomJoinBtn: '[data-testid="sidebar-room-join-btn"]',
   sidebarRoomCreateBtn: '[data-testid="sidebar-room-create-btn"]',
+  sidebarSectionPinned: '[data-testid="sidebar-section-pinned"]',
+  sidebarSectionActive: '[data-testid="sidebar-section-active"]',
+  sidebarSectionArchived: '[data-testid="sidebar-section-archived"]',
+  sidebarConversationActions: '[data-testid="sidebar-conversation-actions-btn"]',
+  sidebarConversationMenu: '[data-testid="sidebar-conversation-menu"]',
+  sidebarConversationMenuPin: '[data-testid="sidebar-conversation-menu-pin"]',
+  sidebarConversationMenuMute: '[data-testid="sidebar-conversation-menu-mute"]',
+  sidebarConversationMenuArchive: '[data-testid="sidebar-conversation-menu-archive"]',
   homeEmpty: '[data-testid="home-empty"]',
 
   // ---- Room create modal ----
