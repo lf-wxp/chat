@@ -109,49 +109,76 @@ impl DialogState {
 ///
 /// Mount this once in the chat view root. It reads from a shared
 /// `DialogState` and renders a styled overlay when active.
+///
+/// Layout / animation / dismissal are delegated to the shared
+/// `ModalWrapper`. Escape and backdrop click both map to "Cancel" so
+/// dismissing the dialog by any means consistently resolves the
+/// pending `confirm()` future with `false`.
 #[component]
 pub fn Dialog(
   /// Shared dialog state.
   state: DialogState,
 ) -> impl IntoView {
+  use crate::components::room::modal_wrapper::{ModalSize, ModalWrapper};
+
   let i18n = i18n::use_i18n();
+
+  let visible = state.visible;
+  let is_open = Signal::derive(move || visible.get());
 
   let state_ok = state.clone();
   let state_cancel = state.clone();
+  let state_close = state.clone();
   let on_ok: Callback<()> = Callback::new(move |_: ()| state_ok.resolve(true));
   let on_cancel: Callback<()> = Callback::new(move |_: ()| state_cancel.resolve(false));
+  // Escape / backdrop click -> resolve(false). Same effect as Cancel.
+  let on_close: Callback<()> = Callback::new(move |_: ()| state_close.resolve(false));
+
+  let message = state.message;
+  let show_cancel = state.show_cancel;
 
   view! {
-    <Show when=move || state.visible.get() fallback=|| ()>
-      <div class="dialog-overlay" data-testid="dialog-overlay">
-        <div class="dialog-box" role="dialog" aria-modal="true" data-testid="dialog">
-          <p class="dialog-message" data-testid="dialog-message">{move || state.message.get()}</p>
-          <div class="dialog-actions">
-            <Show when=move || state.show_cancel.get() fallback=|| ()>
-              <button
-                type="button"
-                class="dialog-btn dialog-btn-cancel"
-                aria-label=move || t_string!(i18n, common.cancel)
-                title=move || t_string!(i18n, common.cancel)
-                on:click=move |_| on_cancel.run(())
-                data-testid="dialog-cancel"
-              >
-                <Icon icon=i::LuX />
-              </button>
-            </Show>
+    <ModalWrapper
+      on_close=on_close
+      open=is_open
+      size=ModalSize::Small
+      class="dialog-box"
+      labelled_by="dialog-message"
+      testid="dialog"
+    >
+      <div class="modal-body">
+        <p
+          id="dialog-message"
+          class="dialog-message"
+          data-testid="dialog-message"
+        >
+          {move || message.get()}
+        </p>
+        <div class="dialog-actions">
+          <Show when=move || show_cancel.get() fallback=|| ()>
             <button
               type="button"
-              class="dialog-btn dialog-btn-ok"
-              aria-label=move || t_string!(i18n, common.ok)
-              title=move || t_string!(i18n, common.ok)
-              on:click=move |_| on_ok.run(())
-              data-testid="dialog-ok"
+              class="dialog-btn dialog-btn-cancel"
+              aria-label=move || t_string!(i18n, common.cancel)
+              title=move || t_string!(i18n, common.cancel)
+              on:click=move |_| on_cancel.run(())
+              data-testid="dialog-cancel"
             >
-              <Icon icon=i::LuCheck />
+              <Icon icon=i::LuX />
             </button>
-          </div>
+          </Show>
+          <button
+            type="button"
+            class="dialog-btn dialog-btn-ok"
+            aria-label=move || t_string!(i18n, common.ok)
+            title=move || t_string!(i18n, common.ok)
+            on:click=move |_| on_ok.run(())
+            data-testid="dialog-ok"
+          >
+            <Icon icon=i::LuCheck />
+          </button>
         </div>
       </div>
-    </Show>
+    </ModalWrapper>
   }
 }

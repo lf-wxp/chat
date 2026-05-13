@@ -5,13 +5,21 @@
 //! buttons. A live countdown displays the remaining seconds before the
 //! local 60 s timeout fires (Req 9.8). Multiple back-to-back invites
 //! queue up so the user is shown one at a time.
+//!
+//! Layout / animation are delegated to the shared `ModalWrapper`.
+//! Escape and backdrop-click are wired up so dismissal acts as
+//! "Decline" (sends `invite_declined`); accidental clicks outside the
+//! modal still decline the invite — we deliberately keep this
+//! behaviour (rather than disabling backdrop dismissal) because the
+//! current product spec treats "ignored = declined" once the 60 s
+//! timer expires anyway.
 
-use leptos::ev::keydown;
 use leptos::prelude::*;
 use leptos_i18n::t;
-use leptos_use::{use_document, use_event_listener, use_interval_fn};
+use leptos_use::use_interval_fn;
 use wasm_bindgen::JsCast;
 
+use crate::components::room::modal_wrapper::{ModalSize, ModalWrapper};
 use crate::error_handler::use_error_toast_manager;
 use crate::i18n;
 use crate::identicon::generate_identicon_data_uri;
@@ -55,63 +63,25 @@ pub fn IncomingInviteModal() -> impl IntoView {
   let front: Memo<Option<IncomingInvite>> =
     Memo::new(move |_| inbound.with(|q| q.first().cloned()));
   let is_visible = Memo::new(move |_| front.get().is_some());
-
-  // §3.1 P1 fix — listen for `Escape` on the document so dismissal
-  // works regardless of where focus lives. `use_event_listener`
-  // auto-removes the listener on cleanup; no manual `StoredValue`
-  // bookkeeping is needed anymore.
-  //
-  // `stop_propagation()` is called in both branches to prevent the
-  // global Escape handler (app.rs) from also firing while the modal
-  // is visible — without it, a rapid double-press could race and
-  // both the invite and an underlying overlay would close (review §3.2).
-  let keydown_mgr = invite_mgr.clone();
-  let keydown_signaling = signaling.clone();
-  let _ = use_event_listener(
-    use_document(),
-    keydown,
-    move |ev: web_sys::KeyboardEvent| {
-      if crate::utils::safe_key(&ev) != "Escape" {
-        return;
-      }
-      let Some(invite) = front.get_untracked() else {
-        // No invite to decline, but still stop the event so the
-        // global handler does not double-handle this Escape.
-        ev.stop_propagation();
-        return;
-      };
-      keydown_mgr.take_inbound(&invite.from);
-      let _ = keydown_signaling.send_invite_declined(&invite.from);
-      ev.stop_propagation();
-    },
-  );
+  let is_open = Signal::derive(move || is_visible.get());
 
   // Phase C — focus restoration: record the element that owned focus
   // before the modal opened and return focus to it once the modal
-  // closes. A full Tab-cycle focus trap is deferred to task 24;
-  // restoring focus already closes the main a11y regression flagged
-  // in §5 ("focus restoration after modal close ❌").
+  // closes. ModalWrapper handles Escape + backdrop-click + ARIA;
+  // we layer focus *return* on top.
   let previous_focus: StoredValue<Option<web_sys::HtmlElement>> = StoredValue::new(None);
-  let modal_ref: NodeRef<leptos::html::Div> = NodeRef::new();
   Effect::new(move |prev_visible: Option<bool>| {
     let visible = is_visible.get();
     let was_visible = prev_visible.unwrap_or(false);
 
     if visible && !was_visible {
-      // Modal just opened — capture the current focus target and move
-      // focus onto the modal container so Tab starts cycling inside.
       if let Some(document) = web_sys::window().and_then(|w| w.document()) {
         let active = document
           .active_element()
           .and_then(|el| el.dyn_into::<web_sys::HtmlElement>().ok());
         previous_focus.set_value(active);
       }
-      if let Some(el) = modal_ref.get() {
-        let div_el: &web_sys::HtmlDivElement = el.as_ref();
-        let _ = div_el.focus();
-      }
     } else if !visible && was_visible {
-      // Modal just closed — restore focus to the triggering element.
       let prev = previous_focus.get_value();
       previous_focus.set_value(None);
       if let Some(el) = prev {
@@ -167,123 +137,130 @@ pub fn IncomingInviteModal() -> impl IntoView {
   let invite_mgr_for_accept = invite_mgr.clone();
   let signaling_for_accept = signaling.clone();
 
+  // Decline-via-dismissal (Escape or backdrop click). Mirrors the
+  // explicit Decline button so any way of closing the modal
+  // consistently sends `invite_declined`.
+  let invite_mgr_for_dismiss = invite_mgr.clone();
+  let signaling_for_dismiss = signaling.clone();
+  let on_close = Callback::new(move |()| {
+    let Some(invite) = front.get_untracked() else {
+      return;
+    };
+    invite_mgr_for_dismiss.take_inbound(&invite.from);
+    let _ = signaling_for_dismiss.send_invite_declined(&invite.from);
+  });
+
   view! {
-    <Show when=move || is_visible.get()>
-      <div
-        class="modal-backdrop modal-backdrop-visible"
-        role="presentation"
-        data-testid="invite-backdrop"
-      >
-        <div
-          class="modal incoming-invite-modal"
-          node_ref=modal_ref
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="incoming-invite-title"
-          tabindex="-1"
-          data-testid="incoming-invite-modal"
-        >
-          <header class="modal-header">
-            <h2 id="incoming-invite-title" class="modal-title">
-              {t!(i18n, discovery.invite_received_title)}
-            </h2>
-            // aria-live="off" avoids flooding the screen-reader with a
-            // new announcement every second. The countdown is still
-            // visible visually; a periodic announcement would be
-            // excessively verbose (WCAG 2.1, review §3.4).
-            <span class="incoming-invite-modal__countdown" aria-live="off">
-              {move || format!("{}s", remaining_seconds.get())}
-            </span>
-          </header>
+    <ModalWrapper
+      on_close=on_close
+      open=is_open
+      size=ModalSize::Medium
+      class="incoming-invite-modal"
+      labelled_by="incoming-invite-title"
+      testid="incoming-invite-modal"
+      // Backdrop click is left enabled (= Decline) to match the
+      // existing UX where "ignored" maps to "declined". Set to false
+      // here if you need a force-answer modal instead.
+    >
+      <header class="modal-header">
+        <h2 id="incoming-invite-title" class="modal-title">
+          {t!(i18n, discovery.invite_received_title)}
+        </h2>
+        // aria-live="off" avoids flooding the screen-reader with a
+        // new announcement every second. The countdown is still
+        // visible visually; a periodic announcement would be
+        // excessively verbose (WCAG 2.1, review §3.4).
+        <span class="incoming-invite-modal__countdown" aria-live="off">
+          {move || format!("{}s", remaining_seconds.get())}
+        </span>
+      </header>
 
-          <div class="modal-body incoming-invite-modal__body">
-            <img
-              class="incoming-invite-modal__avatar"
-              src=move || avatar.get()
-              alt=""
-              width="72"
-              height="72"
-            />
-            <p class="incoming-invite-modal__inviter">{move || inviter_label.get()}</p>
-            <Show when=move || note.get().is_some()>
-              <blockquote class="incoming-invite-modal__note">
-                {move || note.get().unwrap_or_default()}
-              </blockquote>
-            </Show>
-          </div>
-
-          <footer class="modal-footer">
-            <button
-              type="button"
-              class="btn btn--ghost"
-              on:click={
-                let invite_mgr = invite_mgr_for_decline.clone();
-                let signaling = signaling_for_decline.clone();
-                move |_| {
-                  let Some(invite) = front.get_untracked() else {
-                    return;
-                  };
-                  invite_mgr.take_inbound(&invite.from);
-                  if let Err(e) = signaling.send_invite_declined(&invite.from) {
-                    toast.show_error_message_with_key(
-                      "SIG001",
-                      "discovery.invite_failed",
-                      &format!("Failed to send decline: {e}"),
-                    );
-                  }
-                }
-              }
-              data-testid="invite-decline"
-            >
-              {t!(i18n, discovery.decline)}
-            </button>
-            <button
-              type="button"
-              class="btn btn--primary"
-              on:click={
-                let invite_mgr = invite_mgr_for_accept.clone();
-                let signaling = signaling_for_accept.clone();
-                move |_| {
-                  let Some(invite) = front.get_untracked() else {
-                    return;
-                  };
-                  invite_mgr.take_inbound(&invite.from);
-                  if let Err(e) = signaling.send_invite_accepted(&invite.from) {
-                    toast.show_error_message_with_key(
-                      "SIG001",
-                      "discovery.invite_failed",
-                      &format!("Failed to accept invite: {e}"),
-                    );
-                    return;
-                  }
-                  let conv = ConversationId::Direct(invite.from.clone());
-                  let display = invite.display_name.clone();
-                  app_state.conversations.update(|list| {
-                    if !list.iter().any(|c| c.id == conv) {
-                      list.push(crate::state::Conversation {
-                        id: conv.clone(),
-                        display_name: display,
-                        last_message: None,
-                        last_message_ts: Some(chrono::Utc::now().timestamp_millis()),
-                        unread_count: 0,
-                        pinned: false,
-                        pinned_ts: None,
-                        muted: false,
-                        archived: false,
-                        conversation_type: crate::state::ConversationType::Direct,
-                      });
-                    }
-                  });
-                  app_state.active_conversation.set(Some(conv));
-                }
-              }
-              data-testid="invite-accept"
-            >
-              {t!(i18n, discovery.accept)}
-            </button>
-          </footer>
-        </div>
+      <div class="modal-body incoming-invite-modal__body">
+        <img
+          class="incoming-invite-modal__avatar"
+          src=move || avatar.get()
+          alt=""
+          width="72"
+          height="72"
+        />
+        <p class="incoming-invite-modal__inviter">{move || inviter_label.get()}</p>
+        <Show when=move || note.get().is_some()>
+          <blockquote class="incoming-invite-modal__note">
+            {move || note.get().unwrap_or_default()}
+          </blockquote>
+        </Show>
       </div>
-    </Show>
+
+      <footer class="modal-footer">
+        <button
+          type="button"
+          class="btn btn--ghost"
+          on:click={
+            let invite_mgr = invite_mgr_for_decline.clone();
+            let signaling = signaling_for_decline.clone();
+            move |_| {
+              let Some(invite) = front.get_untracked() else {
+                return;
+              };
+              invite_mgr.take_inbound(&invite.from);
+              if let Err(e) = signaling.send_invite_declined(&invite.from) {
+                toast.show_error_message_with_key(
+                  "SIG001",
+                  "discovery.invite_failed",
+                  &format!("Failed to send decline: {e}"),
+                );
+              }
+            }
+          }
+          data-testid="invite-decline"
+        >
+          {t!(i18n, discovery.decline)}
+        </button>
+        <button
+          type="button"
+          class="btn btn--primary"
+          on:click={
+            let invite_mgr = invite_mgr_for_accept.clone();
+            let signaling = signaling_for_accept.clone();
+            move |_| {
+              let Some(invite) = front.get_untracked() else {
+                return;
+              };
+              invite_mgr.take_inbound(&invite.from);
+              if let Err(e) = signaling.send_invite_accepted(&invite.from) {
+                toast.show_error_message_with_key(
+                  "SIG001",
+                  "discovery.invite_failed",
+                  &format!("Failed to accept invite: {e}"),
+                );
+                return;
+              }
+              let conv = ConversationId::Direct(invite.from.clone());
+              let display = invite.display_name.clone();
+              app_state.conversations.update(|list| {
+                if !list.iter().any(|c| c.id == conv) {
+                  list.push(crate::state::Conversation {
+                    id: conv.clone(),
+                    display_name: display,
+                    last_message: None,
+                    last_message_ts: Some(chrono::Utc::now().timestamp_millis()),
+                    unread_count: 0,
+                    pinned: false,
+                    pinned_ts: None,
+                    muted: false,
+                    archived: false,
+                    conversation_type: crate::state::ConversationType::Direct,
+                  });
+                }
+              });
+              app_state.active_conversation.set(Some(conv));
+            }
+          }
+          data-testid="invite-accept"
+        >
+          {t!(i18n, discovery.accept)}
+        </button>
+      </footer>
+    </ModalWrapper>
   }
 }

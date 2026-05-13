@@ -699,25 +699,18 @@
 	color: var(--color-error, #ef4444);
 }
 
-/* ── Modal dialog (P2-7) ── */
-.dialog-overlay {
-	position: fixed;
-	inset: 0;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	background: color-mix(in oklch, var(--bg-primary) 60%, transparent);
-	z-index: 1000;
-}
-
+/* ── Confirm / alert dialog ──
+ *
+ * Hosted via the shared `ModalWrapper`, so the backdrop / animation /
+ * dismissal are owned by `.modal-backdrop` + `.modal` and the glass
+ * effect comes from the `effects` layer. The legacy `.dialog-overlay`
+ * + `.dialog-box` rules are gone; only the inner content styles
+ * (message, actions row, themed buttons) remain.
+ */
 .dialog-box {
-	background-color: var(--bg-elevated, #ffffff);
-	border: 1px solid var(--border-color, #e2e8f0);
-	border-radius: var(--radius-lg, 0.5rem);
-	padding: var(--space-4, 1rem);
 	min-width: 280px;
 	max-width: 400px;
-	box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+	padding: var(--space-4, 1rem);
 }
 
 .dialog-message {
@@ -1111,27 +1104,16 @@
 	}
 }
 
-/* ── Forward Modal ── */
-.forward-modal-backdrop {
-	position: fixed;
-	inset: 0;
-	background: var(--bg-overlay, rgb(0 0 0 / 0.5));
-	z-index: var(--z-modal, 400);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-}
-
+/* ── Forward Modal ──
+ *
+ * Hosted via the shared `ModalWrapper`, so the backdrop / animation /
+ * dismissal are owned by `.modal-backdrop` + `.modal` in modal.css
+ * and the glass effect comes from the `effects` layer. We only carry
+ * the per-component sizing + child layout here.
+ */
 .forward-modal {
-	background: var(--bg-elevated, #ffffff);
-	color: var(--text-primary, #0f172a);
-	border-radius: var(--radius-lg, 0.5rem);
-	box-shadow: var(--shadow-xl);
 	width: min(420px, 92vw);
 	max-height: 80vh;
-	display: flex;
-	flex-direction: column;
-	overflow: hidden;
 }
 
 .forward-modal header {

@@ -88,9 +88,29 @@ pub fn ModalWrapper(
   /// for confirmation dialogs that require immediate user attention.
   #[prop(into, optional)]
   dialog_role: Option<String>,
-  /// Inner content rendered inside the dialog container.
-  children: Children,
+  /// Whether clicking the backdrop dismisses the modal. Defaults to
+  /// `true`. Set to `false` for dialogs that must be answered (e.g.
+  /// incoming-call modal, incoming-invite modal) so the user has to
+  /// explicitly Accept / Decline rather than dismissing by accident.
+  #[prop(optional)]
+  dismiss_on_backdrop_click: Option<bool>,
+  /// Whether pressing Escape dismisses the modal. Defaults to `true`.
+  /// For incoming invites the consumer typically wants Escape to map
+  /// to "Decline" rather than to a silent close, so they can either
+  /// disable this and listen to keydown themselves, or keep it on and
+  /// run the decline side-effect inside `on_close`.
+  #[prop(optional)]
+  dismiss_on_escape: Option<bool>,
+  /// Inner content rendered inside the dialog container. Uses
+  /// `ChildrenFn` (rather than the more common `Children`) so the
+  /// view can be re-built across reactive updates and — crucially —
+  /// shipped through `leptos::portal::Portal`, which requires its
+  /// children closure to be `Fn + Send + Sync`.
+  children: ChildrenFn,
 ) -> impl IntoView {
+  let dismiss_on_backdrop_click = dismiss_on_backdrop_click.unwrap_or(true);
+  let dismiss_on_escape = dismiss_on_escape.unwrap_or(true);
+
   // Internal visible state that drives the CSS class.
   let visible = RwSignal::new(false);
   // Whether a close animation is in progress.
@@ -129,6 +149,9 @@ pub fn ModalWrapper(
     use_document(),
     keydown,
     move |ev: web_sys::KeyboardEvent| {
+      if !dismiss_on_escape {
+        return;
+      }
       if crate::utils::safe_key(&ev) == "Escape"
         && visible.get_untracked()
         && !closing.get_untracked()
@@ -152,6 +175,15 @@ pub fn ModalWrapper(
   let testid = testid.unwrap_or_else(|| "modal-dialog".to_string());
   let dialog_role = dialog_role.unwrap_or_else(|| "dialog".to_string());
 
+  // Portal's children closure is `Fn + Send + Sync`, so any owned
+  // String / Callback we capture has to be `Clone` (and live behind
+  // an `Arc` if it isn't `Copy`). We wrap the per-instance strings
+  // here so the children closure can clone them on every rebuild.
+  let dialog_class = std::sync::Arc::<str>::from(dialog_class);
+  let testid = std::sync::Arc::<str>::from(testid);
+  let dialog_role = std::sync::Arc::<str>::from(dialog_role);
+  let labelled_by = std::sync::Arc::<str>::from(labelled_by);
+
   // In controlled mode, we need to decide whether to render at all.
   // We use `display: none` on the backdrop to hide it when not mounted.
   let should_display = move || {
@@ -160,6 +192,9 @@ pub fn ModalWrapper(
 
   // Backdrop click handler.
   let handle_backdrop_click = move |_| {
+    if !dismiss_on_backdrop_click {
+      return;
+    }
     if closing.get_untracked() {
       return;
     }
@@ -170,38 +205,57 @@ pub fn ModalWrapper(
     }
   };
 
+  // Resolve the portal mount point lazily. Prefer `#modal-root`
+  // (rendered inside `ModalManager`) so every dialog hops out of any
+  // ancestor that would otherwise establish a containing block for
+  // `position: fixed` (sidebar `backdrop-filter`, `.app`'s
+  // `view-transition-name`, theater fullscreen `transform`, …). When
+  // `#modal-root` is unavailable (e.g. unauthenticated shell, unit
+  // tests that mount this component standalone) we fall back to
+  // `<body>`, which is what Portal would also pick implicitly.
+  use wasm_bindgen::JsCast as _;
+  let mount: web_sys::Element = web_sys::window()
+    .and_then(|w| w.document())
+    .and_then(|d| {
+      d.get_element_by_id("modal-root")
+        .or_else(|| d.body().map(|b| b.unchecked_into::<web_sys::Element>()))
+    })
+    .expect("document.body or #modal-root must exist before a modal is rendered");
+
   view! {
-    <div
-      node_ref=backdrop_ref
-      class=move || {
-        if visible.get() {
-          "modal-backdrop modal-backdrop-visible"
-        } else {
-          "modal-backdrop"
-        }
-      }
-      style=move || {
-        if should_display() {
-          ""
-        } else {
-          "display:none"
-        }
-      }
-      role="presentation"
-      data-testid="modal-wrapper-backdrop"
-      on:click=handle_backdrop_click
-    >
+    <leptos::portal::Portal mount=mount>
       <div
-        class=dialog_class
-        role=dialog_role
-        aria-modal="true"
-        aria-labelledby=labelled_by
-        on:click=|ev| ev.stop_propagation()
-        data-testid=testid
+        node_ref=backdrop_ref
+        class=move || {
+          if visible.get() {
+            "modal-backdrop modal-backdrop-visible"
+          } else {
+            "modal-backdrop"
+          }
+        }
+        style=move || {
+          if should_display() {
+            ""
+          } else {
+            "display:none"
+          }
+        }
+        role="presentation"
+        data-testid="modal-wrapper-backdrop"
+        on:click=handle_backdrop_click
       >
-        {children()}
+        <div
+          class=dialog_class.to_string()
+          role=dialog_role.to_string()
+          aria-modal="true"
+          aria-labelledby=labelled_by.to_string()
+          on:click=|ev| ev.stop_propagation()
+          data-testid=testid.to_string()
+        >
+          {children()}
+        </div>
       </div>
-    </div>
+    </leptos::portal::Portal>
   }
 }
 

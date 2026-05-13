@@ -69,7 +69,11 @@ export const sel = {
   incomingInviteModal: '[data-testid="incoming-invite-modal"]',
   inviteAccept: '[data-testid="invite-accept"]',
   inviteDecline: '[data-testid="invite-decline"]',
-  inviteBackdrop: '[data-testid="invite-backdrop"]',
+  // Incoming-invite modal is now hosted via the shared `ModalWrapper`,
+  // which tags its backdrop with `modal-wrapper-backdrop`. Scope the
+  // selector to the inner dialog so other modals don't match.
+  inviteBackdrop:
+    '[data-testid="modal-wrapper-backdrop"]:has([data-testid="incoming-invite-modal"])',
 
   // ---- Chat view ----
   chatView: '[data-testid="chat-view"]',

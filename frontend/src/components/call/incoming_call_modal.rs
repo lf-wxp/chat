@@ -3,6 +3,12 @@
 //! Rendered whenever the local `CallState` transitions to
 //! [`CallState::Ringing`]. Offers Accept / Decline buttons and
 //! displays the caller's nickname, avatar, and media type.
+//!
+//! Layout / animation / dismissal are delegated to the shared
+//! `ModalWrapper`. Backdrop-click is **disabled** so a stray click
+//! cannot silently decline the call — the user must explicitly choose
+//! Accept or Decline. Escape is also disabled for the same reason
+//! (matches platform conventions for incoming-call sheets).
 
 use leptos::prelude::*;
 use leptos::task::spawn_local;
@@ -11,6 +17,7 @@ use message::types::MediaType;
 use message::{UserId, types::UserInfo};
 
 use crate::call::{CallState, use_call_manager, use_call_signals};
+use crate::components::room::modal_wrapper::{ModalSize, ModalWrapper};
 use crate::i18n;
 use crate::state::use_app_state;
 
@@ -45,6 +52,7 @@ pub fn IncomingCallModal() -> impl IntoView {
   let i18n = i18n::use_i18n();
 
   let is_ringing = Memo::new(move |_| should_render_modal(&signals.call_state.get()));
+  let is_open = Signal::derive(move || is_ringing.get());
 
   // Extract caller / media info reactively so the view does not need
   // to destructure the enum inline.
@@ -64,68 +72,71 @@ pub fn IncomingCallModal() -> impl IntoView {
   });
 
   // Clone the manager twice so the accept + decline click handlers each
-  // have their own owned copy; `Show`'s `ChildrenFn` rebuilds the view
-  // on every visibility transition and must therefore remain `Fn`.
+  // have their own owned copy.
   let manager_accept = manager.clone();
   let manager_decline = manager;
 
+  // No-op on_close: the modal is dismissed by the call-state machine
+  // (Accept / Decline button click), not by the wrapper. We still pass
+  // a callback because ModalWrapper requires one.
+  let on_close = Callback::new(|()| {});
+
   view! {
-    <Show when=move || is_ringing.get()>
-      <div
-        class="call-modal-overlay"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="call-modal-title"
-        data-testid="incoming-call-modal"
-      >
-        <div class="call-modal">
-          <header class="call-modal__header">
-            <h2 id="call-modal-title" class="call-modal__title">
-              {move || t_string!(i18n, call.incoming_call)}
-            </h2>
-          </header>
-          <div class="call-modal__body">
-            <p class="call-modal__caller">{move || caller_name.get()}</p>
-            <p class="call-modal__meta">{move || media_label.get()}</p>
-          </div>
-          <footer class="call-modal__actions">
-            <button
-              type="button"
-              class="btn btn--danger"
-              on:click={
-                let manager = manager_decline.clone();
-                move |_| manager.decline_call()
-              }
-              aria-label=move || t_string!(i18n, call.decline)
-              data-testid="call-decline-btn"
-            >
-              {move || t_string!(i18n, call.decline)}
-            </button>
-            <button
-              type="button"
-              class="btn btn--primary"
-              on:click={
-                let manager = manager_accept.clone();
-                move |_| {
-                  let manager = manager.clone();
-                  spawn_local(async move {
-                    if let Err(e) = manager.accept_call().await {
-                      web_sys::console::error_1(
-                        &format!("[call] accept failed: {e}").into(),
-                      );
-                    }
-                  });
-                }
-              }
-              aria-label=move || t_string!(i18n, call.accept)
-              data-testid="call-accept-btn"
-            >
-              {move || t_string!(i18n, call.accept)}
-            </button>
-          </footer>
-        </div>
+    <ModalWrapper
+      on_close=on_close
+      open=is_open
+      size=ModalSize::Small
+      class="call-modal"
+      labelled_by="call-modal-title"
+      testid="incoming-call-modal"
+      dismiss_on_backdrop_click=false
+      dismiss_on_escape=false
+    >
+      <header class="call-modal__header">
+        <h2 id="call-modal-title" class="call-modal__title">
+          {move || t_string!(i18n, call.incoming_call)}
+        </h2>
+      </header>
+      <div class="call-modal__body">
+        <p class="call-modal__caller">{move || caller_name.get()}</p>
+        <p class="call-modal__meta">{move || media_label.get()}</p>
       </div>
-    </Show>
+      <footer class="call-modal__actions">
+        <button
+          type="button"
+          class="btn btn--danger"
+          on:click={
+            let manager = manager_decline.clone();
+            move |_| manager.decline_call()
+          }
+          aria-label=move || t_string!(i18n, call.decline)
+          data-testid="call-decline-btn"
+        >
+          {move || t_string!(i18n, call.decline)}
+        </button>
+        <button
+          type="button"
+          class="btn btn--primary"
+          on:click={
+            let manager = manager_accept.clone();
+            move |_| {
+              let manager = manager.clone();
+              spawn_local(async move {
+                if let Err(e) = manager.accept_call().await {
+                  web_sys::console::error_1(
+                    &format!("[call] accept failed: {e}").into(),
+                  );
+                }
+              });
+            }
+          }
+          aria-label=move || t_string!(i18n, call.accept)
+          data-testid="call-accept-btn"
+        >
+          {move || t_string!(i18n, call.accept)}
+        </button>
+      </footer>
+    </ModalWrapper>
   }
 }
 

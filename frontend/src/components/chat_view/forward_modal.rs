@@ -7,8 +7,13 @@
 //! `ChatManager::forward_message`, which rejects chain forwarding on
 //! its own (Req 4.6.x, error `cht104`) — this UI only needs to render
 //! the failure path when the manager returns `None`.
+//!
+//! Layout / animation / dismissal are delegated to the shared
+//! `ModalWrapper` so the visual + interaction model matches every
+//! other dialog in the app.
 
 use crate::chat::{ChatMessage, MessageContent, use_chat_manager};
+use crate::components::room::modal_wrapper::{ModalSize, ModalWrapper};
 use crate::i18n;
 use crate::state::{Conversation, ConversationId, use_app_state};
 use icondata as i;
@@ -30,9 +35,11 @@ pub fn ForwardModal(
   let query = RwSignal::new(String::new());
   let error = RwSignal::new(Option::<String>::None);
 
+  // Derived signal that drives ModalWrapper's `open` prop.
+  let is_open = Signal::derive(move || source.with(Option::is_some));
+
   // Conversations matching the filter query (case-insensitive on
-  // `display_name`). Excludes the conversation the source message
-  // currently lives in.
+  // `display_name`). Excludes archived conversations.
   let filtered = Memo::new(move |_| {
     let q = query.get().trim().to_lowercase();
     let mut list: Vec<Conversation> = app_state
@@ -46,10 +53,19 @@ pub fn ForwardModal(
     list
   });
 
-  let close = move |_| {
-    source.set(None);
+  let reset = move || {
     query.set(String::new());
     error.set(None);
+  };
+
+  let on_close = Callback::new(move |()| {
+    source.set(None);
+    reset();
+  });
+
+  let close_btn = move |_| {
+    source.set(None);
+    reset();
   };
 
   let is_chain_forward = Memo::new(move |_| {
@@ -69,8 +85,7 @@ pub fn ForwardModal(
     match ok {
       Some(_) => {
         source.set(None);
-        query.set(String::new());
-        error.set(None);
+        reset();
       }
       None => {
         error.set(Some(
@@ -81,97 +96,87 @@ pub fn ForwardModal(
   };
 
   view! {
-    <Show when=move || source.get().is_some() fallback=|| ()>
-      <div
-        class="forward-modal-backdrop"
-        role="dialog"
-        aria-modal="true"
-        data-testid="forward-modal"
-        on:click=move |ev| {
-          // Close when the backdrop itself is clicked, not bubbled
-          // events from the inner modal.
-          if let Some(target) = ev.target()
-            && let Ok(el) = target.dyn_into::<web_sys::Element>()
-            && el.class_list().contains("forward-modal-backdrop")
-          {
-            close(ev);
-          }
-        }
-      >
-        <div class="forward-modal">
-          <header>
-            <span>{t_string!(i18n, chat.forward_modal_title)}</span>
-            <button
-              type="button"
-              class="chat-input-btn"
-              aria-label=move || t_string!(i18n, common.close)
-              on:click=close
-            >
-              <Icon icon=i::LuX />
-            </button>
-          </header>
+    <ModalWrapper
+      on_close=on_close
+      open=is_open
+      size=ModalSize::Small
+      class="forward-modal"
+      labelled_by="forward-modal-title"
+      testid="forward-modal"
+    >
+      <header class="modal-header">
+        <h2 id="forward-modal-title" class="modal-title">
+          {move || t_string!(i18n, chat.forward_modal_title)}
+        </h2>
+        <button
+          type="button"
+          class="modal-close"
+          aria-label=move || t_string!(i18n, common.close)
+          on:click=close_btn
+        >
+          <Icon icon=i::LuX />
+        </button>
+      </header>
 
-          <Show when=move || is_chain_forward.get() fallback=|| ()>
-            <div class="forward-modal-error" role="alert">
-              {move || t_string!(i18n, chat.forward_chain_forbidden)}
-            </div>
-          </Show>
-
-          <Show when=move || !is_chain_forward.get() fallback=|| ()>
-            <div style="padding:0.5rem 1rem">
-              <input
-                type="search"
-                class="chat-input-textarea"
-                placeholder=move || t_string!(i18n, chat.forward_modal_placeholder)
-                aria-label=move || t_string!(i18n, chat.forward_modal_placeholder)
-                prop:value=move || query.get()
-                on:input=move |ev| {
-                  if let Some(v) = input_value(&ev) {
-                    query.set(v);
-                  }
-                }
-              />
-            </div>
-
-            <ul role="listbox">
-              {move || {
-                filtered
-                  .get()
-                  .into_iter()
-                  .map(|conv| {
-                    let name = conv.display_name.clone();
-                    let id = conv.id.clone();
-                    view! {
-                      <li
-                        role="option"
-                        on:click=move |_| do_forward(id.clone())
-                      >
-                        <span>{name}</span>
-                        <span class="forward-modal-last">
-                          {conv.last_message.clone().unwrap_or_default()}
-                        </span>
-                      </li>
-                    }
-                  })
-                  .collect_view()
-              }}
-            </ul>
-          </Show>
-
-          <Show when=move || error.get().is_some() fallback=|| ()>
-            <div class="forward-modal-error" role="alert">
-              {move || error.get().unwrap_or_default()}
-            </div>
-          </Show>
-
-          <footer>
-            <button type="button" class="chat-input-btn" on:click=close>
-              {t_string!(i18n, common.close)}
-            </button>
-          </footer>
+      <Show when=move || is_chain_forward.get() fallback=|| ()>
+        <div class="forward-modal-error" role="alert">
+          {move || t_string!(i18n, chat.forward_chain_forbidden)}
         </div>
-      </div>
-    </Show>
+      </Show>
+
+      <Show when=move || !is_chain_forward.get() fallback=|| ()>
+        <div class="modal-body">
+          <input
+            type="search"
+            class="chat-input-textarea"
+            placeholder=move || t_string!(i18n, chat.forward_modal_placeholder)
+            aria-label=move || t_string!(i18n, chat.forward_modal_placeholder)
+            prop:value=move || query.get()
+            on:input=move |ev| {
+              if let Some(v) = input_value(&ev) {
+                query.set(v);
+              }
+            }
+          />
+
+          <ul role="listbox">
+            {move || {
+              filtered
+                .get()
+                .into_iter()
+                .map(|conv| {
+                  let name = conv.display_name.clone();
+                  let id = conv.id.clone();
+                  view! {
+                    <li
+                      role="option"
+                      on:click=move |_| do_forward(id.clone())
+                    >
+                      <span>{name}</span>
+                      <span class="forward-modal-last">
+                        {conv.last_message.clone().unwrap_or_default()}
+                      </span>
+                    </li>
+                  }
+                })
+                .collect_view()
+            }}
+          </ul>
+        </div>
+      </Show>
+
+      <Show when=move || error.get().is_some() fallback=|| ()>
+        <div class="forward-modal-error" role="alert">
+          {move || error.get().unwrap_or_default()}
+        </div>
+      </Show>
+
+      <footer class="modal-footer">
+        <button type="button" class="btn btn--ghost" on:click=close_btn>
+          {move || t_string!(i18n, common.close)}
+        </button>
+      </footer>
+    </ModalWrapper>
   }
 }
 
