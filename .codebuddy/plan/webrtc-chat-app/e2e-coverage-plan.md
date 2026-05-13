@@ -110,6 +110,9 @@ land the fix and then a thin "round-trip" E2E test to lock it down.
 | G11 | `conversation_flags` were silently dropped between every page reload | The `persist_conversations` debounce timer arms a `set_timeout_once` callback to coalesce hot writes. That callback fires from the browser's timer queue with no surrounding Leptos reactive owner, so the inner `flush_conv_flags_to_idb` looked up `PersistenceManager` via `use_context::<PersistenceManager>()` and got `None` every single time — meaning pin / mute / archive flags were *never* written to IDB despite the in-memory `Conversation.pinned` flipping correctly. The companion `reconcile_conv_flags_from_idb` had the symmetric bug: it ran from `provide_app_state()` *before* `provide_persistence_manager()` had installed the context. Fixed in P1-2 by (a) introducing a `PERSISTENCE_MANAGER_FALLBACK` thread-local mirror (mirroring `CHAT_MANAGER_FALLBACK` etc.) and routing both call sites through `try_use_persistence_manager()`, and (b) moving the reconcile call from `provide_app_state` to `lib.rs::init` after the PM context exists. | P1-2 |
 | G12 | No outbound message queue / offline buffering | `chat::manager::wire::send_wire_out` spawns each send into a `wasm_bindgen_futures::spawn_local` and `console.warn`s on failure with no retry. There is no client-side outbound buffer that would hold messages typed during a transient network drop and replay them after reconnect. The closest existing primitive — `chat::ack_queue` — only retries messages that were *successfully* sent on the wire but are awaiting a `MessageAck`. Plan §3 P1-4 originally called for an "outbound queue flush after reconnect" assertion; that path does not exist, and the P1-4 spec instead locks down the more common "user pauses → network blips → user resumes typing" flow via the WS-reconnect + online-list-rehydrate test. | P1-4 |
 | G13 | No JWT refresh / silent re-auth | `auth::service::try_recover_auth` calls `is_jwt_expired` against a 7-day server-issued token and, on expiry, simply wipes the localStorage keys and routes the user back to the login page. There is no refresh-token round-trip, no proactive re-issuance before expiry, and no automatic re-auth attempt mid-session. Plan §3 P1-4 originally listed "token expiry → auto re-auth"; the P1-4 spec instead asserts the documented current behaviour ("expired token in storage routes to the auth page on reload") so a future refresh-token feature has a clear regression target to flip. | P1-4 |
+| G14 | No user-facing pause / resume controls for file transfers | The file card (`components/chat_view/file_card.rs`) renders cancel / download / re-receive buttons but no pause / resume affordance. The protocol layer supports resume (`file_transfer::on_file_resume_request` rebuilds chunks from the original bytes; `IncomingTransfer::missing_chunks` + `FileResumeRequest` drive the recovery), but it is invoked automatically only on a `file-re-receive` click after a hash mismatch, never on user demand mid-flight. Plan §3 P1-5 "pause / resume" is therefore unrepresentable in E2E without first shipping the buttons. | P1-5 |
+| G15 | No receiver-side dangerous-extension confirmation | The danger-extension confirm dialog (`PickerStrings` / `dialog-ok` in `file_picker.rs`) gates the **sender** before the file is published over the wire. Once the receiver gets a `FileMetadata` with a flagged extension, it surfaces the `⚠️ Security Risk` badge but the `file-download` button still downloads on a single click — there is no second confirm or "save anyway" interstitial. Plan §3 P1-5 "dangerous-extension save-anyway path" therefore reduces to the existing P0-2 sender-side OK assertion; an explicit save-anyway flow needs the receiver-side dialog to ship first. | P1-5 |
+| G16 | No mid-session E2EE key rotation | `webrtc::encryption::PeerCrypto` derives the AES-256-GCM shared key from one ECDH round during connection bootstrap and keeps that key for the lifetime of the page. There is no rekeying timer, no rotation on re-invite, and no user-reachable "rotate keys" affordance. Plan §3 P1-6 "key rotation on re-invite" is therefore unrepresentable; the P1-6 spec covers ciphertext + tamper-rejection only. A future ticket should either ship periodic rotation (e.g. every 24 h or every N messages) or wire the existing one-shot ECDH into a re-invite flow that runs the handshake again. | P1-6 |
 
 ## 3. Rollout plan
 
@@ -261,9 +264,13 @@ needed). When a wave item lands, replace its status emoji:
 - [x] P1-1 mention.spec.ts — commit 0b0362c
 - [x] P1-2 persistence-extended.spec.ts — commit 763189d
 - [x] P1-3 scroll.spec.ts — commit c5ca49d
-- [x] P1-4 disconnect-advanced.spec.ts — commit 6262094
-- [ ] P1-5 file-transfer-flow.spec.ts
-- [ ] P1-6 e2ee-rotation.spec.ts
+- [x] P1-4 disconnect-advanced.spec.ts — commit 2f90f4a
+- [~] P1-5 file-transfer-flow.spec.ts — deferred: all three sub-features
+  blocked on missing UI (G14 pause/resume, G15 receiver-side
+  save-anyway) or a non-E2E-controllable failure injection
+  (mid-transfer ICE drop). Reopen once any of G14/G15 ships.
+- [x] P1-6 e2ee-rotation.spec.ts — commit f9e3cf6
+- [ ] P1-7 context-menu-full.spec.ts
 - [ ] P1-7 context-menu-full.spec.ts
 - [ ] P2-1 sticker.spec.ts
 - [ ] P2-2 voice-message.spec.ts
