@@ -55,7 +55,12 @@ export const sel = {
   onlineUsersSearch: '[data-testid="online-users-search"]',
   onlineUserRow: '[data-testid="online-user-row"]',
   userInfoCard: '[data-testid="user-info-card"]',
-  userInfoBackdrop: '[data-testid="user-info-backdrop"]',
+  // The user-info card is rendered via the shared ModalWrapper, which
+  // tags its backdrop with `modal-wrapper-backdrop`. The card-specific
+  // selector targets that wrapper but scoped to the user-info dialog
+  // so other modals don't match.
+  userInfoBackdrop:
+    '[data-testid="modal-wrapper-backdrop"]:has([data-testid="user-info-card"])',
   userInfoInvite: '[data-testid="user-info-invite"]',
   userInfoConnecting: '[data-testid="user-info-connecting"]',
   userInfoBlock: '[data-testid="user-info-block"]',

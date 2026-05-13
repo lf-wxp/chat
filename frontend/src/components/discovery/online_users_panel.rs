@@ -19,6 +19,7 @@ use message::types::{UserInfo, UserStatus};
 
 use crate::blacklist::use_blacklist_state;
 use crate::components::discovery::MultiInvitePanel;
+use crate::components::room::global_modal_context::GlobalRoomModalState;
 use crate::i18n;
 use crate::identicon::generate_identicon_data_uri;
 use crate::invite::{InviteStatus, use_invite_manager};
@@ -29,13 +30,17 @@ use leptos_icons::Icon;
 
 /// Online users sidebar panel.
 #[component]
-pub fn OnlineUsersPanel(
-  /// Reactive state containing the user id whose info card is open.
-  /// Set by clicks on a row; cleared when the modal closes.
-  selected: RwSignal<Option<UserId>>,
-) -> impl IntoView {
+pub fn OnlineUsersPanel() -> impl IntoView {
   let i18n = i18n::use_i18n();
   let app_state = use_app_state();
+  // The user-info card is hosted globally inside `ModalManager`. We
+  // open it by writing to `GlobalRoomModalState::user_info_target`
+  // instead of rendering it inside the sidebar — the sidebar's
+  // `backdrop-filter` would otherwise establish a containing block
+  // for the modal's `position: fixed` and trap it inside the 16-rem
+  // sidebar column.
+  let modal_state = GlobalRoomModalState::use_global();
+  let selected = modal_state.user_info_target;
 
   let query = RwSignal::new(String::new());
   let multi_select = RwSignal::new(false);

@@ -232,10 +232,21 @@ html[data-glass="off"] .glass-l4::before {
   z-index: 0;
 }
 
-/* Hoist real content above the grain layer on the bridged hosts. */
-.top-bar > *,
-.sidebar > *,
-.drawer > * {
+/* Hoist real content above the grain layer on the bridged hosts.
+ *
+ * IMPORTANT: We must NOT clobber `position: fixed` on overlays that
+ * happen to be rendered as descendants of these hosts. The original
+ * `.sidebar > *` rule was forcing every direct child to
+ * `position: relative` — including any `.modal-backdrop`, whose
+ * `fixed` positioning is what makes it cover the viewport. The
+ * canonical fix is to render every modal at the app root inside
+ * `ModalManager` (so the host is `body`, not `.sidebar`); excluding
+ * `.modal-backdrop` here is belt-and-braces protection so a future
+ * regression that re-renders a modal locally still shows up
+ * correctly instead of collapsing into the sidebar. */
+.top-bar > *:not(.modal-backdrop),
+.sidebar > *:not(.modal-backdrop),
+.drawer > *:not(.modal-backdrop) {
   position: relative;
   z-index: 1;
 }

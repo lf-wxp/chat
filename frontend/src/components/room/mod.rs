@@ -28,7 +28,7 @@ mod member_context_menu;
 mod member_history_panel;
 mod member_list;
 mod member_row;
-mod modal_wrapper;
+pub mod modal_wrapper;
 mod mute_duration_picker;
 mod muted_indicator;
 mod nickname_editor;

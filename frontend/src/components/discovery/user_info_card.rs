@@ -6,16 +6,28 @@
 //! "Add a note" textarea before sending the invitation. Also exposes
 //! the Block / Unblock toggle so users can manage the local blacklist
 //! directly from this card (Req 9.15).
+//!
+//! The card is hosted **globally** inside `ModalManager` (parameter-
+//! less component) and opened by writing to
+//! `GlobalRoomModalState::user_info_target`. This keeps the card out
+//! of the sidebar's containing block — `<aside class="sidebar">`
+//! carries `backdrop-filter`, which establishes a containing block
+//! for `position: fixed` descendants and would otherwise pin the card
+//! to a 16-rem-wide column inside the sidebar.
+//!
+//! Layout / animation are delegated to `ModalWrapper` so the card
+//! shares the enter/exit transitions, Escape-to-close, outside-click
+//! dismissal and ARIA boilerplate with every other dialog in the app
+//! (e.g. `CreateRoomModal`, `InviteMemberModal`).
 
-use leptos::ev::keydown;
 use leptos::prelude::*;
 use leptos_i18n::{t, t_string};
-use leptos_use::{use_document, use_event_listener};
-use message::UserId;
 use message::types::UserStatus;
 use wasm_bindgen::JsCast;
 
 use crate::blacklist::use_blacklist_state;
+use crate::components::room::global_modal_context::GlobalRoomModalState;
+use crate::components::room::modal_wrapper::{ModalSize, ModalWrapper};
 use crate::error_handler::use_error_toast_manager;
 use crate::i18n;
 use crate::identicon::generate_identicon_data_uri;
@@ -26,19 +38,24 @@ use crate::webrtc::try_use_webrtc_manager;
 use icondata as i;
 use leptos_icons::Icon;
 
-/// User info card component. Renders nothing while `target` is `None`.
+/// User info card component (global).
+///
+/// Parameter-less. Opens automatically when
+/// `GlobalRoomModalState::user_info_target` becomes `Some(user_id)`;
+/// closes by clearing that signal.
 #[component]
-pub fn UserInfoCard(
-  /// Reactive selection — `Some(user_id)` opens the card; setting to
-  /// `None` closes it. Updated by parent on close.
-  target: RwSignal<Option<UserId>>,
-) -> impl IntoView {
+pub fn UserInfoCard() -> impl IntoView {
   let i18n = i18n::use_i18n();
   let app_state = use_app_state();
   let blacklist = use_blacklist_state();
   let invite_mgr = use_invite_manager();
   let signaling = use_signaling_client();
   let toast = use_error_toast_manager();
+  let modal_state = GlobalRoomModalState::use_global();
+
+  // Tracked accessor for the currently-targeted user.
+  let target = modal_state.user_info_target;
+  let is_open = Signal::derive(move || target.with(Option::is_some));
 
   let note = RwSignal::new(String::new());
 
@@ -49,24 +66,11 @@ pub fn UserInfoCard(
     }
   });
 
-  // §3.1 P1 fix — Escape dismiss at document level via leptos-use so
-  // the handler fires regardless of current focus and is removed
-  // automatically when the component unmounts.
-  let _ = use_event_listener(
-    use_document(),
-    keydown,
-    move |ev: web_sys::KeyboardEvent| {
-      if crate::utils::safe_key(&ev) == "Escape" && target.get_untracked().is_some() {
-        target.set(None);
-      }
-    },
-  );
-
   // Phase C — focus restoration. Capture the element that owned focus
   // when the card opens and return focus to it when the card closes.
-  // A full Tab-cycle focus trap is deferred to task 24.
+  // (ModalWrapper handles Escape + outside-click + focus on the dialog
+  // shell itself; we layer focus *return* on top.)
   let previous_focus: StoredValue<Option<web_sys::HtmlElement>> = StoredValue::new(None);
-  let modal_ref: NodeRef<leptos::html::Div> = NodeRef::new();
   Effect::new(move |prev_open: Option<bool>| {
     let open = target.get().is_some();
     let was_open = prev_open.unwrap_or(false);
@@ -77,10 +81,6 @@ pub fn UserInfoCard(
           .active_element()
           .and_then(|el| el.dyn_into::<web_sys::HtmlElement>().ok());
         previous_focus.set_value(active);
-      }
-      if let Some(el) = modal_ref.get() {
-        let div_el: &web_sys::HtmlDivElement = el.as_ref();
-        let _ = div_el.focus();
       }
     } else if !open && was_open {
       let prev = previous_focus.get_value();
@@ -137,6 +137,10 @@ pub fn UserInfoCard(
 
   let close = move || target.set(None);
 
+  let on_close = Callback::new(move |()| {
+    target.set(None);
+  });
+
   // Snapshot per-handler clones outside the `view!` so each rebuild of
   // the `Show` children gets fresh `Fn` closures (Leptos' ChildrenFn
   // contract). `signaling`, `invite_mgr`, and `blacklist` are `Clone`
@@ -148,183 +152,172 @@ pub fn UserInfoCard(
   let blacklist_for_block = blacklist.clone();
 
   view! {
-    <Show when=move || target.get().is_some()>
-      <div
-        class="modal-backdrop modal-backdrop-visible"
-        role="presentation"
-        on:click=move |_| close()
-        data-testid="user-info-backdrop"
-      >
-        <div
-          class="modal user-info-card"
-          node_ref=modal_ref
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="user-info-card-title"
-          on:click=move |ev| ev.stop_propagation()
-          tabindex="-1"
-          data-testid="user-info-card"
-        >
-          <header class="modal-header">
-            <h2 id="user-info-card-title" class="modal-title">
-              {move || display.get()}
-            </h2>
-            <button
-              type="button"
-              class="modal-close"
-              aria-label=move || t_string!(i18n, common.close)
-              on:click=move |_| close()
-            ><Icon icon=i::LuX /></button>
-          </header>
+    <ModalWrapper
+      on_close=on_close
+      open=is_open
+      size=ModalSize::Medium
+      class="user-info-card"
+      labelled_by="user-info-card-title"
+      testid="user-info-card"
+    >
+        <header class="modal-header">
+          <h2 id="user-info-card-title" class="modal-title">
+            {move || display.get()}
+          </h2>
+          <button
+            type="button"
+            class="modal-close"
+            aria-label=move || t_string!(i18n, common.close)
+            on:click=move |_| close()
+          ><Icon icon=i::LuX /></button>
+        </header>
 
-          <div class="modal-body user-info-card__body">
-            <img
-              class="user-info-card__avatar"
-              src=move || avatar.get()
-              alt=""
-              width="96"
-              height="96"
-            />
-            <p class="user-info-card__status">
-              {move || format!("{:?}", status.get())}
+        <div class="modal-body user-info-card__body">
+          <img
+            class="user-info-card__avatar"
+            src=move || avatar.get()
+            alt=""
+            width="96"
+            height="96"
+          />
+          <p class="user-info-card__status">
+            {move || format!("{:?}", status.get())}
+          </p>
+          <Show when=move || !signature.get().is_empty()>
+            <p class="user-info-card__signature">{move || signature.get()}</p>
+          </Show>
+
+          <Show when=move || connecting.get()>
+            <p
+              class="user-info-card__connecting"
+              role="status"
+              aria-live="polite"
+              data-testid="user-info-connecting"
+            >
+              {t!(i18n, discovery.connecting_please_wait)}
             </p>
-            <Show when=move || !signature.get().is_empty()>
-              <p class="user-info-card__signature">{move || signature.get()}</p>
-            </Show>
+          </Show>
 
-            <Show when=move || connecting.get()>
-              <p
-                class="user-info-card__connecting"
-                role="status"
-                aria-live="polite"
-                data-testid="user-info-connecting"
-              >
-                {t!(i18n, discovery.connecting_please_wait)}
-              </p>
-            </Show>
-
-            <label class="user-info-card__note-label" for="user-info-note">
-              {t!(i18n, discovery.note_label)}
-            </label>
-            <textarea
-              id="user-info-note"
-              class="user-info-card__note"
-              maxlength="200"
-              placeholder=move || t_string!(i18n, discovery.note_placeholder)
-              prop:value=move || note.get()
-              on:input=move |ev| note.set(event_target_value(&ev))
-              disabled=move || blocked.get() || pending.get() || connecting.get()
-            ></textarea>
-          </div>
-
-          <footer class="modal-footer user-info-card__actions">
-            <button
-              type="button"
-              class=move || {
-                if blocked.get() {
-                  "btn btn--ghost user-info-card__block is-blocked"
-                } else {
-                  "btn btn--ghost user-info-card__block"
-                }
-              }
-              on:click={
-                let invite_mgr = invite_mgr_block.clone();
-                let blacklist = blacklist_for_block.clone();
-                move |_| {
-                  // P2-3.2 fix: read `target` untracked inside the
-                  // event handler so the closure does not subscribe
-                  // to it (consistent with `multi_invite_panel.rs` /
-                  // `online_users_panel.rs`).
-                  let Some(target_id) = target.get_untracked() else {
-                    return;
-                  };
-                  if blacklist.is_blocked(&target_id) {
-                    blacklist.unblock(&target_id);
-                  } else {
-                    let display_name = display.get_untracked();
-                    blacklist.block(target_id.clone(), display_name);
-                    if let Some(mgr) = try_use_webrtc_manager() {
-                      mgr.close_connection(&target_id);
-                    }
-                    invite_mgr.cancel_outbound(&target_id);
-                    close();
-                  }
-                }
-              }
-              data-testid="user-info-block"
-            >
-              {move || {
-                if blocked.get() {
-                  t_string!(i18n, discovery.unblock)
-                } else {
-                  t_string!(i18n, discovery.block)
-                }
-              }}
-            </button>
-            <button
-              type="button"
-              class="btn btn--primary user-info-card__invite"
-              prop:disabled=move || blocked.get() || pending.get() || connecting.get()
-              title=move || {
-                if blocked.get() {
-                  t_string!(i18n, discovery.blocked_tooltip)
-                } else if connecting.get() {
-                  t_string!(i18n, discovery.connecting_please_wait)
-                } else if pending.get() {
-                  t_string!(i18n, discovery.invite_pending_tooltip)
-                } else {
-                  t_string!(i18n, discovery.send_invite)
-                }
-              }
-              on:click={
-                let signaling = signaling_send.clone();
-                let invite_mgr = invite_mgr_send.clone();
-                move |_| {
-                  // P2-3.2 fix: consistent with the block handler,
-                  // read the signals untracked inside the callback.
-                  let Some(target_id) = target.get_untracked() else {
-                    return;
-                  };
-                  let display_name = display.get_untracked();
-                  let note_text = note.get_untracked();
-                  let note_payload = if note_text.trim().is_empty() {
-                    None
-                  } else {
-                    Some(note_text.trim().to_string())
-                  };
-                  if !invite_mgr.track_outbound(target_id.clone(), display_name) {
-                    web_sys::console::warn_1(
-                      &"[invite] duplicate invite suppressed".into(),
-                    );
-                    return;
-                  }
-                  if let Err(e) =
-                    signaling.send_connection_invite(&target_id, note_payload)
-                  {
-                    invite_mgr.cancel_outbound(&target_id);
-                    toast.show_error_message_with_key(
-                      "SIG001",
-                      "discovery.invite_failed",
-                      &format!("Failed to send invitation: {e}"),
-                    );
-                  }
-                }
-              }
-              data-testid="user-info-invite"
-            >
-              {move || {
-                if connecting.get() {
-                  t_string!(i18n, discovery.connecting_please_wait)
-                } else if pending.get() {
-                  t_string!(i18n, discovery.inviting)
-                } else {
-                  t_string!(i18n, discovery.send_invite)
-                }
-              }}
-            </button>
-          </footer>
+          <label class="user-info-card__note-label" for="user-info-note">
+            {t!(i18n, discovery.note_label)}
+          </label>
+          <textarea
+            id="user-info-note"
+            class="user-info-card__note"
+            maxlength="200"
+            placeholder=move || t_string!(i18n, discovery.note_placeholder)
+            prop:value=move || note.get()
+            on:input=move |ev| note.set(event_target_value(&ev))
+            disabled=move || blocked.get() || pending.get() || connecting.get()
+          ></textarea>
         </div>
-      </div>
-    </Show>
+
+        <footer class="modal-footer user-info-card__actions">
+          <button
+            type="button"
+            class=move || {
+              if blocked.get() {
+                "btn btn--ghost user-info-card__block is-blocked"
+              } else {
+                "btn btn--ghost user-info-card__block"
+              }
+            }
+            on:click={
+              let invite_mgr = invite_mgr_block.clone();
+              let blacklist = blacklist_for_block.clone();
+              move |_| {
+                // P2-3.2 fix: read `target` untracked inside the
+                // event handler so the closure does not subscribe
+                // to it (consistent with `multi_invite_panel.rs` /
+                // `online_users_panel.rs`).
+                let Some(target_id) = target.get_untracked() else {
+                  return;
+                };
+                if blacklist.is_blocked(&target_id) {
+                  blacklist.unblock(&target_id);
+                } else {
+                  let display_name = display.get_untracked();
+                  blacklist.block(target_id.clone(), display_name);
+                  if let Some(mgr) = try_use_webrtc_manager() {
+                    mgr.close_connection(&target_id);
+                  }
+                  invite_mgr.cancel_outbound(&target_id);
+                  close();
+                }
+              }
+            }
+            data-testid="user-info-block"
+          >
+            {move || {
+              if blocked.get() {
+                t_string!(i18n, discovery.unblock)
+              } else {
+                t_string!(i18n, discovery.block)
+              }
+            }}
+          </button>
+          <button
+            type="button"
+            class="btn btn--primary user-info-card__invite"
+            prop:disabled=move || blocked.get() || pending.get() || connecting.get()
+            title=move || {
+              if blocked.get() {
+                t_string!(i18n, discovery.blocked_tooltip)
+              } else if connecting.get() {
+                t_string!(i18n, discovery.connecting_please_wait)
+              } else if pending.get() {
+                t_string!(i18n, discovery.invite_pending_tooltip)
+              } else {
+                t_string!(i18n, discovery.send_invite)
+              }
+            }
+            on:click={
+              let signaling = signaling_send.clone();
+              let invite_mgr = invite_mgr_send.clone();
+              move |_| {
+                // P2-3.2 fix: consistent with the block handler,
+                // read the signals untracked inside the callback.
+                let Some(target_id) = target.get_untracked() else {
+                  return;
+                };
+                let display_name = display.get_untracked();
+                let note_text = note.get_untracked();
+                let note_payload = if note_text.trim().is_empty() {
+                  None
+                } else {
+                  Some(note_text.trim().to_string())
+                };
+                if !invite_mgr.track_outbound(target_id.clone(), display_name) {
+                  web_sys::console::warn_1(
+                    &"[invite] duplicate invite suppressed".into(),
+                  );
+                  return;
+                }
+                if let Err(e) =
+                  signaling.send_connection_invite(&target_id, note_payload)
+                {
+                  invite_mgr.cancel_outbound(&target_id);
+                  toast.show_error_message_with_key(
+                    "SIG001",
+                    "discovery.invite_failed",
+                    &format!("Failed to send invitation: {e}"),
+                  );
+                }
+              }
+            }
+            data-testid="user-info-invite"
+          >
+            {move || {
+              if connecting.get() {
+                t_string!(i18n, discovery.connecting_please_wait)
+              } else if pending.get() {
+                t_string!(i18n, discovery.inviting)
+              } else {
+                t_string!(i18n, discovery.send_invite)
+              }
+            }}
+          </button>
+      </footer>
+    </ModalWrapper>
   }
 }
