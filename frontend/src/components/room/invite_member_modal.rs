@@ -3,12 +3,19 @@
 //! Allows the room owner to select one or more online users who are not
 //! yet in the room and send them a `RoomInvite` signalling message
 //! with an optional note.
+//!
+//! The modal is a **global** component rendered at the app root inside
+//! `ModalManager`. It opens whenever
+//! `GlobalRoomModalState::invite_target` is `Some(room)` and closes by
+//! resetting the signal back to `None`. This matches the lifecycle of
+//! `CreateRoomModal` / `PasswordPromptModal` and ensures the dialog can
+//! never be clipped by an ancestor's `overflow: hidden`.
 
 use leptos::prelude::*;
 use leptos_i18n::{t, t_string};
 use message::UserId;
-use message::types::RoomInfo;
 
+use crate::components::room::global_modal_context::GlobalRoomModalState;
 use crate::components::room::modal_wrapper::{ModalSize, ModalWrapper};
 use crate::error_handler::use_error_toast_manager;
 use crate::i18n;
@@ -18,29 +25,32 @@ use crate::state::use_app_state;
 /// Maximum number of recipients per invitation batch to prevent abuse.
 const INVITE_MAX: usize = 5;
 
-/// Invite-to-room modal.
+/// Invite-to-room modal (global).
+///
+/// Parameter-less. Opens automatically when
+/// `GlobalRoomModalState::invite_target` becomes `Some(room)`; closes by
+/// clearing that signal.
 #[component]
-pub fn InviteMemberModal(
-  /// Room whose members should be invited.
-  #[prop(into)]
-  room: Signal<RoomInfo>,
-  /// Controls visibility. The parent flips this signal; the modal
-  /// sets it back to `false` on close / send.
-  #[prop(into)]
-  open: RwSignal<bool>,
-) -> impl IntoView {
+pub fn InviteMemberModal() -> impl IntoView {
   let i18n = i18n::use_i18n();
   let app_state = use_app_state();
   let signaling = use_signaling_client();
   let toast = use_error_toast_manager();
+  let modal_state = GlobalRoomModalState::use_global();
 
   let query = RwSignal::new(String::new());
   let note = RwSignal::new(String::new());
   let selected = RwSignal::new(Vec::<UserId>::new());
 
+  // Tracked accessor for the currently-targeted room.
+  let target_room = modal_state.invite_target;
+  let is_open = Signal::derive(move || target_room.with(Option::is_some));
+
   // Online users who are NOT already in this room.
   let eligible_users = Memo::new(move |_| {
-    let rid = room.with(|r| r.room_id.clone());
+    let Some(rid) = target_room.with(|r| r.as_ref().map(|r| r.room_id.clone())) else {
+      return Vec::new();
+    };
     let existing: Vec<UserId> = app_state.room_members.with(|map| {
       map
         .get(&rid)
@@ -73,23 +83,15 @@ pub fn InviteMemberModal(
       .collect()
   });
 
-  let is_selected = move |uid: &UserId| -> bool { selected.with(|s| s.contains(uid)) };
-
-  let toggle_select = move |uid: UserId| {
-    selected.update(|s| {
-      if let Some(pos) = s.iter().position(|u| u == &uid) {
-        s.remove(pos);
-      } else if s.len() < INVITE_MAX {
-        s.push(uid);
-      }
-    });
-  };
-
-  let on_close = Callback::new(move |()| {
-    open.set(false);
+  let reset_inputs = move || {
     query.set(String::new());
     note.set(String::new());
     selected.set(Vec::new());
+  };
+
+  let on_close = Callback::new(move |()| {
+    target_room.set(None);
+    reset_inputs();
   });
 
   let on_send = Callback::new(move |()| {
@@ -97,7 +99,9 @@ pub fn InviteMemberModal(
     if targets.is_empty() {
       return;
     }
-    let rid = room.with(|r| r.room_id.clone());
+    let Some(rid) = target_room.with_untracked(|r| r.as_ref().map(|r| r.room_id.clone())) else {
+      return;
+    };
     let note_text = note.get_untracked();
     let mut errors = 0_usize;
     for target in &targets {
@@ -119,16 +123,32 @@ pub fn InviteMemberModal(
         t_string!(i18n, room.invite_sent),
       );
     }
-    open.set(false);
-    query.set(String::new());
-    note.set(String::new());
-    selected.set(Vec::new());
+    target_room.set(None);
+    reset_inputs();
   });
 
-  let room_name = Memo::new(move |_| room.with(|r| r.name.clone()));
+  let room_name = Memo::new(move |_| {
+    target_room
+      .with(|r| r.as_ref().map(|r| r.name.clone()))
+      .unwrap_or_default()
+  });
+
+  // Selection helpers — defined here so they capture `selected` (Copy
+  // RwSignal) by move and remain usable inside `For::children`.
+  let is_selected = move |uid: &UserId| -> bool { selected.with(|s| s.contains(uid)) };
+
+  let toggle_select = move |uid: UserId| {
+    selected.update(|s| {
+      if let Some(pos) = s.iter().position(|u| u == &uid) {
+        s.remove(pos);
+      } else if s.len() < INVITE_MAX {
+        s.push(uid);
+      }
+    });
+  };
 
   view! {
-    <Show when=move || open.get()>
+    <Show when=move || is_open.get()>
       <ModalWrapper
         on_close=on_close
         size=ModalSize::Small

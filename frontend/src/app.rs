@@ -208,31 +208,51 @@ pub fn App() -> impl IntoView {
         when=move || auth.get().is_some()
         fallback=move || view! { <AuthPage /> }
       >
-        <div class="app flex overflow-hidden">
-          // Sidebar
-          <Sidebar />
+        // The authenticated shell is split into two siblings:
+        //
+        // 1. `.app` — the layout container. It owns
+        //    `view-transition-name: app-root`, which (per the CSS
+        //    Containment & View-Transitions specs) establishes a new
+        //    containing block for `position: fixed` descendants. Any
+        //    overlay rendered *inside* `.app` therefore inherits that
+        //    containing block instead of the viewport, which clipped
+        //    modals to whatever sub-region of `.app` was visible.
+        //
+        // 2. A sibling fragment — overlays (toasts, modals, the call
+        //    overlay, the debug panel). Hoisted here so their
+        //    `position: fixed` resolves against the viewport again.
+        //    This is what makes `InviteMemberModal`, `CreateRoomModal`
+        //    etc. cover the full screen instead of being trapped
+        //    inside the sidebar / chat area.
+        <div>
+          <div class="app flex overflow-hidden">
+            // Sidebar
+            <Sidebar />
 
-          // Main Content Area
-          <main id="main-content" class="flex-1 flex flex-col min-w-0 overflow-hidden">
-            // Top Bar / Header
-            <TopBar />
+            // Main Content Area
+            <main id="main-content" class="flex-1 flex flex-col min-w-0 overflow-hidden">
+              // Top Bar / Header
+              <TopBar />
 
-          // Chat Area
-          <div class="flex-1 overflow-y-auto">
-            <HomePage />
+              // Chat Area
+              <div class="flex-1 overflow-y-auto">
+                <HomePage />
+              </div>
+            </main>
+
+            // Settings drawer -- always mounted so its CSS transition can play
+            <SettingsPage />
           </div>
-        </main>
 
-        // Settings drawer -- always mounted so its CSS transition can play
-        <SettingsPage />
-
-        // Overlays scoped to the authenticated shell
-        <ToastContainer />
-        <ModalManager />
-        <CallOverlay />
-        <IncomingInviteModal />
-        <DebugPanel />
-      </div>
-    </Show>
+          // Overlays scoped to the authenticated shell, but rendered
+          // *outside* `.app` so `view-transition-name: app-root` does
+          // not become their containing block.
+          <ToastContainer />
+          <ModalManager />
+          <CallOverlay />
+          <IncomingInviteModal />
+          <DebugPanel />
+        </div>
+      </Show>
   }
 }

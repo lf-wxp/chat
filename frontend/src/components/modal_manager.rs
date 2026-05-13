@@ -10,7 +10,8 @@ use leptos_i18n::t_string;
 
 use crate::components::room::global_modal_context::GlobalRoomModalState;
 use crate::components::room::{
-  CreateRoomModal, CreateRoomRequest, IncomingRoomInviteModal, PasswordPromptModal,
+  CreateRoomModal, CreateRoomRequest, IncomingRoomInviteModal, InviteMemberModal,
+  PasswordPromptModal,
 };
 use crate::error_handler::use_error_toast_manager;
 use crate::i18n;
@@ -73,6 +74,7 @@ pub fn ModalManager() -> impl IntoView {
     <div id="modal-root">
       <IncomingRoomInviteModal />
       <CreateRoomModal open=modal_state.create_open on_submit=on_create_submit />
+      <InviteMemberModal />
       <Show when=move || modal_state.password_target.with(Option::is_some)>
         <PasswordPromptModal
           title=password_title

@@ -45,6 +45,7 @@ pub use announcement_panel::AnnouncementPanel;
 pub use create_room_modal::{CreateRoomModal, CreateRoomRequest};
 pub use global_modal_context::GlobalRoomModalState;
 pub use incoming_room_invite_modal::IncomingRoomInviteModal;
+pub use invite_member_modal::InviteMemberModal;
 pub use member_list::MemberListPanel;
 pub use muted_indicator::MutedIndicator;
 pub use nickname_editor::NicknameEditor;

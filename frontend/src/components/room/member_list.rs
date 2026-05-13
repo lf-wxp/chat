@@ -15,7 +15,7 @@ use message::UserId;
 use message::types::{MemberInfo, RoomId};
 
 use crate::components::room::confirm_dialog::{ConfirmDialog, ConfirmTone};
-use crate::components::room::invite_member_modal::InviteMemberModal;
+use crate::components::room::global_modal_context::GlobalRoomModalState;
 use crate::components::room::member_history_panel::MemberHistoryPanel;
 use crate::components::room::member_row::MemberRow;
 use crate::components::room::mute_duration_picker::MuteDurationPicker;
@@ -61,8 +61,11 @@ pub fn MemberListPanel(
   const BATCH_MAX: usize = 5;
   // Sprint 5.2 — Owner/Admin moderation history modal.
   let history_open = RwSignal::new(false);
-  // Req 4.3 — Owner "Invite member" modal.
-  let invite_open = RwSignal::new(false);
+  // Req 4.3 — Owner "Invite member" modal. Hosted globally inside
+  // `ModalManager` so the dialog can never be clipped by the sidebar's
+  // `overflow: hidden`. We trigger it by writing to
+  // `GlobalRoomModalState::invite_target`.
+  let modal_state = GlobalRoomModalState::use_global();
 
   // Fallback toast for the "View profile" action — Req 15.4 §35.
   // A dedicated profile card modal will land in a future iteration;
@@ -316,7 +319,11 @@ pub fn MemberListPanel(
             type="button"
             class="btn btn--ghost room-member-list__invite"
             aria-label=move || t_string!(i18n, room.invite_send_label)
-            on:click=move |_| invite_open.set(true)
+            on:click=move |_| {
+              if let Some(room) = current_room.get() {
+                modal_state.invite_target.set(Some(room));
+              }
+            }
             data-testid="room-member-list-invite"
           >
             "✉ "{t!(i18n, room.invite_to_room)}
@@ -573,20 +580,6 @@ pub fn MemberListPanel(
         <MemberHistoryPanel
           room_id=room_id
           on_close=Callback::new(move |()| history_open.set(false))
-        />
-      </Show>
-
-      <Show when=move || invite_open.get() && current_room.get().is_some()>
-        <InviteMemberModal
-          open=invite_open
-          room=Signal::derive(move || current_room.get().unwrap_or_else(|| {
-            message::types::RoomInfo::new(
-              room_id.get(),
-              String::new(),
-              message::types::RoomType::Chat,
-              actor_id.get().unwrap_or_else(message::UserId::new),
-            )
-          }))
         />
       </Show>
 
