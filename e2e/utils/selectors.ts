@@ -86,6 +86,7 @@ export const sel = {
   messageActionCopy: '[data-testid="message-action-copy"]',
   newMessagesBadge: '[data-testid="new-messages-badge"]',
   backToLatestBtn: '[data-testid="back-to-latest"]',
+  replyBlock: '[data-testid="reply-block"]',
 
   // ---- Sticker / image / file pickers ----
   stickerPanel: '[data-testid="sticker-panel"]',

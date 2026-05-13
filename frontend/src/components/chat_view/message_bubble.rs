@@ -571,6 +571,8 @@ fn reply_block(snippet: Option<ReplySnippet>, cbs: BubbleCallbacks) -> AnyView {
       type="button"
       class="message-reply-block"
       aria-label=format!("Jump to message from {sender}")
+      data-testid="reply-block"
+      data-target-id=target.to_string()
       on:click=move |_| cbs.scroll_to.run(target)
     >
       <span class="reply-sender">{sender_label}</span>

@@ -269,9 +269,8 @@ needed). When a wave item lands, replace its status emoji:
   blocked on missing UI (G14 pause/resume, G15 receiver-side
   save-anyway) or a non-E2E-controllable failure injection
   (mid-transfer ICE drop). Reopen once any of G14/G15 ships.
-- [x] P1-6 e2ee-rotation.spec.ts — commit f9e3cf6
-- [ ] P1-7 context-menu-full.spec.ts
-- [ ] P1-7 context-menu-full.spec.ts
+- [x] P1-6 e2ee-rotation.spec.ts — commit 6d3ab54
+- [x] P1-7 context-menu-full.spec.ts — commit 841d785
 - [ ] P2-1 sticker.spec.ts
 - [ ] P2-2 voice-message.spec.ts
 - [ ] P2-3 image-message.spec.ts
