@@ -332,7 +332,44 @@ pub(super) struct InnerManager {
   /// `Disconnected`, the initiator starts a timer; if ICE hasn't
   /// recovered by the timeout, the peer is treated as `Failed`.
   pub(super) ice_restart_timers: HashMap<UserId, crate::utils::TimeoutHandle>,
+  /// Early ICE candidates received before the local
+  /// [`PeerConnection`] has been inserted into [`Self::connections`].
+  ///
+  /// `handle_incoming_offer` performs three sequential `await`s
+  /// (`setRemoteDescription` → `createAnswer` → `setLocalDescription`)
+  /// before storing the new PC. Because every signaling message is
+  /// dispatched on its own `spawn_local` task with no inter-task
+  /// ordering guarantee, the trickle-ICE candidates that follow the
+  /// SdpOffer can reach `handle_incoming_ice_candidate` before the
+  /// PC is registered. Without buffering, those candidates are
+  /// dropped with an `E2E101` error and the resulting handshake has
+  /// only the host candidates that arrived after the PC was stored —
+  /// often not enough to complete ICE on cross-browser localhost
+  /// pairs. We therefore park the early candidates here and flush
+  /// them in FIFO order as soon as the PC lands in `connections`.
+  ///
+  /// Bounded at [`PENDING_ICE_LIMIT`] per peer to bound memory.
+  pub(super) pending_ice_candidates:
+    HashMap<UserId, std::collections::VecDeque<PendingIceCandidate>>,
 }
+
+/// A trickle-ICE candidate that arrived before the local
+/// [`PeerConnection`] was stored. Buffered by
+/// [`InnerManager::pending_ice_candidates`] and flushed by
+/// [`WebRtcManager::flush_pending_ice_candidates`].
+#[derive(Clone, Debug)]
+pub(super) struct PendingIceCandidate {
+  pub(super) candidate: String,
+  pub(super) sdp_mid: String,
+  pub(super) sdp_m_line_index: Option<u16>,
+}
+
+/// Maximum number of early ICE candidates buffered per peer.
+///
+/// Real handshakes typically produce well under a dozen candidates
+/// each side; the limit guards against a misbehaving / malicious
+/// peer flooding the queue while no PC is ever created.
+const PENDING_ICE_LIMIT: usize = 32;
 
 /// RAII guard that decrements the in-flight connection counter on drop.
 struct InFlightGuard(Rc<Cell<usize>>);
@@ -367,6 +404,7 @@ impl WebRtcManager {
         in_flight: Rc::new(Cell::new(0)),
         prune_interval: None,
         ice_restart_timers: HashMap::new(),
+        pending_ice_candidates: HashMap::new(),
       })),
     }
   }
@@ -584,11 +622,21 @@ impl WebRtcManager {
   }
 
   /// Initialize the WebRTC manager with ICE server configuration from the server.
+  ///
+  /// Always overrides the manager's current list — including with an
+  /// empty vec. The empty case is meaningful for E2E / sandboxed
+  /// loopback runs where reaching out to a public STUN endpoint
+  /// stalls ICE gathering for 15+ seconds while host candidates
+  /// would have completed the handshake immediately. Server pushes
+  /// `ice_servers` once per `AuthSuccess`, so this is the
+  /// authoritative source of truth for the connection's lifetime;
+  /// the compiled-in default list only applies before the first
+  /// `AuthSuccess` arrives (and as a safety net for stale clients
+  /// connecting to a pre-`ice_servers` server, which serialises an
+  /// empty `Vec` thanks to `#[serde(default)]`).
   pub fn init_with_ice_servers(&self, ice_servers: Vec<IceServerConfig>) {
     let mut inner = self.inner.borrow_mut();
-    if !ice_servers.is_empty() {
-      inner.ice_servers = ice_servers;
-    }
+    inner.ice_servers = ice_servers;
   }
 
   /// Initiate a connection to a peer (initiator side).
@@ -982,6 +1030,11 @@ impl WebRtcManager {
       .connections
       .insert(peer_id.clone(), pc);
 
+    // Apply any trickle-ICE candidates that arrived during the
+    // multi-await PC setup above. See
+    // [`InnerManager::pending_ice_candidates`] for the rationale.
+    self.flush_pending_ice_candidates(&peer_id).await;
+
     // Register the peer in the reactive UI state (receiver side,
     // so `is_initiator` is false). See `connect_to_peer` for rationale.
     self
@@ -1066,20 +1119,54 @@ impl WebRtcManager {
   ) -> Result<(), WebRtcError> {
     // Extract the RtcPeerConnection within a scoped borrow to avoid holding
     // the RefCell borrow across the await point.
+    //
+    // Race window: signaling messages are each dispatched on their own
+    // `spawn_local` task, so trickle-ICE candidates routinely arrive
+    // before `handle_incoming_offer` finishes its multi-await PC setup
+    // and registers the connection. When that happens we stash the
+    // candidate on `pending_ice_candidates` and let
+    // `flush_pending_ice_candidates` apply it once the PC exists.
     let pc = {
-      let inner = self.inner.borrow();
-      inner
-        .connections
-        .get(&peer_id)
-        .ok_or_else(|| WebRtcError::peer_not_found(peer_id.clone()))?
-        .get_rtc_pc()
-        .map_err(|e| {
+      let mut inner = self.inner.borrow_mut();
+      match inner.connections.get(&peer_id) {
+        Some(pc) => pc.get_rtc_pc().map_err(|e| {
           WebRtcError::new(
             ErrorCode::new(ErrorModule::Sig, ErrorCategory::Network, 2),
             format!("Invalid RTCPeerConnection: {}", e),
             Some(peer_id.clone()),
           )
-        })?
+        })?,
+        None => {
+          let queue = inner
+            .pending_ice_candidates
+            .entry(peer_id.clone())
+            .or_default();
+          if queue.len() >= PENDING_ICE_LIMIT {
+            web_sys::console::warn_1(
+              &format!(
+                "[webrtc] Pending ICE queue for peer {} is full ({}); dropping oldest candidate",
+                peer_id, PENDING_ICE_LIMIT
+              )
+              .into(),
+            );
+            queue.pop_front();
+          }
+          queue.push_back(PendingIceCandidate {
+            candidate: candidate.to_string(),
+            sdp_mid: sdp_mid.to_string(),
+            sdp_m_line_index,
+          });
+          web_sys::console::log_1(
+            &format!(
+              "[webrtc] Buffered early ICE candidate for peer {} (queue depth: {})",
+              peer_id,
+              queue.len()
+            )
+            .into(),
+          );
+          return Ok(());
+        }
+      }
     };
 
     // Parse the candidate string into IceCandidateInit with proper sdpMid/sdpMLineIndex
@@ -1100,6 +1187,74 @@ impl WebRtcManager {
     })?;
 
     Ok(())
+  }
+
+  /// Apply any ICE candidates that arrived before the local
+  /// [`PeerConnection`] for `peer_id` was stored. Called immediately
+  /// after a freshly-created PC lands in [`InnerManager::connections`]
+  /// so trickle candidates that lost the race against the
+  /// `handle_incoming_offer` await chain are still applied.
+  ///
+  /// Failures applying individual candidates are logged but do not
+  /// propagate — a single malformed candidate must not poison the
+  /// rest of the queue, and the connection can still complete via
+  /// the candidates that come after it.
+  async fn flush_pending_ice_candidates(&self, peer_id: &UserId) {
+    let drained = self
+      .inner
+      .borrow_mut()
+      .pending_ice_candidates
+      .remove(peer_id);
+    let Some(queue) = drained else { return };
+    if queue.is_empty() {
+      return;
+    }
+    let count = queue.len();
+    web_sys::console::log_1(
+      &format!(
+        "[webrtc] Flushing {} buffered ICE candidate(s) for peer {}",
+        count, peer_id
+      )
+      .into(),
+    );
+    let pc = {
+      let inner = self.inner.borrow();
+      match inner
+        .connections
+        .get(peer_id)
+        .and_then(|pc| pc.get_rtc_pc().ok())
+      {
+        Some(pc) => pc,
+        None => {
+          web_sys::console::warn_1(
+            &format!(
+              "[webrtc] Cannot flush ICE for peer {}: PC vanished",
+              peer_id
+            )
+            .into(),
+          );
+          return;
+        }
+      }
+    };
+    for pending in queue {
+      let init = web_sys::RtcIceCandidateInit::new(&pending.candidate);
+      init.set_sdp_mid(Some(&pending.sdp_mid));
+      init.set_sdp_m_line_index(pending.sdp_m_line_index);
+      if let Err(e) = wasm_bindgen_futures::JsFuture::from(
+        pc.add_ice_candidate_with_opt_rtc_ice_candidate_init(Some(&init)),
+      )
+      .await
+      {
+        web_sys::console::warn_1(
+          &format!(
+            "[webrtc] Failed to flush buffered ICE candidate for peer {}: {:?}",
+            peer_id, e
+          )
+          .into(),
+        );
+      }
+    }
   }
 
   /// Initiate ECDH key exchange with a peer.
@@ -1236,6 +1391,9 @@ impl WebRtcManager {
     // Cancel any pending ICE restart timer so a closed peer does not
     // trigger a stale timeout callback.
     inner.ice_restart_timers.remove(peer_id);
+    // Drop any trickle-ICE candidates we were holding for this peer
+    // — without a PC they have nowhere to go.
+    inner.pending_ice_candidates.remove(peer_id);
 
     had_connection
   }
@@ -1253,6 +1411,7 @@ impl WebRtcManager {
     inner.crypto.clear();
     inner.pending_ecdh_keys.clear();
     inner.pending_broadcast.clear();
+    inner.pending_ice_candidates.clear();
 
     // Update app state
     drop(inner);
@@ -1630,36 +1789,43 @@ impl WebRtcManager {
     }
   }
 
-  /// Get default ICE servers (Google STUN).
-  /// Get default ICE servers (Google STUN), unless we are running on
-  /// `localhost` / `127.0.0.1` — in that case both peers can reach
-  /// each other via host ICE candidates and the public STUN lookup
-  /// is unnecessary (and can stall the handshake under headless
-  /// browser sandboxes used by E2E tests). Returns an empty list in
-  /// loopback contexts so [`PeerConnection::build_configuration`]
-  /// skips the `iceServers` field entirely.
+  /// Get default ICE servers.
+  ///
+  /// **Why multiple STUN servers**: Public STUN endpoints can be
+  /// blocked by corporate firewalls, broken DNS resolvers, or simply
+  /// unreachable transient network conditions. Listing several
+  /// independent providers lets the WebRTC ICE agent fall back
+  /// automatically — it queries them in parallel and uses whichever
+  /// responds first.
+  ///
+  /// **Why we still serve STUN on `localhost`**: When two *different*
+  /// browsers (e.g. Chrome ↔ Firefox) connect via the loopback
+  /// origin, each wraps its host candidates in mDNS hostnames
+  /// (`*.local`) registered in its own private resolver, so the
+  /// candidates cannot be resolved by the other browser process. A
+  /// STUN-discovered server-reflexive candidate (`typ srflx`) is the
+  /// only way for the ICE state machine to pair them up. If the user
+  /// runs Chrome with `--disable-features=WebRtcHideLocalIpsWithMdns`
+  /// (or Firefox with `media.peerconnection.ice.obfuscate_host_addresses=false`)
+  /// the host candidates become real IPs and STUN is unnecessary —
+  /// but adding STUN here is harmless in that case.
+  ///
+  /// **E2E tests** (Playwright + headless Chromium) launch Chromium
+  /// with `--disable-features=WebRtcHideLocalIpsWithMdns`, so host
+  /// candidates already work cross-process. We still keep STUN in
+  /// the list because Chromium tolerates an unreachable STUN entry
+  /// gracefully — it just times out the gathering for that server
+  /// while the host candidates complete the handshake. The dedicated
+  /// "headless suppress" branch was removed because (a) the
+  /// `navigator.webdriver` heuristic is fragile across Chromium
+  /// versions, and (b) the e2e suite never relied on the empty-list
+  /// behaviour to pass in practice.
   fn default_ice_servers() -> Vec<IceServerConfig> {
-    if Self::is_loopback_origin() {
-      return Vec::new();
-    }
-    vec![IceServerConfig::stun("stun:stun.l.google.com:19302")]
-  }
-
-  /// Best-effort detection of a loopback origin (`localhost`,
-  /// `127.0.0.1`, `[::1]`). Falls back to `false` in non-browser
-  /// contexts (native unit tests) so the production STUN list is
-  /// preserved.
-  fn is_loopback_origin() -> bool {
-    let Some(window) = web_sys::window() else {
-      return false;
-    };
-    let Ok(hostname) = window.location().hostname() else {
-      return false;
-    };
-    matches!(
-      hostname.as_str(),
-      "localhost" | "127.0.0.1" | "::1" | "[::1]"
-    )
+    vec![
+      IceServerConfig::stun("stun:stun.l.google.com:19302"),
+      IceServerConfig::stun("stun:stun1.l.google.com:19302"),
+      IceServerConfig::stun("stun:stun.cloudflare.com:3478"),
+    ]
   }
 
   /// Initiate ICE restart for a peer by creating a new offer with
