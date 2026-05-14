@@ -254,6 +254,11 @@ where
             user_id: user_id.clone(),
             username: auth_success.username,
             nickname: auth_success.nickname,
+            // Push the deployment-configured ICE servers
+            // (`STUN_TURN_SERVERS`) to the client so intranet
+            // STUN/TURN endpoints can be set per environment without
+            // a frontend rebuild. Empty → client keeps its default.
+            ice_servers: ws_state.ice_server_specs(),
           });
           if let Ok(encoded) = encode_signaling_message(&success_msg)
             && socket_tx

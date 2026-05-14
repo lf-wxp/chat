@@ -338,6 +338,11 @@ impl UserStore {
       user_id,
       username: claims.username,
       nickname,
+      // ICE servers are filled in by the WS handler — the auth
+      // module deliberately does not depend on `Config` so that
+      // standalone unit tests of the auth flow stay narrow. The
+      // response is augmented just before being sent on the wire.
+      ice_servers: Vec::new(),
     })
   }
 

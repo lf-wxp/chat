@@ -13,7 +13,9 @@ pub mod user;
 pub mod webrtc;
 
 // Re-export all message types at the signaling module level for convenience.
-pub use auth::{AuthFailure, AuthSuccess, Ping, Pong, SessionInvalidated, TokenAuth, UserLogout};
+pub use auth::{
+  AuthFailure, AuthSuccess, IceServerSpec, Ping, Pong, SessionInvalidated, TokenAuth, UserLogout,
+};
 pub use call::{CallAccept, CallDecline, CallEnd, CallInvite};
 pub use invite::{ConnectionInvite, InviteAccepted, InviteDeclined, InviteTimeout, MultiInvite};
 pub use moderation::{

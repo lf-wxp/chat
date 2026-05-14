@@ -207,6 +207,7 @@ fn test_auth_messages_are_connection_handled() {
     user_id: UserId::new(),
     username: "user".to_string(),
     nickname: "user".to_string(),
+    ice_servers: Vec::new(),
   });
   let auth_failure = SignalingMessage::AuthFailure(AuthFailure {
     reason: "invalid".to_string(),

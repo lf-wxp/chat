@@ -53,7 +53,27 @@ pub struct Config {
 
   // ICE configuration
   /// STUN/TURN servers configuration for WebRTC.
+  ///
+  /// Pushed to every authenticated client inside `AuthSuccess`. The
+  /// list is the *base* list — the runtime auto-prepends an entry
+  /// pointing at the embedded STUN service (see [`Self::stun_port`])
+  /// so a fresh deployment serves WebRTC peers on a closed LAN with
+  /// **zero configuration**.
   pub ice_servers: Vec<String>,
+
+  /// UDP port for the embedded STUN service.
+  ///
+  /// `Some(port)` — bind on `0.0.0.0:port`. The default `3478` is
+  /// the IANA-assigned STUN port; pick any other value if the host
+  /// already runs another STUN/coturn instance.
+  ///
+  /// `None` — disable the embedded STUN entirely. Use this when
+  /// deploying behind a load balancer that already forwards to a
+  /// dedicated STUN/TURN cluster.
+  ///
+  /// Configured via the `STUN_PORT` environment variable
+  /// (`STUN_PORT=0` ⇒ disabled).
+  pub stun_port: Option<u16>,
 
   // TLS configuration
   /// Optional TLS configuration for secure connections.
@@ -111,20 +131,47 @@ impl Config {
     let jwt_secret =
       env::var("JWT_SECRET").unwrap_or_else(|_| "dev-secret-change-in-production".to_string());
 
+    // Embedded STUN port. `STUN_PORT=0` disables the embedded
+    // service so an external coturn deployment can take over.
+    let stun_port = match env::var("STUN_PORT") {
+      Ok(s) => match s.trim().parse::<u16>() {
+        Ok(0) => None,
+        Ok(p) => Some(p),
+        Err(_) => Some(3478),
+      },
+      Err(_) => Some(3478),
+    };
+
     // ICE servers configuration
     //
-    // `STUN_TURN_SERVERS` is a comma-separated list of ICE URLs. An
-    // *empty* value (`STUN_TURN_SERVERS=`) is treated as "no ICE
+    // `STUN_TURN_SERVERS` is a comma-separated list of ICE URLs.
+    //
+    // **Zero-config behaviour** (env var unset): we synthesise a
+    // list that works on **both** a closed LAN (the embedded STUN
+    // entry, auto-discovered host IP) and the open internet (Google
+    // public STUN as a fallback). The browser ICE agent queries all
+    // entries in parallel and uses whichever responds first, so a
+    // mismatched entry is harmless — it just times out.
+    //
+    // An *empty* value (`STUN_TURN_SERVERS=`) is treated as "no ICE
     // servers" rather than `vec![""]`, which matters for E2E tests
-    // that run both peers on `127.0.0.1` — host candidates alone are
-    // enough and reaching out to a public STUN server can stall ICE
+    // that run both peers on `127.0.0.1` — host candidates alone
+    // suffice and reaching out to a public STUN server stalls ICE
     // gathering in sandboxed CI environments.
+    //
+    // An explicitly-provided non-empty list overrides the default
+    // entirely so production deployments can point at a dedicated
+    // STUN/TURN cluster without inheriting the embedded entries.
     let ice_servers = env::var("STUN_TURN_SERVERS").map_or_else(
       |_| {
-        vec![
-          "stun:stun.l.google.com:19302".to_string(),
-          "stun:stun1.l.google.com:19302".to_string(),
-        ]
+        let mut list = Vec::new();
+        if let Some(port) = stun_port {
+          let lan = crate::stun::detect_lan_ipv4();
+          list.push(format!("stun:{lan}:{port}"));
+        }
+        list.push("stun:stun.l.google.com:19302".to_string());
+        list.push("stun:stun1.l.google.com:19302".to_string());
+        list
       },
       |s| {
         s.split(',')
@@ -191,6 +238,7 @@ impl Config {
       addr,
       jwt_secret,
       ice_servers,
+      stun_port,
       tls,
       static_dir,
       stickers_dir,

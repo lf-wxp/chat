@@ -79,6 +79,7 @@ async fn test_websocket_auth_valid_token() {
       user_id: resp_user_id,
       username,
       nickname,
+      ..
     }) => {
       assert_eq!(resp_user_id, user_id);
       assert_eq!(username, "testuser2");
@@ -268,6 +269,7 @@ async fn test_tokenauth_recovery() {
         user_id: resp_user_id,
         username,
         nickname,
+        ..
       })) => {
         assert_eq!(resp_user_id, user_id);
         assert_eq!(username, "testuser5");

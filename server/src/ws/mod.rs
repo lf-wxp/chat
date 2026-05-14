@@ -127,6 +127,24 @@ impl WebSocketState {
       .map(|entry| entry.value().clone())
   }
 
+  /// Snapshot of the deployment-configured ICE server list.
+  ///
+  /// Sourced from the `STUN_TURN_SERVERS` environment variable
+  /// (parsed into [`Config::ice_servers`] at startup) and pushed
+  /// to every authenticated client inside [`AuthSuccess`] so that
+  /// intranet STUN/TURN endpoints can be configured without a
+  /// frontend rebuild. An empty list tells clients to fall back to
+  /// their compiled-in default.
+  #[must_use]
+  pub fn ice_server_specs(&self) -> Vec<message::signaling::IceServerSpec> {
+    self
+      .config
+      .ice_servers
+      .iter()
+      .filter_map(|raw| parse_ice_server_url(raw))
+      .collect()
+  }
+
   /// Check if a user is connected.
   #[must_use]
   pub fn is_connected(&self, user_id: &UserId) -> bool {
@@ -401,3 +419,46 @@ async fn handle_socket(socket: WebSocket, ws_state: Arc<WebSocketState>, remote_
 
 #[cfg(test)]
 mod tests;
+
+/// Parse an ICE server URL of the form
+/// `<scheme>:<host>:<port>[?username=...&credential=...]` into a
+/// wire-friendly [`message::signaling::IceServerSpec`].
+///
+/// Returns `None` for unsupported schemes so that a misconfigured
+/// entry cannot break the auth handshake — the rest of the list
+/// still flows through and the client logs a warning when the
+/// resulting list is empty (handled in
+/// `WebRtcManager::init_with_ice_servers`).
+fn parse_ice_server_url(raw: &str) -> Option<message::signaling::IceServerSpec> {
+  let trimmed = raw.trim();
+  if trimmed.is_empty() {
+    return None;
+  }
+  let scheme_end = trimmed.find(':')?;
+  let scheme = &trimmed[..scheme_end];
+  if !matches!(scheme, "stun" | "stuns" | "turn" | "turns") {
+    return None;
+  }
+  let (url_part, query) = match trimmed.find('?') {
+    Some(idx) => (&trimmed[..idx], Some(&trimmed[idx + 1..])),
+    None => (trimmed, None),
+  };
+  let mut username = None;
+  let mut credential = None;
+  if let Some(qs) = query {
+    for pair in qs.split('&') {
+      if let Some((k, v)) = pair.split_once('=') {
+        match k {
+          "username" => username = Some(v.to_string()),
+          "credential" => credential = Some(v.to_string()),
+          _ => {}
+        }
+      }
+    }
+  }
+  Some(message::signaling::IceServerSpec {
+    url: url_part.to_string(),
+    username,
+    credential,
+  })
+}

@@ -72,11 +72,15 @@ fn test_default_ice_servers() {
 }
 
 #[test]
-fn test_init_with_empty_ice_servers_keeps_defaults() {
+fn test_init_with_empty_ice_servers_overrides_defaults() {
   let app_state = test_app_state();
   let manager = WebRtcManager::new(app_state);
 
-  // Empty vec should not overwrite defaults
+  // The server is authoritative for ICE server configuration; an
+  // explicitly empty `Vec` is a meaningful signal ("use host
+  // candidates only" — see the doc-comment on
+  // `init_with_ice_servers`) and must override the compiled-in
+  // default rather than being silently ignored.
   manager.init_with_ice_servers(vec![]);
   assert_eq!(manager.connection_count(), 0);
 }

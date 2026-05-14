@@ -122,6 +122,12 @@ export async function startServer(): Promise<ServerInstance> {
     // CI environments, causing the peer connection to stay in
     // `Connecting` until it times out as `Failed` ~15 s later.
     STUN_TURN_SERVERS: '',
+    // Disable the embedded STUN service. Without this, the parallel
+    // E2E workers would race each other for UDP port 3478 — the
+    // first wins, the rest log a startup warning and clients fall
+    // back to host candidates anyway, but we'd be relying on flaky
+    // ordering. Setting `STUN_PORT=0` skips the bind altogether.
+    STUN_PORT: '0',
   };
 
   const child: ChildProcess = spawn(SERVER_BINARY, [], {

@@ -6,6 +6,7 @@ pub mod discovery;
 pub mod logging;
 pub mod room;
 pub mod server;
+pub mod stun;
 pub mod ws;
 
 pub use auth::UserStore;

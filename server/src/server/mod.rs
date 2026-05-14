@@ -11,7 +11,7 @@ use tokio_util::sync::CancellationToken;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::auth::UserStore;
 use crate::auth::handlers;
@@ -123,6 +123,25 @@ impl Server {
       stickers_dir = %self.config.stickers_dir.display(),
       "Server configured"
     );
+
+    // Spawn the embedded STUN service (RFC 5389 Binding subset)
+    // unless explicitly disabled. The bind port is taken from
+    // `Config::stun_port`; setting it to `0` turns the embedded
+    // server off so a separately-deployed coturn can take over.
+    if let Some(stun_port) = self.config.stun_port {
+      let stun_addr = SocketAddr::from((std::net::Ipv4Addr::UNSPECIFIED, stun_port));
+      match crate::stun::spawn(stun_addr).await {
+        Ok(()) => {}
+        Err(e) => {
+          warn!(
+            error = %e,
+            stun_port = stun_port,
+            "Failed to start embedded STUN server — clients will fall back \
+             to the configured public STUN list"
+          );
+        }
+      }
+    }
 
     // Create TCP listener
     let listener = tokio::net::TcpListener::bind(addr).await?;

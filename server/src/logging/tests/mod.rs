@@ -7,6 +7,7 @@ pub(super) fn create_test_config(temp_dir: &TempDir, log_output: &str) -> crate:
     addr: "0.0.0.0:3000".parse().unwrap(),
     jwt_secret: "test-secret".to_string(),
     ice_servers: vec![],
+    stun_port: None,
     tls: None,
     static_dir: std::path::PathBuf::from("./static"),
     stickers_dir: std::path::PathBuf::from("./stickers"),

@@ -257,6 +257,31 @@ impl SignalingClient {
     utils::save_to_local_storage(crate::auth::KEY_USER_ID, &auth_success.user_id.to_string());
     utils::save_to_local_storage(crate::auth::KEY_USERNAME, &auth_success.username);
 
+    // Apply server-pushed ICE servers. The server is authoritative
+    // for the deployment's `STUN_TURN_SERVERS` setting (including
+    // an *explicitly empty* list — the canonical "use host
+    // candidates only" mode for sandboxed loopback / E2E runs).
+    // We therefore call `init_with_ice_servers` unconditionally so
+    // an empty list reliably suppresses the public-STUN fallback
+    // built into `WebRtcManager::default_ice_servers`.
+    if let Some(manager) = crate::webrtc::try_use_webrtc_manager() {
+      let servers: Vec<crate::webrtc::IceServerConfig> = auth_success
+        .ice_servers
+        .iter()
+        .map(
+          |spec| match (spec.username.as_deref(), spec.credential.as_deref()) {
+            (Some(u), Some(c)) => crate::webrtc::IceServerConfig::turn(&spec.url, u, c),
+            _ => crate::webrtc::IceServerConfig::stun(&spec.url),
+          },
+        )
+        .collect();
+      console_log(&format!(
+        "[signaling] Applying {} server-provided ICE server(s)",
+        servers.len()
+      ));
+      manager.init_with_ice_servers(servers);
+    }
+
     // If we are in a reconnection flow (banner visible), switch
     // the recovery phase to "Restoring connections..." now that auth has
     // succeeded, so the banner text changes from "Reconnecting..." to

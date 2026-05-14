@@ -13,6 +13,7 @@ fn test_signaling_message_discriminator() {
     user_id: UserId::new(),
     username: "alice".to_string(),
     nickname: "alice".to_string(),
+    ice_servers: Vec::new(),
   });
   assert_eq!(msg.discriminator(), 0x01);
 
@@ -56,6 +57,7 @@ fn create_auth_session_discriminators() -> Vec<u8> {
       user_id: UserId::new(),
       username: String::new(),
       nickname: String::new(),
+      ice_servers: Vec::new(),
     })
     .discriminator(),
     SignalingMessage::AuthFailure(AuthFailure {
@@ -298,6 +300,7 @@ fn create_auth_session_messages() -> Vec<SignalingMessage> {
       user_id: UserId::new(),
       username: String::new(),
       nickname: String::new(),
+      ice_servers: Vec::new(),
     }),
     SignalingMessage::AuthFailure(AuthFailure {
       reason: String::new(),
