@@ -120,18 +120,37 @@ pub fn ModalWrapper(
 
   let backdrop_ref: NodeRef<leptos::html::Div> = NodeRef::new();
 
+  // Token shared with the latest pending exit animation; bumping the
+  // counter when reopening invalidates any in-flight cleanup so a
+  // late-arriving safety timeout from the previous close cannot
+  // unmount the freshly-reopened dialog.
+  let exit_token = StoredValue::new(0u32);
+
   // --- Controlled mode: react to open signal changes ---
   if let Some(open_sig) = open {
     Effect::new(move |_| {
       let is_open = open_sig.get();
       if is_open {
-        // Opening: mark mounted and schedule visible on next frame.
+        // Opening (or re-opening before the previous close finished):
+        // bump the exit token so any pending safety timer is no-op'd,
+        // then drive mounted/closing back to a clean entry state.
+        exit_token.update_value(|t| *t = t.wrapping_add(1));
         mounted.set(true);
         closing.set(false);
         schedule_visible(visible);
       } else if visible.get_untracked() || mounted.get_untracked() {
         // Closing: start exit animation.
-        start_exit_animation(visible, closing, mounted, backdrop_ref, on_close);
+        exit_token.update_value(|t| *t = t.wrapping_add(1));
+        let token = exit_token.get_value();
+        start_exit_animation(
+          visible,
+          closing,
+          mounted,
+          backdrop_ref,
+          on_close,
+          exit_token,
+          token,
+        );
       }
     });
   } else {
@@ -159,7 +178,17 @@ pub fn ModalWrapper(
         ev.stop_propagation();
         if open.is_some() {
           // In controlled mode, trigger exit animation.
-          start_exit_animation(visible, closing, mounted, backdrop_ref, on_close);
+          exit_token.update_value(|t| *t = t.wrapping_add(1));
+          let token = exit_token.get_value();
+          start_exit_animation(
+            visible,
+            closing,
+            mounted,
+            backdrop_ref,
+            on_close,
+            exit_token,
+            token,
+          );
         } else {
           on_close.run(());
         }
@@ -175,22 +204,38 @@ pub fn ModalWrapper(
   let testid = testid.unwrap_or_else(|| "modal-dialog".to_string());
   let dialog_role = dialog_role.unwrap_or_else(|| "dialog".to_string());
 
-  // Portal's children closure is `Fn + Send + Sync`, so any owned
-  // String / Callback we capture has to be `Clone` (and live behind
-  // an `Arc` if it isn't `Copy`). We wrap the per-instance strings
-  // here so the children closure can clone them on every rebuild.
-  let dialog_class = std::sync::Arc::<str>::from(dialog_class);
-  let testid = std::sync::Arc::<str>::from(testid);
-  let dialog_role = std::sync::Arc::<str>::from(dialog_role);
-  let labelled_by = std::sync::Arc::<str>::from(labelled_by);
+  // Portal's / Show's children closures are `Fn + Send + Sync`, so
+  // every owned non-`Copy` value we capture has to live behind a
+  // `Copy` handle. Wrapping the per-instance strings in
+  // `StoredValue` makes them trivially capturable (they become
+  // `Copy`) without losing identity across re-renders.
+  let dialog_class = StoredValue::new(dialog_class);
+  let testid = StoredValue::new(testid);
+  let dialog_role = StoredValue::new(dialog_role);
+  let labelled_by = StoredValue::new(labelled_by);
+  // Park the `ChildrenFn` (an `Arc<dyn Fn>`) in a `StoredValue` so
+  // it becomes `Copy` for the purposes of closure capture. Without
+  // this trampoline the surrounding `view!` closure (which `<Show>`
+  // / `<Portal>` both demand to be `Fn`) would consume `children`
+  // by-move and end up `FnOnce`.
+  let children = StoredValue::new(children);
 
   // In controlled mode, we need to decide whether to render at all.
-  // We use `display: none` on the backdrop to hide it when not mounted.
-  let should_display = move || {
+  // We must remove the DOM nodes entirely (rather than `display: none`)
+  // so that:
+  //   1. `data-testid` queries do not match while the modal is closed —
+  //      otherwise Playwright's `toHaveCount(0)` for an inert modal
+  //      fails because the dialog `<div>` is still in the tree.
+  //   2. A stale backdrop cannot intercept pointer events on the next
+  //      modal that opens immediately after this one closes.
+  // Conditionally-mount mode ignores the signal — the parent uses
+  // `<Show>` to drive presence, so we always render here.
+  let should_render = move || {
     if open.is_some() { mounted.get() } else { true }
   };
 
-  // Backdrop click handler.
+  // Backdrop click handler. Captures only `Copy` values, so it is
+  // already `Fn`/`FnMut` and can live at function scope.
   let handle_backdrop_click = move |_| {
     if !dismiss_on_backdrop_click {
       return;
@@ -199,7 +244,17 @@ pub fn ModalWrapper(
       return;
     }
     if open.is_some() {
-      start_exit_animation(visible, closing, mounted, backdrop_ref, on_close);
+      exit_token.update_value(|t| *t = t.wrapping_add(1));
+      let token = exit_token.get_value();
+      start_exit_animation(
+        visible,
+        closing,
+        mounted,
+        backdrop_ref,
+        on_close,
+        exit_token,
+        token,
+      );
     } else {
       on_close.run(());
     }
@@ -224,37 +279,32 @@ pub fn ModalWrapper(
 
   view! {
     <leptos::portal::Portal mount=mount>
-      <div
-        node_ref=backdrop_ref
-        class=move || {
-          if visible.get() {
-            "modal-backdrop modal-backdrop-visible"
-          } else {
-            "modal-backdrop"
-          }
-        }
-        style=move || {
-          if should_display() {
-            ""
-          } else {
-            "display:none"
-          }
-        }
-        role="presentation"
-        data-testid="modal-wrapper-backdrop"
-        on:click=handle_backdrop_click
-      >
+      <Show when=should_render>
         <div
-          class=dialog_class.to_string()
-          role=dialog_role.to_string()
-          aria-modal="true"
-          aria-labelledby=labelled_by.to_string()
-          on:click=|ev| ev.stop_propagation()
-          data-testid=testid.to_string()
+          node_ref=backdrop_ref
+          class=move || {
+            if visible.get() {
+              "modal-backdrop modal-backdrop-visible"
+            } else {
+              "modal-backdrop"
+            }
+          }
+          role="presentation"
+          data-testid="modal-wrapper-backdrop"
+          on:click=handle_backdrop_click
         >
-          {children()}
+          <div
+            class=move || dialog_class.with_value(|s| s.clone())
+            role=move || dialog_role.with_value(|s| s.clone())
+            aria-modal="true"
+            aria-labelledby=move || labelled_by.with_value(|s| s.clone())
+            on:click=|ev| ev.stop_propagation()
+            data-testid=move || testid.with_value(|s| s.clone())
+          >
+            {move || children.with_value(|c| c())}
+          </div>
         </div>
-      </div>
+      </Show>
     </leptos::portal::Portal>
   }
 }
@@ -278,12 +328,20 @@ fn schedule_visible(visible: RwSignal<bool>) {
 
 /// Begin the exit animation: remove the visible class, then fire `on_close`
 /// after the CSS transition ends (or a safety timeout).
+///
+/// `exit_token` + `my_token` are used to abort late-arriving cleanup
+/// when the modal is reopened mid-close. Each new exit invocation
+/// bumps the shared token; the timer / transitionend callbacks read
+/// the current token before mutating signals and bail out if it has
+/// changed (= someone else has taken over the lifecycle).
 fn start_exit_animation(
   visible: RwSignal<bool>,
   closing: RwSignal<bool>,
   mounted: RwSignal<bool>,
   backdrop_ref: NodeRef<leptos::html::Div>,
   on_close: Callback<()>,
+  exit_token: StoredValue<u32>,
+  my_token: u32,
 ) {
   if closing.get_untracked() {
     return; // already closing
@@ -299,12 +357,18 @@ fn start_exit_animation(
   // Safety timeout — fire callback even if transitionend is swallowed.
   let fired_timeout = fired.clone();
   let timeout_closure = Closure::once(move || {
-    if !fired_timeout.get() {
-      fired_timeout.set(true);
-      mounted.set(false);
-      closing.set(false);
-      on_close.run(());
+    if fired_timeout.get() {
+      return;
     }
+    if exit_token.get_value() != my_token {
+      // The modal was reopened (or another close superseded ours)
+      // before the safety timer fired. Do not clobber the new state.
+      return;
+    }
+    fired_timeout.set(true);
+    mounted.set(false);
+    closing.set(false);
+    on_close.run(());
   });
   if let Some(win) = web_sys::window() {
     let _ = win.set_timeout_with_callback_and_timeout_and_arguments_0(
@@ -318,12 +382,16 @@ fn start_exit_animation(
   if let Some(el) = backdrop_ref.get_untracked() {
     let fired_te = fired.clone();
     let te_closure = Closure::<dyn FnMut(web_sys::Event)>::new(move |_ev: web_sys::Event| {
-      if !fired_te.get() {
-        fired_te.set(true);
-        mounted.set(false);
-        closing.set(false);
-        on_close.run(());
+      if fired_te.get() {
+        return;
       }
+      if exit_token.get_value() != my_token {
+        return;
+      }
+      fired_te.set(true);
+      mounted.set(false);
+      closing.set(false);
+      on_close.run(());
     });
     let _ =
       el.add_event_listener_with_callback("transitionend", te_closure.as_ref().unchecked_ref());

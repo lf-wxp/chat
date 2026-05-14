@@ -50,7 +50,14 @@ test.describe('invitation edge cases', () => {
     // handler is a plain modal-close — unlike the incoming-invite
     // modal which declines the invite.
     await pageB.keyboard.press('Escape');
-    await expect(pageB.locator(sel.userInfoCard)).toHaveCount(0, { timeout: 5_000 });
+    // Wait for the backdrop to fully disappear before proceeding
+    await pageB.locator(sel.userInfoBackdrop).waitFor({ state: 'hidden', timeout: 10_000 });
+
+    // Capture B's console logs to debug the blacklist check.
+    const bLogs: string[] = [];
+    pageB.on('console', (msg) => {
+      bLogs.push(msg.text());
+    });
 
     // A sends an invite to B.
     const rowOnA = await waitForOnlineUser(pageA, b.username);
@@ -58,8 +65,17 @@ test.describe('invitation edge cases', () => {
     await pageA.locator(sel.userInfoCard).waitFor({ state: 'visible' });
     await pageA.locator(sel.userInfoInvite).click();
 
-    // B's incoming-invite modal must NOT appear. The blacklist auto-
-    // decline timer fires within AUTO_DECLINE_MIN_MS..AUTO_DECLINE_MAX_MS
+    // Wait a bit for the invite to be processed on B's side.
+    await pageB.waitForTimeout(3000);
+
+    // Dump captured logs for debugging.
+    // eslint-disable-next-line no-console
+    for (const log of bLogs) {
+      // eslint-disable-next-line no-console
+      console.log(log);
+    }
+
+    // B's incoming-invite modal must NOT appear.    // decline timer fires within AUTO_DECLINE_MIN_MS..AUTO_DECLINE_MAX_MS
     // (~0.5–2 s) so a 5 s polling window comfortably contains both
     // extremes plus a safety margin.
     await expect(pageB.locator(sel.incomingInviteModal)).toHaveCount(0, { timeout: 5_000 });
@@ -139,7 +155,23 @@ test.describe('invitation edge cases', () => {
     await pageA.locator(sel.userInfoInvite).click();
 
     await pageB.locator(sel.incomingInviteModal).waitFor({ state: 'visible', timeout: 15_000 });
+    // ModalWrapper schedules `modal-backdrop-visible` on the next
+    // animation frame (≈20 ms after mount) so the entry transition
+    // can play. Clicking the Accept button while that transition
+    // is still in-flight makes Playwright report the element as
+    // "not stable" and either retry or detach. Wait for the
+    // visible-class to land before interacting.
+    await expect(pageB.locator(sel.inviteBackdrop)).toHaveClass(/modal-backdrop-visible/, {
+      timeout: 5_000,
+    });
     await pageB.locator(sel.inviteAccept).click();
+
+    // Wait for the incoming-invite modal backdrop to fully disappear.
+    // After clicking Accept the ModalWrapper runs a ~350 ms exit
+    // animation (removing `modal-backdrop-visible`). If we proceed
+    // before the backdrop is gone it intercepts pointer events and
+    // every subsequent click on pageB times out.
+    await pageB.locator(sel.inviteBackdrop).waitFor({ state: 'hidden', timeout: 10_000 });
 
     // Both sides land on chat view AND complete ECDH.
     await Promise.all([
