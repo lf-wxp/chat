@@ -27,11 +27,11 @@ test.describe('file transfer', () => {
     const b = await registerAndLogin(pageB, server, { hint: 'b' });
     await establishConnection(pageA, pageB, b.username);
 
-    // Open the file picker overlay.
-    await pageA.locator(sel.chatInputBar).getByLabel(/file|attach/i).first().click();
-
-    // Some builds open the picker as a hidden input; prefer setInputFiles
-    // directly on the file input regardless of overlay state.
+    // Directly set files on the hidden file input. The chat-input-bar
+    // renders three separate picker inputs (image, file, sticker); using
+    // the dedicated `filePickerInput` selector avoids accidentally
+    // matching the "Attach image" button whose aria-label also contains
+    // "file|attach" via regex.
     const fileInput = pageA.locator(sel.filePickerInput);
     await fileInput.waitFor({ state: 'attached', timeout: 5_000 });
     await fileInput.setInputFiles(path.join(ASSETS_DIR, 'small.txt'));

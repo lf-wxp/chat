@@ -101,10 +101,23 @@ export async function establishConnection(
   await userInfoCard.waitFor({ state: 'visible' });
   await pageA.locator(sel.userInfoInvite).click();
 
+  // The frontend does not auto-close the user-info-card after sending
+  // an invite, so we close it explicitly (Escape key) to allow the
+  // ModalWrapper exit animation to run and the backdrop to disappear.
+  await pageA.keyboard.press('Escape');
+  await pageA.locator(sel.userInfoBackdrop).waitFor({ state: 'hidden', timeout: 10_000 });
+
   // Incoming invite modal on B; click Accept.
   const invite = pageB.locator(sel.incomingInviteModal);
   await invite.waitFor({ state: 'visible', timeout: 15_000 });
   await pageB.locator(sel.inviteAccept).click();
+
+  // Wait for the incoming-invite modal backdrop to fully disappear.
+  // After clicking Accept the ModalWrapper runs a ~350 ms exit
+  // animation (removing `modal-backdrop-visible`). If we proceed
+  // before the backdrop is gone it intercepts pointer events and
+  // every subsequent click on pageB times out.
+  await pageB.locator(sel.inviteBackdrop).waitFor({ state: 'hidden', timeout: 10_000 });
 
   // Both sides land on the chat view once the data channel is open.
   await Promise.all([

@@ -102,8 +102,9 @@ async function installWebSocketRegistry(page: Page): Promise<void> {
     interface WindowWithRegistry extends Window {
       __wsRegistry__?: WebSocket[];
       __OriginalWebSocket__?: typeof WebSocket;
+      WebSocket: typeof WebSocket;
     }
-    const w = window as WindowWithRegistry;
+    const w = window as unknown as WindowWithRegistry;
     if (w.__OriginalWebSocket__) return;
     w.__OriginalWebSocket__ = w.WebSocket;
     w.__wsRegistry__ = [];
@@ -122,10 +123,10 @@ async function installWebSocketRegistry(page: Page): Promise<void> {
       return ws;
     } as unknown as typeof WebSocket;
     Wrapped.prototype = Original.prototype;
-    Wrapped.CONNECTING = Original.CONNECTING;
-    Wrapped.OPEN = Original.OPEN;
-    Wrapped.CLOSING = Original.CLOSING;
-    Wrapped.CLOSED = Original.CLOSED;
+    Object.defineProperty(Wrapped, 'CONNECTING', { value: Original.CONNECTING });
+    Object.defineProperty(Wrapped, 'OPEN', { value: Original.OPEN });
+    Object.defineProperty(Wrapped, 'CLOSING', { value: Original.CLOSING });
+    Object.defineProperty(Wrapped, 'CLOSED', { value: Original.CLOSED });
     w.WebSocket = Wrapped;
   });
 }

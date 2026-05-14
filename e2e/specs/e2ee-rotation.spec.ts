@@ -117,9 +117,9 @@ async function installDataChannelHook(page: Page): Promise<void> {
         buf[28] = buf[28] ^ 0xff;
         w.__dcCorruptArmed__ = false;
         w.__dcCorruptHits__! += 1;
-        return original.call(this, buf.buffer);
+        return (original as (data: ArrayBuffer) => void).call(this, buf.buffer as ArrayBuffer);
       }
-      return original.call(this, data);
+      return (original as (data: string | Blob | ArrayBuffer | ArrayBufferView) => void).call(this, data);
     };
   });
 }

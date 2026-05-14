@@ -46,6 +46,13 @@ async function sendMultiInvite(page: Page, targetUsernames: string[]): Promise<v
 async function acceptInviteModal(page: Page): Promise<void> {
   await page.locator(sel.incomingInviteModal).waitFor({ state: 'visible', timeout: 15_000 });
   await page.locator(sel.inviteAccept).click();
+  
+  // Wait for the incoming-invite modal backdrop to fully disappear.
+  // After clicking Accept the ModalWrapper runs a ~350 ms exit
+  // animation (removing `modal-backdrop-visible`). If we proceed
+  // before the backdrop is gone it intercepts pointer events and
+  // every subsequent click on page times out.
+  await page.locator(sel.inviteBackdrop).waitFor({ state: 'hidden', timeout: 10_000 });
 }
 
 /**
@@ -176,6 +183,14 @@ test.describe('multi-user (3 peer mesh)', () => {
     await rowB.click();
     await pageA.locator(sel.userInfoCard).waitFor({ state: 'visible' });
     await pageA.locator(sel.userInfoInvite).click();
+
+    // Close the user-info card explicitly. After clicking "Send
+    // Connection Invitation" the card stays open; the Escape key
+    // triggers the ModalWrapper exit animation so the backdrop
+    // disappears and subsequent clicks are not intercepted.
+    await pageA.keyboard.press('Escape');
+    await pageA.locator(sel.userInfoBackdrop).waitFor({ state: 'hidden', timeout: 10_000 });
+
     await acceptInviteModal(pageB);
 
     await Promise.all([
@@ -193,6 +208,11 @@ test.describe('multi-user (3 peer mesh)', () => {
     await rowC.click();
     await pageA.locator(sel.userInfoCard).waitFor({ state: 'visible' });
     await pageA.locator(sel.userInfoInvite).click();
+
+    // Close the user-info card explicitly so the backdrop disappears.
+    await pageA.keyboard.press('Escape');
+    await pageA.locator(sel.userInfoBackdrop).waitFor({ state: 'hidden', timeout: 10_000 });
+
     await acceptInviteModal(pageC);
 
     await pageC.locator(sel.chatView).waitFor({ state: 'visible', timeout: 20_000 });
