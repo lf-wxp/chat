@@ -239,6 +239,7 @@ pub fn VoiceRecorder(
             class="chat-input-btn voice-recorder__cancel"
             aria-label=move || t_string!(i18n, common.cancel)
             title=move || t_string!(i18n, common.cancel)
+            data-testid="voice-recorder-cancel"
             on:click=handle_cancel
           >
             <Icon icon=i::LuX />
@@ -253,6 +254,7 @@ pub fn VoiceRecorder(
               class="chat-input-btn voice-recorder__record"
               aria-label=move || t_string!(i18n, chat.voice_record)
               title=move || t_string!(i18n, chat.voice_record)
+              data-testid="voice-recorder-record"
               on:click=handle_record
             >
               <Icon icon=i::LuMic />
@@ -268,6 +270,7 @@ pub fn VoiceRecorder(
               class="chat-input-btn voice-recorder__send"
               aria-label=move || t_string!(i18n, chat.voice_send)
               title=move || t_string!(i18n, chat.voice_send)
+              data-testid="voice-recorder-send"
               on:click=handle_stop_and_send
             >
               <Icon icon=i::LuSend />
