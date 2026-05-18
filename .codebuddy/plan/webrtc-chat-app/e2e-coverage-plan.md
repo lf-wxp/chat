@@ -123,6 +123,7 @@ land the fix and then a thin "round-trip" E2E test to lock it down.
 | G24 | `ImagePreviewOverlay` Escape handler was unreachable | The overlay attached `on:keydown` directly to its root `<div>` — but the div had no `tabindex`, no focusable child, and was never `focus()`ed when it mounted, so keyboard events never targeted it. The handler therefore never fired for keyboard-only users (Escape was supposed to dismiss the overlay) and `Locator.press("Escape")` in the E2E suite was a no-op. The shared pattern across every other dismissable surface (`ModalWrapper`, `SidebarConversationMenu`, `StickerPanel`) is to attach the Escape listener to `window` and gate on the visibility signal. `ImagePreviewOverlay` now follows the same pattern via `leptos_use::use_event_listener(use_window(), ev::keydown, ...)`. The root div also gained `tabindex="-1"` so the dialog is at least programmatically focusable for assistive tech. Discovered while writing the P2-3 image preview test. | P2-3 |
 | G25 | `NicknameEditor` component exists but is never mounted | `frontend/src/components/room/nickname_editor.rs` ships a complete `NicknameEditor` with full validation (`message::error::validation::validate_nickname`), a Save button, server-side broadcast via `signaling.send_nickname_change`, error toast on failure, and full `data-testid="nickname-editor*"` coverage. It is `pub use`d from `components/mod.rs`. Despite all that, no `view!` macro anywhere in the codebase instantiates it: `grep -r "<NicknameEditor" frontend/src` returns zero hits. The Settings drawer's Appearance / AV / Privacy / Notifications / Data sections do not embed it, and there is no other surface that does. Users therefore cannot edit their nickname end-to-end. Plan §3 P2-7 originally listed a "nickname edit round-trip" test; the spec dropped it because the surface is unreachable from the rendered UI. A future ticket should mount the editor inside the settings drawer's Account section (next to the Logout button), then a thin round-trip spec exercising `nickname-editor-input` → Save → online list nickname update can land. | P2-7 |
 | G26 | No avatar upload affordance anywhere | The auth state carries an optional `avatar_url` and the `UserInfoCard` renders an `<img class="user-info-card__avatar">` (falling back to an identicon when the URL is empty), but no UI surface lets the user pick or upload a new avatar. The signaling protocol has no `AvatarChange` message either, mirroring the missing `NicknameChange` surface (G25). Plan §3 P2-7 originally listed an "upload avatar" test; the spec dropped it pending both a backend protocol field and a client-side picker (e.g. an "Edit profile" section next to the Logout button in the settings drawer). | P2-7 |
+| G27 | Theater video source round-trip needs a codec-compatible test fixture | Plan §3 P2-5 originally listed an "owner selects local video → frame plays" assertion. Implementing it deterministically requires (a) a tiny, codec-compatible video file under `e2e/assets/` (e.g. an H.264 / VP9 ≤1 KB stub), and (b) a readiness oracle on `<video>` that survives Chromium's lazy decode (e.g. polling `videoWidth > 0` after `play()`). The first is non-trivial — the smallest valid mp4/webm is ~1 KB but not all Chromium builds accept every codec subset. The P2-5 spec covers what is robust today (owner-side `theater-page` mounts, source-picker is visible, in-room chat round-trips a `theater-chat-bubble`); the video-source / viewer-join / cross-peer danmaku assertions land once the fixture ships. | P2-5 |
 
 ## 3. Rollout plan
 
@@ -282,13 +283,16 @@ needed). When a wave item lands, replace its status emoji:
 - [x] P1-6 e2ee-rotation.spec.ts — commit 6d3ab54
 - [x] P1-7 context-menu-full.spec.ts — commit feb87a5
 - [x] P2-1 sticker.spec.ts
-- [ ] P2-2 voice-message.spec.ts
+- [x] P2-2 voice-message.spec.ts
 - [x] P2-3 image-message.spec.ts
 - [~] P2-4 conv-list-management.spec.ts — pin / mute / archive
   landed; "search filter" deferred to G20 (sidebar-search input is
   not wired to any signal); "delete conversation" deferred to G21
   (no delete affordance exists in the row context menu).
-- [ ] P2-5 theater.spec.ts
+- [~] P2-5 theater.spec.ts — creator/source-picker + in-room
+  chat round-trip landed; video-source playback / viewer-join /
+  cross-peer danmaku deferred to G27 (need a codec-compatible
+  test video fixture under `e2e/assets/`).
 - [x] P2-6 settings.spec.ts
 - [~] P2-7 profile.spec.ts — block / unblock / blacklist
   persistence landed; "nickname edit" deferred to G25

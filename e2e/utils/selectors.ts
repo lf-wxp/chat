@@ -107,6 +107,25 @@ export const sel = {
   reactionPicker: '[data-testid="reaction-picker"]',
   reactionPickerEmoji: '[data-testid="reaction-picker-emoji"]',
 
+  // ---- Voice recorder ----
+  voiceRecorder: '[data-testid="voice-recorder"]',
+  voiceRecorderRecord: '[data-testid="voice-recorder-record"]',
+  voiceRecorderSend: '[data-testid="voice-recorder-send"]',
+  voiceRecorderCancel: '[data-testid="voice-recorder-cancel"]',
+
+  // ---- Theater ----
+  theaterPage: '[data-testid="theater-page"]',
+  theaterSourcePicker: '[data-testid="theater-source-picker"]',
+  theaterSourceLocal: '[data-testid="theater-source-local"]',
+  theaterSourceScreen: '[data-testid="theater-source-screen"]',
+  theaterSourceUrl: '[data-testid="theater-source-url"]',
+  theaterVideoPlayer: '[data-testid="theater-video-player"]',
+  theaterChatPanel: '[data-testid="theater-chat-panel"]',
+  theaterChatInput: '[data-testid="theater-chat-input"]',
+  theaterChatSend: '[data-testid="theater-chat-send"]',
+  theaterTabChat: '[data-testid="theater-tab-chat"]',
+  theaterTabMembers: '[data-testid="theater-tab-members"]',
+
   // ---- File transfer card internals ----
   fileProgress: '[data-testid="file-progress"]',
   fileCancel: '[data-testid="file-cancel"]',
