@@ -1,5 +1,6 @@
 /**
- * Conversation list management — pin / mute / archive context-menu actions.
+ * Conversation list management — pin / mute / archive context-menu actions
+ * and (new in G20) the sidebar search filter.
  *
  * Maps to: Wave P2-4. The persisted versions of these flags (pin /
  * archive surviving a reload via IDB `conversation_flags`) are
@@ -14,14 +15,15 @@
  *   3. Archive → row moves to the Archived (collapsible) section
  *      and is hidden by default; expanding the section reveals it
  *      with `data-archived="true"`.
+ *   4. Search filter (G20) → typing in `sidebar-search-input` filters
+ *      the conversation rows by case-insensitive substring on
+ *      `display_name`; clearing the query restores every row.
  *
- * Plan §3 P2-4 originally also listed "search filter" and "delete
- * conversation" as fourth and fifth tests. Both of these UI surfaces
- * are missing from the current frontend (sidebar search input is
- * rendered but has no `on:input` binding, and there is no per-row
- * delete affordance anywhere). Those gaps are tracked in the plan
- * §2.1 table as feature gaps; the corresponding tests will land once
- * the surfaces ship.
+ * Plan §3 P2-4 originally also listed "delete conversation" as a
+ * fifth test. That UI surface is missing from the current frontend
+ * (no per-row delete affordance, no `AppState::delete_conversation`
+ * method). The gap is tracked in the plan §2.1 table as G21; the
+ * test will land once the surface ships.
  */
 
 import { sel } from '../utils/selectors.ts';
@@ -139,5 +141,50 @@ test.describe('conversation list management', () => {
     const archivedRow = archivedSection.locator(sel.sidebarConversationItem).first();
     await expect(archivedRow).toBeVisible({ timeout: 5_000 });
     await expect(archivedRow).toHaveAttribute('data-archived', 'true');
+  });
+
+  test('sidebar search filters conversation rows by display name (G20)', async ({
+    pageA,
+    pageB,
+    pageC,
+    server,
+  }) => {
+    // The standard beforeEach already establishes pageA <-> pageB
+    // and seeds one direct conversation. Build a second one with
+    // pageC so the search filter has meaningful work to do — with
+    // a single row, clearing/applying the filter is indistinguishable
+    // from "list is empty".
+    const userC = await registerAndLogin(pageC, server, { hint: 'cl-search-c' });
+    await establishConnection(pageA, pageC, userC.username);
+    const tag = Date.now().toString(36);
+    await sendAndVerifyMessage(pageA, pageC, `seed-c-${tag}`);
+
+    // Both rows are now in the sidebar.
+    const allRows = pageA.locator(sel.sidebarConversationItem);
+    await expect(allRows).toHaveCount(2, { timeout: 15_000 });
+
+    // Auto-generated usernames produced by `uniqueUsername` share a
+    // common `t_<hint>_` prefix, so we cannot use a leading
+    // substring to disambiguate. Instead we key the filter off the
+    // *trailing* random hex of `userC.username`, which is unique to
+    // userC. The filter is a case-insensitive substring match
+    // against `display_name`, which mirrors the username for users
+    // without a custom nickname.
+    const userCSuffix = userC.username.slice(-4);
+    expect(userCSuffix).toMatch(/^[0-9a-f]+$/);
+
+    const search = pageA.locator(sel.sidebarSearchInput);
+    await search.fill(userCSuffix);
+    await expect(allRows).toHaveCount(1, { timeout: 5_000 });
+    // The remaining row carries userC's username in its aria-label.
+    await expect(allRows.first()).toHaveAttribute('aria-label', new RegExp(userC.username));
+
+    // No-match query empties the visible list.
+    await search.fill('zzz-no-match-zzz');
+    await expect(allRows).toHaveCount(0, { timeout: 5_000 });
+
+    // Clearing the input restores both rows.
+    await search.fill('');
+    await expect(allRows).toHaveCount(2, { timeout: 5_000 });
   });
 });

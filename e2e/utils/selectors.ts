@@ -25,6 +25,7 @@ export const sel = {
   // ---- Sidebar / navigation ----
   sidebar: '[data-testid="sidebar"]',
   sidebarSettingsBtn: '[data-testid="sidebar-settings-btn"]',
+  sidebarSearchInput: '[data-testid="sidebar-search-input"]',
   sidebarConversationItem: '[data-testid="sidebar-conversation-item"]',
   sidebarConnectionStatus: '[data-testid="sidebar-connection-status"]',
   sidebarRoomSection: '[data-testid="sidebar-room-section"]',
@@ -170,6 +171,12 @@ export const sel = {
   // ---- @Mention rendering ----
   mentionHighlight: '[data-testid="mention-highlight"]',
   messageRowMentionsMe: '[data-testid="message-row"][data-mentions-me="true"]',
+
+  // ---- Nickname editor (Settings drawer Account section) ----
+  nicknameEditor: '[data-testid="nickname-editor"]',
+  nicknameEditorInput: '[data-testid="nickname-editor-input"]',
+  nicknameEditorSave: '[data-testid="nickname-editor-save"]',
+  nicknameEditorError: '[data-testid="nickname-editor-error"]',
 } as const;
 
 /** Build a `data-testid` selector dynamically. */

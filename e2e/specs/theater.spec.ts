@@ -125,4 +125,42 @@ test.describe('theater room', () => {
       .first();
     await expect(bubble).toBeVisible({ timeout: 10_000 });
   });
+
+  test('URL picker rejects non-http(s) URLs with a visible error (G27)', async ({
+    pageA,
+    server,
+  }) => {
+    await registerAndLogin(pageA, server, { hint: 'th-url' });
+    await createTheaterRoom(pageA);
+
+    // Toggle the URL form open.
+    await pageA.locator(sel.theaterSourceUrl).click();
+    const urlInput = pageA.locator('[data-testid="theater-source-url-input"]');
+    await expect(urlInput).toBeVisible({ timeout: 5_000 });
+
+    // The native `<input type="url">` validation accepts any
+    // RFC 3986 URI (incl. `ftp://`), so a non-http(s) URL passes the
+    // browser-level check and the form's `submit` event fires —
+    // which lets the picker's own
+    // `starts_with("http://") || starts_with("https://")` branch
+    // surface its alert.
+    await urlInput.fill('ftp://example.test');
+    await pageA.locator('[data-testid="theater-source-url-submit"]').click();
+
+    const error = pageA
+      .locator(sel.theaterSourcePicker)
+      .locator('.theater-source-picker__error');
+    await expect(error).toBeVisible({ timeout: 3_000 });
+    await expect(error).not.toBeEmpty();
+    // Form value preserved so the user can correct the typo.
+    await expect(urlInput).toHaveValue('ftp://example.test');
+
+    // The full "happy-path URL → <video>.src binding" assertion is
+    // deferred until a codec-compatible video fixture lands under
+    // `e2e/assets/`. The player gates `<video>` mounting on
+    // `loadedmetadata`, which never fires for a non-video URL, so
+    // the picker's `url_input.set("")` reset happens but the
+    // `<video>.src` cannot be read until the element materialises.
+    // Tracked as a follow-up under the same G27 plan line.
+  });
 });
