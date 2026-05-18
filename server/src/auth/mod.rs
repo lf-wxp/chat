@@ -386,6 +386,37 @@ impl UserStore {
       .collect()
   }
 
+  /// Update the persisted display nickname for `user_id`.
+  ///
+  /// Returns `true` when the row was found **and** the nickname
+  /// differed from the current value (i.e. an actual write
+  /// happened). Returns `false` when the user does not exist or
+  /// when the new nickname equals the current one (no-op).
+  ///
+  /// Validation (length, charset, leading/trailing whitespace) is
+  /// the caller's responsibility — the room layer already validates
+  /// via `message::error::validation::validate_nickname` and the
+  /// room entity additionally caps length. We deliberately keep this
+  /// layer defensive but not authoritative: an over-strict guard
+  /// here would silently desync the room-scoped `MemberInfo` from
+  /// the global `UserStore` when a future caller forgets to mirror
+  /// the same rules.
+  ///
+  /// G28 — without this method, `handle_nickname_change` was only
+  /// updating room-scoped `MemberInfo` and the next `AuthSuccess`
+  /// after reload re-emitted `nickname = username`, overwriting
+  /// the client's localStorage mirror.
+  pub fn set_nickname(&self, user_id: &UserId, new_nickname: &str) -> bool {
+    if let Some(mut session) = self.users.get_mut(user_id)
+      && session.nickname != new_nickname
+    {
+      session.nickname = new_nickname.to_string();
+      session.last_seen = Utc::now();
+      return true;
+    }
+    false
+  }
+
   /// Update user status.
   pub fn update_status(&self, user_id: &UserId, status: UserStatus) -> Option<UserStatusChange> {
     if let Some(mut session) = self.users.get_mut(user_id) {

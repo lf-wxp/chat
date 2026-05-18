@@ -202,3 +202,64 @@ fn test_multiple_status_changes() {
   let change = store.update_status(&user_id, UserStatus::Online).unwrap();
   assert_eq!(change.status, UserStatus::Online);
 }
+
+// ── G28: nickname persistence on the global User table ──
+
+#[test]
+fn test_set_nickname_writes_to_user_session() {
+  let store = create_test_store();
+  let (user_id, _) = store.register("testuser", "password123").unwrap();
+
+  // Default nickname mirrors the username.
+  let user = store.get_user(&user_id).unwrap();
+  assert_eq!(user.nickname, "testuser");
+
+  // A real change returns `true` and the stored nickname updates.
+  let changed = store.set_nickname(&user_id, "Cool Nick");
+  assert!(changed);
+
+  let user = store.get_user(&user_id).unwrap();
+  assert_eq!(user.nickname, "Cool Nick");
+}
+
+#[test]
+fn test_set_nickname_idempotent_when_unchanged() {
+  // The function reports `false` when the new value equals the
+  // current one — callers (e.g. the WS handler) can short-circuit
+  // any broadcasts on this signal.
+  let store = create_test_store();
+  let (user_id, _) = store.register("testuser", "password123").unwrap();
+
+  store.set_nickname(&user_id, "Same");
+  let second = store.set_nickname(&user_id, "Same");
+  assert!(!second);
+}
+
+#[test]
+fn test_set_nickname_missing_user_is_noop() {
+  let store = create_test_store();
+  let user_id = message::types::UserId::new();
+  let changed = store.set_nickname(&user_id, "Anything");
+  assert!(!changed);
+}
+
+#[test]
+fn test_set_nickname_survives_reauthenticate_with_token() {
+  // G28 cross-reload contract: after a nickname change, a fresh
+  // `authenticate_with_token` returns the new nickname in its
+  // `AuthSuccess` — without this, the client would receive
+  // `nickname = username` on every reload and stomp the local
+  // mirror.
+  let store = create_test_store();
+  let (user_id, token) = store.register("testuser", "password123").unwrap();
+
+  store.set_nickname(&user_id, "Reloaded Nick");
+
+  let auth_success = store
+    .authenticate_with_token(&token)
+    .expect("token should still validate");
+  assert_eq!(auth_success.nickname, "Reloaded Nick");
+  // Username is unchanged — confirms we did not accidentally
+  // alias the two fields.
+  assert_eq!(auth_success.username, "testuser");
+}

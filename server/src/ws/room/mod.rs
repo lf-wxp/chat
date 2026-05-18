@@ -939,6 +939,40 @@ pub async fn handle_nickname_change<S>(
     return;
   }
 
+  // Validate length defensively at the server boundary (the client
+  // already runs the full `validate_nickname` and the room layer
+  // re-checks length, but a stray direct-protocol message could
+  // bypass both — keep the server honest).
+  if nickname_change.new_nickname.is_empty()
+    || nickname_change.new_nickname.chars().count() > 20
+  {
+    send_error_response(
+      socket_tx,
+      "ROM1303",
+      "Invalid nickname",
+      Some("invalid_length"),
+    )
+    .await;
+    return;
+  }
+
+  // G28 — persist the new nickname on the global User table first,
+  // independently of room membership. This ensures `AuthSuccess`
+  // after a page reload returns the canonical nickname even if the
+  // user is not currently in a room. The earlier implementation
+  // gated the entire write on `room_state.set_nickname` succeeding,
+  // which silently dropped the change for users editing their
+  // nickname from the settings drawer outside any room.
+  ws_state
+    .user_store
+    .set_nickname(user_id, &nickname_change.new_nickname);
+
+  // Try to mirror into the room-scoped MemberInfo + broadcast to
+  // room members. This is best-effort: when the user is not in a
+  // room the call returns `UserNotInRoom`, which is no longer an
+  // error condition — the global update above is the source of
+  // truth and any future room join re-seeds the member nickname
+  // from the user store.
   match ws_state.room_state.set_nickname(&nickname_change) {
     Ok(()) => {
       // Broadcast nickname change to all room members
@@ -965,14 +999,23 @@ pub async fn handle_nickname_change<S>(
         "Nickname changed"
       );
     }
+    Err(crate::room::RoomError::UserNotInRoom) => {
+      // Not an error — the user is editing their nickname outside
+      // any room (e.g. from the settings drawer). The global
+      // UserStore update above is sufficient.
+      debug!(
+        user_id = %user_id,
+        new_nickname = %nickname_change.new_nickname,
+        "Nickname changed (no room broadcast — user not in a room)"
+      );
+    }
     Err(e) => {
       warn!(
         user_id = %user_id,
         error = ?e,
-        "Failed to change nickname"
+        "Failed to mirror nickname change to room state"
       );
       let (code, msg) = match e {
-        crate::room::RoomError::UserNotInRoom => ("ROM1302", "You are not in a room"),
         crate::room::RoomError::InvalidInput(_) => ("ROM1303", "Invalid nickname"),
         _ => ("ROM1300", "Failed to change nickname"),
       };

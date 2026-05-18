@@ -10,13 +10,16 @@
  *   * Block / unblock — wired end-to-end via `BlacklistState`,
  *     `localStorage["blacklist"]` and the settings-drawer
  *     `BlacklistManagementPanel`.
- *   * Nickname edit — `NicknameEditor` is now mounted in the settings
+ *   * Nickname edit — `NicknameEditor` is mounted in the settings
  *     drawer's Account section (G25). The component validates with
  *     `message::error::validation::validate_nickname`, persists the
  *     new value into the auth state's `auth_nickname` localStorage
  *     key, and broadcasts a `NicknameChange` signaling message.
+ *     **Server-side persistence (G28) lands the new nickname on
+ *     the global UserStore so reloads no longer clobber the
+ *     client mirror.**
  *
- * This spec locks down both flows:
+ * This spec locks down:
  *
  *   1. Block flips the user-info-card's invite button to `disabled`
  *      and the Block button to "Unblock" — the card-local state
@@ -25,10 +28,13 @@
  *      `blacklist-panel` and disappears after Unblock.
  *   3. The blacklist persists across a page reload via the
  *      `blacklist` localStorage key.
- *   4. Nickname edit (G25) — opening the settings drawer surfaces the
- *      `nickname-editor` component; entering a new value enables Save;
- *      clicking Save persists the value to `localStorage[auth_nickname]`
- *      and survives a page reload.
+ *   4. In-session nickname edit (G25) — opening the settings drawer
+ *      surfaces the `nickname-editor` component; entering a new
+ *      value enables Save; clicking Save persists into
+ *      `localStorage[auth_nickname]` and survives a drawer reopen.
+ *   5. Cross-reload nickname (G28) — the server's `AuthSuccess`
+ *      after `page.reload()` carries the new nickname, so the
+ *      localStorage mirror keeps the user's edit.
  */
 
 import { sel } from '../utils/selectors.ts';
@@ -226,15 +232,56 @@ test.describe('profile / blacklist', () => {
     await pageA.locator(sel.sidebarSettingsBtn).click();
     await expect(pageA.locator(settingsPageSelector)).toBeVisible({ timeout: 3_000 });
     await expect(pageA.locator(sel.nicknameEditorInput)).toHaveValue(newNickname);
+  });
 
-    // NOTE: Persistence across a *page reload* additionally requires
-    // the server to store the nickname change. The current handler
-    // (`server/ws/room/handle_nickname_change`) only broadcasts the
-    // change to room members and updates per-room MemberInfo — the
-    // global User table is never written, so `AuthSuccess` after
-    // reload re-emits `nickname = username` and overwrites the
-    // localStorage value via `handle_auth_success`. That gap is
-    // tracked separately as G28; this test deliberately stops at
-    // the in-session contract.
+  test('nickname survives a page reload (G28 server-side persistence)', async ({
+    pageA,
+    server,
+  }) => {
+    const me = await registerAndLogin(pageA, server, { hint: 'pf-nick-rld' });
+
+    // Open settings + edit nickname (same shape as the in-session
+    // test, abbreviated — we are exercising the cross-reload
+    // contract here, not the editor UI itself).
+    await pageA.locator(sel.sidebarSettingsBtn).click();
+    await expect(pageA.locator(settingsPageSelector)).toBeVisible({ timeout: 5_000 });
+    const input = pageA.locator(sel.nicknameEditorInput);
+    await expect(input).toHaveValue(me.username);
+
+    const tag = Date.now().toString(36).slice(-6);
+    const persisted = `nk_${tag}`;
+    expect(persisted.length).toBeLessThanOrEqual(20);
+
+    await input.fill(persisted);
+    await pageA.locator(sel.nicknameEditorSave).click();
+
+    // Wait for the client-side write to localStorage so the value
+    // has at least committed before we reload (avoids racing the
+    // server roundtrip).
+    await expect
+      .poll(async () => pageA.evaluate(() => localStorage.getItem('auth_nickname')), {
+        timeout: 5_000,
+      })
+      .toBe(persisted);
+
+    // G28 — after reload the server's `AuthSuccess` carries the
+    // new nickname (UserStore was persisted), so the localStorage
+    // mirror retains the new value rather than being clobbered
+    // back to `username` by `handle_auth_success`.
+    await pageA.reload();
+    await waitForAppShell(pageA);
+
+    await expect
+      .poll(async () => pageA.evaluate(() => localStorage.getItem('auth_nickname')), {
+        timeout: 10_000,
+      })
+      .toBe(persisted);
+
+    // Settings drawer surfaces the persisted value on re-open.
+    await pageA.locator(sel.sidebarSettingsBtn).click();
+    await expect(pageA.locator(settingsPageSelector)).toBeVisible({ timeout: 5_000 });
+    await expect(pageA.locator(sel.nicknameEditorInput)).toHaveValue(persisted, {
+      timeout: 5_000,
+    });
   });
 });
