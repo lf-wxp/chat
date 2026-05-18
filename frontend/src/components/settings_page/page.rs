@@ -12,6 +12,7 @@ use super::data_management_section::DataManagementSection;
 use super::notifications_section::NotificationsSection;
 use super::privacy_section::PrivacySection;
 use crate::components::discovery::BlacklistManagementPanel;
+use crate::components::room::NicknameEditor;
 use crate::i18n;
 use crate::settings::use_settings_state;
 use crate::signaling::use_signaling_client;
@@ -312,6 +313,11 @@ pub fn SettingsPage() -> impl IntoView {
               <Icon icon=i::LuUser attr:class="settings-section-icon" />
               {t!(i18n, settings.sections_account)}
             </h2>
+            // Nickname editor (G25). Mounting the existing
+            // `NicknameEditor` here makes the previously unreachable
+            // surface live. Validation, save flow and signaling
+            // broadcast are owned by the component itself.
+            <NicknameEditor />
             <button
               class="btn-danger settings-logout"
               data-testid="settings-logout"
