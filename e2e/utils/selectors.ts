@@ -99,6 +99,9 @@ export const sel = {
 
   // ---- Sticker / image / file pickers ----
   stickerPanel: '[data-testid="sticker-panel"]',
+  stickerPanelItem: '[data-testid="sticker-panel-item"]',
+  messageSticker: '[data-testid="message-sticker"]',
+  messageImage: '[data-testid="message-image"]',
   filePickerInput: '[data-testid="file-picker-input"]',
   imagePickerInput: '[data-testid="image-picker-input"]',
   reactionPicker: '[data-testid="reaction-picker"]',
