@@ -404,6 +404,9 @@ fn content_view(msg: &ChatMessage, self_nickname: Memo<String>, cbs: BubbleCallb
       view! {
         <img
           class="message-image"
+          data-testid="message-image"
+          data-image-width=w
+          data-image-height=h
           src=thumb_url
           width=w
           height=h
@@ -474,6 +477,9 @@ fn render_sticker(sticker: &StickerRef) -> AnyView {
   view! {
     <img
       class="message-sticker"
+      data-testid="message-sticker"
+      data-pack-id=sticker.pack_id.clone()
+      data-sticker-id=sticker.sticker_id.clone()
       src=url
       alt=label.clone()
       loading="lazy"

@@ -47,10 +47,10 @@
 	.sticker-panel {
 		right: 0;
 		left: 0;
+		bottom: 0;
 		width: 100%;
 		max-height: 50vh;
 		border-radius: var(--radius-xl, 0.75rem) var(--radius-xl, 0.75rem) 0 0;
-		bottom: 100%;
 		animation: slide-in-bottom var(--duration-normal, 200ms)
 			var(--ease-default, ease) both;
 	}
@@ -795,17 +795,22 @@
 }
 
 /* ── Sticker Panel ── */
-.sticker-panel-backdrop {
-	position: fixed;
-	inset: 0;
-	z-index: calc(var(--z-popover, 500) - 1);
-}
+/* Note: the previous `.sticker-panel-backdrop` overlay was removed
+ * when the panel switched to a click-outside listener + Portal-mounted
+ * positioning (G23). The panel now lives directly under #modal-root
+ * via `leptos::portal::Portal`, so no full-screen click target is
+ * needed for outside-dismiss. */
 
 .sticker-panel {
-	position: absolute;
-	bottom: calc(100% + var(--space-2, 0.5rem));
-	left: var(--space-2, 0.5rem);
-	width: min(340px, calc(100vw - var(--space-4, 1rem)));
+	/* Portal-rendered into #modal-root → anchor to the viewport via
+	 * `position: fixed`. Bottom offset clears the chat composer
+	 * (input bar ≈ 4rem + a small gap). Right-anchor mirrors the
+	 * smiley toggle's place in the input bar so the panel feels
+	 * attached to its trigger without being a true descendant. */
+	position: fixed;
+	bottom: 5rem;
+	left: var(--space-4, 1rem);
+	width: min(340px, calc(100vw - var(--space-4, 1rem) * 2));
 	max-height: 360px;
 	/* Background / border / box-shadow are owned by the effects layer
    * (glass.css). */
