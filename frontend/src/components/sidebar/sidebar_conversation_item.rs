@@ -119,10 +119,13 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
   let pinned_sig = Signal::derive(move || lookup.get().is_some_and(|c| c.pinned));
   let muted_sig = Signal::derive(move || lookup.get().is_some_and(|c| c.muted));
   let archived_sig = Signal::derive(move || lookup.get().is_some_and(|c| c.archived));
-  let unread_count_sig =
-    Signal::derive(move || lookup.get().map(|c| c.unread_count).unwrap_or(0));
-  let last_message_preview =
-    Signal::derive(move || lookup.get().and_then(|c| c.last_message).unwrap_or_default());
+  let unread_count_sig = Signal::derive(move || lookup.get().map(|c| c.unread_count).unwrap_or(0));
+  let last_message_preview = Signal::derive(move || {
+    lookup
+      .get()
+      .and_then(|c| c.last_message)
+      .unwrap_or_default()
+  });
 
   let conv_id_active = conv_id.clone();
   let is_active =
