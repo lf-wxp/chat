@@ -118,11 +118,7 @@ pub fn StickerPanel(
       // letting its click reach `visible.update(|v| !*v)` would
       // re-open the panel on the same gesture that closed it. The
       // composer marks every chat-input-btn with that class.
-      let on_trigger = target
-        .closest(".chat-input-btn")
-        .ok()
-        .flatten()
-        .is_some();
+      let on_trigger = target.closest(".chat-input-btn").ok().flatten().is_some();
       if !inside_panel && !on_trigger {
         visible.set(false);
       }
