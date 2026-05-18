@@ -59,16 +59,20 @@ pub fn pin_click_action(currently_pinned: bool, at_cap: bool) -> PinClickAction 
 /// Conversation context menu.
 ///
 /// * `conversation_id` — which conversation the menu is acting on.
-/// * `pinned` / `muted` / `archived` — current flags (used to pick the
-///   right label, e.g. "Pin" vs. "Unpin").
+/// * `pinned` / `muted` / `archived` — current flags as reactive
+///   signals (used to pick the right label, e.g. "Pin" vs. "Unpin").
+///   They are signals, not plain bools, because the parent row does
+///   NOT re-mount on flag toggles — the menu has to read fresh
+///   values when the user re-opens it after a previous toggle (G22
+///   in the e2e coverage plan).
 /// * `open` — externally controlled visibility signal; the menu itself
 ///   flips this to `false` on close.
 #[component]
 pub fn SidebarConversationMenu(
   conversation_id: ConversationId,
-  pinned: bool,
-  muted: bool,
-  archived: bool,
+  pinned: Signal<bool>,
+  muted: Signal<bool>,
+  archived: Signal<bool>,
   open: RwSignal<bool>,
 ) -> impl IntoView {
   let app_state = use_app_state();
@@ -84,7 +88,7 @@ pub fn SidebarConversationMenu(
   // toast instead of silently no-op'ing — so we use this only for the
   // tooltip / aria hint.
   let pin_at_cap = Memo::new(move |_| {
-    if pinned {
+    if pinned.get() {
       false
     } else {
       app_state
@@ -142,21 +146,21 @@ pub fn SidebarConversationMenu(
   let id_for_archive = conversation_id.clone();
 
   let pin_label = move || {
-    if pinned {
+    if pinned.get() {
       t_string!(i18n, sidebar.unpin)
     } else {
       t_string!(i18n, sidebar.pin)
     }
   };
   let mute_label = move || {
-    if muted {
+    if muted.get() {
       t_string!(i18n, sidebar.unmute)
     } else {
       t_string!(i18n, sidebar.mute)
     }
   };
   let archive_label = move || {
-    if archived {
+    if archived.get() {
       t_string!(i18n, sidebar.unarchive)
     } else {
       t_string!(i18n, sidebar.archive)
@@ -191,7 +195,7 @@ pub fn SidebarConversationMenu(
             // Req 7.7c — drive the user-visible feedback through the
             // pure `pin_click_action` decision helper so the toast /
             // toggle behaviour is unit-testable in isolation.
-            match pin_click_action(pinned, pin_at_cap.get_untracked()) {
+            match pin_click_action(pinned.get_untracked(), pin_at_cap.get_untracked()) {
               PinClickAction::ShowLimitToast => {
                 if let Some(toast) = toast {
                   toast.show_info_message_with_key(
@@ -228,7 +232,7 @@ pub fn SidebarConversationMenu(
           }
         }
       >
-        <Icon icon=move || if muted { i::LuBell } else { i::LuBellOff } />
+        <Icon icon=move || if muted.get() { i::LuBell } else { i::LuBellOff } />
         <span>{mute_label}</span>
       </button>
 

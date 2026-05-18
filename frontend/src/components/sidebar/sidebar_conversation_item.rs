@@ -80,10 +80,6 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
   let i18n = i18n::use_i18n();
   let conv_id = conversation.id.clone();
   let display_name = conversation.display_name.clone();
-  let pinned = conversation.pinned;
-  let muted = conversation.muted;
-  let archived = conversation.archived;
-  let unread_count = conversation.unread_count;
   let first_char = display_name.chars().next().unwrap_or('?');
 
   // Stable identifier strings for E2E selectors. `data-room-id` is
@@ -95,25 +91,38 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
     crate::state::ConversationId::Direct(_) => (None, "direct".to_string()),
   };
 
-  // Reactive last-message preview. The component is keyed by
-  // `conversation.id` in the parent `<For>`, which means new
-  // `Conversation` snapshots from the parent vector do NOT re-mount
-  // the component — so we cannot simply consume the prop's
-  // `last_message` field once. Instead, derive the preview live from
-  // the global `app_state.conversations` signal so any update (new
-  // inbound message, revocation, edit) is reflected without reload.
-  let last_message_preview = {
-    let conv_id_for_pv = conv_id.clone();
-    Signal::derive(move || {
-      app_state
-        .conversations
-        .get()
-        .into_iter()
-        .find(|c| c.id == conv_id_for_pv)
-        .and_then(|c| c.last_message)
-        .unwrap_or_default()
-    })
-  };
+  // Reactive snapshot of the *current* conversation row from the
+  // global signal. The component is keyed by `conversation.id` in
+  // the parent `<For>`, so it does NOT re-mount when the underlying
+  // `Conversation` value changes (e.g. mute/pin toggles, last-
+  // message updates). Reading the prop fields directly would freeze
+  // the row on the first-render snapshot — `last_message_preview`
+  // already worked around this; we extend the same treatment to
+  // every flag the row renders so toggles are reflected live without
+  // a section reparent.
+  //
+  // ⚠️ History — review G22 in `e2e-coverage-plan.md` §2.1: capturing
+  // `pinned` / `muted` / `archived` / `unread_count` from the prop
+  // by value made the mute action a UI no-op until reload (the row
+  // doesn't change section, so `<For>` keeps the stale instance
+  // alive). All flag-derived attributes / classes / Show gates
+  // below now go through these signals.
+  let conv_id_for_lookup = conv_id.clone();
+  let lookup = Signal::derive(move || {
+    app_state
+      .conversations
+      .get()
+      .into_iter()
+      .find(|c| c.id == conv_id_for_lookup)
+  });
+
+  let pinned_sig = Signal::derive(move || lookup.get().is_some_and(|c| c.pinned));
+  let muted_sig = Signal::derive(move || lookup.get().is_some_and(|c| c.muted));
+  let archived_sig = Signal::derive(move || lookup.get().is_some_and(|c| c.archived));
+  let unread_count_sig =
+    Signal::derive(move || lookup.get().map(|c| c.unread_count).unwrap_or(0));
+  let last_message_preview =
+    Signal::derive(move || lookup.get().and_then(|c| c.last_message).unwrap_or_default());
 
   let conv_id_active = conv_id.clone();
   let is_active =
@@ -121,7 +130,7 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
 
   let menu_open = RwSignal::new(false);
 
-  let has_unread = unread_count > 0u32;
+  let has_unread = Signal::derive(move || unread_count_sig.get() > 0u32);
 
   let item_class = move || {
     let mut classes = String::from("sidebar-conversation");
@@ -130,10 +139,10 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
     } else {
       classes.push_str(" sidebar-item");
     }
-    if muted {
+    if muted_sig.get() {
       classes.push_str(" sidebar-conversation-muted");
     }
-    if pinned {
+    if pinned_sig.get() {
       classes.push_str(" sidebar-conversation-pinned");
     }
     if menu_open.get() {
@@ -153,12 +162,13 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
     let name = display_name.clone();
     move || {
       let mut parts = vec![name.clone()];
-      if muted {
+      if muted_sig.get() {
         parts.push(t_string!(i18n, sidebar.muted_aria_suffix).to_string());
       }
-      if unread_count > 0 {
+      let count = unread_count_sig.get();
+      if count > 0 {
         parts.push(format!(
-          "{unread_count} {}",
+          "{count} {}",
           t_string!(i18n, sidebar.unread_aria_suffix)
         ));
       }
@@ -209,9 +219,9 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
       data-testid="sidebar-conversation-item"
       data-conversation-type=data_conv_type.clone()
       data-room-id=data_room_id.clone().unwrap_or_default()
-      data-pinned=if pinned { "true" } else { "false" }
-      data-archived=if archived { "true" } else { "false" }
-      data-muted=if muted { "true" } else { "false" }
+      data-pinned=move || if pinned_sig.get() { "true" } else { "false" }
+      data-archived=move || if archived_sig.get() { "true" } else { "false" }
+      data-muted=move || if muted_sig.get() { "true" } else { "false" }
     >
       // Avatar
       <div class="sidebar-conversation-avatar" aria-hidden="true">
@@ -225,7 +235,7 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
       // Conversation info
       <div class="sidebar-conversation-info">
         <div class="sidebar-conversation-name truncate">
-          <Show when=move || pinned>
+          <Show when=move || pinned_sig.get()>
             <Icon icon=i::LuPin attr:class="sidebar-conversation-pin-icon" />
           </Show>
           <span>{display_name.clone()}</span>
@@ -237,14 +247,14 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
 
       // Unread badge — aria-live="polite" announces count changes to
       // screen readers without being overly intrusive (WCAG 4.1.3).
-      <Show when=move || has_unread>
+      <Show when=move || has_unread.get()>
         <span class="sidebar-item-badge-unread" aria-live="polite">
-          {unread_count}
+          {move || unread_count_sig.get()}
         </span>
       </Show>
 
       // Mute indicator (decorative — label is baked into aria-label)
-      <Show when=move || muted>
+      <Show when=move || muted_sig.get()>
         <span class="sidebar-conversation-mute-icon" aria-hidden="true">
           <Icon icon=i::LuBellOff />
         </span>
@@ -277,9 +287,9 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
       <Show when=move || menu_open.get() fallback=|| ()>
         <SidebarConversationMenu
           conversation_id=conv_id_menu.clone()
-          pinned=pinned
-          muted=muted
-          archived=archived
+          pinned=pinned_sig
+          muted=muted_sig
+          archived=archived_sig
           open=menu_open
         />
       </Show>
