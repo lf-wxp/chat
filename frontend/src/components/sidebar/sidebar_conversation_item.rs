@@ -1,10 +1,14 @@
 //! Sidebar conversation item component.
 //!
 //! Renders a single row in the pinned / active / archived sections of
-//! the sidebar plus the Pin / Mute / Archive context menu used to
-//! mutate its flags (Req 7.7, Req 14.1.2).
+//! the sidebar plus the Pin / Mute / Archive / Delete context menu
+//! used to mutate its flags (Req 7.7, Req 14.1.2). The Delete action
+//! opens an inline `ModalWrapper` confirmation owned by this row —
+//! the modal does not depend on `DialogState` so deletion remains
+//! reachable when no chat view is mounted (G21).
 
 use super::sidebar_conversation_menu::SidebarConversationMenu;
+use crate::components::room::modal_wrapper::{ModalSize, ModalWrapper};
 use crate::i18n;
 use crate::state::use_app_state;
 use icondata as i;
@@ -132,6 +136,10 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
     Signal::derive(move || app_state.active_conversation.get() == Some(conv_id_active.clone()));
 
   let menu_open = RwSignal::new(false);
+  // G21 — delete confirmation modal. Local to this row so the
+  // dialog is reachable even when there is no active chat view.
+  let delete_modal_open = RwSignal::new(false);
+  let delete_modal_open_signal: Signal<bool> = delete_modal_open.into();
 
   let has_unread = Signal::derive(move || unread_count_sig.get() > 0u32);
 
@@ -294,8 +302,72 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
           muted=muted_sig
           archived=archived_sig
           open=menu_open
+          on_delete=Callback::new(move |_: ()| delete_modal_open.set(true))
         />
       </Show>
+
+      // G21 — delete-confirmation modal. Owned by the row so the
+      // dialog renders independently of the chat view's
+      // `DialogState`. The modal portal-renders to `#modal-root`
+      // (via `ModalWrapper::Portal`), so layout is unaffected by
+      // the sidebar's `backdrop-filter` containing-block trap (G19).
+      {
+        let conv_for_delete = conv_id.clone();
+        let on_close: Callback<()> = Callback::new(move |_: ()| delete_modal_open.set(false));
+        let on_cancel: Callback<()> = Callback::new(move |_: ()| delete_modal_open.set(false));
+        let on_confirm: Callback<()> = Callback::new(move |_: ()| {
+          app_state.purge_conversation(&conv_for_delete);
+          delete_modal_open.set(false);
+        });
+        view! {
+          <ModalWrapper
+            on_close=on_close
+            open=delete_modal_open_signal
+            size=ModalSize::Small
+            class="dialog-box"
+            labelled_by="sidebar-delete-modal-title"
+            testid="sidebar-delete-modal"
+          >
+            <div class="modal-body">
+              <h2
+                id="sidebar-delete-modal-title"
+                class="dialog-message"
+                data-testid="sidebar-delete-modal-title"
+              >
+                {move || t_string!(i18n, sidebar.delete_confirm_title)}
+              </h2>
+              <p
+                class="dialog-message"
+                data-testid="sidebar-delete-modal-body"
+              >
+                {move || t_string!(i18n, sidebar.delete_confirm_body)}
+              </p>
+              <div class="dialog-actions">
+                <button
+                  type="button"
+                  class="dialog-btn dialog-btn-cancel"
+                  aria-label=move || t_string!(i18n, sidebar.delete_confirm_cancel)
+                  title=move || t_string!(i18n, sidebar.delete_confirm_cancel)
+                  on:click=move |_| on_cancel.run(())
+                  data-testid="sidebar-delete-modal-cancel"
+                >
+                  <Icon icon=i::LuX />
+                </button>
+                <button
+                  type="button"
+                  class="dialog-btn dialog-btn-ok dialog-btn-danger"
+                  aria-label=move || t_string!(i18n, sidebar.delete_confirm_ok)
+                  title=move || t_string!(i18n, sidebar.delete_confirm_ok)
+                  on:click=move |_| on_confirm.run(())
+                  data-testid="sidebar-delete-modal-confirm"
+                >
+                  <Icon icon=i::LuTrash2 />
+                </button>
+              </div>
+            </div>
+          </ModalWrapper>
+        }
+      }
     </div>
   }
 }

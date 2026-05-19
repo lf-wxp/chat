@@ -67,6 +67,11 @@ pub fn pin_click_action(currently_pinned: bool, at_cap: bool) -> PinClickAction 
 ///   in the e2e coverage plan).
 /// * `open` — externally controlled visibility signal; the menu itself
 ///   flips this to `false` on close.
+/// * `on_delete` — called when the user clicks the Delete item.
+///   The parent owns the confirmation flow (via its own
+///   `ModalWrapper`) so the menu can stay decoupled from any global
+///   `DialogState` and remains usable from sidebar paths that mount
+///   without an active chat view (G21).
 #[component]
 pub fn SidebarConversationMenu(
   conversation_id: ConversationId,
@@ -74,6 +79,7 @@ pub fn SidebarConversationMenu(
   muted: Signal<bool>,
   archived: Signal<bool>,
   open: RwSignal<bool>,
+  on_delete: Callback<()>,
 ) -> impl IntoView {
   let app_state = use_app_state();
   let i18n = i18n::use_i18n();
@@ -166,6 +172,7 @@ pub fn SidebarConversationMenu(
       t_string!(i18n, sidebar.archive)
     }
   };
+  let delete_label = move || t_string!(i18n, sidebar.delete);
 
   view! {
     <div
@@ -253,6 +260,25 @@ pub fn SidebarConversationMenu(
       >
         <Icon icon=i::LuArchive />
         <span>{archive_label}</span>
+      </button>
+
+      // G21 — Delete conversation. Closes the menu first so the
+      // outside-click listener does not race the modal that the
+      // parent will open.
+      <button
+        type="button"
+        class="sidebar-conversation-menu__item sidebar-conversation-menu__item--danger"
+        role="menuitem"
+        aria-label=delete_label
+        title=delete_label
+        data-testid="sidebar-conversation-menu-delete"
+        on:click=move |_| {
+          open.set(false);
+          on_delete.run(());
+        }
+      >
+        <Icon icon=i::LuTrash2 />
+        <span>{delete_label}</span>
       </button>
     </div>
   }

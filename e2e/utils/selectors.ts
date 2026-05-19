@@ -40,6 +40,10 @@ export const sel = {
   sidebarConversationMenuPin: '[data-testid="sidebar-conversation-menu-pin"]',
   sidebarConversationMenuMute: '[data-testid="sidebar-conversation-menu-mute"]',
   sidebarConversationMenuArchive: '[data-testid="sidebar-conversation-menu-archive"]',
+  sidebarConversationMenuDelete: '[data-testid="sidebar-conversation-menu-delete"]',
+  sidebarDeleteModal: '[data-testid="sidebar-delete-modal"]',
+  sidebarDeleteModalConfirm: '[data-testid="sidebar-delete-modal-confirm"]',
+  sidebarDeleteModalCancel: '[data-testid="sidebar-delete-modal-cancel"]',
   homeEmpty: '[data-testid="home-empty"]',
 
   // ---- Room create modal ----

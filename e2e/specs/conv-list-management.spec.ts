@@ -1,6 +1,6 @@
 /**
- * Conversation list management — pin / mute / archive context-menu actions
- * and (new in G20) the sidebar search filter.
+ * Conversation list management — pin / mute / archive / delete
+ * context-menu actions and the sidebar search filter (G20).
  *
  * Maps to: Wave P2-4. The persisted versions of these flags (pin /
  * archive surviving a reload via IDB `conversation_flags`) are
@@ -18,12 +18,11 @@
  *   4. Search filter (G20) → typing in `sidebar-search-input` filters
  *      the conversation rows by case-insensitive substring on
  *      `display_name`; clearing the query restores every row.
- *
- * Plan §3 P2-4 originally also listed "delete conversation" as a
- * fifth test. That UI surface is missing from the current frontend
- * (no per-row delete affordance, no `AppState::delete_conversation`
- * method). The gap is tracked in the plan §2.1 table as G21; the
- * test will land once the surface ships.
+ *   5. Delete (G21) → menu item opens a confirmation modal; Cancel
+ *      keeps the row; Confirm removes it from the in-memory list
+ *      and the deletion survives a page reload (IDB tombstone is
+ *      flushed via the persist debounce; messages + search index
+ *      are cleared via `PersistenceManager::clear_conversation`).
  */
 
 import { sel } from '../utils/selectors.ts';
@@ -33,6 +32,7 @@ import {
   sendAndVerifyMessage,
 } from '../fixtures/helpers.ts';
 import { expect, test } from '../fixtures/test-base.ts';
+import { waitForAppShell } from '../utils/wait-helpers.ts';
 
 test.describe('conversation list management', () => {
   test.beforeEach(async ({ pageA, pageB, server }) => {
@@ -186,5 +186,67 @@ test.describe('conversation list management', () => {
     // Clearing the input restores both rows.
     await search.fill('');
     await expect(allRows).toHaveCount(2, { timeout: 5_000 });
+  });
+
+  test('delete cancel keeps the row (G21)', async ({ pageA }) => {
+    const row = pageA.locator(sel.sidebarConversationItem).first();
+    await expect(row).toBeVisible();
+
+    // Open the row's context menu → click Delete → the confirmation
+    // modal appears with both buttons reachable.
+    await row.locator(sel.sidebarConversationActions).click();
+    await expect(pageA.locator(sel.sidebarConversationMenu)).toBeVisible();
+    await pageA.locator(sel.sidebarConversationMenuDelete).click();
+
+    const modal = pageA.locator(sel.sidebarDeleteModal);
+    await expect(modal).toBeVisible({ timeout: 5_000 });
+
+    // Cancel — the row must remain.
+    await pageA.locator(sel.sidebarDeleteModalCancel).click();
+    await expect(modal).toBeHidden({ timeout: 5_000 });
+    await expect(pageA.locator(sel.sidebarConversationItem)).toHaveCount(1);
+  });
+
+  test('delete confirm removes the row and the deletion survives a reload (G21)', async ({
+    pageA,
+  }) => {
+    const row = pageA.locator(sel.sidebarConversationItem).first();
+    await expect(row).toBeVisible();
+    // Capture the row's stable name so we can assert the post-reload
+    // sidebar does NOT contain it (rather than relying on count
+    // alone — a flake-resistant invariant in case future seed work
+    // creates additional rows).
+    const ariaLabel = await row.getAttribute('aria-label');
+    expect(ariaLabel).toBeTruthy();
+    const displayName = ariaLabel!.split(' — ')[0].trim();
+    expect(displayName.length).toBeGreaterThan(0);
+
+    // Trigger the delete confirmation and confirm.
+    await row.locator(sel.sidebarConversationActions).click();
+    await expect(pageA.locator(sel.sidebarConversationMenu)).toBeVisible();
+    await pageA.locator(sel.sidebarConversationMenuDelete).click();
+
+    const modal = pageA.locator(sel.sidebarDeleteModal);
+    await expect(modal).toBeVisible({ timeout: 5_000 });
+    await pageA.locator(sel.sidebarDeleteModalConfirm).click();
+    await expect(modal).toBeHidden({ timeout: 5_000 });
+
+    // The row is gone from the sidebar (in-memory state).
+    await expect(pageA.locator(sel.sidebarConversationItem)).toHaveCount(0, {
+      timeout: 5_000,
+    });
+
+    // ── G21 IDB tombstone — reload and verify the row stays gone ──
+    //
+    // `persist_conversations` shares a 500 ms debounce window with
+    // the dirty-flag flush. Wait for the debounce + IDB flush so
+    // the reload below loads the post-delete snapshot rather than
+    // the stale pre-debounce one.
+    await pageA.waitForTimeout(800);
+    await pageA.reload();
+    await waitForAppShell(pageA);
+    await expect(pageA.locator(sel.sidebarConversationItem)).toHaveCount(0, {
+      timeout: 10_000,
+    });
   });
 });

@@ -569,11 +569,16 @@ impl AppState {
   }
 
   /// Remove a conversation from both the in-memory list and the
-  /// IndexedDB `conversation_flags` store. Should be called by chat /
-  /// room cleanup paths when a session is permanently removed
-  /// (LeaveRoom, direct-chat deletion). The IDB delete is queued and
-  /// flushed alongside flag writes so we do not race ourselves
-  /// (review v3 §B1).
+  /// IndexedDB stores (`conversation_flags`, `messages`, search
+  /// index). Should be called by chat / room cleanup paths when a
+  /// session is permanently removed (LeaveRoom, direct-chat
+  /// deletion via the sidebar menu — G21).
+  ///
+  /// The flag-store delete is queued via `tombstone_conv_ids` and
+  /// flushed alongside flag writes by the shared persist debounce
+  /// (review v3 §B1). The message-store / search-index delete runs
+  /// fire-and-forget on a separately spawned task so the
+  /// synchronous click handler never blocks on the IDB round-trip.
   pub fn purge_conversation(&self, conversation_id: &ConversationId) {
     let mut removed = false;
     self.conversations.update(|convs| {
@@ -599,6 +604,24 @@ impl AppState {
       }
     }
     self.persist_conversations();
+
+    // G21 — fire-and-forget delete of the message store + search
+    // index for this conversation. Runs on a separately spawned
+    // task so the synchronous caller (sidebar menu click handler)
+    // never blocks on IDB. A missing PersistenceManager (tests /
+    // pre-init) is silently ignored — `tombstone_conv_ids` already
+    // covers the flags row and the messages will simply remain
+    // orphan in IDB until the user re-runs the delete or the
+    // schema migrates them away.
+    #[cfg(target_arch = "wasm32")]
+    {
+      let conv_for_clear = conversation_id.clone();
+      wasm_bindgen_futures::spawn_local(async move {
+        if let Some(pm) = crate::persistence::try_use_persistence_manager() {
+          let _ = pm.clear_conversation(&conv_for_clear).await;
+        }
+      });
+    }
   }
 
   /// Persist conversation state across both storage layers behind a
