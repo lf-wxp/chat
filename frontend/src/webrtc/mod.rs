@@ -245,6 +245,12 @@ pub enum TheaterPeerEvent {
 /// theater subsystems can observe the same transitions independently.
 type TheaterPeerEventHandler = Rc<dyn Fn(UserId, TheaterPeerEvent)>;
 
+/// Theater-specific remote-track callback. Fires alongside the generic
+/// [`RemoteTrackHandler`] so the theater subsystem can bind the
+/// incoming owner stream to the viewer's `<video>` element without
+/// displacing the call subsystem's participant-grid handler.
+type TheaterRemoteTrackHandler = Rc<dyn Fn(UserId, web_sys::MediaStream)>;
+
 /// Main WebRTC manager that orchestrates all peer connections.
 ///
 /// Uses `Rc<RefCell<>>` for single-threaded WASM compatibility.
@@ -288,6 +294,10 @@ pub struct WebRtcManager {
   /// §12). Runs alongside the call-focused [`on_peer_connected`] /
   /// [`on_peer_closed`] handlers so both subsystems stay informed.
   on_theater_peer_event: Rc<RefCell<Option<TheaterPeerEventHandler>>>,
+  /// Callback invoked when a remote media stream arrives on any peer
+  /// connection, routed to the theater subsystem so the viewer can
+  /// bind the owner's stream to its `<video>` element.
+  on_theater_remote_track: Rc<RefCell<Option<TheaterRemoteTrackHandler>>>,
   inner: Rc<RefCell<InnerManager>>,
 }
 
@@ -395,6 +405,7 @@ impl WebRtcManager {
       on_reconnecting_state: Rc::new(RefCell::new(None)),
       on_theater_message: Rc::new(RefCell::new(None)),
       on_theater_peer_event: Rc::new(RefCell::new(None)),
+      on_theater_remote_track: Rc::new(RefCell::new(None)),
       inner: Rc::new(RefCell::new(InnerManager {
         connections: HashMap::new(),
         crypto: HashMap::new(),
@@ -525,16 +536,42 @@ impl WebRtcManager {
     *self.on_theater_peer_event.borrow_mut() = None;
   }
 
+  /// Register a callback for remote media-stream arrivals routed to
+  /// the theater subsystem (Req 12.3). The theater page installs this
+  /// on mount so the viewer can bind the owner's stream to its
+  /// `<video>` element. Runs alongside the call subsystem's
+  /// [`Self::set_on_remote_track`] handler.
+  pub fn set_on_theater_remote_track<F>(&self, callback: F)
+  where
+    F: Fn(UserId, web_sys::MediaStream) + 'static,
+  {
+    *self.on_theater_remote_track.borrow_mut() = Some(Rc::new(callback));
+  }
+
+  /// Remove any previously-installed theater remote-track handler.
+  /// Safe to call when no handler was registered.
+  pub fn clear_on_theater_remote_track(&self) {
+    *self.on_theater_remote_track.borrow_mut() = None;
+  }
+
   /// Install the configured remote-track handler on a freshly-created
   /// [`PeerConnection`] so the call subsystem sees arriving streams.
-  /// No-op when no handler has been registered yet.
+  /// Also invokes the theater-specific handler when registered so the
+  /// viewer can bind the owner's stream independently.
   fn wire_remote_track_handler(&self, pc: &PeerConnection, peer_id: UserId) {
-    let Some(handler) = self.on_remote_track.borrow().clone() else {
-      return;
-    };
-    let handler = handler.clone();
+    // Clone the Rc handles (not the inner Option) so the closure reads
+    // the handler lazily at the time `ontrack` fires. This avoids a
+    // race where the PeerConnection is created before the theater page
+    // (or call subsystem) has registered its handler.
+    let call_handler_rc = Rc::clone(&self.on_remote_track);
+    let theater_handler_rc = Rc::clone(&self.on_theater_remote_track);
     pc.set_on_track(move |stream| {
-      handler(peer_id.clone(), stream);
+      if let Some(ref h) = *call_handler_rc.borrow() {
+        h(peer_id.clone(), stream.clone());
+      }
+      if let Some(ref h) = *theater_handler_rc.borrow() {
+        h(peer_id.clone(), stream);
+      }
     });
   }
 
@@ -555,6 +592,15 @@ impl WebRtcManager {
     let manager = self.clone();
     let pc_clone = pc.clone();
     pc.set_on_negotiation_needed(move || {
+      // If the renegotiation was pre-empted (e.g. tracks were attached
+      // before the initial offer in `connect_to_peer_with_stream`),
+      // skip this event — the tracks are already in the offer.
+      if pc_clone.should_suppress_renegotiation() {
+        web_sys::console::log_1(
+          &"[webrtc] Suppressed onnegotiationneeded (tracks in initial offer)".into(),
+        );
+        return;
+      }
       // Skip if we are mid-negotiation already.
       if let Ok(rtc_pc) = pc_clone.get_rtc_pc()
         && rtc_pc.signaling_state() != web_sys::RtcSignalingState::Stable
@@ -647,6 +693,33 @@ impl WebRtcManager {
   /// 4. Sends SdpOffer via signaling
   /// 5. Initiates ECDH key exchange (key sent when DataChannel opens)
   pub async fn connect_to_peer(&self, peer_id: UserId) -> Result<(), WebRtcError> {
+    self.connect_to_peer_inner(peer_id, None).await
+  }
+
+  /// Same as [`Self::connect_to_peer`] but pre-attaches the given
+  /// `MediaStream` tracks to the PeerConnection **before** the initial
+  /// SDP offer is created. This avoids a post-connect renegotiation
+  /// which can fail in Chrome with "m-line order mismatch" when a
+  /// DataChannel was already negotiated in the initial offer.
+  ///
+  /// Used by the theater auto-connect flow (Req 12.3 §12) where the
+  /// owner already has a captured local stream ready to push to a
+  /// late-joining viewer.
+  pub async fn connect_to_peer_with_stream(
+    &self,
+    peer_id: UserId,
+    stream: &web_sys::MediaStream,
+  ) -> Result<(), WebRtcError> {
+    self.connect_to_peer_inner(peer_id, Some(stream)).await
+  }
+
+  /// Core implementation shared by [`Self::connect_to_peer`] and
+  /// [`Self::connect_to_peer_with_stream`].
+  async fn connect_to_peer_inner(
+    &self,
+    peer_id: UserId,
+    initial_stream: Option<&web_sys::MediaStream>,
+  ) -> Result<(), WebRtcError> {
     // Atomically check total occupied slots (existing + in-flight)
     // and reserve a slot before any async yield point.
     let in_flight_rc = {
@@ -762,6 +835,27 @@ impl WebRtcManager {
       .get(&peer_id)
       .cloned()
       .ok_or_else(|| WebRtcError::peer_not_found(peer_id.clone()))?;
+
+    // If an initial stream was provided (e.g. theater owner pushing to
+    // a late-joining viewer), attach its tracks BEFORE creating the
+    // offer so they are included in the initial SDP negotiation. This
+    // avoids a post-connect renegotiation that Chrome rejects with
+    // "m-line order mismatch" when a DataChannel m-line already exists.
+    if let Some(stream) = initial_stream {
+      // Only suppress `onnegotiationneeded` if the stream actually has
+      // tracks to add. If the stream is empty (e.g. captureStream()
+      // returned before the video decoded), let renegotiation happen
+      // naturally when tracks become available.
+      let has_tracks = stream.get_tracks().length() > 0;
+      if has_tracks {
+        peer_connection.suppress_next_renegotiation();
+      }
+      if let Err(e) = peer_connection.publish_local_stream(stream) {
+        web_sys::console::warn_1(
+          &format!("[webrtc] Failed to attach initial stream to {peer_id}: {e}").into(),
+        );
+      }
+    }
 
     let offer_result = peer_connection.create_offer().await;
 

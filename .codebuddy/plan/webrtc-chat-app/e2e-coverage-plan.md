@@ -292,13 +292,16 @@ needed). When a wave item lands, replace its status emoji:
 - [x] P2-4 conv-list-management.spec.ts — pin / mute / archive +
   search filter (G20 resolved) + delete (G21 resolved with reload-
   survival assertion).
-- [~] P2-5 theater.spec.ts — creator/source-picker + in-room chat
+- [x] P2-5 theater.spec.ts — creator/source-picker + in-room chat
   round-trip + URL-picker validation + owner-side local-file
   playback with `<video>` mounted on a `blob:` object URL (G27
   resolved owner-side, including the `has_video_source`
-  chicken-and-egg fix). Viewer-join + cross-peer danmaku still
-  deferred — needs WebRTC publish_to_peers + room-join
-  choreography on top of the fixture.
+  chicken-and-egg fix). Viewer-join now implemented: added
+  `TheaterRemoteTrackHandler` to `WebRtcManager`, viewer-side
+  `remote_stream` signal in `TheaterState`, and a binding Effect in
+  `theater_video_player.rs` that sets `<video>.srcObject` when the
+  owner's stream arrives via `ontrack`. E2E test confirms viewer
+  receives the owner's MediaStream with at least one track.
 - [x] P2-6 settings.spec.ts
 - [x] P2-7 profile.spec.ts (5 tests) + avatar.spec.ts (4 tests) —
   block / unblock / blacklist persistence + in-session nickname

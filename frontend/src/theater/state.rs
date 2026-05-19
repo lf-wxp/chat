@@ -188,6 +188,11 @@ pub struct TheaterState {
   /// (Req 12.3 §12). `None` until the owner selects a video source.
   /// Viewers keep this signal untouched.
   pub local_stream: RwSignal<Option<MediaStream>>,
+  /// Viewer-side remote `MediaStream` received from the owner via
+  /// the `ontrack` WebRTC callback. `None` until the first track
+  /// arrives. The theater video player binds this to `<video>.srcObject`
+  /// when the viewer role is active.
+  pub remote_stream: RwSignal<Option<MediaStream>>,
   /// Current playback snapshot (updated by the video element).
   pub playback: RwSignal<PlaybackSnapshot>,
   /// Owner quality tier — only meaningful when I am the owner.
@@ -255,6 +260,7 @@ impl TheaterState {
       has_video_source: RwSignal::new(false),
       video_source_label: RwSignal::new(String::new()),
       local_stream: RwSignal::new(None),
+      remote_stream: RwSignal::new(None),
       playback: RwSignal::new(PlaybackSnapshot::default()),
       quality_tier: RwSignal::new(QualityTier::HighDefinition),
       owner_high_load: RwSignal::new(false),
@@ -305,6 +311,7 @@ impl TheaterState {
     self.has_video_source.set(false);
     self.video_source_label.set(String::new());
     self.local_stream.set(None);
+    self.remote_stream.set(None);
     self.playback.set(PlaybackSnapshot::default());
     self.quality_tier.set(QualityTier::HighDefinition);
     self.owner_high_load.set(false);

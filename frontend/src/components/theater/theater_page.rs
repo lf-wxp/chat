@@ -121,21 +121,35 @@ pub fn TheaterPage(
       }
     });
 
+    // Viewer-side remote track reception — Req 12.3. When the owner
+    // pushes a MediaStream via `publish_local_stream` /
+    // `publish_local_stream_to`, the browser fires `ontrack` on the
+    // viewer's PeerConnection. This handler stores the stream in
+    // `TheaterState::remote_stream` and flips `has_video_source` so
+    // the `<video>` element mounts and the player can bind it.
+    manager.set_on_theater_remote_track(move |_peer_id, stream| {
+      let role = state.my_role.get_untracked();
+      if role != TheaterRole::Owner {
+        state.remote_stream.set(Some(stream));
+        state.has_video_source.set(true);
+      }
+    });
+
     // Owner / viewer peer lifecycle — Req 12.2 §6a + 12.3 §12. The
     // callback runs alongside the call subsystem's handlers so the
     // theater page can flip `owner_reconnecting` (for viewers) and
     // publish the current MediaStream to late-joining viewers (for
     // owners) without displacing the call-side wiring.
-    let manager_for_peer = manager.clone();
     manager.set_on_theater_peer_event(move |peer_id, event| {
       let owner = state.owner_id.get_untracked();
       let role = state.my_role.get_untracked();
       match (role, event) {
         (TheaterRole::Owner, TheaterPeerEvent::Connected) => {
-          // Late-joiner auto stream push (Req 12.3 §12).
-          if let Some(stream) = state.local_stream.get_untracked() {
-            manager_for_peer.publish_local_stream_to(&peer_id, &stream);
-          }
+          // Tracks are pre-attached via `connect_to_peer_with_stream`
+          // in the auto-connect Effect, so no post-connect publish is
+          // needed. Attempting `publish_local_stream_to` here would
+          // trigger a renegotiation that Chrome rejects with "m-line
+          // order mismatch" when a DataChannel m-line already exists.
         }
         (_, TheaterPeerEvent::Connected) if owner.as_ref() == Some(&peer_id) => {
           // Viewer: owner peer just came back — clear the banner.
@@ -165,6 +179,70 @@ pub fn TheaterPage(
     on_cleanup(move || {
       manager_for_cleanup.clear_on_theater_message();
       manager_for_cleanup.clear_on_theater_peer_event();
+      manager_for_cleanup.clear_on_theater_remote_track();
+    });
+  }
+
+  // ── Effect: owner auto-connect to late-joining viewers (Req 12.3 §12) ──
+  // When a new viewer joins the theater room, the owner automatically
+  // initiates a WebRTC connection with the local stream pre-attached so
+  // the initial SDP offer already contains the media tracks. This avoids
+  // a post-connect renegotiation that Chrome rejects with "m-line order
+  // mismatch" when a DataChannel m-line already exists.
+  {
+    let prev_members: Rc<RefCell<std::collections::HashSet<message::UserId>>> =
+      Rc::new(RefCell::new(std::collections::HashSet::new()));
+    Effect::new(move |_| {
+      let role = state.my_role.get_untracked();
+      if role != TheaterRole::Owner {
+        return;
+      }
+      let Some(room_id) = state.room_id.get_untracked() else {
+        return;
+      };
+      let current_members: std::collections::HashSet<message::UserId> =
+        app.room_members.with(|map| {
+          map
+            .get(&room_id)
+            .map(|list| list.iter().map(|m| m.user_id.clone()).collect())
+            .unwrap_or_default()
+        });
+      let prev = prev_members.borrow().clone();
+      let added: Vec<message::UserId> = current_members.difference(&prev).cloned().collect();
+      *prev_members.borrow_mut() = current_members;
+
+      if added.is_empty() {
+        return;
+      }
+      let my_id = app
+        .auth
+        .with_untracked(|a| a.as_ref().map(|a| a.user_id.clone()));
+      let stream = state.local_stream.get_untracked();
+      let Some(manager) = try_use_webrtc_manager() else {
+        return;
+      };
+      for peer in added {
+        if my_id.as_ref() == Some(&peer) {
+          continue;
+        }
+        if manager.is_connected(&peer) {
+          continue;
+        }
+        let mgr = manager.clone();
+        let stream_clone = stream.clone();
+        leptos::task::spawn_local(async move {
+          let result = if let Some(ref s) = stream_clone {
+            mgr.connect_to_peer_with_stream(peer.clone(), s).await
+          } else {
+            mgr.connect_to_peer(peer.clone()).await
+          };
+          if let Err(e) = result {
+            web_sys::console::warn_1(
+              &format!("[theater] auto-connect to viewer {} failed: {e}", peer).into(),
+            );
+          }
+        });
+      }
     });
   }
 

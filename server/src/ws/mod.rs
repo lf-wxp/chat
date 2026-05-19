@@ -145,12 +145,24 @@ impl WebSocketState {
       .collect()
   }
 
-  /// Check if a user is connected.
-  #[must_use]
+  /// Check if a user is currently connected.
   pub fn is_connected(&self, user_id: &UserId) -> bool {
     self.connections.contains_key(user_id)
   }
 
+  /// Check if two users are members of the same room.
+  ///
+  /// Used by the WebRTC signaling relay to allow SDP offers between
+  /// room co-members (e.g. theater owner → viewer) even when they do
+  /// not have a direct peer relationship via `ConnectionInviteAccepted`.
+  pub fn share_room(&self, user_a: &UserId, user_b: &UserId) -> bool {
+    let room_a = self.room_state.get_user_room(user_a);
+    let room_b = self.room_state.get_user_room(user_b);
+    match (room_a, room_b) {
+      (Some(a), Some(b)) => a == b,
+      _ => false,
+    }
+  }
   /// Get all connected user IDs.
   #[must_use]
   pub fn connected_users(&self) -> Vec<UserId> {

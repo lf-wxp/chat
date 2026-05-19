@@ -76,17 +76,20 @@ pub fn handle_signaling_message(
       // PeerConnection torn down on the local side (Req 15.5.40 —
       // Sprint 5.3). The set of removed peers may include kicked,
       // banned and self-leaving members alike.
-      let removed: Vec<message::UserId> = app_state.room_members.with(|map| {
-        let prev: std::collections::HashSet<&message::UserId> = map
-          .get(&update.room_id)
-          .map(|list| list.iter().map(|m| &m.user_id).collect())
-          .unwrap_or_default();
-        let now: std::collections::HashSet<&message::UserId> =
-          update.members.iter().map(|m| &m.user_id).collect();
-        prev.difference(&now).map(|u| (*u).clone()).collect()
-      });
+      let prev_set: std::collections::HashSet<message::UserId> =
+        app_state.room_members.with(|map| {
+          map
+            .get(&update.room_id)
+            .map(|list| list.iter().map(|m| m.user_id.clone()).collect())
+            .unwrap_or_default()
+        });
+      let now_set: std::collections::HashSet<message::UserId> =
+        update.members.iter().map(|m| m.user_id.clone()).collect();
+
+      let removed: Vec<message::UserId> = prev_set.difference(&now_set).cloned().collect();
+
       app_state.room_members.update(|map| {
-        map.insert(update.room_id, update.members);
+        map.insert(update.room_id.clone(), update.members);
       });
       if !removed.is_empty()
         && let Some(manager) = crate::webrtc::try_use_webrtc_manager()

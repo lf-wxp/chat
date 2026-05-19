@@ -64,6 +64,11 @@ pub struct PeerConnection {
   /// so we can detach them (`remove_track`) without re-negotiating when
   /// the call ends.
   local_senders: Rc<RefCell<Vec<RtcRtpSender>>>,
+  /// Number of `onnegotiationneeded` events to suppress. Incremented
+  /// when tracks are pre-attached via `connect_to_peer_with_stream` so
+  /// the initial offer already includes them and the subsequent
+  /// browser-fired event does not trigger a redundant renegotiation.
+  suppress_renegotiation_count: Rc<std::cell::Cell<u32>>,
 }
 
 impl PeerConnection {
@@ -105,6 +110,7 @@ impl PeerConnection {
       on_track: Rc::new(RefCell::new(None)),
       on_negotiation_needed: Rc::new(RefCell::new(None)),
       local_senders: Rc::new(RefCell::new(Vec::new())),
+      suppress_renegotiation_count: Rc::new(std::cell::Cell::new(0)),
     })
   }
 
@@ -364,6 +370,28 @@ impl PeerConnection {
   ///
   /// Calling this while tracks are already published first detaches
   /// the previous senders so we do not double-publish on mode switches.
+  /// Increment the renegotiation suppression counter. Each call
+  /// suppresses one subsequent `onnegotiationneeded` event. Used when
+  /// tracks are pre-attached before the initial offer so the browser's
+  /// deferred event does not trigger a redundant renegotiation.
+  pub fn suppress_next_renegotiation(&self) {
+    let c = self.suppress_renegotiation_count.get();
+    self.suppress_renegotiation_count.set(c + 1);
+  }
+
+  /// Check whether the next `onnegotiationneeded` should be suppressed.
+  /// Returns `true` (and decrements the counter) if suppression is
+  /// active; returns `false` otherwise.
+  pub fn should_suppress_renegotiation(&self) -> bool {
+    let c = self.suppress_renegotiation_count.get();
+    if c > 0 {
+      self.suppress_renegotiation_count.set(c - 1);
+      true
+    } else {
+      false
+    }
+  }
+
   ///
   /// # Errors
   /// Returns `Err` if the browser rejects `addTrack` (e.g. the track

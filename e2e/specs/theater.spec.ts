@@ -224,4 +224,100 @@ test.describe('theater room', () => {
     const readyState = await video.evaluate((el: HTMLVideoElement) => el.readyState);
     expect(readyState).toBeGreaterThanOrEqual(2);
   });
+
+  test('viewer joins the theater room and receives the owner stream (P2-5)', async ({
+    pageA,
+    pageB,
+    server,
+  }) => {
+    // ── Owner (A): create theater + pick local video ──────────────────
+    await registerAndLogin(pageA, server, { hint: 'th-vj-a' });
+    await registerAndLogin(pageB, server, { hint: 'th-vj-b' });
+    const { name } = await createTheaterRoom(pageA);
+
+    // Owner picks the local video file so a MediaStream is captured
+    // and ready to be pushed to joining viewers.
+    await pageA.locator(sel.theaterSourceLocalInput).setInputFiles({
+      name: 'tiny.webm',
+      mimeType: 'video/webm',
+      buffer: (await import('node:fs')).readFileSync(TINY_WEBM),
+    });
+
+    // Wait for the owner's <video> to mount and decode at least one
+    // frame — this confirms the stream is captured and publishable.
+    const ownerVideo = pageA.locator(sel.theaterVideo);
+    await expect(ownerVideo).toBeVisible({ timeout: 10_000 });
+    await expect
+      .poll(
+        async () => ownerVideo.evaluate((el: HTMLVideoElement) => el.readyState),
+        { timeout: 10_000 },
+      )
+      .toBeGreaterThanOrEqual(2);
+
+    // Debug: collect console logs from both pages to diagnose WebRTC flow
+    const logsA: string[] = [];
+    const logsB: string[] = [];
+    pageA.on('console', (msg) => { if (msg.text().includes('[webrtc]') || msg.text().includes('[theater]')) logsA.push(msg.text()); });
+    pageB.on('console', (msg) => { if (msg.text().includes('[webrtc]') || msg.text().includes('[theater]')) logsB.push(msg.text()); });
+
+    // ── Viewer (B): join the theater room ─────────────────────────────
+    // The room appears in B's sidebar via `RoomListUpdate`. Click the
+    // join button, which triggers `JoinRoom` → `RoomJoined` and sets
+    // `active_conversation` to the theater room. The home page then
+    // renders `<TheaterPage>` instead of `<ChatView>`.
+    const itemOnB = pageB.locator(
+      `${sel.sidebarRoomItem}[data-room-name="${name}"]`,
+    );
+    await expect(itemOnB).toBeVisible({ timeout: 15_000 });
+    await itemOnB.locator(sel.sidebarRoomJoinBtn).click();
+    await expect(itemOnB).toHaveAttribute('data-joined', 'true', { timeout: 15_000 });
+
+    // TheaterPage mounts on B because the room_type is Theater.
+    await expect(pageB.locator(sel.theaterPage)).toBeVisible({ timeout: 15_000 });
+
+    // Wait a bit for the auto-connect to happen
+    await pageA.waitForTimeout(5_000);
+
+    // Debug: check owner's peer connection state
+    const ownerDebug = await pageA.evaluate(() => {
+      const w = (window as unknown as { __webrtc_debug?: () => unknown }).__webrtc_debug;
+      return w ? w() : 'no debug hook';
+    });
+    console.log('[DEBUG] Owner WebRTC state:', JSON.stringify(ownerDebug));
+    console.log('[DEBUG] Owner logs:', logsA);
+    console.log('[DEBUG] Viewer logs:', logsB);
+
+    // The viewer initially sees the "waiting for stream" placeholder
+    // until the WebRTC handshake completes and the owner pushes the
+    // stream. Once `ontrack` fires, `has_video_source` flips and the
+    // `<video>` element mounts with `srcObject` bound.
+    const viewerVideo = pageB.locator(sel.theaterVideo);
+    await expect(viewerVideo).toBeVisible({ timeout: 30_000 });
+
+    // Confirm the viewer's <video> has a MediaStream bound via
+    // srcObject (not a blob: URL like the owner's local file).
+    await expect
+      .poll(
+        async () =>
+          viewerVideo.evaluate((el: HTMLVideoElement) => {
+            const srcObj = (el as unknown as { srcObject: MediaStream | null }).srcObject;
+            return {
+              hasSrcObject: srcObj !== null,
+              trackCount: srcObj ? srcObj.getTracks().length : 0,
+            };
+          }),
+        { timeout: 30_000 },
+      )
+      .toMatchObject({
+        hasSrcObject: true,
+        trackCount: expect.any(Number),
+      });
+
+    // The viewer's track count should be at least 1 (video track).
+    const trackCount = await viewerVideo.evaluate((el: HTMLVideoElement) => {
+      const srcObj = (el as unknown as { srcObject: MediaStream | null }).srcObject;
+      return srcObj ? srcObj.getTracks().length : 0;
+    });
+    expect(trackCount).toBeGreaterThanOrEqual(1);
+  });
 });

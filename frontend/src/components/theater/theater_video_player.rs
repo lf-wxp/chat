@@ -83,6 +83,64 @@ fn owner_broadcast(
 }
 
 /// Owner-controlled `<video>` player for the theater room.
+///
+/// Helper: apply a captured `MediaStream` to the theater state and
+/// publish it to connected viewers. Extracted so it can be called
+/// both synchronously (when the video is already loaded) and from
+/// the deferred `canplay` callback.
+fn apply_captured_stream(
+  state: TheaterState,
+  stream: &web_sys::MediaStream,
+  _toast: crate::error_handler::ErrorToastManager,
+) {
+  use wasm_bindgen::JsCast;
+
+  // Req 12.4 §18 — when we have already published a stream,
+  // swap tracks in place via `replaceTrack()` so the browser
+  // does not trigger a full SDP renegotiation.
+  let had_previous = state.local_stream.get_untracked().is_some();
+
+  // Stop all tracks on the previous stream to release hardware
+  // resources (e.g. screen-share indicator) and prevent memory
+  // leaks from orphaned MediaStreamTrack objects.
+  if let Some(old_stream) = state.local_stream.get_untracked() {
+    let tracks = old_stream.get_tracks();
+    for i in 0..tracks.length() {
+      if let Some(track) = tracks.get(i).dyn_ref::<web_sys::MediaStreamTrack>() {
+        track.stop();
+      }
+    }
+  }
+
+  state.local_stream.set(Some(stream.clone()));
+  if let Some(manager) = try_use_webrtc_manager() {
+    if had_previous {
+      let mgr = manager.clone();
+      let stream_for_swap = stream.clone();
+      spawn_local(async move {
+        let tracks = stream_for_swap.get_tracks();
+        for i in 0..tracks.length() {
+          let Some(track) = tracks
+            .get(i)
+            .dyn_ref::<web_sys::MediaStreamTrack>()
+            .cloned()
+          else {
+            continue;
+          };
+          if let Err(err) = mgr.replace_local_track(&track, &stream_for_swap).await {
+            web_sys::console::warn_1(
+              &format!("[theater] replace_local_track failed: {err}").into(),
+            );
+          }
+        }
+      });
+    } else {
+      manager.publish_local_stream(stream);
+    }
+  }
+}
+
+/// Owner-controlled `<video>` player for the theater room.
 #[component]
 pub fn TheaterVideoPlayer(
   /// External `<video>` element reference. The parent owns the ref so
@@ -163,66 +221,46 @@ pub fn TheaterVideoPlayer(
     // Screen-share already has a MediaStream; local file / URL need
     // captureStream() to produce one.
     if state.my_role.get_untracked() == TheaterRole::Owner {
-      let captured = match src.kind {
-        VideoSourceKind::ScreenShare => src.stream.clone(),
-        VideoSourceKind::LocalFile | VideoSourceKind::RemoteUrl => {
-          match crate::call::capture_stream_from_video(video) {
-            Ok(stream) => Some(stream),
-            Err(msg) => {
-              toast.show_error_message("THR004", &msg);
-              None
-            }
-          }
-        }
-      };
-      if let Some(stream) = captured {
-        // Req 12.4 §18 — when we have already published a stream,
-        // swap tracks in place via `replaceTrack()` so the browser
-        // does not trigger a full SDP renegotiation. The first
-        // publish still goes through `publish_local_stream` because
-        // no senders exist yet.
-        let had_previous = state.local_stream.get_untracked().is_some();
-
-        // Stop all tracks on the previous stream to release hardware
-        // resources (e.g. screen-share indicator) and prevent memory
-        // leaks from orphaned MediaStreamTrack objects.
-        if let Some(old_stream) = state.local_stream.get_untracked() {
-          let tracks = old_stream.get_tracks();
-          for i in 0..tracks.length() {
-            if let Some(track) = tracks.get(i).dyn_ref::<web_sys::MediaStreamTrack>() {
-              track.stop();
-            }
-          }
-        }
-
-        state.local_stream.set(Some(stream.clone()));
-        if let Some(manager) = try_use_webrtc_manager() {
-          if had_previous {
-            let mgr = manager.clone();
-            let stream_for_swap = stream.clone();
-            spawn_local(async move {
-              let tracks = stream_for_swap.get_tracks();
-              for i in 0..tracks.length() {
-                let Some(track) = tracks
-                  .get(i)
-                  .dyn_ref::<web_sys::MediaStreamTrack>()
-                  .cloned()
-                else {
-                  continue;
-                };
-                if let Err(err) = mgr.replace_local_track(&track, &stream_for_swap).await {
-                  web_sys::console::warn_1(
-                    &format!("[theater] replace_local_track failed: {err}").into(),
-                  );
-                }
-              }
-            });
+      match src.kind {
+        VideoSourceKind::ScreenShare => {
+          if let Some(stream) = src.stream.clone() {
+            apply_captured_stream(state, &stream, toast);
           } else {
-            manager.publish_local_stream(&stream);
+            state.local_stream.set(None);
           }
         }
-      } else {
-        state.local_stream.set(None);
+        VideoSourceKind::LocalFile | VideoSourceKind::RemoteUrl => {
+          // For local files / URLs, `captureStream()` may return a
+          // MediaStream with 0 tracks if the video hasn't decoded its
+          // first frame yet. We defer capture to the `canplay` event
+          // which guarantees at least one frame is available and the
+          // stream will contain active tracks.
+          let video_el = video.clone();
+          let toast_clone = toast;
+          let state_clone = state;
+          let cb = wasm_bindgen::closure::Closure::once(Box::new(move || {
+            match crate::call::capture_stream_from_video(&video_el) {
+              Ok(stream) => apply_captured_stream(state_clone, &stream, toast_clone),
+              Err(msg) => {
+                toast_clone.show_error_message("THR004", &msg);
+                state_clone.local_stream.set(None);
+              }
+            }
+          }) as Box<dyn FnOnce()>);
+          // If the video already has enough data, fire immediately.
+          if video.ready_state() >= 3 {
+            match crate::call::capture_stream_from_video(video) {
+              Ok(stream) => apply_captured_stream(state, &stream, toast),
+              Err(msg) => {
+                toast.show_error_message("THR004", &msg);
+                state.local_stream.set(None);
+              }
+            }
+          } else {
+            let _ = video.add_event_listener_with_callback("canplay", cb.as_ref().unchecked_ref());
+            cb.forget();
+          }
+        }
       }
     }
   });
@@ -242,6 +280,26 @@ pub fn TheaterVideoPlayer(
       let video: &HtmlVideoElement = el.as_ref();
       crate::call::apply_speaker_settings(video.as_ref());
     }
+  });
+
+  // --- Effect: viewer-side remote stream binding (Req 12.3) -----------
+  // When the theater page's `on_theater_remote_track` handler stores
+  // the owner's MediaStream into `state.remote_stream`, this effect
+  // binds it to the `<video>.srcObject` so the viewer sees the
+  // owner's video. Only fires for non-owner roles.
+  Effect::new(move |_| {
+    if state.my_role.get() == TheaterRole::Owner {
+      return;
+    }
+    let Some(stream) = state.remote_stream.get() else {
+      return;
+    };
+    let Some(el) = video_ref.get() else { return };
+    let video: &HtmlVideoElement = el.as_ref();
+    let stream_js: JsValue = JsValue::from(&stream);
+    let _ = Reflect::set(video, &JsValue::from_str("srcObject"), &stream_js);
+    video.set_autoplay(true);
+    crate::call::apply_speaker_settings(video.as_ref());
   });
 
   // --- Effect: viewer-side owner-reconnecting pause / resume ------------

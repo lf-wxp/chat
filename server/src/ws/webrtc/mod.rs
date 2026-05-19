@@ -61,6 +61,7 @@ pub async fn handle_sdp_offer<S>(
   if !ws_state
     .discovery_state
     .are_peers(&sdp_offer.from, &sdp_offer.to)
+    && !ws_state.share_room(&sdp_offer.from, &sdp_offer.to)
   {
     // Check if there's a pending invitation
     let has_pending = ws_state
