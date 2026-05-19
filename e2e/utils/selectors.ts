@@ -136,7 +136,10 @@ export const sel = {
   // ---- File transfer card internals ----
   fileProgress: '[data-testid="file-progress"]',
   fileCancel: '[data-testid="file-cancel"]',
+  filePause: '[data-testid="file-pause"]',
+  fileResume: '[data-testid="file-resume"]',
   fileDownload: '[data-testid="file-download"]',
+  fileDownloadDangerBtn: '[data-testid="file-download-danger-btn"]',
   fileReReceive: '[data-testid="file-re-receive"]',
   fileHashMismatch: '[data-testid="file-hash-mismatch"]',
   fileDangerBadge: '[data-testid="file-danger-badge"]',

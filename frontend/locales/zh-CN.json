@@ -424,7 +424,10 @@
 		"hash_mismatch": "文件可能已损坏，建议重新接收",
 		"re_receive": "重新接收",
 		"cancel_transfer": "取消",
-		"cancel_receive": "取消"
+		"cancel_receive": "取消",
+		"pause_transfer": "暂停",
+		"resume_transfer": "继续",
+		"save_anyway_detail": "此文件类型可能存在安全风险。仍要保存吗？"
 	},
 	"settings": {
 		"title": "设置",

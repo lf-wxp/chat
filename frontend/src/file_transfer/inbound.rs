@@ -54,23 +54,53 @@ impl FileTransferManager {
     let data = chunk.data;
     let expected_hash = chunk.chunk_hash;
 
+    // G14 — user-initiated pause: drop incoming chunks on the floor
+    // (no bitmap update, no buffer write) so the reassembly state
+    // freezes at the pause point. On resume the receiver issues a
+    // `FileResumeRequest` for the now-missing chunks; any chunks
+    // that arrived during the pause are simply discarded and will
+    // be replayed by the sender as part of the resume round.
+    if self
+      .get_inbound_by_transfer(&tid)
+      .is_some_and(|rx| rx.user_paused.get_untracked())
+    {
+      return;
+    }
+
     let completed = self
       .with_inbound_mut(&peer, &tid, |rx| {
         let res = rx.record_chunk(index, data, Some(&expected_hash));
-        if let Err(e) = res {
-          // A per-chunk hash mismatch is recoverable via resume, so
-          // we log-and-drop rather than failing the whole transfer.
-          // Any other validation error (e.g. index out of range) is
-          // treated as a protocol violation.
-          if e.contains("hash mismatch") {
-            web_sys::console::warn_1(&format!("[file] {e}").into());
-          } else {
-            rx.status
-              .set(TransferStatus::Failed(format!("chunk error: {e}")));
+        match res {
+          Ok(true) => {
+            // Newly recorded chunk — check if it pushed the bitmap
+            // to a complete state, which is the only condition
+            // under which we want to finalise.
+            rx.is_complete()
           }
-          return false;
+          Ok(false) => {
+            // Duplicate chunk (already in bitmap). Must NOT trigger
+            // finalise: a prior finalise task may have already run
+            // `drop_chunks` on the canonical entry, so re-entering
+            // `reassemble_and_publish` here would observe
+            // `bitmap.is_complete() == true` together with an empty
+            // `chunks` map, producing the dreaded
+            // "missing chunk slot during reassembly" error.
+            false
+          }
+          Err(e) => {
+            // A per-chunk hash mismatch is recoverable via resume,
+            // so we log-and-drop rather than failing the whole
+            // transfer. Any other validation error (e.g. index out
+            // of range) is treated as a protocol violation.
+            if e.contains("hash mismatch") {
+              web_sys::console::warn_1(&format!("[file] {e}").into());
+            } else {
+              rx.status
+                .set(TransferStatus::Failed(format!("chunk error: {e}")));
+            }
+            false
+          }
         }
-        rx.is_complete()
       })
       .unwrap_or(false);
 

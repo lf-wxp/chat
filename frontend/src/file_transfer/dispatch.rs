@@ -27,8 +27,8 @@
 //! rejects any non-ECDH plaintext frame so a downgrade attacker
 //! cannot bypass E2EE.
 
-use super::send::{OutgoingTransfer, initial_chunk_size};
-use super::types::{TransferStatus, next_chunk_size};
+use super::send::OutgoingTransfer;
+use super::types::TransferStatus;
 use crate::webrtc::WebRtcManager;
 use leptos::prelude::*;
 use message::UserId;
@@ -284,7 +284,15 @@ async fn sleep_ms(_ms: u64) {}
 /// Ship every chunk of `tx` to a single peer.
 async fn ship_to_peer(tx: &OutgoingTransfer, webrtc: &WebRtcManager, peer: &UserId, start_ms: f64) {
   let total = tx.info.total_chunks;
-  let mut chunk_size = initial_chunk_size();
+  // Slice size *must* match the metadata that the receiver opened
+  // its bitmap with, otherwise the per-chunk index → byte-range
+  // mapping diverges and the receiver's `reassemble()` will report
+  // a `size mismatch` even after every chunk slot is filled.
+  //
+  // Flow-control still informs back-pressure (we yield while the
+  // DC buffer is at high-water and abort on a sustained stall), but
+  // it must not mutate the wire-format slice size — Req 6.2.
+  let info_chunk_size = tx.info.chunk_size as usize;
   let mut cursor = 0usize;
   let mut chunk_index = 0u32;
   // Timestamp (ms since `start_ms`) at which the current high-water
@@ -297,31 +305,30 @@ async fn ship_to_peer(tx: &OutgoingTransfer, webrtc: &WebRtcManager, peer: &User
     }
 
     // Flow control: back off while the DataChannel buffer is full.
-    if let Some(buffered) = buffered_amount(webrtc, peer) {
-      chunk_size = next_chunk_size(chunk_size, buffered);
-      if buffered >= super::types::BUFFER_HIGH_WATER {
-        // Start (or continue) tracking how long we have been
-        // stalled; abort when we cross STALL_TIMEOUT_MS.
-        let now = elapsed_since(start_ms);
-        let began = *stall_began_ms.get_or_insert(now);
-        if now.saturating_sub(began) >= STALL_TIMEOUT_MS {
-          tx.set_peer_status(
-            peer,
-            TransferStatus::Failed(format!(
-              "peer stalled: bufferedAmount stayed ≥ high-water for {STALL_TIMEOUT_MS} ms"
-            )),
-          );
-          return;
-        }
-        // Cooperative yield — let the browser drain the buffer.
-        yield_now().await;
-        continue;
+    if let Some(buffered) = buffered_amount(webrtc, peer)
+      && buffered >= super::types::BUFFER_HIGH_WATER
+    {
+      // Start (or continue) tracking how long we have been
+      // stalled; abort when we cross STALL_TIMEOUT_MS.
+      let now = elapsed_since(start_ms);
+      let began = *stall_began_ms.get_or_insert(now);
+      if now.saturating_sub(began) >= STALL_TIMEOUT_MS {
+        tx.set_peer_status(
+          peer,
+          TransferStatus::Failed(format!(
+            "peer stalled: bufferedAmount stayed ≥ high-water for {STALL_TIMEOUT_MS} ms"
+          )),
+        );
+        return;
       }
-      // Buffer drained — reset the stall clock.
-      stall_began_ms = None;
+      // Cooperative yield — let the browser drain the buffer.
+      yield_now().await;
+      continue;
     }
+    // Buffer drained — reset the stall clock.
+    stall_began_ms = None;
 
-    let end = (cursor + chunk_size).min(tx.bytes.len());
+    let end = (cursor + info_chunk_size).min(tx.bytes.len());
     let slice = &tx.bytes[cursor..end];
     cursor = end;
 

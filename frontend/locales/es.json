@@ -424,7 +424,10 @@
 		"hash_mismatch": "El archivo puede estar corrupto, se recomienda volver a recibir",
 		"re_receive": "Volver a recibir",
 		"cancel_transfer": "Cancelar",
-		"cancel_receive": "Cancelar"
+		"cancel_receive": "Cancelar",
+		"pause_transfer": "Pausar",
+		"resume_transfer": "Reanudar",
+		"save_anyway_detail": "Este tipo de archivo puede suponer riesgos de seguridad. ¿Guardar de todos modos?"
 	},
 	"settings": {
 		"title": "Configuración",

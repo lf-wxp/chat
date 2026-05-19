@@ -369,7 +369,90 @@ impl FileTransferManager {
     }
   }
 
-  /// Pause all inbound transfers from a peer whose connection has
+  /// User-initiated pause for an inbound transfer (G14 / Req 6.6).
+  ///
+  /// Flips `user_paused = true` on the inbound record and surfaces
+  /// [`TransferStatus::Paused`] so the file card swaps the cancel
+  /// button for a resume affordance. While paused,
+  /// [`Self::on_file_chunk`] drops incoming chunks on the floor —
+  /// the bitmap freezes at the pause point. On resume the receiver
+  /// replays a `FileResumeRequest` for the still-missing chunks.
+  ///
+  /// No-op when the transfer is already in a terminal state.
+  pub fn pause_inbound(&self, message_id: &MessageId) {
+    let Some(rx) = self.get_inbound_by_message(message_id) else {
+      return;
+    };
+    if rx.status.get_untracked().is_terminal() {
+      return;
+    }
+    rx.user_paused.set(true);
+    rx.status.set(TransferStatus::Paused);
+  }
+
+  /// User-initiated resume for an inbound transfer paused via
+  /// [`FileTransferManager::pause_inbound`].
+  ///
+  /// Clears the `user_paused` flag, flips status back to
+  /// `InProgress`, and issues a `FileResumeRequest` so the sender
+  /// replays the chunks that were dropped during the pause. The
+  /// natural `on_file_chunk` completion path then finalises the
+  /// transfer once the bitmap fills back up.
+  ///
+  /// No-op when (a) the transfer is already in a terminal state
+  /// (e.g. it raced to `Completed` before the user could click
+  /// resume), or (b) the bitmap is already complete (the transfer
+  /// finalised between the pause flip and this resume call — the
+  /// natural finalise path is in flight, we must not trigger a
+  /// second one which would double-`drop_chunks` and corrupt
+  /// reassembly).
+  pub fn resume_inbound(&self, message_id: &MessageId) {
+    let Some(rx) = self.get_inbound_by_message(message_id) else {
+      return;
+    };
+    if rx.status.get_untracked().is_terminal() {
+      return;
+    }
+    rx.user_paused.set(false);
+
+    let missing = rx.missing_chunks();
+    if missing.is_empty() {
+      // The bitmap is already complete — either the transfer
+      // finished naturally (status will flip to Completed once the
+      // already-spawned `reassemble_and_publish` task settles) or
+      // the chunks were committed before the pause guard fired.
+      // Either way, kicking off another `finalise_inbound` here
+      // would race with the natural one and risk reassembling from
+      // an already-`drop_chunks`'d canonical entry. Just clear the
+      // user-pause flag and let the natural path finalise.
+      rx.status.set(TransferStatus::InProgress);
+      return;
+    }
+
+    rx.status.set(TransferStatus::InProgress);
+
+    let transfer_id = rx.info.transfer_id;
+    if let Some(webrtc) = self.webrtc() {
+      use message::datachannel::{DataChannelMessage, FileResumeRequest};
+      let request = DataChannelMessage::FileResumeRequest(FileResumeRequest {
+        transfer_id,
+        missing_chunks: missing,
+        timestamp_nanos: std::convert::TryFrom::try_from(
+          chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0),
+        )
+        .unwrap_or(0),
+      });
+      let peer = rx.peer.clone();
+      wasm_bindgen_futures::spawn_local(async move {
+        if let Err(e) = webrtc
+          .send_encrypted_data_channel_message(peer, &request)
+          .await
+        {
+          web_sys::console::warn_1(&format!("[file] user-resume request send failed: {e}").into());
+        }
+      });
+    }
+  }
   /// dropped (Req 6.6).
   ///
   /// Transitions every non-terminal inbound transfer from the given
@@ -402,6 +485,9 @@ impl FileTransferManager {
         .filter(|((pid, _tid), rx)| {
           pid == peer_id
             && matches!(rx.status.get_untracked(), TransferStatus::Paused)
+            // G14 — never auto-resume a transfer the user explicitly
+            // paused; they have to click Resume themselves.
+            && !rx.user_paused.get_untracked()
             && !rx.missing_chunks().is_empty()
         })
         .map(|(_, rx)| (rx.info.transfer_id, rx.missing_chunks()))

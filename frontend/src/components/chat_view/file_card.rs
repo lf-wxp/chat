@@ -7,6 +7,7 @@
 //! potentially dangerous (Req 6.8b / 6.8c).
 
 use crate::chat::models::FileRef;
+use crate::components::chat_view::dialog::DialogState;
 use crate::file_transfer::{
   TransferProgress, TransferStatus, format_bytes, try_use_file_transfer_manager,
 };
@@ -16,6 +17,7 @@ use leptos::prelude::*;
 use leptos_i18n::t_string;
 use leptos_icons::Icon;
 use message::MessageId;
+use wasm_bindgen::JsCast;
 
 /// Whether the MIME type represents an image.
 fn is_image(mime: &str) -> bool {
@@ -166,6 +168,37 @@ pub fn FileCard(
     }
   });
 
+  // G14 — receiver-side user-initiated pause/resume affordances.
+  // Only inbound, non-terminal transfers expose pause/resume; the
+  // sender already has a Cancel button which covers the symmetric
+  // outbound case.
+  let show_pause = Memo::new(move |_| {
+    !outgoing
+      && matches!(
+        status.get(),
+        TransferStatus::InProgress | TransferStatus::Preparing
+      )
+  });
+  let show_resume = Memo::new(move |_| !outgoing && matches!(status.get(), TransferStatus::Paused));
+
+  let on_pause = {
+    let mgr = try_use_file_transfer_manager();
+    Callback::new(move |_: ()| {
+      if let Some(ref m) = mgr {
+        m.pause_inbound(&message_id);
+      }
+    })
+  };
+
+  let on_resume = {
+    let mgr = try_use_file_transfer_manager();
+    Callback::new(move |_: ()| {
+      if let Some(ref m) = mgr {
+        m.resume_inbound(&message_id);
+      }
+    })
+  };
+
   let status_label = Memo::new(move |_| match status.get() {
     TransferStatus::Preparing => t_string!(i18n, file.preparing).to_string(),
     TransferStatus::InProgress => {
@@ -181,6 +214,22 @@ pub fn FileCard(
     TransferStatus::Failed(reason) => format!("{}: {reason}", t_string!(i18n, file.failed)),
     TransferStatus::HashMismatch => t_string!(i18n, file.hash_mismatch).to_string(),
   });
+
+  // G15 — save-anyway prompt for inbound files flagged dangerous.
+  // Captured i18n strings + (optional) DialogState pulled from the
+  // reactive owner so the async confirm path can run without
+  // re-entering the i18n context (which `spawn_local` futures
+  // cannot do safely).
+  let save_anyway_msg = {
+    let filename = file_for_download.filename.clone();
+    format!(
+      "{} ({})",
+      t_string!(i18n, file.save_anyway_detail),
+      filename
+    )
+  };
+  let save_anyway_dialog: Option<DialogState> = use_context::<DialogState>();
+  let dangerous_inbound = !outgoing && file_for_download.dangerous;
 
   let eta_label = Memo::new(move |_| {
     let eta = eta_secs.get();
@@ -287,6 +336,40 @@ pub fn FileCard(
           </button>
         </Show>
 
+        // G14 — receiver-side pause button (in-flight inbound only).
+        <Show when=move || show_pause.get() fallback=|| ()>
+          <button
+            type="button"
+            class="message-file-pause"
+            on:click=move |_| on_pause.run(())
+            data-testid="file-pause"
+            aria-label=move || t_string!(i18n, file.pause_transfer)
+            title=move || t_string!(i18n, file.pause_transfer)
+          >
+            <Icon icon=i::LuPause />
+            <span class="message-file-action-label">
+              {move || t_string!(i18n, file.pause_transfer)}
+            </span>
+          </button>
+        </Show>
+
+        // G14 — receiver-side resume button (paused inbound only).
+        <Show when=move || show_resume.get() fallback=|| ()>
+          <button
+            type="button"
+            class="message-file-resume"
+            on:click=move |_| on_resume.run(())
+            data-testid="file-resume"
+            aria-label=move || t_string!(i18n, file.resume_transfer)
+            title=move || t_string!(i18n, file.resume_transfer)
+          >
+            <Icon icon=i::LuPlay />
+            <span class="message-file-action-label">
+              {move || t_string!(i18n, file.resume_transfer)}
+            </span>
+          </button>
+        </Show>
+
         // Hash-mismatch warning with a re-receive placeholder button
         // (Req 6.5a: "File may be corrupted, recommend re-receiving").
         <Show
@@ -324,10 +407,69 @@ pub fn FileCard(
         >
           {
             let filename_for_download = file_for_download.filename.clone();
+            let save_anyway_msg = save_anyway_msg.clone();
+            let dialog = save_anyway_dialog.clone();
+            let i18n_for_download = i18n;
             move || {
               let url = download_url.get();
               let filename = filename_for_download.clone();
+              let save_anyway_msg = save_anyway_msg.clone();
+              let dialog = dialog.clone();
               match url {
+                Some(href) if dangerous_inbound => {
+                  // G15 — receiver-side save-anyway confirm. The
+                  // first click opens a dialog; only after the user
+                  // confirms do we synthesise a click on a hidden
+                  // <a download> to actually persist the blob.
+                  let href_for_handler = href.clone();
+                  let filename_for_handler = filename.clone();
+                  view! {
+                    <button
+                      type="button"
+                      class="message-file-download message-file-download-danger"
+                      data-testid="file-download-danger-btn"
+                      on:click=move |_| {
+                        let dialog = dialog.clone();
+                        let msg = save_anyway_msg.clone();
+                        let href = href_for_handler.clone();
+                        let filename = filename_for_handler.clone();
+                        leptos::task::spawn_local(async move {
+                          let confirmed = match dialog {
+                            Some(d) => d.confirm(msg).await,
+                            None => true,
+                          };
+                          if !confirmed {
+                            return;
+                          }
+                          // Synthesise a click on a transient anchor
+                          // so the browser's download path runs.
+                          // Use the generic `Element::set_attribute`
+                          // surface so we don't need to enable the
+                          // `HtmlAnchorElement` web-sys feature
+                          // just for two attribute writes.
+                          let Some(window) = web_sys::window() else { return };
+                          let Some(document) = window.document() else { return };
+                          let Ok(anchor) = document.create_element("a") else { return };
+                          let _ = anchor.set_attribute("href", &href);
+                          let _ = anchor.set_attribute("download", &filename);
+                          let _ = anchor.set_attribute("style", "display:none");
+                          let Some(body) = document.body() else { return };
+                          let _ = body.append_child(&anchor);
+                          // Cast to HtmlElement to reach `click()`,
+                          // which is part of HTMLElement (already
+                          // enabled via the `HtmlElement` feature).
+                          if let Some(el) = anchor.dyn_ref::<web_sys::HtmlElement>() {
+                            el.click();
+                          }
+                          let _ = body.remove_child(&anchor);
+                        });
+                      }
+                    >
+                      {t_string!(i18n_for_download, file.download)}
+                    </button>
+                  }
+                  .into_any()
+                }
                 Some(href) => view! {
                   <a
                     class="message-file-download"
@@ -335,13 +477,13 @@ pub fn FileCard(
                     download=filename
                     data-testid="file-download"
                   >
-                    {t_string!(i18n, file.download)}
+                    {t_string!(i18n_for_download, file.download)}
                   </a>
                 }
                 .into_any(),
                 None => view! {
                   <span class="message-file-download disabled">
-                    {t_string!(i18n, file.completed)}
+                    {t_string!(i18n_for_download, file.completed)}
                   </span>
                 }
                 .into_any(),

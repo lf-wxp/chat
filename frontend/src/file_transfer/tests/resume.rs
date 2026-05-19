@@ -167,6 +167,32 @@ fn resume_request_payload_carries_transfer_id_and_chunks() {
   assert_eq!(req.missing_chunks, vec![1, 3, 7]);
 }
 
+/// G14 — `user_paused` defaults to `false` on a fresh inbound
+/// transfer; `FileTransferManager::pause_inbound` / `resume_inbound`
+/// flip this flag (the manager-level wiring is exercised in the
+/// integration suite, but the type-level invariant is anchored
+/// here so a future refactor cannot silently turn the default on).
+#[test]
+fn user_paused_defaults_to_false_and_round_trips() {
+  use leptos::prelude::{Get, Set};
+  let info = demo_info(4, 256, "user-pause.bin");
+  let rx = IncomingTransfer::new(info, UserId::from(99u64));
+
+  assert!(!rx.user_paused.get(), "fresh transfer must not be paused");
+
+  rx.user_paused.set(true);
+  assert!(
+    rx.user_paused.get(),
+    "pause flag must be observable after set"
+  );
+
+  rx.user_paused.set(false);
+  assert!(
+    !rx.user_paused.get(),
+    "resume flag must clear after set(false)"
+  );
+}
+
 /// After a disconnect races the initial metadata delivery, the
 /// sender's resume handler must replay both `FileMetadata` (so the
 /// receiver can re-register the reassembly buffer) and the requested

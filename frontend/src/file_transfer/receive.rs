@@ -36,6 +36,17 @@ pub struct IncomingTransfer {
   pub direction: TransferDirection,
   /// Final reassembled object URL, once the transfer completes.
   pub object_url: RwSignal<Option<String>>,
+  /// Whether the *user* has explicitly paused this inbound transfer
+  /// (G14 / Req 6.6 user-initiated pause). When `true`,
+  /// `FileTransferManager::on_file_chunk` drops incoming chunks on
+  /// the floor without committing them to the bitmap, so the
+  /// reassembly buffer freezes at the pause point. On resume the
+  /// receiver replays a `FileResumeRequest` for the still-missing
+  /// chunks. Distinct from the network-induced `TransferStatus::Paused`
+  /// (which `pause_inbound_transfers` flips on `PeerConnectionState::
+  /// Disconnected/Failed/Closed`) so the user can explicitly resume
+  /// even after the connection has fully recovered.
+  pub user_paused: RwSignal<bool>,
 }
 
 impl IncomingTransfer {
@@ -54,6 +65,7 @@ impl IncomingTransfer {
       status,
       direction: TransferDirection::Incoming,
       object_url: RwSignal::new(None),
+      user_paused: RwSignal::new(false),
     }
   }
 
@@ -288,6 +300,29 @@ mod tests {
     let mut rx = IncomingTransfer::new(info, UserId::from(1u64));
     // Zero digest should NOT be validated — treat as "no hash sent".
     assert!(rx.record_chunk(0, vec![1, 2, 3], Some(&[0u8; 32])).unwrap());
+  }
+
+  #[test]
+  fn duplicate_after_complete_returns_false() {
+    // Regression test: when the same chunk is delivered twice
+    // *after* the bitmap is already complete (e.g. the sender
+    // re-sends a chunk in response to a `FileResumeRequest` that
+    // raced with the natural completion path), `record_chunk`
+    // must still report `Ok(false)` so the caller can avoid
+    // re-triggering `finalise_inbound`. A re-finalise would race
+    // with the prior finalise's `drop_chunks` call and produce
+    // "missing chunk slot during reassembly".
+    let info = make_info(2, 6);
+    let mut rx = IncomingTransfer::new(info, UserId::from(1u64));
+    assert!(rx.record_chunk(0, vec![1, 2, 3], None).unwrap());
+    assert!(rx.record_chunk(1, vec![4, 5, 6], None).unwrap());
+    assert!(rx.is_complete());
+    // The "duplicate after complete" delivery — must not look
+    // like a fresh recording, even though `is_complete()` is true.
+    assert!(
+      !rx.record_chunk(1, vec![4, 5, 6], None).unwrap(),
+      "duplicate chunk after complete must report Ok(false)"
+    );
   }
 
   #[test]
