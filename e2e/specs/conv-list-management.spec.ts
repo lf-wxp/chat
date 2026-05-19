@@ -145,7 +145,6 @@ test.describe('conversation list management', () => {
 
   test('sidebar search filters conversation rows by display name (G20)', async ({
     pageA,
-    pageB,
     pageC,
     server,
   }) => {

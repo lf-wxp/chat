@@ -943,9 +943,7 @@ pub async fn handle_nickname_change<S>(
   // already runs the full `validate_nickname` and the room layer
   // re-checks length, but a stray direct-protocol message could
   // bypass both — keep the server honest).
-  if nickname_change.new_nickname.is_empty()
-    || nickname_change.new_nickname.chars().count() > 20
-  {
+  if nickname_change.new_nickname.is_empty() || nickname_change.new_nickname.chars().count() > 20 {
     send_error_response(
       socket_tx,
       "ROM1303",

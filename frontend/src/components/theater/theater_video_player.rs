@@ -110,6 +110,23 @@ pub fn TheaterVideoPlayer(
 
   let is_owner = move || state.my_role.get() == TheaterRole::Owner;
 
+  // --- Effect: flip `has_video_source` the instant `source` is set ------
+  //
+  // The `<video>` element is gated behind `state.has_video_source`
+  // via the `<Show>` block below — so on the very first source
+  // selection the `video_ref` would still be `None` when the next
+  // Effect runs, and the binding below would short-circuit and
+  // never flip the flag. That would leave the player stuck on the
+  // picker forever. Splitting the "flag flip" from the "DOM bind"
+  // ensures the element materialises first, after which the
+  // binding effect runs again with a non-None ref.
+  Effect::new(move |_| {
+    if let Some(src) = source.get() {
+      state.has_video_source.set(true);
+      state.video_source_label.set(src.label.clone());
+    }
+  });
+
   // --- Effect: bind the chosen source to the `<video>` element ------------
   Effect::new(move |_| {
     let Some(el) = video_ref.get() else { return };
@@ -363,6 +380,7 @@ pub fn TheaterVideoPlayer(
           on:pause=handle_pause
           on:error=handle_video_error
           aria-label=move || t_string!(i18n, theater.video_player_label).to_string()
+          data-testid="theater-video"
         ></video>
         <Show when=move || !is_owner()>
           <p class="theater-video-player__viewer-hint" aria-live="polite">

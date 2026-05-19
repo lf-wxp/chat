@@ -65,15 +65,12 @@ pub fn Sidebar() -> impl IntoView {
   // surface (settings, top-bar) ever needed to read it.
   let search_query = RwSignal::new(String::new());
 
-  let pinned_filtered = Signal::derive(move || {
-    filter_conversations_by_query(pinned_memo.get(), &search_query.get())
-  });
-  let active_filtered = Signal::derive(move || {
-    filter_conversations_by_query(active_memo.get(), &search_query.get())
-  });
-  let archived_filtered = Signal::derive(move || {
-    filter_conversations_by_query(archived_memo.get(), &search_query.get())
-  });
+  let pinned_filtered =
+    Signal::derive(move || filter_conversations_by_query(pinned_memo.get(), &search_query.get()));
+  let active_filtered =
+    Signal::derive(move || filter_conversations_by_query(active_memo.get(), &search_query.get()));
+  let archived_filtered =
+    Signal::derive(move || filter_conversations_by_query(archived_memo.get(), &search_query.get()));
 
   // On desktop the sidebar is always visible. On mobile, it is hidden
   // unless the user has explicitly opened it via the menu button.
