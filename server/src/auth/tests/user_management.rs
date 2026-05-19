@@ -263,3 +263,93 @@ fn test_set_nickname_survives_reauthenticate_with_token() {
   // alias the two fields.
   assert_eq!(auth_success.username, "testuser");
 }
+
+// ── G26: avatar persistence on the global User table ──
+
+#[test]
+fn test_set_avatar_writes_to_user_session() {
+  let store = create_test_store();
+  let (user_id, _) = store.register("testuser", "password123").unwrap();
+
+  // Default avatar is `None` — client falls back to identicon.
+  let user = store.get_user(&user_id).unwrap();
+  assert!(user.avatar_url.is_none());
+
+  // A real change returns `true` and the stored value updates.
+  let changed = store.set_avatar(&user_id, Some("data:image/webp;base64,UA=="));
+  assert!(changed);
+
+  let user = store.get_user(&user_id).unwrap();
+  assert_eq!(
+    user.avatar_url.as_deref(),
+    Some("data:image/webp;base64,UA==")
+  );
+}
+
+#[test]
+fn test_set_avatar_idempotent_when_unchanged() {
+  let store = create_test_store();
+  let (user_id, _) = store.register("testuser", "password123").unwrap();
+
+  store.set_avatar(&user_id, Some("data:image/webp;base64,UA=="));
+  let second = store.set_avatar(&user_id, Some("data:image/webp;base64,UA=="));
+  assert!(!second);
+}
+
+#[test]
+fn test_set_avatar_with_none_clears_to_identicon_fallback() {
+  // G26 — sending `None` clears the avatar so clients re-derive
+  // the identicon. This is the "remove avatar" path.
+  let store = create_test_store();
+  let (user_id, _) = store.register("testuser", "password123").unwrap();
+  store.set_avatar(&user_id, Some("data:image/webp;base64,UA=="));
+
+  let cleared = store.set_avatar(&user_id, None);
+  assert!(cleared);
+
+  let user = store.get_user(&user_id).unwrap();
+  assert!(user.avatar_url.is_none());
+}
+
+#[test]
+fn test_set_avatar_missing_user_is_noop() {
+  let store = create_test_store();
+  let user_id = message::types::UserId::new();
+  let changed = store.set_avatar(&user_id, Some("data:image/webp;base64,UA=="));
+  assert!(!changed);
+}
+
+#[test]
+fn test_set_avatar_survives_reauthenticate_with_token() {
+  // G26 cross-reload contract: after an avatar change, a fresh
+  // `authenticate_with_token` returns the new avatar URL in its
+  // `AuthSuccess.avatar_url` so the client can replace the
+  // identicon fallback on reload.
+  let store = create_test_store();
+  let (user_id, token) = store.register("testuser", "password123").unwrap();
+
+  store.set_avatar(&user_id, Some("data:image/webp;base64,RELOADAVATAR"));
+
+  let auth_success = store
+    .authenticate_with_token(&token)
+    .expect("token should still validate");
+  assert_eq!(
+    auth_success.avatar_url.as_deref(),
+    Some("data:image/webp;base64,RELOADAVATAR")
+  );
+}
+
+#[test]
+fn test_to_user_info_carries_avatar_url() {
+  // UserInfo broadcasts (UserListUpdate, etc.) must include the
+  // persisted avatar so peers see the same picture the owner sees.
+  let store = create_test_store();
+  let (user_id, _) = store.register("testuser", "password123").unwrap();
+  store.set_avatar(&user_id, Some("data:image/webp;base64,FOR_PEER"));
+
+  let user = store.get_user(&user_id).unwrap();
+  assert_eq!(
+    user.avatar_url.as_deref(),
+    Some("data:image/webp;base64,FOR_PEER")
+  );
+}

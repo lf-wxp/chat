@@ -17,7 +17,8 @@ use leptos::prelude::*;
 use message::UserId;
 use message::frame::{MessageFrame, encode_frame};
 use message::signaling::{
-  BanMember as BanMemberMsg, ConnectionInvite as ConnectionInviteMsg, CreateRoom as CreateRoomMsg,
+  AvatarChange as AvatarChangeMsg, BanMember as BanMemberMsg,
+  ConnectionInvite as ConnectionInviteMsg, CreateRoom as CreateRoomMsg,
   DemoteAdmin as DemoteAdminMsg, IceCandidate as IceCandidateMsg,
   InviteAccepted as InviteAcceptedMsg, InviteDeclined as InviteDeclinedMsg,
   JoinRoom as JoinRoomMsg, KickMember as KickMemberMsg, LeaveRoom as LeaveRoomMsg,
@@ -624,6 +625,22 @@ impl SignalingClient {
     let msg = SignalingMessage::NicknameChange(NicknameChangeMsg {
       user_id: my_id,
       new_nickname,
+    });
+    self.send(&msg)
+  }
+
+  /// Broadcast an avatar change to the signaling server (G26).
+  ///
+  /// `new_avatar = None` is the "clear avatar" signal; the server
+  /// persists `None` on `UserSession.avatar_url` and broadcasts a
+  /// `UserListUpdate` so peers re-derive the identicon.
+  pub fn send_avatar_change(&self, new_avatar: Option<String>) -> Result<(), String> {
+    let my_id = self
+      .current_user_id()
+      .ok_or("Cannot send AvatarChange: not authenticated")?;
+    let msg = SignalingMessage::AvatarChange(AvatarChangeMsg {
+      user_id: my_id,
+      avatar_url: new_avatar,
     });
     self.send(&msg)
   }

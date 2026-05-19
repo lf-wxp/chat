@@ -58,6 +58,34 @@ fn test_nickname_change_roundtrip() {
 }
 
 #[test]
+fn test_avatar_change_roundtrip_with_data_url() {
+  // G26 — avatar payload is opaque to the protocol; data URLs
+  // (Phase A) and CDN URLs (Phase B) both serialise via the same
+  // Option<String> field.
+  let msg = AvatarChange {
+    user_id: UserId::new(),
+    avatar_url: Some("data:image/webp;base64,UklGRiQAAABXRUJQVlA4".to_string()),
+  };
+  let encoded = bitcode::encode(&msg);
+  let decoded: AvatarChange = bitcode::decode(&encoded).expect("Failed to decode");
+  assert_eq!(msg, decoded);
+}
+
+#[test]
+fn test_avatar_change_roundtrip_with_none_clears_to_identicon() {
+  // Sending `avatar_url = None` is the on-wire signal for "go back
+  // to the identicon fallback".
+  let msg = AvatarChange {
+    user_id: UserId::new(),
+    avatar_url: None,
+  };
+  let encoded = bitcode::encode(&msg);
+  let decoded: AvatarChange = bitcode::decode(&encoded).expect("Failed to decode");
+  assert_eq!(msg, decoded);
+  assert!(decoded.avatar_url.is_none());
+}
+
+#[test]
 fn test_discriminator_user_discovery() {
   assert_eq!(
     SignalingMessage::UserListUpdate(UserListUpdate { users: vec![] }).discriminator(),

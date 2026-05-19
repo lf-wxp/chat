@@ -48,6 +48,12 @@ pub struct AuthSuccess {
   /// var is unset.
   #[serde(default)]
   pub ice_servers: Vec<IceServerSpec>,
+  /// Persisted avatar URL (data URL or CDN URL). `None` means the
+  /// client should fall back to a username-seeded identicon (G26).
+  /// `#[serde(default)]` keeps older clients backwards-compatible:
+  /// a missing field deserialises to `None`.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub avatar_url: Option<String>,
 }
 
 /// Authentication failure response.

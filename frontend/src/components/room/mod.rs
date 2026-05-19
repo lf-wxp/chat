@@ -19,6 +19,7 @@
 
 mod announcement_editor;
 mod announcement_panel;
+mod avatar_editor;
 pub(crate) mod confirm_dialog;
 mod create_room_modal;
 pub(crate) mod global_modal_context;
@@ -42,6 +43,7 @@ mod utils;
 mod tests;
 
 pub use announcement_panel::AnnouncementPanel;
+pub use avatar_editor::AvatarEditor;
 pub use create_room_modal::{CreateRoomModal, CreateRoomRequest};
 pub use global_modal_context::GlobalRoomModalState;
 pub use incoming_room_invite_modal::IncomingRoomInviteModal;

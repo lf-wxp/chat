@@ -106,6 +106,8 @@ pub const NICKNAME_CHANGE: u8 = 0x7B;
 pub const ROOM_ANNOUNCEMENT: u8 = 0x7C;
 /// Moderation notification message type.
 pub const MODERATION_NOTIFICATION: u8 = 0x7D;
+/// Avatar change message type (G26 — user profile).
+pub const AVATAR_CHANGE: u8 = 0x7E;
 
 // Room Response Messages (0x57-0x5A)
 /// Room created response message type.

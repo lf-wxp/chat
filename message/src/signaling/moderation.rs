@@ -70,6 +70,26 @@ pub struct NicknameChange {
   pub new_nickname: String,
 }
 
+/// User avatar change broadcast (G26 — Req 15.1).
+///
+/// The avatar URL is opaque to the protocol — clients may send any
+/// of:
+/// * a `data:image/...` URL (Phase A, current frontend);
+/// * an `https://` CDN URL (Phase B, once an object-store upload
+///   endpoint ships);
+/// * `None` to clear the avatar back to the identicon fallback.
+///
+/// The server simply persists the value on `UserSession` and
+/// broadcasts it; size + format validation happens client-side.
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
+pub struct AvatarChange {
+  /// User ID.
+  pub user_id: UserId,
+  /// New avatar URL (data URL or CDN URL). `None` clears the
+  /// avatar back to the identicon fallback.
+  pub avatar_url: Option<String>,
+}
+
 /// Room announcement update broadcast.
 #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
 pub struct RoomAnnouncement {

@@ -14,6 +14,7 @@ fn test_signaling_message_discriminator() {
     username: "alice".to_string(),
     nickname: "alice".to_string(),
     ice_servers: Vec::new(),
+    avatar_url: None,
   });
   assert_eq!(msg.discriminator(), 0x01);
 
@@ -58,6 +59,7 @@ fn create_auth_session_discriminators() -> Vec<u8> {
       username: String::new(),
       nickname: String::new(),
       ice_servers: Vec::new(),
+      avatar_url: None,
     })
     .discriminator(),
     SignalingMessage::AuthFailure(AuthFailure {
@@ -254,6 +256,11 @@ fn create_moderation_discriminators() -> Vec<u8> {
       new_nickname: String::new(),
     })
     .discriminator(),
+    SignalingMessage::AvatarChange(AvatarChange {
+      user_id: UserId::new(),
+      avatar_url: None,
+    })
+    .discriminator(),
     SignalingMessage::RoomAnnouncement(RoomAnnouncement {
       room_id: RoomId::new(),
       content: String::new(),
@@ -301,6 +308,7 @@ fn create_auth_session_messages() -> Vec<SignalingMessage> {
       username: String::new(),
       nickname: String::new(),
       ice_servers: Vec::new(),
+      avatar_url: None,
     }),
     SignalingMessage::AuthFailure(AuthFailure {
       reason: String::new(),

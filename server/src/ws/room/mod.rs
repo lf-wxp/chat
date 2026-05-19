@@ -998,14 +998,15 @@ pub async fn handle_nickname_change<S>(
       );
     }
     Err(crate::room::RoomError::UserNotInRoom) => {
-      // Not an error — the user is editing their nickname outside
-      // any room (e.g. from the settings drawer). The global
-      // UserStore update above is sufficient.
-      debug!(
-        user_id = %user_id,
-        new_nickname = %nickname_change.new_nickname,
-        "Nickname changed (no room broadcast — user not in a room)"
-      );
+      // User is not in any room — return ROM1302 error so the
+      // client can display an appropriate message.
+      send_error_response(
+        socket_tx,
+        "ROM1302",
+        "You are not in any room",
+        Some("not_in_room"),
+      )
+      .await;
     }
     Err(e) => {
       warn!(
@@ -1020,6 +1021,104 @@ pub async fn handle_nickname_change<S>(
       send_error_response(socket_tx, code, msg, None).await;
     }
   }
+}
+
+/// Handle AvatarChange message (G26 — Req 15.1 avatar upload).
+///
+/// Mirrors `handle_nickname_change`: validates self-ownership,
+/// persists the new avatar to the global UserStore, and broadcasts
+/// the change to peers who have an active discovery relationship
+/// with this user so receivers can update their cached
+/// `UserInfo.avatar_url` for sidebar / user-info-card rendering.
+///
+/// `avatar_url = None` is the on-wire signal for "clear avatar back
+/// to identicon"; the server persists `None` and clients re-derive
+/// the identicon on their side.
+pub async fn handle_avatar_change<S>(
+  socket_tx: &mut S,
+  ws_state: &Arc<WebSocketState>,
+  user_id: &UserId,
+  avatar_change: message::signaling::AvatarChange,
+) where
+  S: Sink<Message> + Unpin,
+  S::Error: Display,
+{
+  // Validate that the user is changing their own avatar.
+  if avatar_change.user_id != *user_id {
+    warn!(
+      user_id = %user_id,
+      target = %avatar_change.user_id,
+      "User attempted to change another user's avatar"
+    );
+    send_error_response(
+      socket_tx,
+      "ROM1401",
+      "You can only change your own avatar",
+      Some("not_your_avatar"),
+    )
+    .await;
+    return;
+  }
+
+  // Defensive size cap at the server boundary — 64 KiB is a generous
+  // ceiling for a data URL that holds a 64×64 webp. Clients enforce
+  // ~16 KiB; this layer just keeps a stray protocol message from
+  // burning unbounded memory. CDN URLs (Phase B) will be well below
+  // this cap.
+  const MAX_AVATAR_BYTES: usize = 64 * 1024;
+  if let Some(ref url) = avatar_change.avatar_url
+    && url.len() > MAX_AVATAR_BYTES
+  {
+    send_error_response(
+      socket_tx,
+      "ROM1402",
+      "Avatar payload exceeds 64 KiB",
+      Some("avatar_too_large"),
+    )
+    .await;
+    return;
+  }
+
+  let changed = ws_state
+    .user_store
+    .set_avatar(user_id, avatar_change.avatar_url.as_deref());
+
+  if !changed {
+    // No-op (same value as already stored, or user missing). Stay
+    // silent — clients that re-send the current avatar on reload
+    // should not see an error.
+    debug!(
+      user_id = %user_id,
+      "Avatar change was a no-op (same value or unknown user)"
+    );
+    return;
+  }
+
+  // Broadcast to every currently-online user so their cached
+  // UserInfo refreshes. Mirrors how `UserStatusChange` propagates —
+  // we re-emit a full UserListUpdate so receivers can overwrite
+  // their map in one go.
+  let users = ws_state.user_store.get_online_users();
+  let list_update = SignalingMessage::UserListUpdate(message::signaling::UserListUpdate { users });
+  if let Ok(encoded) = encode_signaling_message(&list_update) {
+    let online_ids: Vec<_> = ws_state
+      .user_store
+      .get_online_users()
+      .into_iter()
+      .map(|u| u.user_id)
+      .collect();
+    for id in &online_ids {
+      if let Some(sender) = ws_state.get_sender(id) {
+        let _ = sender.send(encoded.clone()).await;
+      }
+    }
+  }
+
+  debug!(
+    user_id = %user_id,
+    has_avatar = avatar_change.avatar_url.is_some(),
+    "Avatar changed"
+  );
 }
 
 /// Handle UpdateRoomInfo message (Owner only — Req 4.5).

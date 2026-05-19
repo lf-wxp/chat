@@ -497,6 +497,35 @@ pub fn handle_signaling_message(
         }
       });
     }
+    SignalingMessage::AvatarChange(msg) => {
+      log_debug(&format!(
+        "AvatarChange: user_id={} has_avatar={}",
+        msg.user_id,
+        msg.avatar_url.is_some()
+      ));
+      // G26 — update the avatar in the online users list so any
+      // currently-visible UserInfoCard / sidebar avatar refreshes
+      // without waiting for the next UserListUpdate.
+      app_state.online_users.update(|users| {
+        if let Some(user) = users.iter_mut().find(|u| u.user_id == msg.user_id) {
+          user.avatar_url = msg.avatar_url.clone();
+        }
+      });
+      // If the change is about *us*, also mirror it into the local
+      // auth state so the top-bar avatar matches what peers see.
+      app_state.auth.update(|state| {
+        if let Some(auth) = state
+          && auth.user_id == msg.user_id
+        {
+          // Empty `avatar_url = None` collapses to the identicon
+          // fallback — keep the existing identicon by leaving the
+          // local field unchanged when receiving a clear.
+          if let Some(ref url) = msg.avatar_url {
+            auth.avatar = url.clone();
+          }
+        }
+      });
+    }
     SignalingMessage::RoomAnnouncement(msg) => {
       log_debug(&format!("RoomAnnouncement in room {}", msg.room_id));
       app_state.rooms.update(|rooms| {

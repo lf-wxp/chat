@@ -12,7 +12,7 @@ use super::data_management_section::DataManagementSection;
 use super::notifications_section::NotificationsSection;
 use super::privacy_section::PrivacySection;
 use crate::components::discovery::BlacklistManagementPanel;
-use crate::components::room::NicknameEditor;
+use crate::components::room::{AvatarEditor, NicknameEditor};
 use crate::i18n;
 use crate::settings::use_settings_state;
 use crate::signaling::use_signaling_client;
@@ -313,6 +313,10 @@ pub fn SettingsPage() -> impl IntoView {
               <Icon icon=i::LuUser attr:class="settings-section-icon" />
               {t!(i18n, settings.sections_account)}
             </h2>
+            // Avatar editor (G26). Sits above the nickname editor
+            // so the user works top-down through their identity:
+            // picture → display name → blacklist → logout.
+            <AvatarEditor />
             // Nickname editor (G25). Mounting the existing
             // `NicknameEditor` here makes the previously unreachable
             // surface live. Validation, save flow and signaling

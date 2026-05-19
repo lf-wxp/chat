@@ -18,6 +18,7 @@ fn test_wasm_auth_success_roundtrip() {
     username: "wasm_user".to_string(),
     nickname: "wasm_user".to_string(),
     ice_servers: Vec::new(),
+    avatar_url: None,
   };
   roundtrip_signaling(0x01, &msg);
 }

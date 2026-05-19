@@ -252,6 +252,14 @@ fn test_discriminator_moderation_messages() {
     NICKNAME_CHANGE
   );
   assert_eq!(
+    SignalingMessage::AvatarChange(AvatarChange {
+      user_id: uid.clone(),
+      avatar_url: Some("data:image/webp;base64,UA==".into()),
+    })
+    .discriminator(),
+    AVATAR_CHANGE
+  );
+  assert_eq!(
     SignalingMessage::ModerationNotification(ModerationNotification {
       room_id: rid,
       action: ModerationAction::Kicked,

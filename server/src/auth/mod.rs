@@ -62,6 +62,9 @@ pub struct UserSession {
   pub status: UserStatus,
   /// User bio
   pub bio: String,
+  /// Avatar URL (data URL or CDN URL). `None` falls back to a
+  /// client-generated identicon (G26).
+  pub avatar_url: Option<String>,
   /// Created at timestamp
   pub created_at: DateTime<Utc>,
   /// Last seen timestamp
@@ -81,6 +84,7 @@ impl UserSession {
       session_id: None,
       status: UserStatus::Online,
       bio: String::new(),
+      avatar_url: None,
       created_at: now,
       last_seen: now,
     }
@@ -94,7 +98,7 @@ impl UserSession {
       username: self.username.clone(),
       nickname: self.nickname.clone(),
       status: self.status,
-      avatar_url: None,
+      avatar_url: self.avatar_url.clone(),
       bio: self.bio.clone(),
       created_at_nanos: self.created_at.timestamp_nanos_opt().unwrap_or(0),
       last_seen_nanos: self.last_seen.timestamp_nanos_opt().unwrap_or(0),
@@ -321,16 +325,20 @@ impl UserStore {
     // W1 fix: Include the user's current nickname in AuthSuccess so that
     // clients can update their display name when it has changed on another
     // device (e.g. via a nickname-change API in a future task).
-    let nickname = self
+    // G26 — also include avatar_url so the client's identicon
+    // fallback can be replaced with the persisted avatar on
+    // reload.
+    let (nickname, avatar_url) = self
       .users
       .get(&user_id)
-      .map(|s| s.nickname.clone())
-      .unwrap_or_else(|| claims.username.clone());
+      .map(|s| (s.nickname.clone(), s.avatar_url.clone()))
+      .unwrap_or_else(|| (claims.username.clone(), None));
 
     debug!(
       user_id = %user_id,
       username = %claims.username,
       nickname = %nickname,
+      has_avatar = avatar_url.is_some(),
       "Token authentication successful"
     );
 
@@ -343,6 +351,7 @@ impl UserStore {
       // standalone unit tests of the auth flow stay narrow. The
       // response is augmented just before being sent on the wire.
       ice_servers: Vec::new(),
+      avatar_url,
     })
   }
 
@@ -413,6 +422,30 @@ impl UserStore {
       session.nickname = new_nickname.to_string();
       session.last_seen = Utc::now();
       return true;
+    }
+    false
+  }
+
+  /// Update the persisted avatar URL for `user_id` (G26).
+  ///
+  /// Accepts any `Option<String>` — `None` clears the avatar back
+  /// to the identicon fallback. The function does NOT validate the
+  /// URL scheme or size: those are client-side responsibilities,
+  /// and over-restricting here would force a wire-protocol bump
+  /// every time the client adopts a new format (e.g. Phase B's
+  /// CDN URLs).
+  ///
+  /// Returns `true` when the row was found AND the value differed
+  /// (an actual write happened). Returns `false` for missing users
+  /// and no-op writes.
+  pub fn set_avatar(&self, user_id: &UserId, new_avatar: Option<&str>) -> bool {
+    if let Some(mut session) = self.users.get_mut(user_id) {
+      let new_value = new_avatar.map(String::from);
+      if session.avatar_url != new_value {
+        session.avatar_url = new_value;
+        session.last_seen = Utc::now();
+        return true;
+      }
     }
     false
   }

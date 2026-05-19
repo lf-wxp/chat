@@ -19,6 +19,7 @@ fn test_auth_success_roundtrip() {
     username: "alice".to_string(),
     nickname: "alice".to_string(),
     ice_servers: Vec::new(),
+    avatar_url: None,
   };
   let encoded = bitcode::encode(&msg);
   let decoded: AuthSuccess = bitcode::decode(&encoded).expect("Failed to decode");
@@ -118,6 +119,7 @@ fn test_discriminator_auth_messages() {
       username: "u".into(),
       nickname: "u".into(),
       ice_servers: Vec::new(),
+      avatar_url: None,
     })
     .discriminator(),
     AUTH_SUCCESS

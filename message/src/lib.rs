@@ -46,8 +46,8 @@ pub use frame::{
   MessageFrame, ReassemblyBuffer, decode_frame, encode_frame,
 };
 pub use signaling::{
-  ActivePeersList, AuthFailure, AuthSuccess, BanMember, CallAccept, CallDecline, CallEnd,
-  CallInvite, ConnectionInvite, CreateRoom, DemoteAdmin, IceCandidate, InviteAccepted,
+  ActivePeersList, AuthFailure, AuthSuccess, AvatarChange, BanMember, CallAccept, CallDecline,
+  CallEnd, CallInvite, ConnectionInvite, CreateRoom, DemoteAdmin, IceCandidate, InviteAccepted,
   InviteDeclined, InviteTimeout, JoinRoom, KickMember, ModerationAction, ModerationNotification,
   MultiInvite, MuteMember, NicknameChange, PeerClosed, PeerEstablished, Ping, Pong, PromoteAdmin,
   RoomAnnouncement, RoomListUpdate, RoomMemberUpdate, SdpAnswer, SdpOffer, SignalingMessage,

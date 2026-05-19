@@ -19,8 +19,9 @@ pub use auth::{
 pub use call::{CallAccept, CallDecline, CallEnd, CallInvite};
 pub use invite::{ConnectionInvite, InviteAccepted, InviteDeclined, InviteTimeout, MultiInvite};
 pub use moderation::{
-  BanMember, DemoteAdmin, ModerationAction, ModerationNotification, MuteMember, NicknameChange,
-  PromoteAdmin, RoomAnnouncement, TheaterMuteAll, TheaterTransferOwner, UnbanMember, UnmuteMember,
+  AvatarChange, BanMember, DemoteAdmin, ModerationAction, ModerationNotification, MuteMember,
+  NicknameChange, PromoteAdmin, RoomAnnouncement, TheaterMuteAll, TheaterTransferOwner,
+  UnbanMember, UnmuteMember,
 };
 pub use room::{
   CreateRoom, JoinRoom, KickMember, LeaveRoom, MuteStatusChange, OwnerChanged, RoomCreated,
@@ -161,6 +162,8 @@ pub enum SignalingMessage {
   DemoteAdmin(DemoteAdmin),
   /// Nickname change.
   NicknameChange(NicknameChange),
+  /// Avatar change (G26 — user profile).
+  AvatarChange(AvatarChange),
   /// Room announcement.
   RoomAnnouncement(RoomAnnouncement),
   /// Moderation notification.
@@ -230,6 +233,7 @@ impl SignalingMessage {
       Self::PromoteAdmin(_) => discriminator::PROMOTE_ADMIN,
       Self::DemoteAdmin(_) => discriminator::DEMOTE_ADMIN,
       Self::NicknameChange(_) => discriminator::NICKNAME_CHANGE,
+      Self::AvatarChange(_) => discriminator::AVATAR_CHANGE,
       Self::RoomAnnouncement(_) => discriminator::ROOM_ANNOUNCEMENT,
       Self::ModerationNotification(_) => discriminator::MODERATION_NOTIFICATION,
     }

@@ -183,6 +183,9 @@ export const sel = {
   nicknameEditorInput: '[data-testid="nickname-editor-input"]',
   nicknameEditorSave: '[data-testid="nickname-editor-save"]',
   nicknameEditorError: '[data-testid="nickname-editor-error"]',
+
+  settingsPageSelector: '[data-testid="settings-page"]',
+
 } as const;
 
 /** Build a `data-testid` selector dynamically. */

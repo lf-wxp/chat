@@ -259,6 +259,12 @@ where
             // STUN/TURN endpoints can be set per environment without
             // a frontend rebuild. Empty → client keeps its default.
             ice_servers: ws_state.ice_server_specs(),
+            // G26 — forward the persisted avatar so the client
+            // restores the user's choice on reload instead of
+            // defaulting to the identicon. `auth_success.avatar_url`
+            // is `None` for fresh sessions where the user has not
+            // uploaded one yet.
+            avatar_url: auth_success.avatar_url,
           });
           if let Ok(encoded) = encode_signaling_message(&success_msg)
             && socket_tx
@@ -480,6 +486,9 @@ where
         }
         SignalingMessage::NicknameChange(nickname_change) => {
           super::room::handle_nickname_change(socket_tx, ws_state, &user_id, nickname_change).await;
+        }
+        SignalingMessage::AvatarChange(avatar_change) => {
+          super::room::handle_avatar_change(socket_tx, ws_state, &user_id, avatar_change).await;
         }
         SignalingMessage::UpdateRoomInfo(update) => {
           super::room::handle_update_room_info(socket_tx, ws_state, &user_id, update).await;
