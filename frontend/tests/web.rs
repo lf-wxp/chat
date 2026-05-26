@@ -271,6 +271,7 @@ fn test_auth_state_full_roundtrip() {
     nickname: "WASM Test".to_string(),
     avatar: String::new(),
     signature: String::new(),
+    token_expires_ms: None,
   };
 
   // Save

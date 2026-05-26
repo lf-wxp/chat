@@ -54,6 +54,7 @@ fn test_auth_state_fields() {
     nickname: "Test User".to_string(),
     avatar: "data:image/svg+xml;base64,test".to_string(),
     signature: String::new(),
+    token_expires_ms: None,
   };
   assert_eq!(auth.user_id, user_id);
   assert_eq!(auth.token, "test-jwt-token");
@@ -72,6 +73,7 @@ fn test_auth_state_clone() {
     nickname: "nick".to_string(),
     avatar: "data:image/svg+xml;base64,abc".to_string(),
     signature: String::new(),
+    token_expires_ms: None,
   };
   let cloned = auth.clone();
   assert_eq!(auth.user_id, cloned.user_id);

@@ -177,16 +177,25 @@ pub fn dispatch_incoming(
       content,
       reply_to,
       timestamp_nanos,
+      room_id: _,
+      mentions,
     }) => {
       // Deduplication check (Req 11.3.4).
       if mgr.is_message_known(&message_id) {
         ack(mgr, peer, message_id, AckStatus::Received);
         return;
       }
-      let mentions_me = target_user_nick.is_some_and(|nick| {
-        let tokens = crate::chat::mention::extract(&content);
-        crate::chat::mention::mentions(&tokens, nick)
-      });
+      // Use the wire-level mentions list when available (G8); fall back
+      // to local parsing for backward compatibility with older peers.
+      let mentions_me = if !mentions.is_empty() {
+        let local_id = mgr.app_state.current_user_id();
+        local_id.is_some_and(|id| mentions.contains(&id))
+      } else {
+        target_user_nick.is_some_and(|nick| {
+          let tokens = crate::chat::mention::extract(&content);
+          crate::chat::mention::mentions(&tokens, nick)
+        })
+      };
       let reply = resolve_reply_snippet(mgr, &conv, reply_to);
       let ui = build_inbound(
         message_id,
@@ -207,6 +216,7 @@ pub fn dispatch_incoming(
       sticker_id,
       reply_to,
       timestamp_nanos,
+      room_id: _,
     }) => {
       // Deduplication check (Req 11.3.4).
       if mgr.is_message_known(&message_id) {
@@ -237,6 +247,7 @@ pub fn dispatch_incoming(
       waveform,
       reply_to,
       timestamp_nanos,
+      room_id: _,
     }) => {
       // Deduplication check (Req 11.3.4).
       if mgr.is_message_known(&message_id) {
@@ -270,6 +281,7 @@ pub fn dispatch_incoming(
       height,
       reply_to,
       timestamp_nanos,
+      room_id: _,
     }) => {
       // Deduplication check (Req 11.3.4).
       if mgr.is_message_known(&message_id) {
@@ -307,6 +319,7 @@ pub fn dispatch_incoming(
       original_sender,
       content,
       timestamp_nanos,
+      room_id: _,
     }) => {
       // Deduplication check (Req 11.3.4).
       if mgr.is_message_known(&message_id) {

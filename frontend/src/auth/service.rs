@@ -140,6 +140,7 @@ fn send_auth_request<T: Serialize + 'static>(
           username,
           avatar,
           signature: String::new(), // set later via settings UI
+          token_expires_ms: None,
         };
 
         save_auth_to_storage(&auth);

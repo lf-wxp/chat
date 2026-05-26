@@ -7,8 +7,21 @@ fn test_chat_text_roundtrip() {
     content: "Hello, **world**!".to_string(),
     reply_to: Some(MessageId::new()),
     timestamp_nanos: 1_000_000_000,
+    room_id: None,
+    mentions: vec![],
   };
   test_bitcode_roundtrip(&msg);
+
+  // With room_id and mentions.
+  let msg_room = ChatText {
+    message_id: MessageId::new(),
+    content: "@alice check this".to_string(),
+    reply_to: None,
+    timestamp_nanos: 2_000_000_000,
+    room_id: Some(RoomId::new()),
+    mentions: vec![UserId::new(), UserId::new()],
+  };
+  test_bitcode_roundtrip(&msg_room);
 }
 
 #[test]
@@ -19,8 +32,19 @@ fn test_chat_sticker_roundtrip() {
     sticker_id: "sticker_123".to_string(),
     reply_to: None,
     timestamp_nanos: 1_000_000_000,
+    room_id: None,
   };
   test_bitcode_roundtrip(&msg);
+
+  let msg_room = ChatSticker {
+    message_id: MessageId::new(),
+    pack_id: "pack_002".to_string(),
+    sticker_id: "sticker_456".to_string(),
+    reply_to: None,
+    timestamp_nanos: 2_000_000_000,
+    room_id: Some(RoomId::new()),
+  };
+  test_bitcode_roundtrip(&msg_room);
 }
 
 #[test]
@@ -32,6 +56,7 @@ fn test_chat_voice_roundtrip() {
     waveform: vec![10, 20, 30, 40, 50],
     reply_to: None,
     timestamp_nanos: 1_000_000_000,
+    room_id: None,
   };
   test_bitcode_roundtrip(&msg);
 }
@@ -46,6 +71,7 @@ fn test_chat_image_roundtrip() {
     height: 1080,
     reply_to: Some(MessageId::new()),
     timestamp_nanos: 1_000_000_000,
+    room_id: None,
   };
   test_bitcode_roundtrip(&msg);
 }
@@ -148,6 +174,7 @@ fn test_forward_message_roundtrip() {
     original_sender: UserId::new(),
     content: "Forwarded content".to_string(),
     timestamp_nanos: 1_000_000_000,
+    room_id: None,
   };
   test_bitcode_roundtrip(&msg);
 }
@@ -252,6 +279,8 @@ fn test_datachannel_message_roundtrip() {
     content: "Test message".to_string(),
     reply_to: None,
     timestamp_nanos: 1_000_000_000,
+    room_id: None,
+    mentions: vec![],
   });
   let encoded = bitcode::encode(&msg);
   let decoded: DataChannelMessage = bitcode::decode(&encoded).expect("Failed to decode");

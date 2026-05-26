@@ -138,6 +138,7 @@ mod wasm {
       nickname: "Me".to_string(),
       avatar: String::new(),
       signature: String::new(),
+      token_expires_ms: None,
     }));
     let manager = ChatManager::new(app_state);
     (app_state, manager, me, peer)
@@ -203,6 +204,8 @@ mod wasm {
       content: "hi".to_string(),
       reply_to: None,
       timestamp_nanos: 1_700_000_000_000_000_000,
+      room_id: None,
+      mentions: vec![],
     });
     crate::chat::routing::dispatch_incoming(
       &manager,
@@ -249,6 +252,8 @@ mod wasm {
       content: "are you there".to_string(),
       reply_to: None,
       timestamp_nanos: 1_700_000_000_000_000_000,
+      room_id: None,
+      mentions: vec![],
     });
     crate::chat::routing::dispatch_incoming(
       &manager,
@@ -285,6 +290,8 @@ mod wasm {
       content: "hi".to_string(),
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
+      mentions: vec![],
     });
     crate::chat::routing::dispatch_incoming(
       &manager,
@@ -358,6 +365,8 @@ mod wasm {
         content: "hi".to_string(),
         reply_to: None,
         timestamp_nanos: 0,
+        room_id: None,
+        mentions: vec![],
       }),
     );
     manager.apply_reaction(

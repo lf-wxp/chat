@@ -11,6 +11,7 @@ use crate::state::ConversationId;
 use chrono::Utc;
 use leptos::prelude::*;
 use message::MessageId;
+use message::UserId;
 use message::datachannel::{
   ChatImage, ChatSticker, ChatText, ChatVoice, DataChannelMessage, ForwardMessage, MessageReaction,
   MessageRevoke, ReactionAction,
@@ -55,9 +56,11 @@ impl ChatManager {
 
     let wire = DataChannelMessage::ChatText(ChatText {
       message_id: id,
-      content: trimmed,
+      content: trimmed.clone(),
       reply_to: reply_to.map(|r| r.message_id),
       timestamp_nanos: now_ms_to_nanos(now_ms),
+      room_id: conv.room_id(),
+      mentions: crate::chat::mention::extract_user_ids(&trimmed, self),
     });
     self.dispatch_and_track(conv, id, wire);
     Some(id)
@@ -100,6 +103,7 @@ impl ChatManager {
       sticker_id,
       reply_to: None,
       timestamp_nanos: now_ms_to_nanos(now_ms),
+      room_id: conv.room_id(),
     });
     self.dispatch_and_track(conv, id, wire);
     Some(id)
@@ -149,6 +153,7 @@ impl ChatManager {
       waveform,
       reply_to: None,
       timestamp_nanos: now_ms_to_nanos(now_ms),
+      room_id: conv.room_id(),
     });
     self.dispatch_and_track(conv, id, wire);
     Some(id)
@@ -190,6 +195,7 @@ impl ChatManager {
       height: payload.height,
       reply_to: None,
       timestamp_nanos: now_ms_to_nanos(now_ms),
+      room_id: conv.room_id(),
     });
     self.dispatch_and_track(conv, id, wire);
     Some(id)
@@ -247,6 +253,7 @@ impl ChatManager {
       original_sender: source.sender.clone(),
       content: content_text,
       timestamp_nanos: now_ms_to_nanos(now_ms),
+      room_id: target_conv.room_id(),
     });
     self.dispatch_and_track(target_conv, id, wire);
     Some(id)
@@ -425,8 +432,8 @@ impl ChatManager {
       // For room conversations, an empty peer list means the user is the
       // only member — mark as Sent instead of Failed because the message
       // is stored locally and will be delivered when other members join.
-      // For direct conversations, no peers means the connection is down,
-      // so Failed is the correct status.
+      // For direct conversations, buffer the message for later delivery
+      // when the peer reconnects (G12 offline buffer).
       if matches!(conv, ConversationId::Room(_)) {
         if let Some(state) = self.inner.borrow().conversations.get(&conv).copied() {
           state.messages.update(|list| {
@@ -436,7 +443,26 @@ impl ChatManager {
           });
         }
       } else {
-        self.mark_failed(id);
+        // G12: Buffer the message for replay when the peer reconnects
+        // instead of immediately marking as Failed. Cap the buffer at
+        // 50 entries to prevent unbounded memory growth — evict the
+        // oldest entry and mark it as failed.
+        const OFFLINE_BUFFER_CAP: usize = 50;
+        let mut inner = self.inner.borrow_mut();
+        if inner.offline_buffer.len() >= OFFLINE_BUFFER_CAP {
+          if let Some((_, evicted_id, _)) = inner.offline_buffer.first().cloned() {
+            inner.offline_buffer.remove(0);
+            drop(inner);
+            self.mark_failed(evicted_id);
+            self
+              .inner
+              .borrow_mut()
+              .offline_buffer
+              .push((conv, id, wire));
+          }
+        } else {
+          inner.offline_buffer.push((conv, id, wire));
+        }
       }
       return;
     }
@@ -499,6 +525,25 @@ impl ChatManager {
           m.status = MessageStatus::Sent;
         }
       });
+    }
+  }
+
+  /// G12: Drain the offline buffer for a specific peer. Called when a
+  /// DataChannel becomes available after reconnection. Replays all
+  /// buffered messages targeting the given peer's conversation.
+  pub fn drain_offline_buffer_for(&self, peer: &UserId) {
+    let conv = ConversationId::Direct(peer.clone());
+    let buffered: Vec<(ConversationId, MessageId, DataChannelMessage)> = {
+      let mut inner = self.inner.borrow_mut();
+      let (matching, remaining): (Vec<_>, Vec<_>) = inner
+        .offline_buffer
+        .drain(..)
+        .partition(|(c, _, _)| *c == conv);
+      inner.offline_buffer = remaining;
+      matching
+    };
+    for (c, id, wire) in buffered {
+      self.dispatch_and_track(c, id, wire);
     }
   }
 }

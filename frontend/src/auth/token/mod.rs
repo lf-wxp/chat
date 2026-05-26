@@ -103,6 +103,7 @@ pub fn load_auth_from_storage() -> Option<AuthState> {
     nickname,
     avatar,
     signature,
+    token_expires_ms: None,
   })
 }
 

@@ -31,6 +31,7 @@ pub mod helpers;
 pub mod image_picker;
 pub mod image_preview;
 pub mod input_bar;
+pub mod mention_autocomplete;
 pub mod message_bubble;
 pub mod message_list;
 pub mod reaction_picker;

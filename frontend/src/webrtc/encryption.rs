@@ -418,6 +418,63 @@ impl PeerCrypto {
     self.key_id
   }
 
+  /// G16: Rotate the ECDH key pair. Generates a fresh key pair,
+  /// increments the key_id, and returns the new public key bytes so
+  /// the caller can send an `EcdhKeyExchange` message to the peer.
+  ///
+  /// After rotation, the shared key is cleared until the peer responds
+  /// with their new public key (or re-sends their existing one to
+  /// derive a new shared secret from our new private key).
+  ///
+  /// # Errors
+  /// Returns an error if key generation fails.
+  pub async fn rotate_key(&mut self) -> Result<Vec<u8>, String> {
+    let window = web_sys::window().ok_or("No window object available")?;
+    let crypto = window
+      .crypto()
+      .map_err(|_| "Crypto not available".to_string())?;
+    let subtle = crypto.subtle();
+
+    let algo = Self::ecdh_key_gen_algorithm()?;
+    let usages = Array::new();
+    usages.push(&"deriveKey".into());
+    usages.push(&"deriveBits".into());
+
+    let algo_obj: &js_sys::Object = algo.dyn_ref().ok_or("ECDH algorithm is not an Object")?;
+
+    let key_pair = wasm_bindgen_futures::JsFuture::from(
+      subtle
+        .generate_key_with_object(algo_obj, true, &usages)
+        .map_err(|e| format!("Failed to call generate_key: {:?}", e))?,
+    )
+    .await
+    .map_err(|e| format!("Key rotation: failed to generate new key pair: {:?}", e))?;
+
+    let private_key = js_sys::Reflect::get(&key_pair, &"privateKey".into())
+      .map_err(|_| "Failed to get private key")?;
+    let public_key = js_sys::Reflect::get(&key_pair, &"publicKey".into())
+      .map_err(|_| "Failed to get public key")?;
+
+    self.private_key = CryptoKeyValue::from_js(private_key)?;
+    self.public_key = CryptoKeyValue::from_js(public_key)?;
+    self.shared_key = None;
+    self.key_id = self.key_id.wrapping_add(1);
+
+    self.export_public_key().await
+  }
+
+  /// G16: Check whether key rotation is due based on a message counter.
+  ///
+  /// Rotation is recommended every 1000 messages or every 1 hour,
+  /// whichever comes first. The caller is responsible for tracking the
+  /// message count and invoking [`Self::rotate_key`] when this returns
+  /// `true`.
+  #[must_use]
+  pub fn should_rotate(&self, messages_since_rotation: u64) -> bool {
+    const ROTATION_THRESHOLD: u64 = 1000;
+    messages_since_rotation >= ROTATION_THRESHOLD
+  }
+
   /// Generate a random nonce for AES-GCM using window.crypto.getRandomValues().
   fn generate_nonce(crypto: &web_sys::Crypto) -> Result<Vec<u8>, String> {
     let buf = Uint8Array::new_with_length(GCM_NONCE_SIZE as u32);

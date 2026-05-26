@@ -24,12 +24,14 @@ use crate::components::chat_view::message_list::{MessageList, ScrollController};
 use crate::components::chat_view::sticker_panel::StickerPanel;
 use crate::components::chat_view::typing_indicator::TypingIndicator;
 use crate::components::chat_view::voice_recorder::VoiceRecorder;
+use crate::components::room::MemberListPanel;
 use crate::file_transfer::use_file_transfer_manager;
 use crate::i18n;
 use crate::state::use_app_state;
 use leptos::prelude::*;
 use leptos_i18n::t_string;
 use message::MessageId;
+use message::types::RoomId;
 use web_sys::DragEvent;
 
 /// Root chat view.
@@ -73,6 +75,15 @@ pub fn ChatView() -> impl IntoView {
   let forward_source: RwSignal<Option<ChatMessage>> = RwSignal::new(None);
   let preview_url: RwSignal<Option<String>> = RwSignal::new(None);
   let scroll_controller: RwSignal<Option<ScrollController>> = RwSignal::new(None);
+
+  // G7: Derive the room_id when the active conversation is a Room so
+  // we can conditionally mount the member list panel.
+  let room_id_signal: Memo<Option<RoomId>> =
+    Memo::new(move |_| match app_state.active_conversation.get() {
+      Some(crate::state::ConversationId::Room(rid)) => Some(rid),
+      _ => None,
+    });
+  let members_visible = RwSignal::new(false);
 
   // Overlay visibility signals shared with the input bar.
   let overlays = InputOverlays {
@@ -210,6 +221,20 @@ pub fn ChatView() -> impl IntoView {
           aria-hidden="true"
         ></span>
         <CallStartButton conv=conv />
+        // G7: Toggle button for the member list panel (room only).
+        <Show when=move || room_id_signal.get().is_some()>
+          <button
+            type="button"
+            class="btn btn--icon chat-view__members-toggle"
+            class:is-active=move || members_visible.get()
+            on:click=move |_| members_visible.update(|v| *v = !*v)
+            aria-label="Toggle member list"
+            aria-pressed=move || members_visible.get().to_string()
+            data-testid="chat-members-toggle"
+          >
+            "\u{1F465}"
+          </button>
+        </Show>
         <MessageList
           conv=conv
           cbs=cbs
@@ -236,6 +261,20 @@ pub fn ChatView() -> impl IntoView {
         <ForwardModal source=forward_source />
         <Dialog state=dialog_state.clone() />
       </div>
+
+      // G7: Member list panel for room conversations. Toggled via a
+      // button in the header area. Only mounted when the active
+      // conversation is a room.
+      <Show when=move || room_id_signal.get().is_some() && members_visible.get()>
+        {move || room_id_signal.get().map(|rid| {
+          let rid_signal = Signal::derive(move || rid.clone());
+          view! {
+            <aside class="chat-view-members" data-testid="chat-room-member-panel">
+              <MemberListPanel room_id=rid_signal />
+            </aside>
+          }
+        })}
+      </Show>
     </Show>
   }
 }

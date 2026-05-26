@@ -267,6 +267,8 @@ fn test_decode_wrong_message_type_bitcode_mismatch() {
     content: "Hello WASM".to_string(),
     reply_to: None,
     timestamp_nanos: 1_000_000_000,
+    room_id: None,
+    mentions: vec![],
   };
   let payload = bitcode::encode(&msg);
   let encoded = encode_message(0x80, &payload).unwrap().to_vec();

@@ -172,6 +172,8 @@ fn process_ack_ticks_removes_retry_payload_on_expiry() {
     content: "hello".to_string(),
     reply_to: None,
     timestamp_nanos: 0,
+    room_id: None,
+    mentions: vec![],
   });
 
   // Set up index and retry payload for the entry.

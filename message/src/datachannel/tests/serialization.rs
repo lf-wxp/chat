@@ -11,6 +11,8 @@ fn test_datachannel_message_json_roundtrip() {
     content: "Hello, **world**!".to_string(),
     reply_to: Some(MessageId::new()),
     timestamp_nanos: 1_000_000_000,
+    room_id: None,
+    mentions: vec![],
   });
   let json = serde_json::to_string(&msg).expect("Failed to serialize DataChannelMessage");
   let decoded: DataChannelMessage =
@@ -27,6 +29,7 @@ fn test_datachannel_message_json_roundtrip_all_variants() {
       sticker_id: "sticker_123".to_string(),
       reply_to: None,
       timestamp_nanos: 1_000_000_000,
+      room_id: None,
     }),
     DataChannelMessage::MessageAck(MessageAck {
       message_id: MessageId::new(),

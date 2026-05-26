@@ -252,6 +252,7 @@ impl SignalingClient {
       nickname,
       avatar,
       signature,
+      token_expires_ms: None,
     }));
 
     utils::save_to_local_storage(crate::auth::KEY_USER_ID, &auth_success.user_id.to_string());

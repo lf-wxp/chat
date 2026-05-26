@@ -17,8 +17,23 @@ use super::TYPING_RATE_LIMIT_MS;
 
 impl ChatManager {
   /// Append an incoming chat message to the conversation.
+  ///
+  /// Deduplicates by `message_id` — if the message is already present
+  /// in the in-memory list it is silently dropped (G10 fix). The
+  /// IndexedDB layer has its own dedup via primary key, but the UI
+  /// list previously did not, which could cause visual duplicates
+  /// after reconnection or persistence reload races.
   pub fn push_incoming(&self, conv: ConversationId, mut msg: ChatMessage) {
     let state = self.conversation_state(&conv);
+
+    // G10: Deduplicate — skip if message already in memory list.
+    let dominated = state
+      .messages
+      .with_untracked(|list| list.iter().any(|m| m.id == msg.id));
+    if dominated {
+      return;
+    }
+
     self.inner.borrow_mut().index.insert(msg.id, conv.clone());
 
     // Mark as received / unread.

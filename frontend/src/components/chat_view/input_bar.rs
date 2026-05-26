@@ -17,6 +17,7 @@
 use crate::chat::models::MAX_TEXT_LENGTH;
 use crate::chat::{ReplySnippet, use_chat_manager};
 use crate::components::chat_view::helpers::preview_text;
+use crate::components::chat_view::mention_autocomplete::MentionAutocomplete;
 use crate::i18n;
 use crate::state::{ConversationId, use_app_state};
 use icondata as i;
@@ -60,6 +61,10 @@ pub fn InputBar(
   // Composition buffer.
   let draft = RwSignal::new(String::new());
   let textarea_ref = NodeRef::<html::Textarea>::new();
+
+  // G5: Mention autocomplete state.
+  let cursor_pos = RwSignal::new(0usize);
+  let mention_visible = RwSignal::new(false);
 
   // Consume one-shot mention requests from the room member list
   // ("Mention in chat" action — Req 15.4 §35). Appends `@{nickname} `
@@ -156,6 +161,8 @@ pub fn InputBar(
         && let Ok(textarea) = target.dyn_into::<HtmlTextAreaElement>()
       {
         draft.set(textarea.value());
+        // G5: Track cursor position for mention autocomplete.
+        cursor_pos.set(textarea.selection_start().ok().flatten().unwrap_or(0) as usize);
         manager.send_typing(true);
       }
     }
@@ -213,6 +220,27 @@ pub fn InputBar(
           .into_any()
         }}
       </Show>
+
+      // G5: Mention autocomplete popup (positioned above the input row).
+      <MentionAutocomplete
+        draft=Signal::derive(move || draft.get())
+        cursor_pos=Signal::derive(move || cursor_pos.get())
+        visible=mention_visible
+        on_select=Callback::new(move |user: message::types::UserInfo| {
+          let text = draft.get_untracked();
+          let pos = cursor_pos.get_untracked().min(text.len());
+          let before = &text[..pos];
+          if let Some(at_pos) = before.rfind('@') {
+            let mut new_text = text[..at_pos].to_string();
+            new_text.push_str(&format!("@{} ", user.nickname));
+            new_text.push_str(&text[pos..]);
+            let new_cursor = at_pos + 1 + user.nickname.len() + 1;
+            draft.set(new_text);
+            cursor_pos.set(new_cursor);
+          }
+        })
+        _conv=conv
+      />
 
       <div class="chat-input-row">
         <button

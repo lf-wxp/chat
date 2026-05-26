@@ -35,6 +35,8 @@ fn all_discriminators_are_unique() {
       content: "t".to_string(),
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
+      mentions: vec![],
     }),
     DataChannelMessage::ChatSticker(ChatSticker {
       message_id: mid(),
@@ -42,6 +44,7 @@ fn all_discriminators_are_unique() {
       sticker_id: "s".to_string(),
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
     }),
     DataChannelMessage::ChatVoice(ChatVoice {
       message_id: mid(),
@@ -50,6 +53,7 @@ fn all_discriminators_are_unique() {
       waveform: vec![0u8; 16],
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
     }),
     DataChannelMessage::ChatImage(ChatImage {
       message_id: mid(),
@@ -59,6 +63,7 @@ fn all_discriminators_are_unique() {
       height: 100,
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
     }),
     DataChannelMessage::FileChunk(FileChunk {
       transfer_id: tid(),
@@ -105,6 +110,7 @@ fn all_discriminators_are_unique() {
       original_sender: uid(),
       content: "fwd".to_string(),
       timestamp_nanos: 0,
+      room_id: None,
     }),
     DataChannelMessage::MessageReaction(MessageReaction {
       message_id: mid(),
@@ -201,6 +207,8 @@ fn message_discriminator_roundtrip() {
     content: "Hello, World!".to_string(),
     reply_to: None,
     timestamp_nanos: 1234567890,
+    room_id: None,
+    mentions: vec![],
   });
 
   let discriminator = msg.discriminator();
@@ -312,6 +320,7 @@ fn chat_sticker_roundtrip() {
     sticker_id: "cat".to_string(),
     reply_to: None,
     timestamp_nanos: 0,
+    room_id: None,
   });
   let payload = bitcode::encode(&msg);
   let decoded: DataChannelMessage = bitcode::decode(&payload).unwrap();
@@ -593,6 +602,7 @@ fn forward_message_roundtrip() {
     original_sender: uid(),
     content: "forwarded content".to_string(),
     timestamp_nanos: 12345,
+    room_id: None,
   });
   let decoded: DataChannelMessage = bitcode::decode(&bitcode::encode(&msg)).unwrap();
   if let DataChannelMessage::ForwardMessage(f) = decoded {
@@ -649,6 +659,8 @@ fn all_message_variants() -> Vec<DataChannelMessage> {
       content: "t".to_string(),
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
+      mentions: vec![],
     }),
     DataChannelMessage::ChatSticker(ChatSticker {
       message_id: mid(),
@@ -656,6 +668,7 @@ fn all_message_variants() -> Vec<DataChannelMessage> {
       sticker_id: "s".to_string(),
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
     }),
     DataChannelMessage::ChatVoice(ChatVoice {
       message_id: mid(),
@@ -664,6 +677,7 @@ fn all_message_variants() -> Vec<DataChannelMessage> {
       waveform: vec![0u8; 16],
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
     }),
     DataChannelMessage::ChatImage(ChatImage {
       message_id: mid(),
@@ -673,6 +687,7 @@ fn all_message_variants() -> Vec<DataChannelMessage> {
       height: 100,
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
     }),
     DataChannelMessage::FileChunk(FileChunk {
       transfer_id: tid(),
@@ -719,6 +734,7 @@ fn all_message_variants() -> Vec<DataChannelMessage> {
       original_sender: uid(),
       content: "fwd".to_string(),
       timestamp_nanos: 0,
+      room_id: None,
     }),
     DataChannelMessage::MessageReaction(MessageReaction {
       message_id: mid(),

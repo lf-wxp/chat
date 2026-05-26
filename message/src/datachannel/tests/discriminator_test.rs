@@ -9,6 +9,8 @@ fn test_datachannel_message_discriminator() {
       content: String::new(),
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
+      mentions: vec![],
     })
     .discriminator(),
     0x80
@@ -21,6 +23,7 @@ fn test_datachannel_message_discriminator() {
       sticker_id: String::new(),
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
     })
     .discriminator(),
     0x81
@@ -79,6 +82,8 @@ fn test_discriminator_chat_messages() {
       content: String::new(),
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
+      mentions: vec![],
     })
     .discriminator(),
     discriminator::CHAT_TEXT
@@ -91,6 +96,7 @@ fn test_discriminator_chat_messages() {
       sticker_id: String::new(),
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
     })
     .discriminator(),
     discriminator::CHAT_STICKER
@@ -104,6 +110,7 @@ fn test_discriminator_chat_messages() {
       waveform: vec![],
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
     })
     .discriminator(),
     discriminator::CHAT_VOICE
@@ -118,6 +125,7 @@ fn test_discriminator_chat_messages() {
       height: 0,
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
     })
     .discriminator(),
     discriminator::CHAT_IMAGE
@@ -202,6 +210,7 @@ fn test_discriminator_message_enhancement() {
       original_sender: UserId::new(),
       content: String::new(),
       timestamp_nanos: 0,
+      room_id: None,
     })
     .discriminator(),
     discriminator::FORWARD_MESSAGE
@@ -306,6 +315,8 @@ fn create_chat_message_discriminators() -> Vec<u8> {
       content: String::new(),
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
+      mentions: vec![],
     })
     .discriminator(),
     DataChannelMessage::ChatSticker(ChatSticker {
@@ -314,6 +325,7 @@ fn create_chat_message_discriminators() -> Vec<u8> {
       sticker_id: String::new(),
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
     })
     .discriminator(),
     DataChannelMessage::ChatVoice(ChatVoice {
@@ -323,6 +335,7 @@ fn create_chat_message_discriminators() -> Vec<u8> {
       waveform: vec![],
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
     })
     .discriminator(),
     DataChannelMessage::ChatImage(ChatImage {
@@ -333,6 +346,7 @@ fn create_chat_message_discriminators() -> Vec<u8> {
       height: 0,
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
     })
     .discriminator(),
   ]
@@ -392,6 +406,7 @@ fn create_message_status_discriminators() -> Vec<u8> {
       original_sender: UserId::new(),
       content: String::new(),
       timestamp_nanos: 0,
+      room_id: None,
     })
     .discriminator(),
     DataChannelMessage::MessageReaction(MessageReaction {

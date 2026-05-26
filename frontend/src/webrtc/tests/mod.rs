@@ -24,6 +24,8 @@ fn test_datachannel_message_discriminators() {
     content: "test".to_string(),
     reply_to: None,
     timestamp_nanos: 0,
+    room_id: None,
+    mentions: vec![],
   });
   assert_eq!(chat.discriminator(), 0x80);
 
@@ -72,6 +74,8 @@ fn encrypted_marker_disjoint_from_every_discriminator() {
       content: "m".into(),
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
+      mentions: vec![],
     })
     .discriminator(),
     DataChannelMessage::EcdhKeyExchange(message::datachannel::EcdhKeyExchange {

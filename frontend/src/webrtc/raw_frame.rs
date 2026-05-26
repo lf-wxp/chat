@@ -14,6 +14,32 @@
 use super::{WebRtcManager, build_file_placeholder};
 use leptos::prelude::GetUntracked;
 use message::UserId;
+use message::datachannel::DataChannelMessage;
+
+/// Resolve the target [`ConversationId`] from an inbound
+/// `DataChannelMessage`. Room messages carry a `room_id` field so the
+/// receiver routes them to the correct room conversation; direct
+/// messages fall back to `Direct(peer_id)`.
+fn resolve_conv_from_msg(
+  msg: &DataChannelMessage,
+  peer_id: &UserId,
+) -> crate::state::ConversationId {
+  let room_id = match msg {
+    DataChannelMessage::ChatText(m) => m.room_id.as_ref(),
+    DataChannelMessage::ChatSticker(m) => m.room_id.as_ref(),
+    DataChannelMessage::ChatVoice(m) => m.room_id.as_ref(),
+    DataChannelMessage::ChatImage(m) => m.room_id.as_ref(),
+    DataChannelMessage::ForwardMessage(m) => m.room_id.as_ref(),
+    // Control frames (ACK, revoke, read, reaction, typing) don't carry
+    // room_id — they are routed by the message index lookup inside the
+    // chat manager, so Direct(peer) is fine as a placeholder.
+    _ => None,
+  };
+  match room_id {
+    Some(id) => crate::state::ConversationId::Room(id.clone()),
+    None => crate::state::ConversationId::Direct(peer_id.clone()),
+  }
+}
 
 impl WebRtcManager {
   /// Handle a raw DataChannel frame (Task 19.1 — Req 5.1.3).
@@ -216,7 +242,10 @@ impl WebRtcManager {
         };
         let peer_name = self.lookup_peer_nickname(&peer_id);
         let local_nick = self.app_state.auth.get_untracked().map(|a| a.nickname);
-        let conv = crate::state::ConversationId::Direct(peer_id.clone());
+        // Resolve conversation from the message's room_id field (G1 fix).
+        // Room messages carry a room_id so the receiver routes them to the
+        // correct room conversation instead of the direct chat.
+        let conv = resolve_conv_from_msg(&msg, &peer_id);
         crate::chat::routing::dispatch_incoming(
           &chat,
           peer_id,

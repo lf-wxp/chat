@@ -290,6 +290,8 @@ fn test_datachannel_discriminator_range_wasm() {
       content: String::new(),
       reply_to: None,
       timestamp_nanos: 0,
+      room_id: None,
+      mentions: vec![],
     }),
     DataChannelMessage::TypingIndicator(crate::datachannel::TypingIndicator { is_typing: true }),
     DataChannelMessage::MessageRead(crate::datachannel::MessageRead {

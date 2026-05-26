@@ -10,6 +10,7 @@ fn test_wasm_datachannel_chat_sticker_roundtrip() {
     sticker_id: "sticker_042".to_string(),
     reply_to: None,
     timestamp_nanos: 1_000_000_000,
+    room_id: None,
   };
   roundtrip_datachannel(0x81, &msg);
 }
@@ -25,6 +26,7 @@ fn test_wasm_datachannel_chat_voice_roundtrip() {
     waveform: vec![10, 20, 30, 40],
     reply_to: None,
     timestamp_nanos: 1_000_000_000,
+    room_id: None,
   };
   roundtrip_datachannel(0x82, &msg);
 }
@@ -41,6 +43,7 @@ fn test_wasm_datachannel_chat_image_roundtrip() {
     height: 1080,
     reply_to: None,
     timestamp_nanos: 1_000_000_000,
+    room_id: None,
   };
   roundtrip_datachannel(0x83, &msg);
 }
@@ -130,6 +133,7 @@ fn test_wasm_datachannel_forward_message_roundtrip() {
     original_sender: UserId::new(),
     content: "Forwarded from WASM".to_string(),
     timestamp_nanos: 1_000_000_000,
+    room_id: None,
   };
   roundtrip_datachannel(0x94, &msg);
 }

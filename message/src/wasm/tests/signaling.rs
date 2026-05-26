@@ -417,6 +417,8 @@ fn test_wasm_datachannel_chat_text_roundtrip() {
     content: "Hello from WASM!".to_string(),
     reply_to: None,
     timestamp_nanos: 1_000_000_000,
+    room_id: None,
+    mentions: vec![],
   };
   roundtrip_datachannel(0x80, &msg);
 }

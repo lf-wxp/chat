@@ -113,6 +113,10 @@ pub(crate) struct Inner {
   /// re-broadcast a message on retry without the UI having to keep the
   /// raw bytes around.
   pub(crate) retry_payloads: HashMap<MessageId, DataChannelMessage>,
+  /// G12: Offline message buffer — messages queued when no peers are
+  /// connected for a direct conversation. Drained and dispatched when
+  /// the peer's DataChannel becomes available again.
+  pub(crate) offline_buffer: Vec<(ConversationId, MessageId, DataChannelMessage)>,
 }
 
 impl Inner {
@@ -125,6 +129,7 @@ impl Inner {
       typing_peer_at: HashMap::new(),
       index: HashMap::new(),
       retry_payloads: HashMap::new(),
+      offline_buffer: Vec::new(),
     }
   }
 

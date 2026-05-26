@@ -112,6 +112,14 @@ pub struct ChatText {
   pub reply_to: Option<MessageId>,
   /// Sender timestamp in nanoseconds since Unix epoch.
   pub timestamp_nanos: u64,
+  /// Room ID when sent inside a room conversation. `None` for 1:1 chats.
+  /// Enables the receiver to route the message to the correct conversation
+  /// even though the wire frame is delivered peer-to-peer (Req 2.3).
+  pub room_id: Option<RoomId>,
+  /// User IDs explicitly mentioned via `@username` in the content.
+  /// Allows the receiver to trigger mention-specific notifications
+  /// without re-parsing the Markdown (Req 2.11).
+  pub mentions: Vec<UserId>,
 }
 
 /// Sticker chat message.
@@ -127,6 +135,8 @@ pub struct ChatSticker {
   pub reply_to: Option<MessageId>,
   /// Sender timestamp in nanoseconds since Unix epoch.
   pub timestamp_nanos: u64,
+  /// Room ID when sent inside a room conversation. `None` for 1:1 chats.
+  pub room_id: Option<RoomId>,
 }
 
 /// Voice chat message.
@@ -144,6 +154,8 @@ pub struct ChatVoice {
   pub reply_to: Option<MessageId>,
   /// Sender timestamp in nanoseconds since Unix epoch.
   pub timestamp_nanos: u64,
+  /// Room ID when sent inside a room conversation. `None` for 1:1 chats.
+  pub room_id: Option<RoomId>,
 }
 
 /// Image chat message.
@@ -163,6 +175,8 @@ pub struct ChatImage {
   pub reply_to: Option<MessageId>,
   /// Sender timestamp in nanoseconds since Unix epoch.
   pub timestamp_nanos: u64,
+  /// Room ID when sent inside a room conversation. `None` for 1:1 chats.
+  pub room_id: Option<RoomId>,
 }
 
 // =============================================================================
@@ -301,6 +315,8 @@ pub struct ForwardMessage {
   pub content: String,
   /// Forward timestamp in nanoseconds.
   pub timestamp_nanos: u64,
+  /// Room ID when forwarded inside a room conversation. `None` for 1:1 chats.
+  pub room_id: Option<RoomId>,
 }
 
 /// Reaction action type.

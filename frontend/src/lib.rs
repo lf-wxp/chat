@@ -10,6 +10,7 @@ pub mod call;
 pub mod chat;
 pub mod components;
 pub mod config;
+pub mod cross_tab;
 pub mod error_handler;
 pub mod file_transfer;
 pub mod i18n_helpers;

@@ -37,6 +37,18 @@ pub enum ConversationId {
   Room(RoomId),
 }
 
+impl ConversationId {
+  /// Extract the room ID if this is a room conversation, `None` for
+  /// direct chats. Used to populate the `room_id` field on outbound
+  /// wire messages so receivers can route them correctly (Req 2.3).
+  pub fn room_id(&self) -> Option<RoomId> {
+    match self {
+      Self::Room(id) => Some(id.clone()),
+      Self::Direct(_) => None,
+    }
+  }
+}
+
 /// Maximum number of pinned conversations.
 pub const MAX_PINS: usize = 5;
 
@@ -194,6 +206,11 @@ pub struct AuthState {
   pub avatar: String,
   /// Custom signature / status message (Req 10.1.6).
   pub signature: String,
+  /// Token expiry timestamp in milliseconds since epoch (G13).
+  /// When the current time approaches this value (within 5 minutes),
+  /// the signaling client will proactively re-send `TokenAuth` to
+  /// obtain a fresh token without interrupting the session.
+  pub token_expires_ms: Option<i64>,
 }
 
 /// Global application state.

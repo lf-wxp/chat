@@ -172,6 +172,18 @@ impl PeerConnection {
   pub async fn handle_offer(&self, sdp: &str) -> Result<String, String> {
     let pc = self.get_pc()?;
 
+    // G4 fix: Handle "glare" — if we have a pending local offer when a
+    // remote offer arrives (both sides tried to renegotiate at the same
+    // time), rollback our local description first. This prevents the
+    // "m-line order mismatch" error that Chrome raises when
+    // setRemoteDescription is called in `have-local-offer` state.
+    if pc.signaling_state() == web_sys::RtcSignalingState::HaveLocalOffer {
+      let rollback = web_sys::RtcSessionDescriptionInit::new(web_sys::RtcSdpType::Rollback);
+      wasm_bindgen_futures::JsFuture::from(pc.set_local_description(&rollback))
+        .await
+        .map_err(|e| format!("Failed to rollback local description: {:?}", e))?;
+    }
+
     let offer_desc = web_sys::RtcSessionDescriptionInit::new(web_sys::RtcSdpType::Offer);
     offer_desc.set_sdp(sdp);
     wasm_bindgen_futures::JsFuture::from(pc.set_remote_description(&offer_desc))

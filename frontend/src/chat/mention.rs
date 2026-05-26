@@ -147,5 +147,38 @@ pub fn mentions(names: &[String], target: &str) -> bool {
   names.iter().any(|n| n.to_lowercase() == target_lc)
 }
 
+/// Extract `@mention` tokens from `content` and resolve them to
+/// `UserId` values using the member list available via the chat
+/// manager. Returns an empty vec for direct chats or when no mentions
+/// are found.
+///
+/// This is used on the outbound path to populate the `mentions` field
+/// on `ChatText` wire messages (G8 fix).
+pub fn extract_user_ids(
+  content: &str,
+  mgr: &crate::chat::manager::ChatManager,
+) -> Vec<message::UserId> {
+  use leptos::prelude::GetUntracked;
+
+  let tokens = extract(content);
+  if tokens.is_empty() {
+    return Vec::new();
+  }
+  // Resolve each token against the online users list.
+  let online = mgr.app_state.online_users.get_untracked();
+  let mut ids = Vec::new();
+  for token in &tokens {
+    let token_lc = token.to_lowercase();
+    if let Some(user) = online
+      .iter()
+      .find(|u| u.nickname.to_lowercase() == token_lc)
+      && !ids.contains(&user.user_id)
+    {
+      ids.push(user.user_id.clone());
+    }
+  }
+  ids
+}
+
 #[cfg(test)]
 mod tests;

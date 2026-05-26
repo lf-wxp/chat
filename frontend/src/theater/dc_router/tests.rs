@@ -106,6 +106,8 @@ fn classify_rejects_non_theater_variants() {
     content: "hi".into(),
     reply_to: None,
     timestamp_nanos: 0,
+    room_id: None,
+    mentions: vec![],
   });
   assert!(classify(chat).is_err());
 }
@@ -120,6 +122,8 @@ fn classify_round_trips_err_payload() {
     content: "hi".into(),
     reply_to: None,
     timestamp_nanos: 0,
+    room_id: None,
+    mentions: vec![],
   });
   let returned = classify(original.clone()).expect_err("non-theater variant");
   assert_eq!(*returned, original);
