@@ -48,6 +48,7 @@ import type { Page } from '@playwright/test';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TINY_WEBM = path.resolve(__dirname, '..', 'assets', 'tiny.webm');
+const DEMO_MP4 = path.resolve(__dirname, '..', 'assets', 'demo.mp4');
 
 /**
  * Create a Theater-type room as `page`'s logged-in user.
@@ -230,41 +231,31 @@ test.describe('theater room', () => {
     pageB,
     server,
   }) => {
-    // ── Owner (A): create theater + pick local video ──────────────────
+    // ── Owner (A): create theater + pick local video (demo.mp4) ───────
+    // Using a real MP4 file (17 MB) to exercise the realistic scenario
+    // where `captureStream()` is deferred until the `canplay` event.
+    // This tests the late-stream-publish fix: the viewer may join
+    // before the owner's stream is captured, and the owner must push
+    // the stream once it becomes available.
     await registerAndLogin(pageA, server, { hint: 'th-vj-a' });
     await registerAndLogin(pageB, server, { hint: 'th-vj-b' });
     const { name } = await createTheaterRoom(pageA);
 
-    // Owner picks the local video file so a MediaStream is captured
-    // and ready to be pushed to joining viewers.
-    await pageA.locator(sel.theaterSourceLocalInput).setInputFiles({
-      name: 'tiny.webm',
-      mimeType: 'video/webm',
-      buffer: (await import('node:fs')).readFileSync(TINY_WEBM),
-    });
+    // Owner picks the local MP4 file via the file input.
+    await pageA.locator(sel.theaterSourceLocalInput).setInputFiles(DEMO_MP4);
 
     // Wait for the owner's <video> to mount and decode at least one
     // frame — this confirms the stream is captured and publishable.
     const ownerVideo = pageA.locator(sel.theaterVideo);
-    await expect(ownerVideo).toBeVisible({ timeout: 10_000 });
+    await expect(ownerVideo).toBeVisible({ timeout: 15_000 });
     await expect
       .poll(
         async () => ownerVideo.evaluate((el: HTMLVideoElement) => el.readyState),
-        { timeout: 10_000 },
+        { timeout: 15_000 },
       )
       .toBeGreaterThanOrEqual(2);
 
-    // Debug: collect console logs from both pages to diagnose WebRTC flow
-    const logsA: string[] = [];
-    const logsB: string[] = [];
-    pageA.on('console', (msg) => { if (msg.text().includes('[webrtc]') || msg.text().includes('[theater]')) logsA.push(msg.text()); });
-    pageB.on('console', (msg) => { if (msg.text().includes('[webrtc]') || msg.text().includes('[theater]')) logsB.push(msg.text()); });
-
     // ── Viewer (B): join the theater room ─────────────────────────────
-    // The room appears in B's sidebar via `RoomListUpdate`. Click the
-    // join button, which triggers `JoinRoom` → `RoomJoined` and sets
-    // `active_conversation` to the theater room. The home page then
-    // renders `<TheaterPage>` instead of `<ChatView>`.
     const itemOnB = pageB.locator(
       `${sel.sidebarRoomItem}[data-room-name="${name}"]`,
     );
@@ -275,24 +266,12 @@ test.describe('theater room', () => {
     // TheaterPage mounts on B because the room_type is Theater.
     await expect(pageB.locator(sel.theaterPage)).toBeVisible({ timeout: 15_000 });
 
-    // Wait a bit for the auto-connect to happen
-    await pageA.waitForTimeout(5_000);
-
-    // Debug: check owner's peer connection state
-    const ownerDebug = await pageA.evaluate(() => {
-      const w = (window as unknown as { __webrtc_debug?: () => unknown }).__webrtc_debug;
-      return w ? w() : 'no debug hook';
-    });
-    console.log('[DEBUG] Owner WebRTC state:', JSON.stringify(ownerDebug));
-    console.log('[DEBUG] Owner logs:', logsA);
-    console.log('[DEBUG] Viewer logs:', logsB);
-
     // The viewer initially sees the "waiting for stream" placeholder
     // until the WebRTC handshake completes and the owner pushes the
     // stream. Once `ontrack` fires, `has_video_source` flips and the
     // `<video>` element mounts with `srcObject` bound.
     const viewerVideo = pageB.locator(sel.theaterVideo);
-    await expect(viewerVideo).toBeVisible({ timeout: 30_000 });
+    await expect(viewerVideo).toBeVisible({ timeout: 45_000 });
 
     // Confirm the viewer's <video> has a MediaStream bound via
     // srcObject (not a blob: URL like the owner's local file).

@@ -305,6 +305,13 @@ impl PeerDataChannel {
   }
 
   /// Set up open handler.
+  ///
+  /// **Race-condition guard**: If the DataChannel has already transitioned
+  /// to the `Open` state by the time this method is called (which can
+  /// happen on the answerer side when ICE completes before the
+  /// `ondatachannel` callback fires), the browser will have already
+  /// dispatched the `open` event and the `onopen` handler will never
+  /// fire.  We detect this case and invoke the callback synchronously.
   pub fn set_on_open<F>(&self, callback: F)
   where
     F: Fn() + 'static,
@@ -316,6 +323,19 @@ impl PeerDataChannel {
         return;
       }
     };
+
+    // If the channel is already open, the `open` event has already
+    // fired and the handler will never be invoked. Call the callback
+    // immediately to avoid a deadlock in the ECDH handshake.
+    if channel.ready_state() == RtcDataChannelState::Open {
+      callback();
+      // Still register the handler for consistency, but the callback
+      // has already been consumed so we use a no-op.
+      let noop = Closure::wrap(Box::new(|_: web_sys::Event| {}) as Box<dyn FnMut(web_sys::Event)>);
+      channel.set_onopen(Some(noop.as_ref().unchecked_ref()));
+      *self.on_open.borrow_mut() = Some(noop);
+      return;
+    }
 
     let closure = Closure::wrap(Box::new(move |_event: web_sys::Event| {
       callback();

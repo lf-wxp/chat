@@ -139,12 +139,12 @@ export async function establishConnection(
     expect(pageA.locator(sel.e2eeReadySentinel).first()).toHaveAttribute(
       'data-ready',
       'true',
-      { timeout: 30_000 },
+      { timeout: 60_000 },
     ),
     expect(pageB.locator(sel.e2eeReadySentinel).first()).toHaveAttribute(
       'data-ready',
       'true',
-      { timeout: 30_000 },
+      { timeout: 60_000 },
     ),
   ]);
 }

@@ -118,9 +118,18 @@ pub fn should_dispatch(active_room: Option<&RoomId>, inbound: &TheaterInbound) -
 
 /// Apply an inbound event to the local theater state.
 ///
+/// `resolve_name` maps a `UserId` to a human-readable display name
+/// (nickname or username). Callers with access to `AppState` pass a
+/// closure that looks up the online-users list; unit tests can pass
+/// `|id| id.to_string()` for deterministic output.
+///
 /// Returns `true` when the event was accepted, `false` when it was
 /// filtered out. The distinction is useful for tests and for telemetry.
-pub fn apply(state: &TheaterState, inbound: TheaterInbound) -> bool {
+pub fn apply(
+  state: &TheaterState,
+  inbound: TheaterInbound,
+  resolve_name: impl Fn(&message::UserId) -> String,
+) -> bool {
   let active = state.room_id.get_untracked();
   if !should_dispatch(active.as_ref(), &inbound) {
     return false;
@@ -161,7 +170,7 @@ pub fn apply(state: &TheaterState, inbound: TheaterInbound) -> bool {
       return apply_playback_progress(state, &p);
     }
     TheaterInbound::Chat(c) => {
-      apply_chat(state, c, is_owner);
+      apply_chat(state, c, is_owner, &resolve_name);
     }
   }
   true
@@ -174,11 +183,17 @@ pub fn apply(state: &TheaterState, inbound: TheaterInbound) -> bool {
 /// The relay broadcast itself is delegated to the caller via the
 /// `pending_chat_relay` signal to keep `dc_router` free of
 /// `web_sys::*` side effects (so native unit tests remain viable).
-fn apply_chat(state: &TheaterState, payload: TheaterChatText, is_owner: bool) {
+fn apply_chat(
+  state: &TheaterState,
+  payload: TheaterChatText,
+  is_owner: bool,
+  resolve_name: &impl Fn(&message::UserId) -> String,
+) {
+  let sender_name = resolve_name(&payload.sender_id);
   state.push_chat_message(TheaterChatMessage {
     id: state.next_chat_message_id(),
     sender_id: payload.sender_id.clone(),
-    sender_name: payload.sender_id.to_string(),
+    sender_name,
     content: payload.content.clone(),
     sent_at_ms: payload.timestamp_nanos / 1_000_000,
     is_self: false,

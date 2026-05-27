@@ -22,6 +22,13 @@ use crate::theater::state::{TheaterRole, TheaterState};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
+/// Test wrapper that calls `apply` with a fallback name resolver
+/// (just returns the user id as a string). Production code passes a
+/// closure that looks up the online-users list.
+fn apply_test(state: &TheaterState, inbound: TheaterInbound) -> bool {
+  apply(state, inbound, |id| id.to_string())
+}
+
 fn make_room_id(seed: u128) -> RoomId {
   RoomId::from_uuid(Uuid::from_u128(seed))
 }
@@ -78,7 +85,7 @@ fn apply_danmaku_pushes_to_incoming_queue() {
   state.room_id.set(Some(room));
 
   let d = make_danmaku("test danmaku");
-  let accepted = apply(&state, TheaterInbound::Danmaku(d.clone()));
+  let accepted = apply_test(&state, TheaterInbound::Danmaku(d.clone()));
 
   assert!(accepted);
   let queue: VecDeque<Danmaku> = state.incoming_danmaku.get_untracked();
@@ -92,7 +99,7 @@ fn apply_danmaku_rejected_when_no_active_room() {
   // room_id is None by default.
 
   let d = make_danmaku("orphan");
-  let accepted = apply(&state, TheaterInbound::Danmaku(d));
+  let accepted = apply_test(&state, TheaterInbound::Danmaku(d));
 
   assert!(!accepted);
   let queue: VecDeque<Danmaku> = state.incoming_danmaku.get_untracked();
@@ -105,9 +112,9 @@ fn apply_multiple_danmaku_accumulates_in_order() {
   let room = make_room_id(101);
   state.room_id.set(Some(room));
 
-  apply(&state, TheaterInbound::Danmaku(make_danmaku("first")));
-  apply(&state, TheaterInbound::Danmaku(make_danmaku("second")));
-  apply(&state, TheaterInbound::Danmaku(make_danmaku("third")));
+  apply_test(&state, TheaterInbound::Danmaku(make_danmaku("first")));
+  apply_test(&state, TheaterInbound::Danmaku(make_danmaku("second")));
+  apply_test(&state, TheaterInbound::Danmaku(make_danmaku("third")));
 
   let queue: VecDeque<Danmaku> = state.incoming_danmaku.get_untracked();
   assert_eq!(queue.len(), 3);
@@ -125,7 +132,7 @@ fn apply_subtitle_data_populates_track() {
   state.room_id.set(Some(room.clone()));
 
   let data = make_subtitle_data(room);
-  let accepted = apply(&state, TheaterInbound::SubtitleData(data));
+  let accepted = apply_test(&state, TheaterInbound::SubtitleData(data));
 
   assert!(accepted);
   let track = state.subtitle.get_untracked();
@@ -145,7 +152,7 @@ fn apply_subtitle_data_rejected_for_wrong_room() {
   state.room_id.set(Some(my_room));
 
   let data = make_subtitle_data(other_room);
-  let accepted = apply(&state, TheaterInbound::SubtitleData(data));
+  let accepted = apply_test(&state, TheaterInbound::SubtitleData(data));
 
   assert!(!accepted);
   assert!(state.subtitle.get_untracked().is_none());
@@ -159,12 +166,12 @@ fn apply_subtitle_clear_removes_track() {
 
   // First populate a track.
   let data = make_subtitle_data(room.clone());
-  apply(&state, TheaterInbound::SubtitleData(data));
+  apply_test(&state, TheaterInbound::SubtitleData(data));
   assert!(state.subtitle.get_untracked().is_some());
 
   // Then clear it.
   let clear = make_subtitle_clear(room);
-  let accepted = apply(&state, TheaterInbound::SubtitleClear(clear));
+  let accepted = apply_test(&state, TheaterInbound::SubtitleClear(clear));
 
   assert!(accepted);
   assert!(state.subtitle.get_untracked().is_none());
@@ -179,11 +186,11 @@ fn apply_subtitle_clear_rejected_for_wrong_room() {
 
   // Populate a track for my room.
   let data = make_subtitle_data(my_room);
-  apply(&state, TheaterInbound::SubtitleData(data));
+  apply_test(&state, TheaterInbound::SubtitleData(data));
 
   // Try to clear from a different room — should be rejected.
   let clear = make_subtitle_clear(other_room);
-  let accepted = apply(&state, TheaterInbound::SubtitleClear(clear));
+  let accepted = apply_test(&state, TheaterInbound::SubtitleClear(clear));
 
   assert!(!accepted);
   // Track should still be present.
@@ -199,7 +206,7 @@ fn apply_playback_updates_snapshot() {
   state.room_id.set(Some(room.clone()));
 
   let progress = make_playback(room, 5_000);
-  let accepted = apply(&state, TheaterInbound::Playback(progress));
+  let accepted = apply_test(&state, TheaterInbound::Playback(progress));
 
   assert!(accepted);
   let snap = state.playback.get_untracked();
@@ -216,7 +223,7 @@ fn apply_playback_rejected_for_wrong_room() {
   state.room_id.set(Some(my_room));
 
   let progress = make_playback(other_room, 10_000);
-  let accepted = apply(&state, TheaterInbound::Playback(progress));
+  let accepted = apply_test(&state, TheaterInbound::Playback(progress));
 
   assert!(!accepted);
   // Playback should remain at default (0).
@@ -231,11 +238,11 @@ fn apply_playback_idempotent_for_same_values() {
   state.room_id.set(Some(room.clone()));
 
   let progress = make_playback(room.clone(), 7_000);
-  let first = apply(&state, TheaterInbound::Playback(progress.clone()));
+  let first = apply_test(&state, TheaterInbound::Playback(progress.clone()));
   assert!(first);
 
   // Applying the same progress again should return false (no change).
-  let second = apply(&state, TheaterInbound::Playback(progress));
+  let second = apply_test(&state, TheaterInbound::Playback(progress));
   assert!(!second);
 }
 
@@ -248,22 +255,22 @@ fn apply_interleaved_messages_all_dispatch_correctly() {
   state.room_id.set(Some(room.clone()));
 
   // Danmaku
-  apply(&state, TheaterInbound::Danmaku(make_danmaku("hello")));
+  apply_test(&state, TheaterInbound::Danmaku(make_danmaku("hello")));
 
   // Subtitle
-  apply(
+  apply_test(
     &state,
     TheaterInbound::SubtitleData(make_subtitle_data(room.clone())),
   );
 
   // Playback
-  apply(
+  apply_test(
     &state,
     TheaterInbound::Playback(make_playback(room.clone(), 3_000)),
   );
 
   // Another danmaku
-  apply(&state, TheaterInbound::Danmaku(make_danmaku("world")));
+  apply_test(&state, TheaterInbound::Danmaku(make_danmaku("world")));
 
   // Verify all state was updated correctly.
   let queue: VecDeque<Danmaku> = state.incoming_danmaku.get_untracked();
@@ -286,7 +293,7 @@ fn apply_after_room_change_filters_stale_messages() {
 
   // Start in room A.
   state.room_id.set(Some(room_a.clone()));
-  apply(
+  apply_test(
     &state,
     TheaterInbound::Playback(make_playback(room_a.clone(), 1_000)),
   );
@@ -296,7 +303,7 @@ fn apply_after_room_change_filters_stale_messages() {
   state.room_id.set(Some(room_b.clone()));
 
   // A stale message from room A should be rejected.
-  let stale = apply(
+  let stale = apply_test(
     &state,
     TheaterInbound::Playback(make_playback(room_a, 99_000)),
   );
@@ -307,7 +314,7 @@ fn apply_after_room_change_filters_stale_messages() {
   // responsibility. The important thing is the stale message was rejected.
 
   // A message for room B should be accepted.
-  let fresh = apply(
+  let fresh = apply_test(
     &state,
     TheaterInbound::Playback(make_playback(room_b, 2_000)),
   );
@@ -325,7 +332,7 @@ fn apply_danmaku_enqueues_on_owner_batcher() {
   state.my_role.set(TheaterRole::Owner);
 
   let d = make_danmaku("from viewer");
-  assert!(apply(&state, TheaterInbound::Danmaku(d.clone())));
+  assert!(apply_test(&state, TheaterInbound::Danmaku(d.clone())));
 
   // Overlay gets a copy.
   let queue: VecDeque<Danmaku> = state.incoming_danmaku.get_untracked();
@@ -343,7 +350,7 @@ fn apply_danmaku_does_not_enqueue_for_viewers() {
   state.room_id.set(Some(room));
   state.my_role.set(TheaterRole::Viewer);
 
-  apply(&state, TheaterInbound::Danmaku(make_danmaku("x")));
+  apply_test(&state, TheaterInbound::Danmaku(make_danmaku("x")));
 
   let pending = state.with_danmaku_batcher::<usize>(|b| b.pending_len());
   assert_eq!(pending, 0);
@@ -362,7 +369,7 @@ fn apply_danmaku_batch_splats_into_overlay_queue() {
     room_id: room,
     entries: vec![make_danmaku("a"), make_danmaku("b"), make_danmaku("c")],
   };
-  assert!(apply(&state, TheaterInbound::DanmakuBatch(batch)));
+  assert!(apply_test(&state, TheaterInbound::DanmakuBatch(batch)));
 
   let queue: VecDeque<Danmaku> = state.incoming_danmaku.get_untracked();
   assert_eq!(queue.len(), 3);
@@ -383,7 +390,7 @@ fn apply_danmaku_batch_rejected_on_owner() {
     room_id: room,
     entries: vec![make_danmaku("loopback")],
   };
-  assert!(!apply(&state, TheaterInbound::DanmakuBatch(batch)));
+  assert!(!apply_test(&state, TheaterInbound::DanmakuBatch(batch)));
   assert!(state.incoming_danmaku.get_untracked().is_empty());
 }
 
@@ -402,7 +409,7 @@ fn apply_chat_appends_to_local_log_for_viewer() {
     content: "hello viewers".into(),
     timestamp_nanos: 1_000_000_000,
   };
-  assert!(apply(&state, TheaterInbound::Chat(payload)));
+  assert!(apply_test(&state, TheaterInbound::Chat(payload)));
 
   let msgs = state.chat_messages.get_untracked();
   assert_eq!(msgs.len(), 1);
@@ -427,7 +434,7 @@ fn apply_chat_queues_relay_on_owner() {
     content: "relay me".into(),
     timestamp_nanos: 1_000_000_000,
   };
-  assert!(apply(&state, TheaterInbound::Chat(payload.clone())));
+  assert!(apply_test(&state, TheaterInbound::Chat(payload.clone())));
 
   // Owner appends to its own log so the bubble is visible locally.
   assert_eq!(state.chat_messages.get_untracked().len(), 1);

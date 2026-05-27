@@ -259,12 +259,12 @@ impl SignalingClient {
     utils::save_to_local_storage(crate::auth::KEY_USERNAME, &auth_success.username);
 
     // Apply server-pushed ICE servers. The server is authoritative
-    // for the deployment's `STUN_TURN_SERVERS` setting (including
-    // an *explicitly empty* list — the canonical "use host
-    // candidates only" mode for sandboxed loopback / E2E runs).
-    // We therefore call `init_with_ice_servers` unconditionally so
-    // an empty list reliably suppresses the public-STUN fallback
-    // built into `WebRtcManager::default_ice_servers`.
+    // for the deployment's `STUN_TURN_SERVERS` setting. A non-empty
+    // list overrides the frontend's compiled-in defaults; an empty
+    // list means the server has no specific ICE configuration and
+    // the frontend should keep its own defaults (Google + Cloudflare
+    // STUN). This ensures that local development (where the server
+    // may not have STUN configured) still works with public STUN.
     if let Some(manager) = crate::webrtc::try_use_webrtc_manager() {
       let servers: Vec<crate::webrtc::IceServerConfig> = auth_success
         .ice_servers
@@ -276,11 +276,19 @@ impl SignalingClient {
           },
         )
         .collect();
-      console_log(&format!(
-        "[signaling] Applying {} server-provided ICE server(s)",
-        servers.len()
-      ));
-      manager.init_with_ice_servers(servers);
+      // Only override defaults when the server explicitly provides
+      // ICE servers. An empty list means "no preference" — keep the
+      // frontend's compiled-in STUN fallback so host+srflx candidates
+      // are still gathered.
+      if !servers.is_empty() {
+        console_log(&format!(
+          "[signaling] Applying {} server-provided ICE server(s)",
+          servers.len()
+        ));
+        manager.init_with_ice_servers(servers);
+      } else {
+        console_log("[signaling] Server sent empty ICE list; keeping frontend defaults");
+      }
     }
 
     // If we are in a reconnection flow (banner visible), switch

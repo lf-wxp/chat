@@ -162,9 +162,23 @@ pub async fn acquire_display_stream() -> Result<MediaStream, String> {
     .media_devices()
     .map_err(|e| format!("mediaDevices unavailable: {e:?}"))?;
 
+  // IMPORTANT: When `audio: true` is set in getDisplayMedia constraints,
+  // Chrome restricts the picker to only show browser tabs (because system
+  // audio capture is only supported for tab capture). To allow the user
+  // to share windows and entire screens, we set `audio` to a preference
+  // object that makes it optional, or omit it entirely and let the
+  // browser offer the "Share audio" checkbox when applicable (tab mode).
+  //
+  // Setting video to `true` allows all surface types (monitor, window,
+  // browser tab). The user can still opt into audio sharing when they
+  // pick a browser tab — Chrome shows the "Share tab audio" checkbox.
   let constraints = DisplayMediaStreamConstraints::new();
   constraints.set_video(&JsValue::TRUE);
-  constraints.set_audio(&JsValue::TRUE);
+  // Do NOT set audio to true — this restricts Chrome to tab-only mode.
+  // Instead, use `{ audio: { optional: [] } }` or simply omit audio
+  // to let the browser decide based on the selected surface type.
+  // On Chromium, omitting audio still shows the "Share audio" checkbox
+  // for tab captures.
 
   let promise = devices
     .get_display_media_with_constraints(&constraints)

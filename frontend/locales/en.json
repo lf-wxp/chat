@@ -363,7 +363,8 @@
 		"video_cors_error": "This video source does not support cross-origin playback. Please download and use local video playback instead.",
 		"video_format_unsupported": "This video format is not supported. Please convert to MP4 (H.264) or WebM format and try again.",
 		"high_load_banner": "Danmaku load is high, some danmaku may be delayed.",
-		"show_panel": "Show chat panel"
+		"show_panel": "Show chat panel",
+		"change_source": "Change source"
 	},
 	"call": {
 		"call": "Call",

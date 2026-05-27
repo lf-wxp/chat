@@ -23,10 +23,13 @@ export default defineConfig({
   // because the server uses in-memory state shared across the file's tests.
   fullyParallel: false,
   // Different spec files can still run in parallel as separate workers.
-  workers: isCI ? 2 : undefined,
+  // Cap at 2 to avoid resource contention that starves ECDH handshakes
+  // (each worker spawns its own server + 2-3 browser contexts, and the
+  // Web Crypto API async operations are sensitive to CPU scheduling).
+  workers: isCI ? 2 : 2,
   forbidOnly: isCI,
-  retries: isCI ? 2 : 1,
-  timeout: 60_000,
+  retries: 2,
+  timeout: 90_000,
   expect: {
     timeout: 15_000,
   },

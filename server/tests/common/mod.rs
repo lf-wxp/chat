@@ -105,7 +105,7 @@ where
 }
 
 /// Register a user, connect via WebSocket, authenticate, and skip the initial
-/// AuthSuccess + UserListUpdate messages.
+/// AuthSuccess + UserListUpdate + RoomListUpdate messages.
 ///
 /// Returns the authenticated WebSocket stream and the user's ID.
 pub async fn auth_user(
@@ -130,11 +130,8 @@ pub async fn auth_user(
     response
   );
 
-  // Wait for UserListUpdate or ActivePeersList
-  let _ = recv_signaling_filtered(&mut ws, |msg| {
-    matches!(msg, SignalingMessage::Ping(_) | SignalingMessage::Pong(_))
-  })
-  .await;
+  // Drain all initial broadcast messages (UserListUpdate, RoomListUpdate, ActivePeersList, etc.)
+  drain_messages(&mut ws, Duration::from_millis(100)).await;
 
   (ws, user_id)
 }

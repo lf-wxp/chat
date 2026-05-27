@@ -363,7 +363,8 @@
 		"video_cors_error": "Esta fuente de video no soporta reproducción entre orígenes. Descárgala y usa reproducción local.",
 		"video_format_unsupported": "Este formato de video no es compatible. Conviértelo a MP4 (H.264) o WebM e inténtalo de nuevo.",
 		"high_load_banner": "La carga de danmaku es alta, algunos danmaku pueden estar retrasados.",
-		"show_panel": "Mostrar panel de chat"
+		"show_panel": "Mostrar panel de chat",
+		"change_source": "Cambiar fuente"
 	},
 	"call": {
 		"call": "Llamar",

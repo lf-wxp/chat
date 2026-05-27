@@ -158,6 +158,43 @@ html[data-glass="off"] .theater-copyright__tooltip {
   border-radius: var(--radius-sm, 4px);
 }
 
+.theater-video-player__change-source {
+  position: absolute;
+  inset-block-start: var(--space-2, .5rem);
+  inset-inline-end: var(--space-2, .5rem);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1, .25rem);
+  padding: var(--space-1, .25rem) var(--space-2, .5rem);
+  background: rgb(0 0 0 / .6);
+  color: #f8fafc;
+  font-size: var(--font-xs, .75rem);
+  border: 1px solid rgb(255 255 255 / .2);
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--duration-fast, 150ms) ease,
+    background-color var(--duration-fast, 150ms) ease;
+}
+
+.theater-video-player:hover .theater-video-player__change-source,
+.theater-video-player__change-source:focus-visible {
+  opacity: 1;
+}
+
+.theater-video-player__change-source:hover {
+  background: rgb(0 0 0 / .8);
+}
+
+.theater-video-player__change-source svg {
+  inline-size: 14px;
+  block-size: 14px;
+}
+
+.theater-video-player__change-source-label {
+  white-space: nowrap;
+}
+
 /* ── Video source picker ── */
 .theater-source-picker {
   inline-size: 100%;

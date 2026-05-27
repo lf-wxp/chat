@@ -19,11 +19,13 @@
 //! has been selected the owner sees the picker and viewers see a
 //! "waiting for stream" placeholder.
 
+use icondata as i;
 use js_sys::{Date, Reflect};
 use leptos::html;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use leptos_i18n::{t, t_string};
+use leptos_icons::Icon;
 use message::datachannel::DataChannelMessage;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
@@ -235,6 +237,12 @@ pub fn TheaterVideoPlayer(
           // first frame yet. We defer capture to the `canplay` event
           // which guarantees at least one frame is available and the
           // stream will contain active tracks.
+          //
+          // IMPORTANT: We use `addEventListener` with `{ once: true }`
+          // so the browser removes the listener after the first
+          // invocation. This prevents the "FnOnce called more than
+          // once" panic that occurs when `canplay` fires multiple
+          // times (e.g. after seek or buffer recovery).
           let video_el = video.clone();
           let toast_clone = toast;
           let state_clone = state;
@@ -257,7 +265,15 @@ pub fn TheaterVideoPlayer(
               }
             }
           } else {
-            let _ = video.add_event_listener_with_callback("canplay", cb.as_ref().unchecked_ref());
+            // Use `{ once: true }` to ensure the browser only fires
+            // the callback once and then auto-removes the listener.
+            let opts = web_sys::AddEventListenerOptions::new();
+            opts.set_once(true);
+            let _ = video.add_event_listener_with_callback_and_add_event_listener_options(
+              "canplay",
+              cb.as_ref().unchecked_ref(),
+              &opts,
+            );
             cb.forget();
           }
         }
@@ -321,6 +337,12 @@ pub fn TheaterVideoPlayer(
   });
 
   // --- Effect: viewer-side seek when remote playback drifts ---------------
+  // NOTE: When the viewer's `<video>` is bound to a live MediaStream
+  // (via `srcObject`), `currentTime` reflects the elapsed time since
+  // the stream started playing locally — NOT the owner's file position.
+  // Calling `set_current_time()` on a MediaStream is a no-op in most
+  // browsers or causes erratic jumps. We therefore only synchronize
+  // play/pause state for live streams and skip seeking entirely.
   Effect::new(move |_| {
     if state.my_role.get() == TheaterRole::Owner {
       return;
@@ -328,10 +350,22 @@ pub fn TheaterVideoPlayer(
     let Some(el) = video_ref.get() else { return };
     let snapshot = state.playback.get();
     let video: &HtmlVideoElement = el.as_ref();
-    let local_ms = (video.current_time() * 1_000.0) as u64;
-    if let Some(target_ms) = needs_seek(local_ms, snapshot.current_time_ms) {
-      video.set_current_time((target_ms as f64) / 1_000.0);
+
+    // Detect whether the video is playing a live MediaStream (srcObject)
+    // vs. a seekable source (src URL). MediaStreams have infinite
+    // duration or report NaN/Infinity.
+    let is_live_stream = !video.duration().is_finite() || video.duration().is_nan();
+
+    if !is_live_stream {
+      // Seekable source (e.g. direct URL playback) — apply seek logic.
+      let local_ms = (video.current_time() * 1_000.0) as u64;
+      if let Some(target_ms) = needs_seek(local_ms, snapshot.current_time_ms) {
+        video.set_current_time((target_ms as f64) / 1_000.0);
+      }
     }
+
+    // Play/pause synchronization applies to both live streams and
+    // seekable sources.
     if snapshot.is_paused && !video.paused() {
       let _ = video.pause();
     } else if !snapshot.is_paused && video.paused() {
@@ -353,25 +387,41 @@ pub fn TheaterVideoPlayer(
   });
 
   // --- Owner-side `<video>` event handlers --------------------------------
+  // These handlers read the local `<video>` element state and mirror it
+  // into `state.playback` + broadcast to viewers. They MUST be no-ops
+  // for viewers because the viewer's `video.current_time()` reflects
+  // the live stream elapsed time (not the owner's file position).
   let handle_loaded_metadata = move |_| {
+    if state.my_role.get_untracked() != TheaterRole::Owner {
+      return;
+    }
     let Some(el) = video_ref.get() else { return };
     let snap = snapshot_from(el.as_ref());
     state.playback.set(snap);
     owner_broadcast(&state, last_sent_ms, last_snapshot, snap);
   };
   let handle_timeupdate = move |_| {
+    if state.my_role.get_untracked() != TheaterRole::Owner {
+      return;
+    }
     let Some(el) = video_ref.get() else { return };
     let snap = snapshot_from(el.as_ref());
     state.playback.set(snap);
     owner_broadcast(&state, last_sent_ms, last_snapshot, snap);
   };
   let handle_play = move |_| {
+    if state.my_role.get_untracked() != TheaterRole::Owner {
+      return;
+    }
     let Some(el) = video_ref.get() else { return };
     let snap = snapshot_from(el.as_ref());
     state.playback.set(snap);
     owner_broadcast(&state, last_sent_ms, last_snapshot, snap);
   };
   let handle_pause = move |_| {
+    if state.my_role.get_untracked() != TheaterRole::Owner {
+      return;
+    }
     let Some(el) = video_ref.get() else { return };
     let snap = snapshot_from(el.as_ref());
     state.playback.set(snap);
@@ -440,6 +490,37 @@ pub fn TheaterVideoPlayer(
           aria-label=move || t_string!(i18n, theater.video_player_label).to_string()
           data-testid="theater-video"
         ></video>
+        <Show when=is_owner>
+          <button
+            type="button"
+            class="btn btn--icon theater-video-player__change-source"
+            on:click=move |_| {
+              // Stop all tracks on the current local stream to release
+              // hardware resources before switching sources.
+              if let Some(old_stream) = state.local_stream.get_untracked() {
+                let tracks = old_stream.get_tracks();
+                for idx in 0..tracks.length() {
+                  if let Some(track) = tracks.get(idx).dyn_ref::<web_sys::MediaStreamTrack>() {
+                    track.stop();
+                  }
+                }
+              }
+              state.local_stream.set(None);
+              state.has_video_source.set(false);
+              state.video_source_label.set(String::new());
+              state.playback.set(PlaybackSnapshot::default());
+              source.set(None);
+            }
+            aria-label=move || t_string!(i18n, theater.change_source).to_string()
+            title=move || t_string!(i18n, theater.change_source).to_string()
+            data-testid="theater-change-source"
+          >
+            <Icon icon=i::LuRefreshCw />
+            <span class="theater-video-player__change-source-label">
+              {t!(i18n, theater.change_source)}
+            </span>
+          </button>
+        </Show>
         <Show when=move || !is_owner()>
           <p class="theater-video-player__viewer-hint" aria-live="polite">
             {t!(i18n, theater.viewer_read_only)}

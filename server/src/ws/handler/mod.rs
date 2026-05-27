@@ -340,6 +340,14 @@ where
             let _ = socket_tx.send(Message::Binary(Bytes::from(encoded))).await;
           }
 
+          // Send current room list to the newly authenticated user so
+          // they see rooms that were created before they logged in.
+          let rooms = ws_state.room_state.get_all_rooms();
+          let room_list_msg = SignalingMessage::RoomListUpdate(RoomListUpdate { rooms });
+          if let Ok(encoded) = encode_signaling_message(&room_list_msg) {
+            let _ = socket_tx.send(Message::Binary(Bytes::from(encoded))).await;
+          }
+
           info!(
             user_id = %user_id,
             remote_addr = %mask_ip(&conn_state.remote_addr),

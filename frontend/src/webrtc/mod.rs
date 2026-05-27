@@ -151,9 +151,11 @@ const MAX_MESH_PEERS: usize = 8;
 /// public key within this window after the local side buffered its key,
 /// callers of [`WebRtcManager::prune_expired_ecdh`] will drop the pending
 /// entry and surface a `handshake_timed_out` flag through the reactive
-/// UI state. Kept short enough to surface stuck handshakes but long
-/// enough that a healthy ICE + DataChannel open round-trip easily fits.
-pub(super) const ECDH_EXCHANGE_TIMEOUT_MS: f64 = 10_000.0;
+/// UI state. Kept at 15 s so the auto-retry mechanism (see
+/// `provide_webrtc_manager`) can fire multiple attempts within the
+/// 60 s E2E sentinel timeout. A healthy ICE + DataChannel open
+/// round-trip completes well within 15 s even under moderate load.
+pub(super) const ECDH_EXCHANGE_TIMEOUT_MS: f64 = 15_000.0;
 
 /// Maximum number of control-frame broadcast messages queued per peer
 /// while the ECDH handshake is in flight (Task 19.1 C-1 fix).
@@ -298,6 +300,12 @@ pub struct WebRtcManager {
   /// connection, routed to the theater subsystem so the viewer can
   /// bind the owner's stream to its `<video>` element.
   on_theater_remote_track: Rc<RefCell<Option<TheaterRemoteTrackHandler>>>,
+  /// Buffer for track events that arrive before the theater handler
+  /// is registered. Replayed when `set_on_theater_remote_track` is
+  /// called. This handles the race where the owner's auto-connect
+  /// completes (and pushes tracks) before the viewer's TheaterPage
+  /// has mounted and registered its handler.
+  pending_theater_tracks: Rc<RefCell<Vec<(UserId, web_sys::MediaStream)>>>,
   inner: Rc<RefCell<InnerManager>>,
 }
 
@@ -361,6 +369,11 @@ pub(super) struct InnerManager {
   /// Bounded at [`PENDING_ICE_LIMIT`] per peer to bound memory.
   pub(super) pending_ice_candidates:
     HashMap<UserId, std::collections::VecDeque<PendingIceCandidate>>,
+  /// Peers for which `initiate_ecdh_exchange` is currently in-flight
+  /// (between the first `await` and the final key storage). Used by
+  /// `handle_data_channel_open` to avoid spawning a redundant
+  /// proactive ECDH when the initiator's exchange is still running.
+  pub(super) ecdh_in_progress: std::collections::HashSet<UserId>,
 }
 
 /// A trickle-ICE candidate that arrived before the local
@@ -406,6 +419,7 @@ impl WebRtcManager {
       on_theater_message: Rc::new(RefCell::new(None)),
       on_theater_peer_event: Rc::new(RefCell::new(None)),
       on_theater_remote_track: Rc::new(RefCell::new(None)),
+      pending_theater_tracks: Rc::new(RefCell::new(Vec::new())),
       inner: Rc::new(RefCell::new(InnerManager {
         connections: HashMap::new(),
         crypto: HashMap::new(),
@@ -416,6 +430,7 @@ impl WebRtcManager {
         prune_interval: None,
         ice_restart_timers: HashMap::new(),
         pending_ice_candidates: HashMap::new(),
+        ecdh_in_progress: std::collections::HashSet::new(),
       })),
     }
   }
@@ -545,7 +560,16 @@ impl WebRtcManager {
   where
     F: Fn(UserId, web_sys::MediaStream) + 'static,
   {
-    *self.on_theater_remote_track.borrow_mut() = Some(Rc::new(callback));
+    let handler: Rc<dyn Fn(UserId, web_sys::MediaStream)> = Rc::new(callback);
+    *self.on_theater_remote_track.borrow_mut() = Some(Rc::clone(&handler));
+
+    // Replay any track events that arrived before the handler was
+    // registered (race between owner auto-connect and viewer page mount).
+    let pending: Vec<(UserId, web_sys::MediaStream)> =
+      self.pending_theater_tracks.borrow_mut().drain(..).collect();
+    for (peer_id, stream) in pending {
+      handler(peer_id, stream);
+    }
   }
 
   /// Remove any previously-installed theater remote-track handler.
@@ -565,12 +589,20 @@ impl WebRtcManager {
     // (or call subsystem) has registered its handler.
     let call_handler_rc = Rc::clone(&self.on_remote_track);
     let theater_handler_rc = Rc::clone(&self.on_theater_remote_track);
+    let pending_tracks_rc = Rc::clone(&self.pending_theater_tracks);
     pc.set_on_track(move |stream| {
       if let Some(ref h) = *call_handler_rc.borrow() {
         h(peer_id.clone(), stream.clone());
       }
       if let Some(ref h) = *theater_handler_rc.borrow() {
         h(peer_id.clone(), stream);
+      } else {
+        // Buffer the track event for replay when the theater handler
+        // is registered. This handles the race where ontrack fires
+        // before TheaterPage has mounted.
+        pending_tracks_rc
+          .borrow_mut()
+          .push((peer_id.clone(), stream));
       }
     });
   }
@@ -644,7 +676,68 @@ impl WebRtcManager {
       web_sys::console::warn_1(
         &format!("[webrtc] Failed to publish local stream to {peer_id}: {e}").into(),
       );
+      return;
     }
+    // After adding tracks, a renegotiation is needed so the remote
+    // peer receives the `ontrack` event. For non-initiator PCs (where
+    // `onnegotiationneeded` is not wired), we must manually create and
+    // send a new SDP offer. For initiator PCs, the browser fires
+    // `onnegotiationneeded` automatically, but we drive it manually
+    // here as well to ensure it happens promptly.
+    // Consume the flag (side-effect: clears it) regardless of its value.
+    let _ = pc.take_needs_renegotiation();
+
+    // Guard: only renegotiate when the signaling state is stable.
+    // If the PC is still in `have-local-offer` (waiting for an answer
+    // from the remote peer — e.g. the initial offer from
+    // `connect_to_peer_with_stream`), creating a new offer would
+    // overwrite the pending local description and cause ICE failure.
+    // The tracks are already in the initial offer in that case, so
+    // no renegotiation is needed.
+    let is_stable = pc
+      .get_rtc_pc()
+      .map(|rtc| rtc.signaling_state() == web_sys::RtcSignalingState::Stable)
+      .unwrap_or(false);
+    if !is_stable {
+      web_sys::console::log_1(
+        &format!(
+          "[webrtc] publish_local_stream_to: skipping renegotiation for {} (signaling not stable)",
+          peer_id
+        )
+        .into(),
+      );
+      return;
+    }
+
+    let manager = self.clone();
+    let pid = peer_id.clone();
+    let pc_clone = pc.clone();
+    wasm_bindgen_futures::spawn_local(async move {
+      match pc_clone.create_offer().await {
+        Ok(sdp) => {
+          if let Some(sig) = manager.get_signaling()
+            && let Err(e) = sig.send_sdp_offer(&pid, &sdp)
+          {
+            web_sys::console::warn_1(
+              &format!(
+                "[webrtc] publish_local_stream_to renegotiation send_sdp_offer failed for {}: {e}",
+                pid
+              )
+              .into(),
+            );
+          }
+        }
+        Err(e) => {
+          web_sys::console::warn_1(
+            &format!(
+              "[webrtc] publish_local_stream_to renegotiation create_offer failed for {}: {e}",
+              pid
+            )
+            .into(),
+          );
+        }
+      }
+    });
   }
 
   /// Best-effort peer nickname lookup. Falls back to the user id when
@@ -793,10 +886,30 @@ impl WebRtcManager {
       pc
     }; // inner borrow dropped here
 
-    // Set up DataChannel open handler to send ECDH key when ready
+    // Store connection BEFORE setting up DataChannel callbacks so that
+    // if set_on_open fires synchronously (race-condition guard in
+    // PeerDataChannel::set_on_open), the connection is already in the
+    // map and can be found by handle_data_channel_open /
+    // initiate_ecdh_exchange.
+    self
+      .inner
+      .borrow_mut()
+      .connections
+      .insert(peer_id.clone(), pc);
+
+    // Set up DataChannel open handler to send ECDH key when ready.
+    // PeerDataChannel::set_on_open includes a race-condition guard
+    // that invokes the callback immediately if the DataChannel is
+    // already open.
     let manager_dc_open = self.clone();
     let dc_open_peer_id = peer_id.clone();
-    if let Some(dc) = pc.get_data_channel() {
+    if let Some(dc) = self
+      .inner
+      .borrow()
+      .connections
+      .get(&peer_id)
+      .and_then(|pc| pc.get_data_channel())
+    {
       dc.set_on_open(move || {
         manager_dc_open.handle_data_channel_open(dc_open_peer_id.clone());
       });
@@ -810,14 +923,6 @@ impl WebRtcManager {
         manager_dc_msg.handle_data_channel_raw_frame(dc_msg_peer_id.clone(), bytes);
       });
     }
-
-    // Store connection BEFORE creating offer so it can be cleaned up
-    // if offer creation fails (avoids leaking the PeerConnection).
-    self
-      .inner
-      .borrow_mut()
-      .connections
-      .insert(peer_id.clone(), pc);
 
     // Register the peer in the reactive UI state so that
     // subsequent `update_connection_state` / `update_data_channel_state`
@@ -1085,7 +1190,18 @@ impl WebRtcManager {
           &format!("[webrtc] Incoming DataChannel from {}", dc_peer_id).into(),
         );
         if let Ok(dc) = handle_incoming_channel(channel, dc_peer_id.clone()) {
-          // Set up open handler for ECDH key exchange
+          // IMPORTANT: Store the DataChannel on the peer connection
+          // BEFORE setting up event handlers. If the DataChannel is
+          // already in the Open state when we call set_on_open, the
+          // callback fires synchronously and needs the DataChannel to
+          // be available in the connection map (e.g. for ECDH key
+          // exchange via initiate_ecdh_exchange).
+          manager_dc.setup_data_channel(dc_peer_id.clone(), dc.clone());
+
+          // Set up open handler for ECDH key exchange.
+          // PeerDataChannel::set_on_open includes a race-condition
+          // guard that invokes the callback immediately if the
+          // DataChannel is already open.
           let manager_open = manager_dc.clone();
           let open_peer_id = dc_peer_id.clone();
           dc.set_on_open(move || {
@@ -1099,9 +1215,6 @@ impl WebRtcManager {
           dc.set_on_raw_message(move |bytes| {
             manager_msg.handle_data_channel_raw_frame(msg_peer_id.clone(), bytes);
           });
-
-          // Store the DataChannel on the peer connection
-          manager_dc.setup_data_channel(dc_peer_id.clone(), dc);
         }
       });
 
@@ -1145,6 +1258,27 @@ impl WebRtcManager {
           Some(peer_id.clone()),
         )
       })?;
+    }
+
+    // Eagerly start ECDH key generation on the answerer side so the
+    // key pair is ready by the time the DataChannel opens. Spawned
+    // (not awaited) to avoid blocking the SDP answer flow — the
+    // `ecdh_in_progress` flag prevents `handle_data_channel_open`
+    // from spawning a duplicate.
+    {
+      let manager = self.clone();
+      let pid = peer_id.clone();
+      wasm_bindgen_futures::spawn_local(async move {
+        if let Err(e) = manager.initiate_ecdh_exchange(pid.clone()).await {
+          web_sys::console::error_1(
+            &format!(
+              "[webrtc] Answerer ECDH initiation failed for {}: {}",
+              pid, e
+            )
+            .into(),
+          );
+        }
+      });
     }
 
     web_sys::console::log_1(
@@ -1354,10 +1488,25 @@ impl WebRtcManager {
   /// Initiate ECDH key exchange with a peer.
   ///
   /// Generates an ECDH key pair and stores the raw public key as pending.
-  /// The key is sent over the DataChannel once it opens.
+  /// The key is sent over the DataChannel once it opens. If the
+  /// DataChannel is already open (race: the `onopen` callback fired
+  /// before this async function completed), the key is sent immediately.
+  ///
+  /// Sets `ecdh_in_progress` before the first await so that
+  /// `handle_data_channel_open` can detect an in-flight exchange and
+  /// skip redundant proactive initiation.
   async fn initiate_ecdh_exchange(&self, peer_id: UserId) -> Result<(), WebRtcError> {
+    // Mark this peer as having an ECDH exchange in progress so
+    // `handle_data_channel_open` does not spawn a duplicate.
+    self
+      .inner
+      .borrow_mut()
+      .ecdh_in_progress
+      .insert(peer_id.clone());
+
     // Perform async operations first, without holding RefCell borrow
     let crypto = PeerCrypto::new(peer_id.clone()).await.map_err(|e| {
+      self.inner.borrow_mut().ecdh_in_progress.remove(&peer_id);
       WebRtcError::new(
         ErrorCode::new(ErrorModule::E2e, ErrorCategory::Security, 1),
         format!("Failed to create PeerCrypto: {}", e),
@@ -1366,6 +1515,7 @@ impl WebRtcManager {
     })?;
 
     let public_key = crypto.export_public_key().await.map_err(|e| {
+      self.inner.borrow_mut().ecdh_in_progress.remove(&peer_id);
       WebRtcError::new(
         ErrorCode::new(ErrorModule::E2e, ErrorCategory::Security, 1),
         format!("Failed to export public key: {}", e),
@@ -1373,16 +1523,49 @@ impl WebRtcManager {
       )
     })?;
 
-    // Now borrow_mut to insert (no await after this point)
-    let mut inner = self.inner.borrow_mut();
-    inner.crypto.insert(peer_id.clone(), crypto);
-    inner.pending_ecdh_keys.insert(
-      peer_id.clone(),
-      PendingEcdh {
-        public_key,
-        started_at_ms: js_sys::Date::now(),
-      },
-    );
+    // Check if the DataChannel is already open (race condition fix):
+    // The `handle_data_channel_open` callback may have already fired
+    // while we were awaiting the crypto operations above. In that case
+    // the callback found no pending key and did nothing. We detect
+    // this by checking the DC ready state now.
+    let dc_already_open = {
+      let inner = self.inner.borrow();
+      inner
+        .connections
+        .get(&peer_id)
+        .and_then(|pc| pc.get_data_channel())
+        .map(|dc| dc.ready_state() == web_sys::RtcDataChannelState::Open)
+        .unwrap_or(false)
+    };
+
+    // Store crypto and pending key, then clear in-progress flag.
+    {
+      let mut inner = self.inner.borrow_mut();
+      inner.crypto.insert(peer_id.clone(), crypto);
+      if !dc_already_open {
+        // DataChannel not yet open — buffer the key for the onopen callback.
+        inner.pending_ecdh_keys.insert(
+          peer_id.clone(),
+          PendingEcdh {
+            public_key: public_key.clone(),
+            started_at_ms: js_sys::Date::now(),
+          },
+        );
+      }
+      inner.ecdh_in_progress.remove(&peer_id);
+    }
+
+    // If the DataChannel is already open, send the key immediately.
+    if dc_already_open {
+      web_sys::console::log_1(
+        &format!(
+          "[webrtc] DataChannel already open for peer {}, sending ECDH key immediately",
+          peer_id
+        )
+        .into(),
+      );
+      self.send_datachannel_ecdh_key_direct(peer_id.clone(), &public_key);
+    }
 
     web_sys::console::log_1(
       &format!("[webrtc] Initiated ECDH exchange with peer {}", peer_id).into(),
@@ -1550,6 +1733,25 @@ impl WebRtcManager {
     let connections: Vec<PeerConnection> =
       self.inner.borrow().connections.values().cloned().collect();
     for pc in &connections {
+      // Skip PCs that are not in stable signaling state. If the PC is
+      // still in `have-local-offer` (waiting for an answer — e.g. the
+      // initial offer from `connect_to_peer_with_stream` just went out),
+      // calling `unpublish_local_media` + `addTrack` would disrupt the
+      // in-flight SDP negotiation and cause ICE failure.
+      let is_stable = pc
+        .get_rtc_pc()
+        .map(|rtc| rtc.signaling_state() == web_sys::RtcSignalingState::Stable)
+        .unwrap_or(false);
+      if !is_stable {
+        web_sys::console::log_1(
+          &format!(
+            "[webrtc] publish_local_stream: skipping {} (signaling not stable)",
+            pc.peer_id()
+          )
+          .into(),
+        );
+        continue;
+      }
       if let Err(e) = pc.publish_local_stream(stream) {
         web_sys::console::warn_1(
           &format!(
@@ -1559,6 +1761,42 @@ impl WebRtcManager {
           )
           .into(),
         );
+        continue;
+      }
+      // If the PC is a receiver (non-initiator), `publish_local_stream`
+      // sets a flag indicating that a manual renegotiation is needed
+      // because the `onnegotiationneeded` handler is not wired for
+      // receivers. Drive the offer manually here.
+      if pc.take_needs_renegotiation() {
+        let manager = self.clone();
+        let peer_id = pc.peer_id().clone();
+        let pc_clone = pc.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+          match pc_clone.create_offer().await {
+            Ok(sdp) => {
+              if let Some(sig) = manager.get_signaling()
+                && let Err(e) = sig.send_sdp_offer(&peer_id, &sdp)
+              {
+                web_sys::console::warn_1(
+                  &format!(
+                    "[webrtc] Manual renegotiation send_sdp_offer failed for {}: {e}",
+                    peer_id
+                  )
+                  .into(),
+                );
+              }
+            }
+            Err(e) => {
+              web_sys::console::warn_1(
+                &format!(
+                  "[webrtc] Manual renegotiation create_offer failed for {}: {e}",
+                  peer_id
+                )
+                .into(),
+              );
+            }
+          }
+        });
       }
     }
   }
@@ -1675,6 +1913,18 @@ impl WebRtcManager {
   #[must_use]
   pub fn is_connected(&self, peer_id: &UserId) -> bool {
     self.inner.borrow().connections.contains_key(peer_id)
+  }
+
+  /// Check whether the local side initiated the connection to `peer_id`.
+  /// Returns `false` if no connection exists or if the remote side
+  /// initiated it (i.e. we received an incoming offer).
+  pub fn is_initiator(&self, peer_id: &UserId) -> bool {
+    self
+      .inner
+      .borrow()
+      .connections
+      .get(peer_id)
+      .is_some_and(|pc| pc.is_initiator())
   }
 
   /// Get the current `bufferedAmount` of a peer's DataChannel.
@@ -2075,9 +2325,49 @@ pub fn provide_webrtc_manager(app_state: AppState) -> WebRtcManager {
   // by unit tests). Skipping the timer silently is safe in
   // non-browser contexts (native unit tests) because the method stays
   // callable directly.
+  //
+  // When a pending ECDH entry expires but the DataChannel is still
+  // open and no shared key has been established, we automatically
+  // retry the exchange. This handles the edge case where the initial
+  // ECDH key was lost due to a race condition (e.g. DC opened before
+  // the key was buffered, or the remote peer's key was dropped).
   let prune_mgr = manager.clone();
   if let Some(handle) = crate::utils::set_interval(PRUNE_INTERVAL_MS, move || {
-    let _expired = prune_mgr.prune_expired_ecdh();
+    let expired = prune_mgr.prune_expired_ecdh();
+    // Auto-retry ECDH for expired peers that still have a live
+    // DataChannel but no established encryption.
+    for peer_id in expired {
+      let should_retry = {
+        let inner = prune_mgr.inner.borrow();
+        let has_open_dc = inner
+          .connections
+          .get(&peer_id)
+          .and_then(|pc| pc.get_data_channel())
+          .map(|dc| dc.ready_state() == web_sys::RtcDataChannelState::Open)
+          .unwrap_or(false);
+        let has_crypto = inner.crypto.contains_key(&peer_id);
+        let already_retrying = inner.ecdh_in_progress.contains(&peer_id);
+        has_open_dc && !has_crypto && !already_retrying
+      };
+      if should_retry {
+        let retry_mgr = prune_mgr.clone();
+        let retry_pid = peer_id.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+          web_sys::console::log_1(
+            &format!(
+              "[webrtc] Auto-retrying ECDH for peer {} after timeout",
+              retry_pid
+            )
+            .into(),
+          );
+          if let Err(e) = retry_mgr.initiate_ecdh_exchange(retry_pid.clone()).await {
+            web_sys::console::error_1(
+              &format!("[webrtc] ECDH retry failed for {}: {}", retry_pid, e).into(),
+            );
+          }
+        });
+      }
+    }
   }) {
     manager.inner.borrow_mut().prune_interval = Some(handle);
   }

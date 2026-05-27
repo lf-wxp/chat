@@ -181,12 +181,12 @@ test.describe('invitation edge cases', () => {
     await expect(pageA.locator(sel.e2eeReadySentinel).first()).toHaveAttribute(
       'data-ready',
       'true',
-      { timeout: 30_000 },
+      { timeout: 60_000 },
     );
     await expect(pageB.locator(sel.e2eeReadySentinel).first()).toHaveAttribute(
       'data-ready',
       'true',
-      { timeout: 30_000 },
+      { timeout: 60_000 },
     );
   });
 

@@ -210,7 +210,10 @@ impl WebRtcManager {
 
   /// Handle DataChannel open event for a peer.
   ///
-  /// Sends any pending ECDH key and updates peer state.
+  /// Sends any pending ECDH key and updates peer state. If no pending
+  /// key exists and no crypto has been established yet (answerer side
+  /// race condition), proactively initiates the ECDH exchange so the
+  /// handshake is not stuck waiting for the remote peer's key.
   pub(super) fn handle_data_channel_open(&self, peer_id: UserId) {
     web_sys::console::log_1(&format!("[webrtc] DataChannel opened for peer {}", peer_id).into());
 
@@ -225,6 +228,40 @@ impl WebRtcManager {
 
     if let Some(key_data) = key_data {
       self.send_datachannel_ecdh_key_direct(peer_id.clone(), &key_data);
+    } else {
+      // No pending key found. This happens on the answerer side (which
+      // never calls `initiate_ecdh_exchange`) or when the initiator's
+      // `initiate_ecdh_exchange` hasn't completed yet. If we have no
+      // crypto state for this peer AND no ECDH is currently in-flight,
+      // proactively start the ECDH exchange so the handshake completes
+      // even if the remote side's key is delayed or lost.
+      let inner = self.inner.borrow();
+      let has_crypto = inner.crypto.contains_key(&peer_id);
+      let ecdh_running = inner.ecdh_in_progress.contains(&peer_id);
+      drop(inner);
+
+      if !has_crypto && !ecdh_running {
+        let manager = self.clone();
+        let pid = peer_id.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+          web_sys::console::log_1(
+            &format!(
+              "[webrtc] No pending ECDH key for peer {} on DC open, initiating proactively",
+              pid
+            )
+            .into(),
+          );
+          if let Err(e) = manager.initiate_ecdh_exchange(pid.clone()).await {
+            web_sys::console::error_1(
+              &format!(
+                "[webrtc] Proactive ECDH initiation failed for {}: {}",
+                pid, e
+              )
+              .into(),
+            );
+          }
+        });
+      }
     }
 
     // Always clear any prior timeout flag when the DataChannel opens,

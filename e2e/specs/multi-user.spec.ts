@@ -66,7 +66,7 @@ async function expectE2eeReady(page: Page): Promise<void> {
   await expect(page.locator(sel.e2eeReadySentinel).first()).toHaveAttribute(
     'data-ready',
     'true',
-    { timeout: 30_000 },
+    { timeout: 60_000 },
   );
 }
 

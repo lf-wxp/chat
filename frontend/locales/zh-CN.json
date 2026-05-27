@@ -363,7 +363,8 @@
 		"video_cors_error": "该视频源不支持跨域播放，请下载后使用本地视频播放。",
 		"video_format_unsupported": "该视频格式不受支持，请转换为 MP4 (H.264) 或 WebM 格式后重试。",
 		"high_load_banner": "弹幕负载较高，部分弹幕可能出现延迟。",
-		"show_panel": "显示聊天面板"
+		"show_panel": "显示聊天面板",
+		"change_source": "更换视频源"
 	},
 	"call": {
 		"call": "语音通话",

@@ -30,6 +30,7 @@ async fn recv_signaling(ws: &mut WsStream) -> Option<SignalingMessage> {
         | SignalingMessage::UserStatusChange(_)
         | SignalingMessage::PeerEstablished(_)
         | SignalingMessage::ErrorResponse(_)
+        | SignalingMessage::RoomListUpdate(_)
     )
   })
   .await
@@ -50,6 +51,7 @@ async fn recv_signaling_including_errors(ws: &mut WsStream) -> Option<SignalingM
         | SignalingMessage::UserListUpdate(_)
         | SignalingMessage::UserStatusChange(_)
         | SignalingMessage::PeerEstablished(_)
+        | SignalingMessage::RoomListUpdate(_)
     )
   })
   .await
@@ -390,6 +392,7 @@ async fn test_bidirectional_invitation_conflict() {
         | SignalingMessage::ActivePeersList(_)
         | SignalingMessage::UserListUpdate(_)
         | SignalingMessage::UserStatusChange(_)
+        | SignalingMessage::RoomListUpdate(_)
     )
   };
 

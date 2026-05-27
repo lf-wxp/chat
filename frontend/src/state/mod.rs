@@ -361,6 +361,39 @@ impl AppState {
     self.auth.get_untracked().is_some()
   }
 
+  /// Resolve a `UserId` to a human-readable display name by looking up
+  /// the online-users list. Prefers nickname over username; falls back
+  /// to the room member list if the user is not in the online list;
+  /// ultimately returns the UUID string when no match is found.
+  #[must_use]
+  pub fn resolve_user_display_name(&self, user_id: &UserId) -> String {
+    // First try the online users list (most common path).
+    let from_online = self.online_users.with_untracked(|users| {
+      users.iter().find(|u| u.user_id == *user_id).map(|u| {
+        if u.nickname.is_empty() {
+          u.username.clone()
+        } else {
+          u.nickname.clone()
+        }
+      })
+    });
+    if let Some(name) = from_online {
+      return name;
+    }
+    // Fallback: scan room members across all rooms.
+    let from_members = self.room_members.with_untracked(|map| {
+      for members in map.values() {
+        if let Some(m) = members.iter().find(|m| m.user_id == *user_id)
+          && !m.nickname.is_empty()
+        {
+          return Some(m.nickname.clone());
+        }
+      }
+      None
+    });
+    from_members.unwrap_or_else(|| user_id.to_string())
+  }
+
   /// Get current user ID.
   #[must_use]
   pub fn current_user_id(&self) -> Option<UserId> {

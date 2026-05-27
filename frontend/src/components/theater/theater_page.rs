@@ -117,7 +117,9 @@ pub fn TheaterPage(
       // because the WebRTC layer only forwards the recognised set,
       // but we still unwrap defensively.
       if let Ok(inbound) = classify_theater_inbound(msg) {
-        let _ = apply_theater_inbound(&state, inbound);
+        let _ = apply_theater_inbound(&state, inbound, |sender_id| {
+          app.resolve_user_display_name(sender_id)
+        });
       }
     });
 
@@ -145,11 +147,20 @@ pub fn TheaterPage(
       let role = state.my_role.get_untracked();
       match (role, event) {
         (TheaterRole::Owner, TheaterPeerEvent::Connected) => {
-          // Tracks are pre-attached via `connect_to_peer_with_stream`
-          // in the auto-connect Effect, so no post-connect publish is
-          // needed. Attempting `publish_local_stream_to` here would
-          // trigger a renegotiation that Chrome rejects with "m-line
-          // order mismatch" when a DataChannel m-line already exists.
+          // The auto-connect Effect establishes a DataChannel-only
+          // connection first. Once ICE is fully connected, push the
+          // local media stream (if available) via renegotiation.
+          // A 500ms delay lets the ECDH handshake complete so the
+          // DataChannel is ready for the renegotiation offer.
+          if let Some(stream) = state.local_stream.get_untracked()
+            && let Some(mgr) = try_use_webrtc_manager()
+          {
+            let pid = peer_id.clone();
+            let s = stream.clone();
+            let _ = crate::utils::set_timeout_once(500, move || {
+              mgr.publish_local_stream_to(&pid, &s);
+            });
+          }
         }
         (_, TheaterPeerEvent::Connected) if owner.as_ref() == Some(&peer_id) => {
           // Viewer: owner peer just came back — clear the banner.
@@ -162,6 +173,14 @@ pub fn TheaterPage(
           // Viewer: owner peer hit a transient ICE flap — surface
           // the 30s grace banner so the user can either wait or
           // leave (Req 12.2 §6a).
+          // Guard: if the manager still has an active connection to
+          // the owner, this event came from a stale/replaced PC and
+          // should be ignored (SDP glare recovery path).
+          if let Some(mgr) = try_use_webrtc_manager()
+            && mgr.is_connected(&peer_id)
+          {
+            return;
+          }
           state.owner_reconnecting.set(true);
         }
         (_, TheaterPeerEvent::Closed) if owner.as_ref() == Some(&peer_id) => {
@@ -169,6 +188,13 @@ pub fn TheaterPage(
           // up so the grace ticker flips to the "offline" CTA once
           // the window elapses; the grace helper will switch
           // messaging based on the remaining-seconds signal.
+          // Guard: same as Disconnected — ignore if a replacement
+          // connection is already active.
+          if let Some(mgr) = try_use_webrtc_manager()
+            && mgr.is_connected(&peer_id)
+          {
+            return;
+          }
           state.owner_reconnecting.set(true);
           state.owner_grace_seconds.set(0);
         }
@@ -185,10 +211,12 @@ pub fn TheaterPage(
 
   // ── Effect: owner auto-connect to late-joining viewers (Req 12.3 §12) ──
   // When a new viewer joins the theater room, the owner automatically
-  // initiates a WebRTC connection with the local stream pre-attached so
-  // the initial SDP offer already contains the media tracks. This avoids
-  // a post-connect renegotiation that Chrome rejects with "m-line order
-  // mismatch" when a DataChannel m-line already exists.
+  // initiates a WebRTC connection (DataChannel only). Media tracks are
+  // pushed separately via `publish_local_stream_to` in the
+  // `TheaterPeerEvent::Connected` handler after the ICE connection is
+  // fully established. This two-phase approach avoids ICE failures that
+  // occur when media tracks are pre-attached to the initial SDP offer
+  // in certain browser configurations.
   {
     let prev_members: Rc<RefCell<std::collections::HashSet<message::UserId>>> =
       Rc::new(RefCell::new(std::collections::HashSet::new()));
@@ -217,7 +245,6 @@ pub fn TheaterPage(
       let my_id = app
         .auth
         .with_untracked(|a| a.as_ref().map(|a| a.user_id.clone()));
-      let stream = state.local_stream.get_untracked();
       let Some(manager) = try_use_webrtc_manager() else {
         return;
       };
@@ -229,18 +256,53 @@ pub fn TheaterPage(
           continue;
         }
         let mgr = manager.clone();
-        let stream_clone = stream.clone();
         leptos::task::spawn_local(async move {
-          let result = if let Some(ref s) = stream_clone {
-            mgr.connect_to_peer_with_stream(peer.clone(), s).await
-          } else {
-            mgr.connect_to_peer(peer.clone()).await
-          };
-          if let Err(e) = result {
+          if let Err(e) = mgr.connect_to_peer(peer.clone()).await {
             web_sys::console::warn_1(
               &format!("[theater] auto-connect to viewer {} failed: {e}", peer).into(),
             );
           }
+        });
+      }
+    });
+  }
+
+  // ── Effect: owner publishes stream to already-connected peers (late stream) ──
+  // When the owner selects a large video file (e.g. MP4), `captureStream()`
+  // is deferred until the `canplay` event fires. If viewers joined before
+  // that point, their PeerConnections were established without media tracks.
+  // This Effect watches `local_stream` and, when it transitions from None
+  // to Some, publishes the stream to every already-connected peer via
+  // `publish_local_stream`. The `onnegotiationneeded` handler on each PC
+  // will then drive a renegotiation so the viewer receives the tracks.
+  {
+    let prev_had_stream: Rc<std::cell::Cell<bool>> = Rc::new(std::cell::Cell::new(false));
+    Effect::new(move |_| {
+      let role = state.my_role.get_untracked();
+      if role != TheaterRole::Owner {
+        return;
+      }
+      let stream = state.local_stream.get();
+      let has_stream = stream.is_some();
+      let had_before = prev_had_stream.get();
+      prev_had_stream.set(has_stream);
+
+      // Only act on the None → Some transition (first stream arrival).
+      // The `apply_captured_stream` function already calls
+      // `publish_local_stream` for the first stream, but that only
+      // reaches peers whose connections are fully established at that
+      // instant. This Effect fires reactively and catches any peers
+      // that finished their SDP exchange in the meantime.
+      if !had_before
+        && has_stream
+        && let Some(ref s) = stream
+        && let Some(manager) = try_use_webrtc_manager()
+      {
+        // Small delay to let any in-flight SDP exchanges settle.
+        let stream_clone = s.clone();
+        let mgr = manager.clone();
+        let _ = crate::utils::set_timeout_once(500, move || {
+          mgr.publish_local_stream(&stream_clone);
         });
       }
     });

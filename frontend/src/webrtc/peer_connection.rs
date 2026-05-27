@@ -69,6 +69,11 @@ pub struct PeerConnection {
   /// the initial offer already includes them and the subsequent
   /// browser-fired event does not trigger a redundant renegotiation.
   suppress_renegotiation_count: Rc<std::cell::Cell<u32>>,
+  /// Flag set by [`Self::publish_local_stream`] when the local side is
+  /// the receiver (non-initiator). The `onnegotiationneeded` handler is
+  /// not wired for receivers to avoid glare, so the WebRtcManager must
+  /// manually drive a renegotiation offer after `addTrack`.
+  needs_manual_renegotiation: Rc<std::cell::Cell<bool>>,
 }
 
 impl PeerConnection {
@@ -111,6 +116,7 @@ impl PeerConnection {
       on_negotiation_needed: Rc::new(RefCell::new(None)),
       local_senders: Rc::new(RefCell::new(Vec::new())),
       suppress_renegotiation_count: Rc::new(std::cell::Cell::new(0)),
+      needs_manual_renegotiation: Rc::new(std::cell::Cell::new(false)),
     })
   }
 
@@ -404,6 +410,13 @@ impl PeerConnection {
     }
   }
 
+  /// Check and clear the manual renegotiation flag. Returns `true` if
+  /// the flag was set (meaning `publish_local_stream` was called on a
+  /// receiver-side PC and the caller must drive a renegotiation offer).
+  pub fn take_needs_renegotiation(&self) -> bool {
+    self.needs_manual_renegotiation.replace(false)
+  }
+
   ///
   /// # Errors
   /// Returns `Err` if the browser rejects `addTrack` (e.g. the track
@@ -420,6 +433,14 @@ impl PeerConnection {
       };
       let sender = pc.add_track(&track, stream, &streams);
       senders.push(sender);
+    }
+    // When we are the receiver (non-initiator), the browser's
+    // `onnegotiationneeded` handler is not wired (to avoid glare).
+    // However, adding tracks still requires a renegotiation so the
+    // remote side learns about the new media. We set a flag so the
+    // WebRtcManager can drive the offer manually after this call.
+    if !self.is_initiator() && tracks.length() > 0 {
+      self.needs_manual_renegotiation.set(true);
     }
     Ok(())
   }

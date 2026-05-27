@@ -103,6 +103,7 @@ features = [
   "DragEvent",
   "PointerEvent",
   "MouseEvent",
+  "AddEventListenerOptions",
 
   # WebSocket & Signaling
   "WebSocket",

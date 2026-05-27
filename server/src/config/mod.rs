@@ -169,6 +169,10 @@ impl Config {
           let lan = crate::stun::detect_lan_ipv4();
           list.push(format!("stun:{lan}:{port}"));
         }
+        // Include multiple STUN providers for redundancy. Cloudflare's
+        // STUN server is generally more reachable in restricted network
+        // environments (e.g. China) than Google's.
+        list.push("stun:stun.cloudflare.com:3478".to_string());
         list.push("stun:stun.l.google.com:19302".to_string());
         list.push("stun:stun1.l.google.com:19302".to_string());
         list

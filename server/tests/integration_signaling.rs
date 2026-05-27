@@ -125,8 +125,8 @@ async fn auth_user(
   let response = recv_signaling(&mut ws).await;
   assert!(matches!(response, Some(SignalingMessage::AuthSuccess(_))));
 
-  // Wait for UserListUpdate or ActivePeersList
-  let _ = recv_signaling(&mut ws).await;
+  // Drain all initial broadcast messages (UserListUpdate, RoomListUpdate, ActivePeersList, etc.)
+  drain_messages(&mut ws, Duration::from_millis(100)).await;
 
   (ws, user_id)
 }
