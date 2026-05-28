@@ -519,15 +519,28 @@ impl FileTransferManager {
         // Task 19.1 — encrypted envelope path (Req 5.1.3).
         let webrtc = webrtc.clone();
         let peer = peer_id.clone();
+        // Clone the manager so the async closure can roll back the
+        // transfer status to `Paused` when the encrypted send fails
+        // (e.g. ECDH key exchange has not completed yet). Without
+        // this rollback the transfer would be stuck in `InProgress`
+        // with no resume button visible and no download link either.
+        let file_mgr = self.clone();
+        let tid = transfer_id;
         wasm_bindgen_futures::spawn_local(async move {
           if let Err(e) = webrtc
             .send_encrypted_data_channel_message(peer, &request)
             .await
           {
             web_sys::console::warn_1(
-              &format!("[file] auto-resume request send failed for transfer {transfer_id}: {e}")
-                .into(),
+              &format!("[file] auto-resume request send failed for transfer {tid}: {e}").into(),
             );
+            // Roll back to Paused so the user (or a subsequent
+            // auto-resume attempt) can retry. The status was
+            // optimistically set to InProgress above; reverting it
+            // ensures the resume button remains visible.
+            if let Some(rx) = file_mgr.get_inbound_by_transfer(&tid) {
+              rx.status.set(TransferStatus::Paused);
+            }
           }
         });
       }

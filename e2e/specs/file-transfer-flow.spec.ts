@@ -284,7 +284,11 @@ test.describe('file transfer flow (P1-5)', () => {
     const b = await registerAndLogin(pageB, server, { hint: 'wd-rcv-b' });
     await establishConnection(pageA, pageB, b.username);
 
-    const PAYLOAD = 4 * ONE_MB;
+    // Use the same 49 MB payload as the pause/resume test to
+    // guarantee the transfer stays in-flight for several seconds
+    // on loopback DataChannel, ensuring forceCloseAllSockets
+    // always interrupts a live transfer rather than racing it.
+    const PAYLOAD = PAUSE_PAYLOAD;
 
     const fileInput = pageA.locator(sel.filePickerInput);
     await fileInput.waitFor({ state: 'attached' });
@@ -322,12 +326,28 @@ test.describe('file transfer flow (P1-5)', () => {
     // `Completed` (and the manual `Resume` button is available as a
     // fallback when the auto-resume could not deliver — e.g. a
     // partial bitmap that the sender's side already terminated).
-    const resumeBtn = receiverCard.locator(sel.fileResume);
-    if (await resumeBtn.isVisible().catch(() => false)) {
-      await resumeBtn.dispatchEvent('click');
-    }
+    //
+    // Poll until the transfer reaches Completed (auto-resume may need
+    // a few seconds after WS recovery for ECDH re-negotiation and
+    // the resume-request round-trip).
+    await expect
+      .poll(
+        async () => {
+          // If the resume button appears, click it once.
+          const btn = receiverCard.locator(sel.fileResume);
+          if (await btn.isVisible({ timeout: 100 }).catch(() => false)) {
+            await btn.dispatchEvent('click').catch(() => {});
+          }
+          // Return the download link visibility so poll can succeed.
+          const dl = receiverCard.locator(sel.fileDownload);
+          return dl.isVisible({ timeout: 100 }).catch(() => false);
+        },
+        { timeout: 90_000, intervals: [2_000] },
+      )
+      .toBe(true);
 
-    await expect(receiverCard.locator(sel.fileDownload)).toBeVisible({ timeout: 90_000 });
+    // Download link must now be visible.
+    await expect(receiverCard.locator(sel.fileDownload)).toBeVisible({ timeout: 10_000 });
 
     // Integrity guarantee: the saved blob is byte-identical to what
     // the sender shipped (length is the cheap proxy for content

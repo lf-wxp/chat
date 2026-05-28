@@ -101,101 +101,120 @@ export async function startServer(): Promise<ServerInstance> {
     ? DEFAULT_STICKERS_DIR
     : mkdtempSync(path.join(tmpdir(), 'e2e-stickers-'));
 
-  const port = await findFreePort();
-  const baseUrl = `http://127.0.0.1:${port}`;
-  const wsUrl = `ws://127.0.0.1:${port}/ws`;
+  // Retry up to 3 times to handle TOCTOU port races: findFreePort()
+  // releases the port before the server binds, so another process
+  // may grab it in between (os error 48: Address already in use).
+  const MAX_PORT_RETRIES = 3;
+  let lastError: Error | null = null;
 
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    PORT: String(port),
-    JWT_SECRET: 'e2e-test-jwt-secret-do-not-use-in-production',
-    RUST_LOG: process.env.RUST_LOG ?? 'warn,server=info',
-    RUST_LOG_FORMAT: 'pretty',
-    LOG_OUTPUT: 'stdout',
-    STATIC_DIR: FRONTEND_DIST,
-    STICKERS_DIR: stickersDir,
-    // Disable public STUN/TURN servers for E2E runs. Both peers are on
-    // the same host (127.0.0.1); host ICE candidates are sufficient and
-    // do not require an external STUN lookup. Leaving the default
-    // `stun:stun.l.google.com:19302` in place would make Chromium
-    // block ICE gathering on an unreachable DNS resolve in sandboxed
-    // CI environments, causing the peer connection to stay in
-    // `Connecting` until it times out as `Failed` ~15 s later.
-    STUN_TURN_SERVERS: '',
-    // Disable the embedded STUN service. Without this, the parallel
-    // E2E workers would race each other for UDP port 3478 — the
-    // first wins, the rest log a startup warning and clients fall
-    // back to host candidates anyway, but we'd be relying on flaky
-    // ordering. Setting `STUN_PORT=0` skips the bind altogether.
-    STUN_PORT: '0',
-  };
+  for (let attempt = 0; attempt < MAX_PORT_RETRIES; attempt += 1) {
+    const port = await findFreePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const wsUrl = `ws://127.0.0.1:${port}/ws`;
 
-  const child: ChildProcess = spawn(SERVER_BINARY, [], {
-    cwd: REPO_ROOT,
-    env,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      PORT: String(port),
+      JWT_SECRET: 'e2e-test-jwt-secret-do-not-use-in-production',
+      RUST_LOG: process.env.RUST_LOG ?? 'warn,server=info',
+      RUST_LOG_FORMAT: 'pretty',
+      LOG_OUTPUT: 'stdout',
+      STATIC_DIR: FRONTEND_DIST,
+      STICKERS_DIR: stickersDir,
+      // Disable public STUN/TURN servers for E2E runs. Both peers are on
+      // the same host (127.0.0.1); host ICE candidates are sufficient and
+      // do not require an external STUN lookup. Leaving the default
+      // `stun:stun.l.google.com:19302` in place would make Chromium
+      // block ICE gathering on an unreachable DNS resolve in sandboxed
+      // CI environments, causing the peer connection to stay in
+      // `Connecting` until it times out as `Failed` ~15 s later.
+      STUN_TURN_SERVERS: '',
+      // Disable the embedded STUN service. Without this, the parallel
+      // E2E workers would race each other for UDP port 3478 — the
+      // first wins, the rest log a startup warning and clients fall
+      // back to host candidates anyway, but we'd be relying on flaky
+      // ordering. Setting `STUN_PORT=0` skips the bind altogether.
+      STUN_PORT: '0',
+    };
 
-  const logs: string[] = [];
-  const captureLog = (chunk: Buffer | string): void => {
-    const text = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
-    if (process.env.E2E_SERVER_LOG === '1') {
-      // Forward to test runner stdout for live debugging.
-      process.stdout.write(`[server:${port}] ${text}`);
-    }
-    for (const line of text.split('\n')) {
-      if (line.trim().length > 0) {
-        logs.push(line);
-        // Cap memory: keep at most 5_000 most-recent lines per server.
-        if (logs.length > 5_000) {
-          logs.splice(0, logs.length - 5_000);
+    const child: ChildProcess = spawn(SERVER_BINARY, [], {
+      cwd: REPO_ROOT,
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    const logs: string[] = [];
+    const captureLog = (chunk: Buffer | string): void => {
+      const text = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+      if (process.env.E2E_SERVER_LOG === '1') {
+        // Forward to test runner stdout for live debugging.
+        process.stdout.write(`[server:${port}] ${text}`);
+      }
+      for (const line of text.split('\n')) {
+        if (line.trim().length > 0) {
+          logs.push(line);
+          // Cap memory: keep at most 5_000 most-recent lines per server.
+          if (logs.length > 5_000) {
+            logs.splice(0, logs.length - 5_000);
+          }
         }
       }
-    }
-  };
-  child.stdout?.on('data', captureLog);
-  child.stderr?.on('data', captureLog);
+    };
+    child.stdout?.on('data', captureLog);
+    child.stderr?.on('data', captureLog);
 
-  let exited = false;
-  child.on('exit', (code, signal) => {
-    exited = true;
-    logs.push(`[server] exited code=${code ?? 'null'} signal=${signal ?? 'null'}`);
-  });
+    let exited = false;
+    child.on('exit', (code, signal) => {
+      exited = true;
+      logs.push(`[server] exited code=${code ?? 'null'} signal=${signal ?? 'null'}`);
+    });
 
-  // If the binary fails to start (e.g. missing build), `waitForHealth` will
-  // reject after the configured retry budget. Surface logs in that case.
-  try {
-    await waitForHealth(baseUrl);
-  } catch (err) {
-    if (!exited) {
-      child.kill('SIGKILL');
+    // If the binary fails to start (e.g. missing build), `waitForHealth` will
+    // reject after the configured retry budget. Surface logs in that case.
+    try {
+      await waitForHealth(baseUrl);
+    } catch (err) {
+      if (!exited) {
+        child.kill('SIGKILL');
+      }
+      // Check if the failure was due to port conflict (EADDRINUSE).
+      const logsText = logs.join('\n');
+      if (logsText.includes('Address already in use') && attempt < MAX_PORT_RETRIES - 1) {
+        // Port was stolen between findFreePort() and server bind; retry.
+        lastError = err as Error;
+        await sleep(100);
+        continue;
+      }
+      throw new Error(
+        `${(err as Error).message}\n--- server logs (last 50 lines) ---\n${logs.slice(-50).join('\n')}`,
+      );
     }
-    throw new Error(
-      `${(err as Error).message}\n--- server logs (last 50 lines) ---\n${logs.slice(-50).join('\n')}`,
-    );
+
+    let stopped = false;
+    const stop = async (): Promise<void> => {
+      if (stopped || exited) {
+        stopped = true;
+        return;
+      }
+      stopped = true;
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(() => {
+          if (!exited) {
+            child.kill('SIGKILL');
+          }
+          resolve();
+        }, 5_000);
+        child.once('exit', () => {
+          clearTimeout(timer);
+          resolve();
+        });
+        child.kill('SIGTERM');
+      });
+    };
+
+    return { port, baseUrl, wsUrl, logs, stop };
   }
 
-  let stopped = false;
-  const stop = async (): Promise<void> => {
-    if (stopped || exited) {
-      stopped = true;
-      return;
-    }
-    stopped = true;
-    await new Promise<void>((resolve) => {
-      const timer = setTimeout(() => {
-        if (!exited) {
-          child.kill('SIGKILL');
-        }
-        resolve();
-      }, 5_000);
-      child.once('exit', () => {
-        clearTimeout(timer);
-        resolve();
-      });
-      child.kill('SIGTERM');
-    });
-  };
-
-  return { port, baseUrl, wsUrl, logs, stop };
+  // All retries exhausted — should not reach here, but satisfy TypeScript.
+  throw lastError ?? new Error('Failed to start server after port retries');
 }

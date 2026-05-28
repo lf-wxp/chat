@@ -63,19 +63,23 @@ impl SignalingClient {
       client.stop_heartbeat();
       client.inner.borrow_mut().ws = None;
 
-      // Tear down every active
-      // PeerConnection the moment the signalling channel is gone.
-      // ICE/SDP traffic cannot continue without the signalling server,
-      // and leaving stale PCs around means their ICE / connection-state
-      // callbacks keep firing, wasting resources and potentially
-      // emitting stale `PeerEstablished` messages on the next reconnect.
-      // `close_all` is idempotent: the explicit `logout` path already
-      // runs it *before* closing the WebSocket so that `PeerClosed`
-      // signalling fits in the final round-trip, and this second call
-      // is a no-op when the map is already empty. The post-reconnect
-      // mesh is re-established by the `ActivePeersList` recovery flow
-      // driven from `AuthSuccess` → `recover_active_peers`.
-      client.cleanup_webrtc_on_disconnect();
+      // Only tear down PeerConnections when the close is terminal
+      // (normal closure or auth failure). For transient disconnects
+      // (network flap, server restart, code 1006 abnormal) we keep
+      // PeerConnections alive so that DataChannel-based file transfers
+      // can continue uninterrupted — the DataChannel is independent of
+      // the signaling WebSocket. The post-reconnect `ActivePeersList`
+      // recovery flow will re-establish any peers that were lost.
+      //
+      // Safety: if ICE also fails (e.g. full network outage), the
+      // `PeerConnectionState::Failed` handler in mod.rs will call
+      // `close_connection` and clean up the stale PeerConnection.
+      let is_terminal_close = code == super::WS_CLOSE_NORMAL
+        || code == super::WS_CLOSE_AUTH_INVALID
+        || code == super::WS_CLOSE_AUTH_FORBIDDEN;
+      if is_terminal_close {
+        client.cleanup_webrtc_on_disconnect();
+      }
 
       client.handle_close_code(code);
     }) as Box<dyn Fn(web_sys::CloseEvent)>);

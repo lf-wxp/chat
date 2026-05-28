@@ -1679,6 +1679,17 @@ impl WebRtcManager {
   pub fn close_all(&self) {
     let mut inner = self.inner.borrow_mut();
 
+    // P1-5 fix: synchronously pause inbound transfers BEFORE closing
+    // the PeerConnections, so that the transfer status is immediately
+    // set to `Paused` without relying on the async
+    // `onconnectionstatechange` event (which may fire too late for
+    // the E2E test that force-closes the WS).
+    if let Some(file_mgr) = self.file_manager.borrow().clone() {
+      for peer_id in inner.connections.keys() {
+        file_mgr.pause_inbound_transfers(peer_id);
+      }
+    }
+
     for (peer_id, pc) in &mut inner.connections {
       pc.close();
       web_sys::console::log_1(&format!("[webrtc] Closed connection to peer {}", peer_id).into());

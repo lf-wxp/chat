@@ -123,6 +123,16 @@ impl WebRtcManager {
     // succeeds on the drained frames.
     self.flush_pending_broadcast(&peer_id);
 
+    // After the encryption channel is established, retry any inbound
+    // file transfers from this peer that are still in `Paused` status.
+    // This handles the case where `try_resume_inbound_from_peer` was
+    // called during the `Connected` state transition but the ECDH
+    // key exchange had not completed yet, causing the resume request
+    // to fail and the status to be rolled back to `Paused`.
+    if let Some(file_mgr) = self.file_manager.borrow().clone() {
+      file_mgr.try_resume_inbound_from_peer(&peer_id);
+    }
+
     web_sys::console::log_1(
       &format!("[webrtc] Completed ECDH exchange with peer {}", peer_id).into(),
     );

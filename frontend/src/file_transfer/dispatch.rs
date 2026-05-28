@@ -343,7 +343,18 @@ async fn ship_to_peer(tx: &OutgoingTransfer, webrtc: &WebRtcManager, peer: &User
         // the peer's ECDH key just got garbage-collected after a
         // reconnect. Wait briefly for the handshake to recover and
         // retry the same slice once before failing the transfer.
-        if (e.contains("No shared key") || e.contains("no_shared_key"))
+        //
+        // P1-5 fix: also handle DataChannel-not-open errors that
+        // occur when the signalling WebSocket drops mid-transfer and
+        // both sides' PeerConnections are torn down by
+        // `cleanup_webrtc_on_disconnect`.  The auto-resume path
+        // will re-establish the connection;  we just need to wait
+        // long enough for the reconnect + ECDH handshake to finish.
+        let is_transient = e.contains("No shared key")
+          || e.contains("no_shared_key")
+          || e.contains("not open")
+          || e.contains("DataChannel not open");
+        if is_transient
           && wait_for_shared_key(webrtc, peer, ECDH_WAIT_TIMEOUT_MS).await
           && send_chunk_to_peer(webrtc, peer, tx.info.transfer_id, chunk_index, total, slice)
             .await

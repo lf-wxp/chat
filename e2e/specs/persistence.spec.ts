@@ -32,10 +32,7 @@ test.describe('persistence', () => {
     // The app debounces conversation-metadata writes to localStorage
     // by 100 ms (see `PERSIST_DEBOUNCE_MS` in `state/mod.rs`). Reloading
     // immediately can drop the last write, leaving an empty sidebar on
-    // boot. Give the debounce timer a generous window to flush before
-    // we reload. A more deterministic hook (e.g. awaiting a known
-    // `localStorage.conversations` JSON) would be even better but the
-    // fixed delay is the least-invasive fix that matches reality.
+    // boot. Wait for the localStorage skeleton to be flushed first.
     await pageA.waitForFunction(
       () => {
         const raw = window.localStorage.getItem('conversations');
@@ -48,6 +45,36 @@ test.describe('persistence', () => {
         }
       },
       undefined,
+      { timeout: 10_000 },
+    );
+
+    // Messages are persisted to IndexedDB via fire-and-forget
+    // `spawn_local` calls. The localStorage write above only covers
+    // the conversation skeleton — the actual message records may still
+    // be in-flight. Wait until IndexedDB contains all 3 messages so
+    // `load_history` after reload finds them reliably.
+    await pageA.waitForFunction(
+      (expectedCount: number) => {
+        return new Promise<boolean>((resolve) => {
+          const req = indexedDB.open('chat_frontend');
+          req.onsuccess = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains('messages')) {
+              resolve(false);
+              return;
+            }
+            const tx = db.transaction('messages', 'readonly');
+            const store = tx.objectStore('messages');
+            const countReq = store.count();
+            countReq.onsuccess = () => {
+              resolve(countReq.result >= expectedCount);
+            };
+            countReq.onerror = () => resolve(false);
+          };
+          req.onerror = () => resolve(false);
+        });
+      },
+      messages.length,
       { timeout: 10_000 },
     );
 

@@ -13,6 +13,33 @@ import { type BrowserContext, type Page, test as base } from '@playwright/test';
 
 import { type ServerInstance, startServer } from './server.ts';
 
+/**
+ * Suppress expected browser console errors that are a natural side-effect
+ * of force-closing WebSocket connections in the signaling-drop test
+ * (ERR_CONNECTION_REFUSED). These messages are harmless noise in the
+ * Playwright trace output; filtering them here keeps traces readable.
+ *
+ * Note: Playwright does NOT auto-fail tests on console.error — this is
+ * purely a trace/log hygiene measure.
+ */
+function suppressExpectedConsoleErrors(ctx: BrowserContext): void {
+  ctx.on('page', (page) => {
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') {
+        const text = msg.text();
+        if (
+          text.includes('ERR_CONNECTION_REFUSED') ||
+          text.includes('net::ERR_CONNECTION_REFUSED') ||
+          text.includes('WebSocket connection to') ||
+          text.includes('Error during WebSocket handshake')
+        ) {
+          return;
+        }
+      }
+    });
+  });
+}
+
 interface WorkerFixtures {
   server: ServerInstance;
 }
@@ -56,6 +83,9 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       // option has to be repeated per custom context fixture.
       serviceWorkers: 'block',
     });
+
+    suppressExpectedConsoleErrors(ctx);
+
     await use(ctx);
     await ctx.close();
   },
@@ -66,6 +96,9 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       permissions: ['microphone', 'camera', 'clipboard-read', 'clipboard-write', 'notifications'],
       serviceWorkers: 'block',
     });
+
+    suppressExpectedConsoleErrors(ctx);
+
     await use(ctx);
     await ctx.close();
   },
@@ -76,6 +109,9 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       permissions: ['microphone', 'camera', 'clipboard-read', 'clipboard-write', 'notifications'],
       serviceWorkers: 'block',
     });
+
+    suppressExpectedConsoleErrors(ctx);
+
     await use(ctx);
     await ctx.close();
   },
