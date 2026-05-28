@@ -97,11 +97,17 @@ pub fn MessageBubble(
   let reactions = msg.reactions.clone();
   let me_user_id = app_state.current_user_id();
 
-  // Reactive timer signal: updates every 30 s so `can_revoke` turns
-  // off automatically once the 2-minute window elapses.
+  // Reactive timer signal: updates periodically so `can_revoke` turns
+  // off automatically once the revoke window elapses.
+  // In E2E builds the interval is 1 s (window = 5 s); in production
+  // it is 30 s (window = 2 min).
   let now_ms = RwSignal::new(chrono::Utc::now().timestamp_millis());
   {
-    let handle = crate::utils::set_interval(30_000, move || {
+    #[cfg(feature = "e2e")]
+    let interval = 1_000;
+    #[cfg(not(feature = "e2e"))]
+    let interval = 30_000;
+    let handle = crate::utils::set_interval(interval, move || {
       now_ms.set(chrono::Utc::now().timestamp_millis());
     });
     // Keep the handle alive for the lifetime of the component.
@@ -160,7 +166,10 @@ pub fn MessageBubble(
   let status_view = if outgoing {
     let manager_for_resend = manager.clone();
     Some(view! {
-      <span class=move || format!("message-status {}", status.css_class())>
+      <span
+        class=move || format!("message-status {}", status.css_class())
+        data-status=move || status.css_class()
+      >
         {status_icon(status)}
         <Show when=move || status == MessageStatus::Failed fallback=|| ()>
           <button

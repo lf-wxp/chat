@@ -15,6 +15,11 @@ pub const MAX_REACTIONS_PER_MESSAGE: usize = 20;
 
 /// Revoke window: messages may only be revoked within 2 minutes of the
 /// original send timestamp (Req 4.4.x).
+/// In E2E builds the window is shortened to 5 s so tests can exercise
+/// the expiry path without waiting a full 2 minutes.
+#[cfg(feature = "e2e")]
+pub const REVOKE_WINDOW_MS: i64 = 5_000;
+#[cfg(not(feature = "e2e"))]
 pub const REVOKE_WINDOW_MS: i64 = 2 * 60 * 1_000;
 
 /// Maximum text-message length in characters (Req 4.1.x, error code

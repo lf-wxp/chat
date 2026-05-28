@@ -68,3 +68,5 @@ frontend/public/icons/icon-*.png
 
 
 .playwright-mcp
+
+test-results

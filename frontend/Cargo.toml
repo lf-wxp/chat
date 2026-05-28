@@ -240,6 +240,8 @@ locales = ["en", "zh-CN", "es"]
 [features]
 csr = ["leptos/csr", "leptos_i18n/csr"]
 default = ["csr"]
+# Shortens timeouts (e.g. invite timeout) for E2E test speed.
+e2e = []
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 uuid = {workspace = true, features = ["js", "v4"]}

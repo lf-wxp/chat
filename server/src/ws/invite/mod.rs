@@ -74,6 +74,15 @@ pub async fn handle_connection_invite<S>(
       .discovery_state
       .merge_bidirectional_invitations(&invite.from, &invite.to);
 
+    // Register the active peer relationship so that subsequent SDP
+    // offers pass the `are_peers()` check in `handle_sdp_offer`.
+    // Without this, the initiator's SDP offer would be rejected with
+    // "No active connection with target user" because the merge
+    // already cleared the pending invitations.
+    ws_state
+      .discovery_state
+      .add_active_peer(&invite.from, &invite.to);
+
     // avoid SDP "glare" race by deterministically
     // electing exactly one initiator. Without this, both clients
     // would receive `InviteAccepted` and concurrently call

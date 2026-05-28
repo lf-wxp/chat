@@ -81,8 +81,8 @@ pub const ASSUMED_UPLOAD_BPS: u64 = 2 * 1024 * 1024;
 /// audit it at a glance.  Kept in one place so the UI picker and
 /// the domain type share the same definition.
 pub const DANGEROUS_EXTENSIONS: &[&str] = &[
-  ".exe", ".bat", ".cmd", ".sh", ".ps1", ".vbs", ".js", ".jar", ".msi", ".dmg", ".app", ".deb",
-  ".rpm",
+  ".exe", ".bat", ".cmd", ".sh", ".ps1", ".vbs", ".wsf", ".js", ".jar", ".msi", ".dmg", ".app",
+  ".deb", ".rpm",
 ];
 
 /// Check whether a filename carries a dangerous extension.

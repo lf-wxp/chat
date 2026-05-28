@@ -93,4 +93,34 @@ test.describe('message actions', () => {
 
     await expect(pageA.locator(sel.forwardModal)).toBeVisible();
   });
+
+  // The revoke window is shortened to 5 s in E2E builds (feature = "e2e"),
+  // and the now_ms timer ticks every 1 s, so after ~6 s the revoke button
+  // should disappear.
+  test('revoke button is not shown for messages older than 2 minutes', async ({
+    pageA,
+    pageB,
+  }) => {
+    const tag = Date.now().toString(36);
+    const text = `old-msg-${tag}`;
+    await sendAndVerifyMessage(pageA, pageB, text);
+
+    const row = pageA.locator(sel.messageRow, { hasText: text }).first();
+    await row.waitFor({ state: 'visible', timeout: 5_000 });
+
+    // Verify revoke button IS visible initially (within the window).
+    await row.hover();
+    await expect(row.locator(sel.messageActionRevoke)).toBeVisible({ timeout: 3_000 });
+
+    // Wait for the revoke window to expire (5 s) + timer tick (1 s) + buffer.
+    await pageA.waitForTimeout(7_000);
+
+    // Re-hover to trigger action bar refresh.
+    await row.hover();
+
+    // The revoke action should NOT appear for messages older than the window.
+    await expect(row.locator(sel.messageActionRevoke)).not.toBeVisible({
+      timeout: 5_000,
+    });
+  });
 });

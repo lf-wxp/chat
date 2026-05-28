@@ -304,18 +304,21 @@ description = "Build the message crate in release mode"
 workspace = false
 
 [tasks.build-server-release]
-args = ["build", "--release"]
+args = ["build", "--release", "--features", "e2e"]
 command = "cargo"
 cwd = "server"
-description = "Build the server crate in release mode"
+description = "Build the server crate in release mode (with e2e feature for shortened timeouts)"
 workspace = false
 
 [tasks.build-frontend-release]
-args = ["build", "--release"]
-command = "trunk"
-cwd = "frontend"
-description = "Build the frontend crate in release mode"
+description = "Build the frontend crate in release mode (with e2e feature for shortened timeouts)"
 workspace = false
+script = '''
+#!/bin/bash
+set -euo pipefail
+cd frontend
+trunk build --release --features e2e
+'''
 
 # ============================================================================
 # Test Tasks

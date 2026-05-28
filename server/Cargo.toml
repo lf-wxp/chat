@@ -77,5 +77,9 @@ serial_test.workspace = true
 tempfile.workspace = true
 tokio-tungstenite.workspace = true
 
+[features]
+# Shortens timeouts (e.g. invite timeout) for E2E test speed.
+e2e = []
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # Native-specific dependencies

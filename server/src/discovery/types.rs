@@ -15,7 +15,11 @@ pub const INVITE_RATE_LIMIT_PER_MINUTE: usize = 10;
 pub const INVITE_RATE_LIMIT_PER_HOUR: usize = 50;
 /// Maximum unanswered invitations per target user.
 pub const MAX_UNANSWERED_INVITATIONS_PER_TARGET: usize = 5;
-/// Invitation timeout duration (60 seconds).
+/// Invitation timeout duration (60 seconds in production, 5 seconds in
+/// E2E builds so tests can exercise the timeout path quickly).
+#[cfg(feature = "e2e")]
+pub const INVITATION_TIMEOUT: Duration = Duration::from_secs(5);
+#[cfg(not(feature = "e2e"))]
 pub const INVITATION_TIMEOUT: Duration = Duration::from_secs(60);
 /// SDP negotiation timeout duration (30 seconds).
 pub const SDP_NEGOTIATION_TIMEOUT_SECS: u64 = 30;

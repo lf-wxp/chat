@@ -40,6 +40,11 @@ mod tests;
 pub use models::{BatchProgress, IncomingInvite, InviteStatus, OutboundInvite};
 
 /// Default per-invite timeout in milliseconds (Req 9.8).
+/// In E2E builds the timeout is shortened to 5 s so tests can
+/// exercise the timeout path without waiting a full minute.
+#[cfg(feature = "e2e")]
+pub const INVITE_TIMEOUT_MS: i64 = 5_000;
+#[cfg(not(feature = "e2e"))]
 pub const INVITE_TIMEOUT_MS: i64 = 60_000;
 
 /// Cleanup tick interval in milliseconds — drives both timeout sweeps

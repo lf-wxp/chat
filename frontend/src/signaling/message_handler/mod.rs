@@ -366,10 +366,18 @@ pub fn handle_signaling_message(
           peer.from.clone()
         };
         // Clear any lingering outbound invite (Connecting or Pending).
-        if let Some(mgr) = crate::invite::try_use_invite_manager()
-          && mgr.has_pending_outbound_untracked(&other)
-        {
-          mgr.clear_outbound(&other);
+        if let Some(mgr) = crate::invite::try_use_invite_manager() {
+          if mgr.has_pending_outbound_untracked(&other) {
+            mgr.clear_outbound(&other);
+          }
+          // Also dismiss any inbound invite from the same peer. In a
+          // bidirectional merge the first invite may have been forwarded
+          // as a regular ConnectionInvite before the server detected the
+          // conflict. If the incoming-invite modal is still showing, we
+          // must remove it so the user does not accidentally accept it
+          // (which would trigger a duplicate connect_to_peer and cause
+          // SDP glare).
+          mgr.take_inbound(&other);
         }
         // Ensure a direct conversation entry exists so the chat UI is
         // ready (mirrors the `InviteAccepted` path).
@@ -973,6 +981,20 @@ fn handle_incoming_invite(invite: message::signaling::ConnectionInvite, app_stat
   }
 
   if let Some(mgr) = crate::invite::try_use_invite_manager() {
+    // Suppress the incoming-invite modal when we already have an
+    // outbound invite to the same peer. This is the bidirectional
+    // merge scenario: both sides sent invites near-simultaneously and
+    // the server will auto-merge them (sending InviteAccepted to the
+    // elected initiator). Showing the modal here would let the user
+    // manually accept it, triggering a duplicate `connect_to_peer`
+    // call and causing SDP glare.
+    if mgr.has_pending_outbound_untracked(&inviter) {
+      log_debug(&format!(
+        "[invite] Suppressing incoming invite from {inviter} — outbound invite already pending (bidirectional merge expected)"
+      ));
+      return;
+    }
+
     let now = chrono::Utc::now().timestamp_millis();
     mgr.push_inbound(crate::invite::IncomingInvite::new(
       inviter,
