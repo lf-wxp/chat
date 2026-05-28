@@ -1,4 +1,4 @@
-//! Global room modal context (Req 4.1 / 4.2 UI fix).
+//! Global room modal context (Req 4.1 / 4.2).
 //!
 //! Provides signals that allow any component in the tree to trigger
 //! the create-room, password-prompt, invite-member and user-info

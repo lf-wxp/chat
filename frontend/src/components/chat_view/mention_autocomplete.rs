@@ -1,4 +1,4 @@
-//! Inline `@mention` autocomplete popup (G5 fix).
+//! Inline `@mention` autocomplete popup.
 //!
 //! Renders a floating suggestion list below the textarea when the user
 //! types `@` followed by one or more characters. The list is filtered

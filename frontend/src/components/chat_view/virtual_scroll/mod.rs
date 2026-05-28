@@ -38,7 +38,7 @@ const OVERSCAN: usize = 3;
 /// Maximum number of entries in the height cache. When exceeded, the
 /// oldest entries are evicted (simple LRU approximation by clearing
 /// half the cache). This prevents unbounded memory growth when loading
-/// extensive history (P5 fix).
+/// extensive history.
 const HEIGHT_CACHE_MAX_SIZE: usize = 2000;
 
 /// Base height (px) for a single-line text bubble (padding + avatar + name).
@@ -406,7 +406,7 @@ pub fn VirtualMessageWindow(
 
           // Req 14.11.3.3: "Beginning of conversation" divider when
           // all history has been loaded (has_more = false).
-          // N1 fix: read `has_more` reactively inside the `when` closure
+          // read `has_more` reactively inside the `when` closure
           // instead of snapshotting it with `get_untracked()` outside.
           <Show when=move || !vs.has_more.get() && start == 0 fallback=|| ()>
             <div

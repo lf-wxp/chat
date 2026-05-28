@@ -215,7 +215,6 @@ impl FileTransferManager {
   /// URL (if any) so the receiver stops processing chunks for this
   /// transfer, then drops the record from the manager map so a
   /// long-lived session does not accumulate cancelled buffers
-  /// (Qc3 fix).
   pub fn cancel_inbound(&self, msg_id: &MessageId) {
     if let Some(rx) = self.get_inbound_by_message(msg_id) {
       rx.status.set(TransferStatus::Cancelled);
@@ -369,7 +368,7 @@ impl FileTransferManager {
     }
   }
 
-  /// User-initiated pause for an inbound transfer (G14 / Req 6.6).
+  /// User-initiated pause for an inbound transfer (Req 6.6).
   ///
   /// Flips `user_paused = true` on the inbound record and surfaces
   /// [`TransferStatus::Paused`] so the file card swaps the cancel
@@ -485,7 +484,7 @@ impl FileTransferManager {
         .filter(|((pid, _tid), rx)| {
           pid == peer_id
             && matches!(rx.status.get_untracked(), TransferStatus::Paused)
-            // G14 — never auto-resume a transfer the user explicitly
+            // never auto-resume a transfer the user explicitly
             // paused; they have to click Resume themselves.
             && !rx.user_paused.get_untracked()
             && !rx.missing_chunks().is_empty()
@@ -572,7 +571,7 @@ impl FileTransferManager {
 
   /// Drop all inbound transfer records that have reached a terminal
   /// state (Completed, Failed, Cancelled, HashMismatch), releasing
-  /// their manager-side bookkeeping (P2-D fix).
+  /// their manager-side bookkeeping.
   ///
   /// Also releases the `bytes` field of terminal outbound transfers
   /// (P2-11 mitigation), since the dispatch loop has already consumed

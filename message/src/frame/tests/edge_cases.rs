@@ -4,7 +4,7 @@ use super::*;
 use crate::types::MessageId;
 
 // =============================================================================
-// Additional Edge Case Tests (MA-P1-002, BUG-002)
+// Additional Edge Case Tests 
 // =============================================================================
 
 #[test]
@@ -42,7 +42,7 @@ fn test_reassembly_buffer_chunk_index_at_boundary() {
 }
 
 // =============================================================================
-// Chunk Offset Overflow Tests (BUG-002)
+// Chunk Offset Overflow Tests 
 // =============================================================================
 
 /// Test that chunk offset calculation doesn't overflow.

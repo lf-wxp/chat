@@ -23,7 +23,7 @@ use crate::state::use_app_state;
 
 /// Whether the given [`CallState`] should cause the incoming-call
 /// modal to be rendered. Extracted as a pure helper so the decision
-/// is testable without mounting the component (round-4 coverage fix).
+/// is testable without mounting the component.
 #[must_use]
 pub const fn should_render_modal(state: &CallState) -> bool {
   matches!(state, CallState::Ringing { .. })

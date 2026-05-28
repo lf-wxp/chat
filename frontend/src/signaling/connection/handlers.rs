@@ -91,7 +91,7 @@ impl SignalingClient {
     ws.set_onerror(Some(onerror.as_ref().unchecked_ref()));
 
     // Retain closures in Inner so disconnect() can detach + drop them,
-    // instead of leaking a set on every reconnect (Bug 7).
+    // instead of leaking a set on every reconnect.
     let mut inner = self.inner.borrow_mut();
     inner.onopen = Some(onopen);
     inner.onmessage = Some(onmessage);
@@ -399,7 +399,7 @@ impl SignalingClient {
     ));
 
     // Show a user-visible toast so the user knows why they are being
-    // redirected back to the login page (P9 fix). The i18n key
+    // redirected back to the login page. The i18n key
     // `error.auth001` was originally wired here, but it is hard-coded to
     // "JWT token expired" while `AuthFailure.reason` may carry many other
     // causes (signature mismatch after a server key rotation, unknown
@@ -436,7 +436,7 @@ impl SignalingClient {
     console_warn("[signaling] Session invalidated by another device login");
 
     // Use the dedicated `auth.session_invalidated` i18n key instead of a
-    // generic error toast (Bug 5). The code string remains AUTH502 for
+    // generic error toast. The code string remains AUTH502 for
     // logging and analytics parity with the server registry.
     // Use the cached ErrorToastManager instead of calling
     // use_error_toast_manager() which requires Leptos reactive context

@@ -167,7 +167,7 @@ fn resume_request_payload_carries_transfer_id_and_chunks() {
   assert_eq!(req.missing_chunks, vec![1, 3, 7]);
 }
 
-/// G14 — `user_paused` defaults to `false` on a fresh inbound
+/// `user_paused` defaults to `false` on a fresh inbound
 /// transfer; `FileTransferManager::pause_inbound` / `resume_inbound`
 /// flip this flag (the manager-level wiring is exercised in the
 /// integration suite, but the type-level invariant is anchored

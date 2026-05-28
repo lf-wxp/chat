@@ -310,7 +310,7 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
       // dialog renders independently of the chat view's
       // `DialogState`. The modal portal-renders to `#modal-root`
       // (via `ModalWrapper::Portal`), so layout is unaffected by
-      // the sidebar's `backdrop-filter` containing-block trap (G19).
+      // the sidebar's `backdrop-filter` containing-block trap.
       {
         let conv_for_delete = conv_id.clone();
         let on_close: Callback<()> = Callback::new(move |_: ()| delete_modal_open.set(false));

@@ -158,7 +158,7 @@ const MAX_MESH_PEERS: usize = 8;
 pub(super) const ECDH_EXCHANGE_TIMEOUT_MS: f64 = 15_000.0;
 
 /// Maximum number of control-frame broadcast messages queued per peer
-/// while the ECDH handshake is in flight (Task 19.1 C-1 fix).
+/// while the ECDH handshake is in flight (Task 19.1).
 ///
 /// `broadcast_data_channel_message` buffers frames that cannot be
 /// encrypted yet so they can be flushed as soon as the shared key is
@@ -321,7 +321,7 @@ pub(super) struct InnerManager {
   /// evict entries whose peer never completed the handshake).
   pub(super) pending_ecdh_keys: HashMap<UserId, PendingEcdh>,
   /// Control-frame broadcast messages queued per peer while the ECDH
-  /// handshake is still in flight (Task 19.1 C-1 fix).
+  /// handshake is still in flight (Task 19.1).
   ///
   /// `broadcast_data_channel_message` enqueues instead of silently
   /// dropping when `has_encryption_key` returns `false`, so critical
@@ -1679,7 +1679,7 @@ impl WebRtcManager {
   pub fn close_all(&self) {
     let mut inner = self.inner.borrow_mut();
 
-    // P1-5 fix: synchronously pause inbound transfers BEFORE closing
+    // synchronously pause inbound transfers BEFORE closing
     // the PeerConnections, so that the transfer status is immediately
     // set to `Paused` without relying on the async
     // `onconnectionstatechange` event (which may fire too late for

@@ -114,7 +114,7 @@ pub async fn acquire_user_media(media_type: MediaType) -> Result<MediaStream, St
 /// hand us a second microphone track that the browser would expose as
 /// a duplicate "tab is using microphone" indicator, while the original
 /// audio sender on the PeerConnection is left untouched. Requesting
-/// video only sidesteps the duplicate-track issue (M3 fix).
+/// video only sidesteps the duplicate-track issue.
 ///
 /// # Errors
 /// Returns `Err` with an English description if `getUserMedia` fails

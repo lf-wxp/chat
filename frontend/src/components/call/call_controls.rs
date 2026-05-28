@@ -24,7 +24,6 @@ use leptos_icons::Icon;
 ///   3. The "local" tile as a last resort (single-user call).
 ///
 /// Exposed as a `const` array so the priority can be verified by unit
-/// tests (round-4 coverage fix).
 pub const PIP_VIDEO_SELECTORS: &[&str] = &[
   "[data-pip-candidate='hero'] .video-tile__video",
   "[data-pip-candidate='peer'] .video-tile__video",

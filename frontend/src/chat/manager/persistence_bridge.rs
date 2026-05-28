@@ -236,7 +236,7 @@ impl ChatManager {
             }
           }
           state.messages.update(|list| {
-            // Build a set of all known IDs for O(1) dedup lookups (N2 fix).
+            // Build a set of all known IDs for O(1) dedup lookups.
             // Include the target_id so the target message is never
             // erroneously deduplicated from the existing list.
             let mut seen: std::collections::HashSet<MessageId> =
@@ -259,7 +259,7 @@ impl ChatManager {
               }
             }
             // Sort the entire combined list so clock-skew or
-            // out-of-order messages don't break the timeline (V2 fix).
+            // out-of-order messages don't break the timeline.
             combined.sort_by_key(|m| m.timestamp_ms);
             *list = combined;
           });

@@ -2,9 +2,8 @@
 //!
 //! Replaces `window.confirm()` / `window.alert()` with styled
 //! Leptos components that support dark mode and are accessible
-//! (P2-7 from code review).
 //!
-//! P2-D fix: the `confirm()` future is now event-driven via a
+//! the `confirm()` future is now event-driven via a
 //! `futures::channel::oneshot` — a button click resolves the
 //! future immediately instead of waiting for the next 50 ms poll
 //! tick.

@@ -637,7 +637,7 @@ where
 /// is used to await the entire batch before starting the next one.
 ///
 /// Each batch has a 15-second timeout to prevent a single hanging peer
-/// connection from blocking the entire recovery flow (P4 fix).
+/// connection from blocking the entire recovery flow.
 ///
 /// The `app_state` parameter is passed explicitly so that WebSocket callbacks
 /// (which run outside the Leptos reactive owner) can access it without calling
@@ -663,7 +663,7 @@ fn recover_active_peers(
     return;
   };
 
-  // C1 fix: Filter out peers that are no longer online. The server may
+  // Filter out peers that are no longer online. The server may
   // include peers in ActivePeersList that have since gone offline (e.g.
   // due to a race between peer disconnect and the list snapshot).
   // Attempting to connect to an offline peer wastes resources and produces
@@ -925,7 +925,7 @@ fn handle_incoming_invite(invite: message::signaling::ConnectionInvite, app_stat
     let inviter_for_timer = inviter.clone();
     let blacklist_for_timer = blacklist.clone();
     let app_state_for_timer = app_state;
-    // P2-3.3 fix: the delay is produced by `random_auto_decline_delay_ms`
+    // the delay is produced by `random_auto_decline_delay_ms`
     // in `[30_000, 60_000]` which always fits in `i32`. Using `expect`
     // surfaces any future widening of the delay bounds instead of
     // silently neutralising the auto-decline with an `i32::MAX` timer.

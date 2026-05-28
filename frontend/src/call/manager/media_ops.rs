@@ -23,7 +23,6 @@ impl CallManager {
       track.set_enabled(new_enabled);
     }
     // Notify remote peers so their tiles can render a muted icon
-    // (Req 3.5 — P1-New fix).
     self.broadcast_media_state();
     new_enabled
   }
@@ -85,7 +84,7 @@ impl CallManager {
     // PeerConnection (Req 7.2 — no re-negotiation handshake; the
     // browser's `onnegotiationneeded` will fire automatically).
     //
-    // M3 fix: request a *video-only* stream rather than a combined
+    // request a *video-only* stream rather than a combined
     // audio+video one. The audio sender on the PeerConnection is
     // already wired up from the original `acquire_user_media` call;
     // adopting a second microphone track here would surface a
@@ -141,7 +140,7 @@ impl CallManager {
       self.signals.local_stream.set(Some(new_video_stream));
     }
 
-    // H3 fix: keep `CallState.media_type` aligned with the actual
+    // keep `CallState.media_type` aligned with the actual
     // mode of the call so refresh-recovery, telemetry, and any other
     // observer of the state machine sees Video — not Audio — once
     // the camera has been added.
@@ -207,7 +206,7 @@ impl CallManager {
     let currently_on = self.signals.local_media.get_untracked().screen_sharing;
 
     if currently_on {
-      // M5 fix: detach the `onended` handler before stopping the
+      // detach the `onended` handler before stopping the
       // track. Calling `stop()` triggers `onended` synchronously on
       // some browsers; without this clean-up that would re-enter
       // `toggle_screen_share` (bounced by the guard, but still a wasted

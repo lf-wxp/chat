@@ -55,7 +55,7 @@ fn test_ws_url_production_port_no_replacement() {
 #[test]
 fn test_http_url_format_matches_detect_logic() {
   // Browser's location.protocol() includes the colon, e.g. "https:"
-  // After P11 fix: we strip the trailing colon before formatting,
+  // we strip the trailing colon before formatting,
   // so detect_http_url now produces "https://host" (correct).
   let protocol = "https:";
   let scheme = protocol.trim_end_matches(':');

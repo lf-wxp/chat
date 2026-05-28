@@ -308,7 +308,7 @@ impl SignalingClient {
   ///
   /// If no auth state is available (e.g. connection was opened before
   /// login completed), the socket is closed immediately so we don't sit
-  /// in an ambiguous "connected but unauthenticated" state (Bug 4).
+  /// in an ambiguous "connected but unauthenticated" state.
   pub fn send_token_auth(&self) {
     // Use with_untracked() since this is called from WebSocket callbacks
     // (onopen handler) which are outside the Leptos reactive tracking scope.

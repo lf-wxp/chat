@@ -16,7 +16,6 @@ use crate::state::use_app_state;
 ///
 /// Exposed as a pure function so the mapping can be exercised by unit
 /// tests without mounting the full [`NetworkIndicator`] component
-/// (round-4 test-coverage fix).
 #[must_use]
 pub fn bar_is_active(quality: NetworkQuality, bar: usize) -> bool {
   match quality {
@@ -28,7 +27,7 @@ pub fn bar_is_active(quality: NetworkQuality, bar: usize) -> bool {
 }
 
 /// Whether a bar should render active given an *optional* quality
-/// reading. M1 fix — when no `getStats()` sample has been collected
+/// when no `getStats()` sample has been collected
 /// yet (e.g. during the first 5 s after a peer connects, or when the
 /// browser returns an empty stats report), the indicator must NOT
 /// pretend the network is "Good"; instead every bar stays inactive
@@ -126,7 +125,7 @@ pub fn quality_data_attr(quality: Option<NetworkQuality>) -> &'static str {
 /// attribute shows the quality label plus the latest RTT, packet-loss,
 /// bandwidth, and connection-type figures (Req 14.10.3).
 ///
-/// When no quality sample has been collected yet (M1 fix), every bar
+/// When no quality sample has been collected yet, every bar
 /// stays inactive and the tooltip displays the localised "Unknown"
 /// label so the user is not misled into thinking the connection is
 /// healthy when the indicator is actually waiting on first data.
@@ -270,7 +269,7 @@ mod tests {
 
   #[test]
   fn no_quality_keeps_all_bars_inactive() {
-    // M1 fix: until a real stats sample arrives, every bar must stay
+    // until a real stats sample arrives, every bar must stay
     // inactive — rendering "Good" by default would falsely advertise
     // a healthy connection during the initial 5 s polling window.
     for bar in 1..=4 {

@@ -190,7 +190,7 @@ const fn step_up(q: NetworkQuality) -> NetworkQuality {
 ///
 /// Returns `None` when the report contains *no* recognisable stats
 /// (e.g. the connection is still being established or the browser
-/// returned an empty map). H4 fix — the previous implementation
+/// returned an empty map). the previous implementation
 /// returned an "optimistic" zero-RTT / zero-loss sample which then
 /// classified as `Excellent`, falsely advertising a perfect connection
 /// to the user while the link was actually broken. Returning `None`

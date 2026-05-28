@@ -43,7 +43,6 @@ pub(super) fn permission_state_label(window: &leptos_use::UseWindow) -> String {
 /// `state` is an `ArcRwSignal` so the leaked closure can continue to
 /// update it after every settings-drawer mount / unmount cycle
 /// without risking a "value already disposed" panic from the owner
-/// arena (B-2 fix).
 pub(super) fn subscribe_permission_change(
   state: ArcRwSignal<String>,
   window: &leptos_use::UseWindow,

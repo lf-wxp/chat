@@ -29,7 +29,7 @@ pub fn App() -> impl IntoView {
   // sibling components (Settings drawer's "Open Debug Panel" button,
   // header shortcuts, etc.) can toggle it via context. Previously
   // the signal was provided inside `DebugPanel` itself, which made
-  // it invisible to siblings like `SettingsPage` (V2-S-3 fix).
+  // it invisible to siblings like `SettingsPage`.
   let _ = crate::components::debug::provide_debug_panel_visibility();
 
   // Reactive signal tracking whether the system prefers dark mode.
@@ -188,7 +188,6 @@ pub fn App() -> impl IntoView {
 
       // Global overlays sit outside the auth gate so error toasts and
       // the reconnect banner remain visible on the login/register page
-      // (Code Quality 1 fix).
       <ErrorToastContainer />
       <ReconnectBanner />
       <OfflineBanner />

@@ -67,9 +67,9 @@ impl PersistenceManager {
         }
       }
 
-      // Incremental inverted-index update (Req 7.6 P1 fix).
+      // Incremental inverted-index update (Req 7.6).
       // Perform the in-memory mutation under a single borrow so the
-      // index is never `None` during the async gap (V3 fix).
+      // index is never `None` during the async gap.
       let search_entries = {
         let mut inner = this.inner.borrow_mut();
         if let Some(ref mut idx) = inner.index {

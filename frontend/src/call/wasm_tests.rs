@@ -58,7 +58,7 @@ fn parse_ignores_non_nominated_candidate_pair() {
   let report = build_report(&[("cp1", pair)]);
 
   // Non-nominated pair contributes nothing; with no other recognised
-  // entries the report is treated as "no data" (H4 fix).
+  // entries the report is treated as "no data".
   assert!(parse_stats_report(&report, 0).is_none());
 }
 
@@ -96,7 +96,7 @@ fn parse_aggregates_multiple_inbound_streams() {
 
 #[wasm_bindgen_test]
 fn parse_handles_empty_report() {
-  // H4 fix: an empty report must NOT silently classify as Excellent.
+  // an empty report must NOT silently classify as Excellent.
   // Returning None lets the caller skip the update so the UI renders
   // "Unknown" instead of a misleading green bar.
   let report: JsValue = Object::new().into();

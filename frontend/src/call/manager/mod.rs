@@ -136,7 +136,7 @@ pub struct CallSignals {
   /// display the current capture resolution or warn when degraded.
   pub self_video_profile: RwSignal<VideoProfile>,
   /// Most-recent network stats sample per peer, so the UI can display
-  /// RTT/loss details on hover (UX-2 fix, Req 14.10).
+  /// RTT/loss details on hover (Req 14.10).
   pub network_stats: RwSignal<HashMap<UserId, NetworkStatsSample>>,
 }
 

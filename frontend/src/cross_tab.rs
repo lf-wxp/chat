@@ -1,4 +1,4 @@
-//! Cross-tab synchronization via BroadcastChannel (G9 fix).
+//! Cross-tab synchronization via BroadcastChannel.
 //!
 //! Enables multiple browser tabs of the same application to stay in
 //! sync without duplicating WebSocket connections or WebRTC sessions.

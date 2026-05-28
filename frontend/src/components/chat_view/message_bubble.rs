@@ -129,7 +129,7 @@ pub fn MessageBubble(
 
   let content_view = content_view(&msg, self_nickname, cbs);
 
-  // ResizeObserver-based height refinement for virtual scrolling (P1 fix).
+  // ResizeObserver-based height refinement for virtual scrolling.
   let bubble_ref = NodeRef::<leptos::html::Div>::new();
   if let Some(vs) = vs {
     let msg_id = msg.id;

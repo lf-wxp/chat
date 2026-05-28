@@ -2,7 +2,7 @@
 //!
 //! This module owns the fan-out path for non-chat control frames
 //! (`MediaStateUpdate`, `ReconnectingState`, etc.) and the
-//! `pending_broadcast` queue introduced by the Task 19.1 C-1 fix.
+//! `pending_broadcast` queue introduced by the Task 19.1.
 //!
 //! Every method here is an `impl WebRtcManager { ... }` entry so the
 //! public API surface matches what it looked like before the
@@ -21,7 +21,7 @@ impl WebRtcManager {
   /// payload through the envelope path. Peers whose ECDH handshake
   /// has not completed yet have the frame **queued** in
   /// `pending_broadcast` so it can be flushed as soon as the shared
-  /// key is derived (Task 19.1 C-1 fix — prevents silent loss of
+  /// key is derived (Task 19.1 — prevents silent loss of
   /// critical control frames such as `ReconnectingState` during a
   /// cold-start race). The queue is bounded by
   /// [`PENDING_BROADCAST_LIMIT`] per peer; the oldest frame is
@@ -56,7 +56,7 @@ impl WebRtcManager {
   }
 
   /// Enqueue a control-frame broadcast for a peer whose ECDH handshake
-  /// has not yet completed (Task 19.1 C-1 fix).
+  /// has not yet completed (Task 19.1).
   ///
   /// The queue is bounded by [`PENDING_BROADCAST_LIMIT`] per peer; if
   /// the cap is reached the oldest entry is dropped so a misbehaving
@@ -84,7 +84,7 @@ impl WebRtcManager {
   }
 
   /// Drain and re-broadcast every frame queued for a peer whose ECDH
-  /// handshake just completed (Task 19.1 C-1 fix).
+  /// handshake just completed (Task 19.1).
   ///
   /// Called from [`WebRtcManager::handle_ecdh_key`] immediately after
   /// the shared key is installed. Each queued frame goes through the

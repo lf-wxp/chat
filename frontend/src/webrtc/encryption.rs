@@ -418,7 +418,7 @@ impl PeerCrypto {
     self.key_id
   }
 
-  /// G16: Rotate the ECDH key pair. Generates a fresh key pair,
+  /// Rotate the ECDH key pair. Generates a fresh key pair,
   /// increments the key_id, and returns the new public key bytes so
   /// the caller can send an `EcdhKeyExchange` message to the peer.
   ///
@@ -463,7 +463,7 @@ impl PeerCrypto {
     self.export_public_key().await
   }
 
-  /// G16: Check whether key rotation is due based on a message counter.
+  /// Check whether key rotation is due based on a message counter.
   ///
   /// Rotation is recommended every 1000 messages or every 1 hour,
   /// whichever comes first. The caller is responsible for tracking the

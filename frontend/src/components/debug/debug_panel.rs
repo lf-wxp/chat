@@ -26,7 +26,6 @@ pub struct DebugPanelVisibility(pub RwSignal<bool>);
 /// context inside [`DebugPanel`] itself is not sufficient, because
 /// `provide_context` is only visible to descendants — sibling
 /// components would get `None` and the button would become a silent
-/// no-op (V2-S-3 fix).
 #[must_use]
 pub fn provide_debug_panel_visibility() -> DebugPanelVisibility {
   let visible = RwSignal::new(false);

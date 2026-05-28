@@ -27,7 +27,7 @@ use crate::identicon::generate_identicon_data_uri;
 /// Returned as a `Vec<&'static str>` joined by the caller (via
 /// `parts.join(" ")`) so the helper stays allocation-light for tests.
 /// Exposed as a pure function so the rendering logic is unit-testable
-/// without mounting the component (round-4 coverage fix).
+/// without mounting the component.
 #[must_use]
 pub fn tile_class_parts(
   hero: bool,

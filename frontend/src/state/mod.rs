@@ -206,7 +206,7 @@ pub struct AuthState {
   pub avatar: String,
   /// Custom signature / status message (Req 10.1.6).
   pub signature: String,
-  /// Token expiry timestamp in milliseconds since epoch (G13).
+  /// Token expiry timestamp in milliseconds since epoch.
   /// When the current time approaches this value (within 5 minutes),
   /// the signaling client will proactively re-send `TokenAuth` to
   /// obtain a fresh token without interrupting the session.

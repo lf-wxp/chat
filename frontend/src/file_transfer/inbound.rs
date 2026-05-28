@@ -43,7 +43,7 @@ impl FileTransferManager {
   /// Records the chunk, updates progress, and — once complete —
   /// schedules reassembly + hash verification + blob-URL creation.
   ///
-  /// P2-C fix: if the sender supplies a non-zero per-chunk SHA-256
+  /// if the sender supplies a non-zero per-chunk SHA-256
   /// digest, the receiver validates it before committing the chunk.
   /// A mismatch leaves the slot in `missing_chunks()` so the resume
   /// round re-requests a fresh copy (the full transfer is **not**
@@ -54,7 +54,7 @@ impl FileTransferManager {
     let data = chunk.data;
     let expected_hash = chunk.chunk_hash;
 
-    // G14 — user-initiated pause: drop incoming chunks on the floor
+    // user-initiated pause: drop incoming chunks on the floor
     // (no bitmap update, no buffer write) so the reassembly state
     // freezes at the pause point. On resume the receiver issues a
     // `FileResumeRequest` for the now-missing chunks; any chunks
@@ -136,7 +136,7 @@ impl FileTransferManager {
       return;
     }
 
-    // P2-F fix: re-send the `FileMetadata` frame first so a receiver
+    // re-send the `FileMetadata` frame first so a receiver
     // that missed the original announcement (e.g. the inbound record
     // was dropped during a disconnect race) can re-register the
     // reassembly buffer before the replayed chunks arrive. Metadata
@@ -183,7 +183,7 @@ impl FileTransferManager {
       // `send_chunk_with_retry`, and yielding periodically so the
       // browser keeps the UI thread alive on large resume bursts.
       let chunk_size = tx.info.chunk_size as usize;
-      // P2-C fix: use `now_ms()` on all targets so the native path
+      // use `now_ms()` on all targets so the native path
       // also has proper stall detection. Previously native used
       // `0.0` which made `elapsed_since(start_ms)` always return 0,
       // causing `await_buffer_drained` to never detect a stall.
@@ -255,7 +255,7 @@ impl FileTransferManager {
         reassemble_and_publish(&manager, &peer_clone, &tid_clone, &rx).await;
         // Free chunk memory now that the file is reassembled (F3-5).
         manager.with_inbound_mut(&peer_clone, &tid_clone, |rx| rx.drop_chunks());
-        // P2-D fix: schedule a delayed cleanup that drops terminal
+        // schedule a delayed cleanup that drops terminal
         // inbound records from the manager map. The blob URL remains
         // valid in the browser's URL registry, and the UI's reactive
         // signal clones survive the drop, so the download link keeps
@@ -332,7 +332,7 @@ fn make_blob_url(_bytes: &[u8], _mime: &str) -> Option<String> {
 }
 
 /// Schedule a delayed call to [`FileTransferManager::cleanup_terminal_inbound`]
-/// after `delay_ms` milliseconds (P2-D fix).
+/// after `delay_ms` milliseconds.
 ///
 /// Uses `setTimeout` on WASM to avoid blocking the UI thread. On
 /// native the cleanup runs immediately since tests don't need the

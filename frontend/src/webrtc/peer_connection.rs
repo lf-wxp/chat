@@ -178,7 +178,7 @@ impl PeerConnection {
   pub async fn handle_offer(&self, sdp: &str) -> Result<String, String> {
     let pc = self.get_pc()?;
 
-    // G4 fix: Handle "glare" — if we have a pending local offer when a
+    // Handle "glare" — if we have a pending local offer when a
     // remote offer arrives (both sides tried to renegotiate at the same
     // time), rollback our local description first. This prevents the
     // "m-line order mismatch" error that Chrome raises when
@@ -617,8 +617,7 @@ impl PeerConnection {
   ///
   /// Clears all JS event handlers and drops the stored closures to prevent
   /// memory leaks. Also clears the `data_channel` field so that
-  /// subsequent `close()` calls on a replaced connection are no-ops (P1-18
-  /// fix).
+  /// subsequent `close()` calls on a replaced connection are no-ops.
   pub fn close(&mut self) {
     if let Ok(pc) = self.get_pc() {
       pc.set_onicecandidate(None);

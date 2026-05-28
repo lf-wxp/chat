@@ -433,7 +433,7 @@ impl ChatManager {
       // only member — mark as Sent instead of Failed because the message
       // is stored locally and will be delivered when other members join.
       // For direct conversations, buffer the message for later delivery
-      // when the peer reconnects (G12 offline buffer).
+      // when the peer reconnects.
       if matches!(conv, ConversationId::Room(_)) {
         if let Some(state) = self.inner.borrow().conversations.get(&conv).copied() {
           state.messages.update(|list| {
@@ -443,7 +443,7 @@ impl ChatManager {
           });
         }
       } else {
-        // G12: Buffer the message for replay when the peer reconnects
+        // Buffer the message for replay when the peer reconnects
         // instead of immediately marking as Failed. Cap the buffer at
         // 50 entries to prevent unbounded memory growth — evict the
         // oldest entry and mark it as failed.
@@ -528,7 +528,7 @@ impl ChatManager {
     }
   }
 
-  /// G12: Drain the offline buffer for a specific peer. Called when a
+  /// Drain the offline buffer for a specific peer. Called when a
   /// DataChannel becomes available after reconnection. Replays all
   /// buffered messages targeting the given peer's conversation.
   pub fn drain_offline_buffer_for(&self, peer: &UserId) {

@@ -197,7 +197,7 @@ pub async fn broadcast_file(tx: OutgoingTransfer, webrtc: WebRtcManager) {
 /// Maximum time (ms) the flow-control loop will tolerate
 /// `bufferedAmount` staying above the high-water mark before
 /// declaring the peer stalled and failing the per-peer transfer
-/// (P2-A fix). Prevents an indefinite macrotask spin when the
+/// Prevents an indefinite macrotask spin when the
 /// remote side has silently stopped draining the DataChannel.
 const STALL_TIMEOUT_MS: u64 = 30_000;
 
@@ -229,7 +229,7 @@ pub(crate) async fn wait_for_shared_key(
   // Cap the polling budget on native builds (unit tests) so a
   // missing browser event loop cannot wedge the test in a hot loop
   // when `sleep_ms` and `elapsed_since` are both no-ops
-  // (Task 19.1 H-2 fix).
+  // (Task 19.1).
   #[cfg(not(target_arch = "wasm32"))]
   let mut native_polls = 0u32;
   #[cfg(not(target_arch = "wasm32"))]
@@ -344,7 +344,7 @@ async fn ship_to_peer(tx: &OutgoingTransfer, webrtc: &WebRtcManager, peer: &User
         // reconnect. Wait briefly for the handshake to recover and
         // retry the same slice once before failing the transfer.
         //
-        // P1-5 fix: also handle DataChannel-not-open errors that
+        // also handle DataChannel-not-open errors that
         // occur when the signalling WebSocket drops mid-transfer and
         // both sides' PeerConnections are torn down by
         // `cleanup_webrtc_on_disconnect`.  The auto-resume path
@@ -423,7 +423,7 @@ pub(crate) async fn send_chunk_to_peer(
 
 /// Wait until `bufferedAmount` for the peer drops below the
 /// `BUFFER_HIGH_WATER` mark, yielding to the browser event loop
-/// between observations (Task 19.1 H-3 fix).
+/// between observations (Task 19.1).
 ///
 /// Returns `Ok(())` once the buffer drains, or
 /// `Err(reason)` if the stall exceeds [`STALL_TIMEOUT_MS`] or the
@@ -460,7 +460,7 @@ pub(crate) async fn await_buffer_drained(
 }
 
 /// Send a chunk with one transparent retry on a transient
-/// `no_shared_key` error (Task 19.1 H-3 fix).
+/// `no_shared_key` error (Task 19.1).
 ///
 /// Mirrors the recovery policy of [`ship_to_peer`] so the resume
 /// path can survive a peer's ECDH key being evicted mid-transfer

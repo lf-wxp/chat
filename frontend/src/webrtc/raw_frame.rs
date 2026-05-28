@@ -242,7 +242,7 @@ impl WebRtcManager {
         };
         let peer_name = self.lookup_peer_nickname(&peer_id);
         let local_nick = self.app_state.auth.get_untracked().map(|a| a.nickname);
-        // Resolve conversation from the message's room_id field (G1 fix).
+        // Resolve conversation from the message's room_id field.
         // Room messages carry a room_id so the receiver routes them to the
         // correct room conversation instead of the direct chat.
         let conv = resolve_conv_from_msg(&msg, &peer_id);

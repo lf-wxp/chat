@@ -74,7 +74,7 @@ pub async fn handle_connection_invite<S>(
       .discovery_state
       .merge_bidirectional_invitations(&invite.from, &invite.to);
 
-    // P0-Bug-1 fix: avoid SDP "glare" race by deterministically
+    // avoid SDP "glare" race by deterministically
     // electing exactly one initiator. Without this, both clients
     // would receive `InviteAccepted` and concurrently call
     // `connect_to_peer`, producing two crossed offers.

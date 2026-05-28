@@ -177,7 +177,7 @@ impl CallManager {
       // aggregation rule is strictly "lower rank wins".
       let mut worst_quality: Option<message::types::NetworkQuality> = None;
       for (peer_id, report) in reports {
-        // H4 fix: skip samples whose underlying `getStats()` report
+        // skip samples whose underlying `getStats()` report
         // contained no recognisable entries. Folding these into the
         // aggregate would bias the worst-quality calculation toward
         // an artificial "Excellent" reading and falsely advertise a

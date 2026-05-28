@@ -37,7 +37,7 @@ pub struct IncomingTransfer {
   /// Final reassembled object URL, once the transfer completes.
   pub object_url: RwSignal<Option<String>>,
   /// Whether the *user* has explicitly paused this inbound transfer
-  /// (G14 / Req 6.6 user-initiated pause). When `true`,
+  /// (Req 6.6 user-initiated pause). When `true`,
   /// `FileTransferManager::on_file_chunk` drops incoming chunks on
   /// the floor without committing them to the bitmap, so the
   /// reassembly buffer freezes at the pause point. On resume the
@@ -79,7 +79,7 @@ impl IncomingTransfer {
   /// validates `sha256(data) == expected_hash` before committing
   /// the chunk to the buffer. On mismatch the chunk is **dropped**
   /// (not stored) so that `missing_chunks()` still lists the slot
-  /// and a resume round can request a fresh copy (P2-C fix).
+  /// and a resume round can request a fresh copy.
   pub fn record_chunk(
     &mut self,
     index: u32,

@@ -279,7 +279,7 @@ pub(crate) async fn begin_transfer_async(
         manager: &manager,
       });
     }
-    // P2-E fix: revoke the blob URL on non-Started paths so
+    // revoke the blob URL on non-Started paths so
     // memory is not leaked when the transfer fails to start.
     StartTransferOutcome::NoPeers => {
       let _ = Url::revoke_object_url(&url);

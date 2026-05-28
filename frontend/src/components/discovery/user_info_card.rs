@@ -226,7 +226,7 @@ pub fn UserInfoCard() -> impl IntoView {
               let invite_mgr = invite_mgr_block.clone();
               let blacklist = blacklist_for_block.clone();
               move |_| {
-                // P2-3.2 fix: read `target` untracked inside the
+                // read `target` untracked inside the
                 // event handler so the closure does not subscribe
                 // to it (consistent with `multi_invite_panel.rs` /
                 // `online_users_panel.rs`).
@@ -275,7 +275,7 @@ pub fn UserInfoCard() -> impl IntoView {
               let signaling = signaling_send.clone();
               let invite_mgr = invite_mgr_send.clone();
               move |_| {
-                // P2-3.2 fix: consistent with the block handler,
+                // consistent with the block handler,
                 // read the signals untracked inside the callback.
                 let Some(target_id) = target.get_untracked() else {
                   return;

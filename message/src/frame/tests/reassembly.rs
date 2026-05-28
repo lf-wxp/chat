@@ -387,7 +387,7 @@ fn test_chunk_manager_same_message_different_types() {
 
 #[test]
 fn test_chunk_manager_eviction_policy() {
-  // BUG-001: Verify that ChunkManager evicts the OLDEST buffer
+  // Verify that ChunkManager evicts the OLDEST buffer
   // when MAX_REASSEMBLY_BUFFERS is exceeded.
   let mut manager = ChunkManager::new();
   let message_type: u8 = 0x80;
@@ -464,7 +464,7 @@ fn test_reassembly_buffer_duplicate_chunk_index() {
 
 #[test]
 fn test_reassembly_buffer_overlapping_chunks() {
-  // BUG-002: Test that overlapping chunk data doesn't cause corruption
+  // Test that overlapping chunk data doesn't cause corruption
   let message_id = MessageId::new();
   let mut buffer = ReassemblyBuffer::new(message_id, 100, 2, 0x80);
 

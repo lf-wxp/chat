@@ -168,7 +168,7 @@ pub fn FileCard(
     }
   });
 
-  // G14 — receiver-side user-initiated pause/resume affordances.
+  // receiver-side user-initiated pause/resume affordances.
   // Only inbound, non-terminal transfers expose pause/resume; the
   // sender already has a Cancel button which covers the symmetric
   // outbound case.
@@ -215,7 +215,7 @@ pub fn FileCard(
     TransferStatus::HashMismatch => t_string!(i18n, file.hash_mismatch).to_string(),
   });
 
-  // G15 — save-anyway prompt for inbound files flagged dangerous.
+  // save-anyway prompt for inbound files flagged dangerous.
   // Captured i18n strings + (optional) DialogState pulled from the
   // reactive owner so the async confirm path can run without
   // re-entering the i18n context (which `spawn_local` futures
@@ -336,7 +336,7 @@ pub fn FileCard(
           </button>
         </Show>
 
-        // G14 — receiver-side pause button (in-flight inbound only).
+        // receiver-side pause button (in-flight inbound only).
         <Show when=move || show_pause.get() fallback=|| ()>
           <button
             type="button"
@@ -353,7 +353,7 @@ pub fn FileCard(
           </button>
         </Show>
 
-        // G14 — receiver-side resume button (paused inbound only).
+        // receiver-side resume button (paused inbound only).
         <Show when=move || show_resume.get() fallback=|| ()>
           <button
             type="button"
@@ -417,7 +417,7 @@ pub fn FileCard(
               let dialog = dialog.clone();
               match url {
                 Some(href) if dangerous_inbound => {
-                  // G15 — receiver-side save-anyway confirm. The
+                  // receiver-side save-anyway confirm. The
                   // first click opens a dialog; only after the user
                   // confirms do we synthesise a click on a hidden
                   // <a download> to actually persist the blob.

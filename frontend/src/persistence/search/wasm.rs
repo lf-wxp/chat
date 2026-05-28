@@ -161,7 +161,7 @@ fn drain_batch(
   }
   let scanned = records.len();
   // Use offset=0 for per-batch scoring — the global offset is
-  // applied once at the end of full_scan_search (V5 fix).
+  // applied once at the end of full_scan_search.
   let batch_query = SearchQuery {
     offset: 0,
     ..(**query).clone()

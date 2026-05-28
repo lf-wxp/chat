@@ -118,7 +118,7 @@ pub async fn start_outgoing_transfer(
   // Compute the SHA-256 digest (Req 6.5a) up front so the receiver
   // can verify as soon as reassembly completes. If the hash fails
   // we refuse to start the transfer rather than silently sending a
-  // zero digest (P0 fix from code review).
+  // zero digest.
   let digest = match hash::sha256(&bytes).await {
     Ok(d) => d,
     Err(e) => {

@@ -322,10 +322,10 @@ impl UserStore {
       session.last_seen = Utc::now();
     }
 
-    // W1 fix: Include the user's current nickname in AuthSuccess so that
+    // Include the user's current nickname in AuthSuccess so that
     // clients can update their display name when it has changed on another
     // device (e.g. via a nickname-change API in a future task).
-    // G26 — also include avatar_url so the client's identicon
+    // also include avatar_url so the client's identicon
     // fallback can be replaced with the persisted avatar on
     // reload.
     let (nickname, avatar_url) = self

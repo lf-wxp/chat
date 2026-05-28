@@ -153,7 +153,7 @@ pub fn mentions(names: &[String], target: &str) -> bool {
 /// are found.
 ///
 /// This is used on the outbound path to populate the `mentions` field
-/// on `ChatText` wire messages (G8 fix).
+/// on `ChatText` wire messages.
 pub fn extract_user_ids(
   content: &str,
   mgr: &crate::chat::manager::ChatManager,

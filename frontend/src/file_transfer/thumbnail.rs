@@ -6,7 +6,7 @@
 //! file card loads a small preview instead of decoding the full
 //! original image.
 //!
-//! P2-E fix: uses `canvas.to_blob()` + `URL.createObjectURL()` to
+//! uses `canvas.to_blob()` + `URL.createObjectURL()` to
 //! produce a true `blob:` URL rather than a ~33 %-larger Base64
 //! Data URL, and exposes [`revoke_thumbnail_url`] so callers can
 //! release the blob when the transfer is cancelled or dismissed.

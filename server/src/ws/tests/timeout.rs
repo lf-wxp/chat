@@ -1,4 +1,4 @@
-//! Handler timeout tests (BUG-003).
+//! Handler timeout tests.
 
 use super::*;
 

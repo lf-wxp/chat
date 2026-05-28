@@ -205,7 +205,7 @@ pub fn tokenise(input: &str) -> Vec<String> {
   }
 
   // Deduplicate while preserving first-occurrence order so scoring
-  // remains deterministic (R4 fix).
+  // remains deterministic.
   let mut seen = HashSet::with_capacity(tokens.len());
   tokens.retain(|t| seen.insert(t.clone()));
 

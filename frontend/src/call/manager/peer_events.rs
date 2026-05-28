@@ -127,7 +127,7 @@ impl CallManager {
   /// the active-speaker indicator (Req 3.7) lights up without any
   /// per-component wiring.
   ///
-  /// Round-4 fix: browsers fire `ontrack` once per remote track (audio
+  /// browsers fire `ontrack` once per remote track (audio
   /// and video arrive as two separate events for the same peer), and
   /// mid-call toggles (remote side re-enabling its camera) fire it
   /// again. The previous implementation called
@@ -157,7 +157,7 @@ impl CallManager {
         self.inner.borrow_mut().vad.insert(peer, detector);
       }
       Err(e) => {
-        // M4 fix: in 8-person mesh calls the local client opens up to
+        // in 8-person mesh calls the local client opens up to
         // 7 concurrent `AudioContext`s for VAD, which can exceed
         // Chrome's per-document cap. Failing softly here keeps the
         // call running — the active-speaker indicator simply will
@@ -263,7 +263,7 @@ impl CallManager {
   /// arrived before any RTP track), an entry is created so the flags
   /// are not lost; the entry will gain a `stream` later on `ontrack`.
   ///
-  /// Round-4 fix: ignore broadcasts arriving outside an active/inviting
+  /// ignore broadcasts arriving outside an active/inviting
   /// call. A DataChannel can deliver a handful of buffered messages
   /// after `tear_down_local_media` has cleared `participants`; without
   /// this guard the late message would resurrect an isolated
@@ -290,7 +290,7 @@ impl CallManager {
   /// Update the remote participant's reconnecting flag in response to
   /// a `ReconnectingState` DataChannel broadcast (Req 10.5.24).
   ///
-  /// Round-4 fix: guarded by [`Self::is_call_live`] — see
+  /// guarded by [`Self::is_call_live`] — see
   /// [`Self::on_remote_media_state`] for rationale.
   pub fn on_remote_reconnecting(
     &self,
@@ -321,7 +321,7 @@ impl CallManager {
 
   /// Feed a single per-peer network-quality sample into the app state.
   /// Also stores the raw sample so the UI can display RTT/loss details
-  /// on hover (UX-2 fix, Req 14.10).
+  /// on hover (Req 14.10).
   pub fn on_network_sample(&self, peer: UserId, sample: NetworkStatsSample) {
     self.app_state.network_quality.update(|map| {
       map.insert(peer.clone(), sample.classify());
