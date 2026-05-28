@@ -129,19 +129,13 @@ fn test_discriminator_auth_messages() {
     AUTH_FAILURE
   );
   assert_eq!(
-    SignalingMessage::UserLogout(UserLogout::default()).discriminator(),
+    SignalingMessage::UserLogout(UserLogout).discriminator(),
     USER_LOGOUT
   );
+  assert_eq!(SignalingMessage::Ping(Ping).discriminator(), PING);
+  assert_eq!(SignalingMessage::Pong(Pong).discriminator(), PONG);
   assert_eq!(
-    SignalingMessage::Ping(Ping::default()).discriminator(),
-    PING
-  );
-  assert_eq!(
-    SignalingMessage::Pong(Pong::default()).discriminator(),
-    PONG
-  );
-  assert_eq!(
-    SignalingMessage::SessionInvalidated(SessionInvalidated::default()).discriminator(),
+    SignalingMessage::SessionInvalidated(SessionInvalidated).discriminator(),
     SESSION_INVALIDATED
   );
 }

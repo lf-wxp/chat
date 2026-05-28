@@ -213,10 +213,10 @@ fn test_auth_messages_are_connection_handled() {
   let auth_failure = SignalingMessage::AuthFailure(AuthFailure {
     reason: "invalid".to_string(),
   });
-  let ping = SignalingMessage::Ping(Ping::default());
-  let pong = SignalingMessage::Pong(Pong::default());
-  let session_invalidated = SignalingMessage::SessionInvalidated(SessionInvalidated::default());
-  let logout = SignalingMessage::UserLogout(UserLogout::default());
+  let ping = SignalingMessage::Ping(Ping);
+  let pong = SignalingMessage::Pong(Pong);
+  let session_invalidated = SignalingMessage::SessionInvalidated(SessionInvalidated);
+  let logout = SignalingMessage::UserLogout(UserLogout);
 
   // All of these should match the auth/heartbeat fallthrough arm
   assert!(matches!(token_auth, SignalingMessage::TokenAuth(_)));

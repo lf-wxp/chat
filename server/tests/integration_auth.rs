@@ -202,7 +202,7 @@ async fn test_complete_auth_lifecycle() {
   }
 
   // Step 6: Send Ping and receive Pong
-  let ping_msg = SignalingMessage::Ping(Ping::default());
+  let ping_msg = SignalingMessage::Ping(Ping);
   send_signaling(&mut ws, &ping_msg).await;
 
   // Loop to find Pong response (skip any server heartbeats)
@@ -217,7 +217,7 @@ async fn test_complete_auth_lifecycle() {
   assert!(found_pong, "Expected to receive Pong response");
 
   // Step 7: Send UserLogout
-  let logout_msg = SignalingMessage::UserLogout(message::signaling::UserLogout::default());
+  let logout_msg = SignalingMessage::UserLogout(message::signaling::UserLogout);
   send_signaling(&mut ws, &logout_msg).await;
 
   // Wait for disconnect

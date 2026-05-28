@@ -98,7 +98,7 @@ impl SignalingClient {
     if let Some(ws) = inner_ref.ws.as_ref()
       && ws.ready_state() == WebSocket::OPEN
     {
-      let msg = SignalingMessage::Ping(Ping::default());
+      let msg = SignalingMessage::Ping(Ping);
       match SignalingClient::encode_message(&msg) {
         Ok(uint8) => {
           if ws.send_with_array_buffer(&uint8.buffer()).is_err() {

@@ -49,7 +49,7 @@ fn test_websocket_state_broadcast_empty() {
   let state = create_test_ws_state();
 
   // Broadcast to zero connections should succeed
-  let msg = SignalingMessage::Ping(Ping::default());
+  let msg = SignalingMessage::Ping(Ping);
   let encoded = encode_signaling_message(&msg).unwrap();
   // This should not panic
   let rt = tokio::runtime::Runtime::new().unwrap();
@@ -63,7 +63,7 @@ fn test_websocket_state_send_to_nonexistent_user() {
   let state = create_test_ws_state();
   let user_id = UserId::new();
 
-  let msg = SignalingMessage::Ping(Ping::default());
+  let msg = SignalingMessage::Ping(Ping);
   let encoded = encode_signaling_message(&msg).unwrap();
 
   // Sending to nonexistent user should return false

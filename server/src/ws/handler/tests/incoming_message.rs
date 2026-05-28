@@ -37,7 +37,7 @@ async fn test_handle_pong_message() {
   let mut ctx = TestContext::new();
 
   // Simulate receiving a Pong message
-  let pong_msg = SignalingMessage::Pong(Pong::default());
+  let pong_msg = SignalingMessage::Pong(Pong);
   let encoded = TestContext::create_encoded_message(&pong_msg);
 
   // Record the heartbeat time before

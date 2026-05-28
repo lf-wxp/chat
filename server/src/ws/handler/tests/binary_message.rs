@@ -16,7 +16,7 @@ async fn test_handle_binary_valid_ping() {
   let mut ctx = TestContext::new();
 
   // Create a valid Ping message
-  let ping_msg = SignalingMessage::Ping(message::signaling::Ping::default());
+  let ping_msg = SignalingMessage::Ping(message::signaling::Ping);
   let encoded = TestContext::create_encoded_message(&ping_msg);
 
   // Handle the binary message

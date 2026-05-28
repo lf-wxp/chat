@@ -160,7 +160,7 @@ where
     SignalingMessage::Ping(_) => {
       // Respond with pong
       conn_state.last_heartbeat = Instant::now();
-      let pong_msg = SignalingMessage::Pong(Pong::default());
+      let pong_msg = SignalingMessage::Pong(Pong);
       if let Ok(encoded) = encode_signaling_message(&pong_msg)
         && socket_tx
           .send(Message::Binary(Bytes::from(encoded)))
@@ -217,8 +217,7 @@ where
           // Check if this user is already connected (another session)
           if let Some(existing_sender) = ws_state.get_sender(&user_id) {
             // Send SessionInvalidated to the old connection
-            let invalidated_msg =
-              SignalingMessage::SessionInvalidated(SessionInvalidated::default());
+            let invalidated_msg = SignalingMessage::SessionInvalidated(SessionInvalidated);
             if let Ok(encoded) = encode_signaling_message(&invalidated_msg) {
               let _ = existing_sender.send(encoded).await;
             }

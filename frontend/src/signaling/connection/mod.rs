@@ -367,7 +367,7 @@ impl SignalingClient {
     }
 
     // 2. Send UserLogout signaling message (Req 10.9.35d).
-    let msg = SignalingMessage::UserLogout(UserLogout::default());
+    let msg = SignalingMessage::UserLogout(UserLogout);
     let _ = self.send(&msg);
 
     // 3. Stop user status monitoring (idle checks + activity listeners)

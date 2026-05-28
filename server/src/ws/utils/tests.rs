@@ -20,7 +20,7 @@ fn test_encode_signaling_message() {
 
 #[test]
 fn test_decode_signaling_message() {
-  let msg = SignalingMessage::Ping(Ping::default());
+  let msg = SignalingMessage::Ping(Ping);
   let encoded = encode_signaling_message(&msg).unwrap();
   let frame = decode_frame(&encoded).unwrap();
   let decoded = decode_signaling_message(&frame);
@@ -203,7 +203,7 @@ fn test_encode_decode_roundtrip_user_status_change() {
 
 #[test]
 fn test_encode_decode_roundtrip_pong() {
-  let msg = SignalingMessage::Pong(message::signaling::Pong::default());
+  let msg = SignalingMessage::Pong(message::signaling::Pong);
   let encoded = encode_signaling_message(&msg).unwrap();
   let frame = decode_frame(&encoded).unwrap();
   let decoded = decode_signaling_message(&frame);

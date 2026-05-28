@@ -66,11 +66,11 @@ fn create_auth_session_discriminators() -> Vec<u8> {
       reason: String::new(),
     })
     .discriminator(),
-    SignalingMessage::UserLogout(UserLogout::default()).discriminator(),
-    SignalingMessage::Ping(Ping::default()).discriminator(),
-    SignalingMessage::Pong(Pong::default()).discriminator(),
+    SignalingMessage::UserLogout(UserLogout).discriminator(),
+    SignalingMessage::Ping(Ping).discriminator(),
+    SignalingMessage::Pong(Pong).discriminator(),
     SignalingMessage::ErrorResponse(ErrorResponse::new(SIG001, "x", "t")).discriminator(),
-    SignalingMessage::SessionInvalidated(SessionInvalidated::default()).discriminator(),
+    SignalingMessage::SessionInvalidated(SessionInvalidated).discriminator(),
     SignalingMessage::UserListUpdate(UserListUpdate { users: vec![] }).discriminator(),
     SignalingMessage::UserStatusChange(UserStatusChange {
       user_id: UserId::new(),

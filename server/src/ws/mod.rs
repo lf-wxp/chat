@@ -396,7 +396,7 @@ async fn handle_socket(socket: WebSocket, ws_state: Arc<WebSocketState>, remote_
         }
 
         // Send ping
-        let ping_msg = SignalingMessage::Ping(Ping::default());
+        let ping_msg = SignalingMessage::Ping(Ping);
         if let Ok(encoded) = encode_signaling_message(&ping_msg) {
           if socket_tx.send(Message::Binary(Bytes::from(encoded))).await.is_err() {
             warn!("Failed to send ping");

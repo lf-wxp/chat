@@ -546,6 +546,6 @@ async fn test_active_peers_list_after_connection() {
   sleep(Duration::from_millis(100)).await;
 
   // Verify connection is established by checking they can still communicate
-  let ping = message::signaling::Ping::default();
+  let ping = message::signaling::Ping;
   send_signaling(&mut ws1, &SignalingMessage::Ping(ping)).await;
 }

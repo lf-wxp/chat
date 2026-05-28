@@ -149,14 +149,14 @@ fn encode_message(msg: &SignalingMessage) -> Vec<u8> {
 
 #[test]
 fn test_ping_message_encodes_to_valid_frame() {
-  let msg = SignalingMessage::Ping(Ping::default());
+  let msg = SignalingMessage::Ping(Ping);
   let bytes = encode_message(&msg);
   assert!(!bytes.is_empty(), "Encoded frame should not be empty");
 }
 
 #[test]
 fn test_pong_message_encodes_to_valid_frame() {
-  let msg = SignalingMessage::Pong(Pong::default());
+  let msg = SignalingMessage::Pong(Pong);
   let bytes = encode_message(&msg);
   assert!(!bytes.is_empty(), "Encoded frame should not be empty");
 }
@@ -176,7 +176,7 @@ fn test_token_auth_encodes_to_valid_frame() {
 
 #[test]
 fn test_encode_then_decode_roundtrip() {
-  let msg = SignalingMessage::Ping(Ping::default());
+  let msg = SignalingMessage::Ping(Ping);
   let discriminator = msg.discriminator();
   let encoded = encode_message(&msg);
 
@@ -198,7 +198,7 @@ fn test_encode_then_decode_roundtrip() {
 
 #[test]
 fn test_different_messages_produce_different_frames() {
-  let ping = SignalingMessage::Ping(Ping::default());
+  let ping = SignalingMessage::Ping(Ping);
   let token_auth = SignalingMessage::TokenAuth(TokenAuth {
     token: "token123".to_string(),
   });

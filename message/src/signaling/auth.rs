@@ -1,34 +1,23 @@
-//! Connection & authentication signaling messages.
+//! Authentication signaling messages.
 
 use bitcode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 
+// Re-export UserId from types
 use crate::types::UserId;
 
-/// JWT authentication on WebSocket connect / page refresh.
+// ---------------------------------------------------------
+// Token authentication message types for signaling protocol
+// ---------------------------------------------------------
+
+/// JWT authentication message.
+///
+/// Client sends this immediately after WebSocket connection is established
+/// to authenticate the session. The server responds with `AuthSuccess` or `AuthFailure`.
 #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
 pub struct TokenAuth {
-  /// JWT token for authentication.
+  /// JWT token string.
   pub token: String,
-}
-
-/// One ICE server entry pushed from the server to the client as part
-/// of [`AuthSuccess`]. Mirrors the WebRTC `RTCIceServer` dictionary
-/// (URL plus optional username / credential for TURN auth) so
-/// deployments can configure intranet STUN/TURN endpoints purely via
-/// environment variables (`STUN_TURN_SERVERS`) without a frontend
-/// rebuild.
-///
-/// Wire format: a `Vec<IceServerSpec>` is appended to `AuthSuccess`.
-/// Empty list means the client should keep its compiled-in default.
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
-pub struct IceServerSpec {
-  /// `stun:` or `turn:` / `turns:` URL.
-  pub url: String,
-  /// Optional username (TURN only).
-  pub username: Option<String>,
-  /// Optional credential / shared secret (TURN only).
-  pub credential: Option<String>,
 }
 
 /// Authentication success response.
@@ -36,46 +25,54 @@ pub struct IceServerSpec {
 pub struct AuthSuccess {
   /// Authenticated user ID.
   pub user_id: UserId,
-  /// Authenticated username.
+  /// Username.
   pub username: String,
-  /// Display nickname (may differ from username).
+  /// Display nickname.
   pub nickname: String,
-  /// ICE servers (STUN/TURN) the client should pass to every
-  /// `RTCPeerConnection`. Configured server-side via the
-  /// `STUN_TURN_SERVERS` environment variable. An empty list tells
-  /// the client to use its compiled-in default; this preserves
-  /// backwards compatibility for older deployments where the env
-  /// var is unset.
-  #[serde(default)]
+  /// ICE server configuration for WebRTC.
   pub ice_servers: Vec<IceServerSpec>,
-  /// Persisted avatar URL (data URL or CDN URL). `None` means the
-  /// client should fall back to a username-seeded identicon (G26).
-  /// `#[serde(default)]` keeps older clients backwards-compatible:
-  /// a missing field deserialises to `None`.
-  #[serde(default, skip_serializing_if = "Option::is_none")]
+  /// Avatar URL (data URL or CDN URL).
   pub avatar_url: Option<String>,
 }
 
 /// Authentication failure response.
 #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
 pub struct AuthFailure {
-  /// Failure reason.
+  /// Reason for auth failure.
   pub reason: String,
 }
 
-/// Active logout notification.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
-pub struct UserLogout {}
-
-/// Heartbeat ping.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
-pub struct Ping {}
-
-/// Heartbeat pong.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
-pub struct Pong {}
+/// User logout message.
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Serialize, Deserialize, Default)]
+pub struct UserLogout;
 
 /// Session invalidated by another device login.
-/// Sent to old connection when user logs in from a new device.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
-pub struct SessionInvalidated {}
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Serialize, Deserialize, Default)]
+pub struct SessionInvalidated;
+
+// ---------------------------------------------------------
+// Heartbeat messages
+// ---------------------------------------------------------
+
+/// Heartbeat ping message.
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Serialize, Deserialize, Default)]
+pub struct Ping;
+
+/// Heartbeat pong message.
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Serialize, Deserialize, Default)]
+pub struct Pong;
+
+// ---------------------------------------------------------
+// ICE server specification
+// ---------------------------------------------------------
+
+/// ICE server configuration.
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
+pub struct IceServerSpec {
+  /// Server URL (e.g., "stun:stun.example.com").
+  pub url: String,
+  /// Optional username for TURN server.
+  pub username: Option<String>,
+  /// Optional credential for TURN server.
+  pub credential: Option<String>,
+}

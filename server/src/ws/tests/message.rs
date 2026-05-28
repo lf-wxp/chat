@@ -20,7 +20,7 @@ fn test_encode_signaling_message() {
 
 #[test]
 fn test_decode_signaling_message() {
-  let msg = SignalingMessage::Ping(Ping::default());
+  let msg = SignalingMessage::Ping(Ping);
   let encoded = encode_signaling_message(&msg).unwrap();
   let frame = decode_frame(&encoded).unwrap();
   let decoded = decode_signaling_message(&frame);
@@ -31,7 +31,7 @@ fn test_decode_signaling_message() {
 
 #[test]
 fn test_session_invalidated_message() {
-  let msg = SignalingMessage::SessionInvalidated(SessionInvalidated::default());
+  let msg = SignalingMessage::SessionInvalidated(SessionInvalidated);
   let result = encode_signaling_message(&msg);
   assert!(result.is_ok());
 
@@ -52,7 +52,7 @@ fn test_session_invalidated_message() {
 #[test]
 fn test_ping_message_encoding() {
   // Test that Ping message can be encoded correctly
-  let ping_msg = SignalingMessage::Ping(Ping::default());
+  let ping_msg = SignalingMessage::Ping(Ping);
   let result = encode_signaling_message(&ping_msg);
   assert!(result.is_ok());
 
@@ -65,7 +65,7 @@ fn test_ping_message_encoding() {
 #[test]
 fn test_pong_message_encoding() {
   // Test that Pong message can be encoded correctly
-  let pong_msg = SignalingMessage::Pong(Pong::default());
+  let pong_msg = SignalingMessage::Pong(Pong);
   let result = encode_signaling_message(&pong_msg);
   assert!(result.is_ok());
 
