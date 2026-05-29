@@ -8,15 +8,15 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # Leptos framework (CSR + WASM)
-leptos = {version = "0.8.19", features = ["csr"]}
+leptos = {version = "0.8", features = ["csr"]}
 leptos_i18n = {version = "0.6.2", features = ["csr"]}
-leptos_meta = "0.8.6"
-leptos_router = "0.8.13"
+leptos_meta = "0.8"
+leptos_router = "0.8"
 
 # Leptos utility hooks (VueUse-style). Only the features we actually use
 # are enabled so the WASM bundle doesn't pull in `use_clipboard`,
 # `use_websocket`, `use_color_mode`, etc. that come with the default set.
-leptos-use = {version = "0.18.3", default-features = false, features = [
+leptos-use = {version = "0.18", default-features = false, features = [
   "use_event_listener",
   "use_document",
   "use_interval_fn",
@@ -28,44 +28,44 @@ leptos-use = {version = "0.18.3", default-features = false, features = [
 
 # Icon library — only pull in the icon sets we actually use to avoid
 # macOS linker symbol-name overflow (ld: Assertion failed: name.size() <= maxLength)
-icondata = {version = "0.7.0", default-features = false, features = ["lucide", "ico-moon-free"]}
-leptos_icons = "0.7.1"
+icondata = {version = "0.7", default-features = false, features = ["lucide", "ico-moon-free"]}
+leptos_icons = "0.7"
 
-js-sys = "0.3.97"
-wasm-bindgen = "0.2.120"
-wasm-bindgen-futures = "0.4.70"
+js-sys = "0.3"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
 
 # Serialization
-serde = {version = "1.0.228", features = ["derive"]}
-serde_json = "1.0.149"
+serde = {version = "1.0", features = ["derive"]}
+serde_json = "1.0"
 
 # Date & time
-chrono = {version = "0.4.44", features = ["wasmbind"]}
+chrono = {version = "0.4", features = ["wasmbind"]}
 
 # Base64 decoding (JWT payload) — replaces window.atob() for correct UTF-8 handling
-base64 = "0.22.1"
+base64 = "0.22"
 
 # UUID generation (js feature enables wasm-bindgen support for WASM targets)
 uuid = {workspace = true, features = ["v4"]}
 
 # Bitcode codec for binary WebSocket messages
-bitcode = "0.6.9"
+bitcode = "0.6"
 
 # Async utilities (join_all for concurrent broadcast). Frontend is WASM, so
 # we disable futures' default `executor`/`thread-pool` features to avoid
 # pulling in std thread-based code paths.
-futures = {version = "0.3.32", default-features = false, features = ["std", "async-await"]}
+futures = {version = "0.3", default-features = false, features = ["std", "async-await"]}
 
 # SHA-256 for native unit tests (WASM uses SubtleCrypto via web-sys).
 sha2 = {workspace = true}
 
 # Hex encoding / decoding (file hash persistence)
-hex = "0.4.3"
+hex = "0.4"
 
 # Forward Rust panics to the browser console with file/line location so
 # WASM RuntimeError stack traces can be traced back to their source
 # (invaluable for diagnosing silent panics inside `spawn_local` tasks).
-console_error_panic_hook = "0.1.7"
+console_error_panic_hook = "0.1"
 
 # Shared message crate (includes signaling, datachannel, etc.)
 message = {path = "../message", features = ["wasm"]}
@@ -93,9 +93,7 @@ features = [
   "Performance",
   "Blob",
   "BlobPropertyBag",
-  "Url",
-
-  # Events
+  "Url", # Events
   "Event",
   "KeyboardEvent",
   "MessageEvent",
@@ -103,20 +101,14 @@ features = [
   "DragEvent",
   "PointerEvent",
   "MouseEvent",
-  "AddEventListenerOptions",
-
-  # WebSocket & Signaling
+  "AddEventListenerOptions", # WebSocket & Signaling
   "WebSocket",
   "BinaryType",
-  "DomException",
-
-  # HTTP Fetch API
+  "DomException", # HTTP Fetch API
   "Request",
   "RequestInit",
   "Response",
-  "Headers",
-
-  # WebRTC
+  "Headers", # WebRTC
   "RtcPeerConnection",
   "RtcConfiguration",
   "RtcDataChannel",
@@ -136,9 +128,7 @@ features = [
   "RtcPeerConnectionState",
   "RtcOfferOptions",
   "RtcRtpSender",
-  "RtcTrackEvent",
-
-  # Media streams (call + screen share)
+  "RtcTrackEvent", # Media streams (call + screen share)
   "MediaStream",
   "MediaStreamConstraints",
   "MediaStreamTrack",
@@ -146,31 +136,22 @@ features = [
   "MediaDeviceInfo",
   "DisplayMediaStreamConstraints",
   "MediaTrackConstraints",
-  "HtmlVideoElement",
-
-  # Web Audio (call VAD, Req 7.3)
+  "HtmlVideoElement", # Web Audio (call VAD, Req 7.3)
   "AudioContext",
   "AnalyserNode",
   "AudioNode",
-  "MediaStreamAudioSourceNode",
-
-  # Voice recording (Task 16 — Opus capture + waveform)
+  "MediaStreamAudioSourceNode", # Voice recording (Task 16 — Opus capture + waveform)
   "MediaRecorder",
   "MediaRecorderOptions",
   "BlobEvent",
-  "RecordingState",
-
-  # Web Crypto API
+  "RecordingState", # Web Crypto API
   "Crypto",
   "CryptoKey",
   "SubtleCrypto",
   "Algorithm",
   "EcKeyGenParams",
   "EcdhKeyDeriveParams",
-
-  "console",
-
-  # Chat UI (Task 16)
+  "console", # Chat UI (Task 16)
   "HtmlTextAreaElement",
   "HtmlInputElement",
   "HtmlMediaElement",
@@ -180,20 +161,14 @@ features = [
   "ImageData",
   "ScrollIntoViewOptions",
   "ScrollBehavior",
-  "ScrollLogicalPosition",
-
-  # Clipboard & drag-and-drop
+  "ScrollLogicalPosition", # Clipboard & drag-and-drop
   "Clipboard",
   "DataTransfer",
   "File",
   "FileList",
-  "FileReader",
-
-  # Cache API (sticker asset caching, Task 16 P8)
+  "FileReader", # Cache API (sticker asset caching, Task 16 P8)
   "Cache",
-  "CacheStorage",
-
-  # IndexedDB (Task 17 — message persistence)
+  "CacheStorage", # IndexedDB (Task 17 — message persistence)
   "IdbFactory",
   "IdbDatabase",
   "IdbOpenDbRequest",
@@ -207,31 +182,25 @@ features = [
   "IdbVersionChangeEvent",
   "IdbKeyRange",
   "IdbCursorDirection",
-  "IdbCursorWithValue",
-
-  # Storage quota API
+  "IdbCursorWithValue", # Storage quota API
   "StorageManager",
-  "StorageEstimate",
-
-  # Resize observer (virtual scroll height measurement)
+  "StorageEstimate", # Resize observer (virtual scroll height measurement)
   "ResizeObserver",
   "ResizeObserverEntry",
-  "DomRectReadOnly",
-
-  # Browser Notification API (Req 7.4 — incoming-call OS notification)
+  "DomRectReadOnly", # Browser Notification API (Req 7.4 — incoming-call OS notification)
   "Notification",
   "NotificationOptions",
   "NotificationPermission",
   "VisibilityState",
 ]
-version = "0.3.97"
+version = "0.3"
 
 [dev-dependencies]
-wasm-bindgen-test = "0.3.70"
+wasm-bindgen-test = "0.3"
 
 [build-dependencies]
-leptos_i18n_build = {version = "0.6.2", features = ["csr"]}
-leptos_i18n_parser = "0.6.2"
+leptos_i18n_build = {version = "0.6", features = ["csr"]}
+leptos_i18n_parser = "0.6"
 
 [package.metadata.leptos-i18n]
 default = "en"

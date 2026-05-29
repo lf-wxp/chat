@@ -497,10 +497,12 @@ pub fn cleanup_old_logs(
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
+/// use server::logging::desensitize_jwt;
+///
 /// let token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U";
 /// let desensitized = desensitize_jwt(token);
-/// // Result: "eyJhbGci******hsR8U"
+/// assert_eq!(desensitized, "eyJhbGci****sR8U");
 /// ```
 #[must_use]
 pub fn desensitize_jwt(token: &str) -> String {
@@ -517,10 +519,12 @@ pub fn desensitize_jwt(token: &str) -> String {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
+/// use server::logging::mask_ip;
+///
 /// let ip = "192.168.1.100";
 /// let masked = mask_ip(ip);
-/// // Result: "192.168.1.xxx"
+/// assert_eq!(masked, "192.168.1.xxx");
 /// ```
 #[must_use]
 pub fn mask_ip(ip: &str) -> String {

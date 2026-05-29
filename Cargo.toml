@@ -12,78 +12,78 @@ version = "0.1.0"
 
 [workspace.dependencies]
 # Async runtime
-tokio = {version = "1.52.3", features = ["full"]}
+tokio = {version = "1.52", features = ["full"]}
 
 # Web framework
-axum = {version = "0.8.9", features = ["ws", "macros"]}
-axum-extra = {version = "0.12.6", features = ["typed-header"]}
-tower = {version = "0.5.3", features = ["util"]}
-tower-http = {version = "0.6.10", features = ["fs", "cors", "trace"]}
+axum = {version = "0.8", features = ["ws", "macros"]}
+axum-extra = {version = "0.12", features = ["typed-header"]}
+tower = {version = "0.5", features = ["util"]}
+tower-http = {version = "0.6", features = ["fs", "cors", "trace"]}
 
 # Serialization
-bitcode = {version = "0.6.9", features = ["serde", "uuid"]}
-serde = {version = "1.0.228", features = ["derive"]}
-serde_json = "1.0.149"
+bitcode = {version = "0.6", features = ["serde", "uuid"]}
+serde = {version = "1.0", features = ["derive"]}
+serde_json = "1.0"
 
 # Frontend framework (WASM)
 leptos = "0.8.19"
 leptos_i18n = "0.6.2"
-leptos_meta = "0.8"
-leptos_router = "0.8"
+leptos_meta = "0.8.6"
+leptos_router = "0.8.13"
 
 # WASM bindings
-js-sys = "0.3.98"
-wasm-bindgen = "0.2.121"
-wasm-bindgen-futures = "0.4.71"
-web-sys = "0.3.98"
+js-sys = "0.3"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+web-sys = "0.3"
 
 # Logging and tracing
-tracing = "0.1.44"
-tracing-appender = "0.2.5"
-tracing-subscriber = {version = "0.3.23", features = ["env-filter", "json"]}
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = {version = "0.3", features = ["env-filter", "json"]}
 
 # Error handling
 anyhow = "1.0.102"
 thiserror = "2.0.18"
 
 # UUID and identifiers
-uuid = {version = "1.23.1", features = ["v4", "v5", "serde"]}
+uuid = {version = "1.23", features = ["v4", "v5", "serde"]}
 
 # Cryptography
-argon2 = {version = "0.5.3", features = ["std"]}
-base64 = "0.22.1"
-getrandom = {version = "0.4.2", features = ["wasm_js"]}
-hmac = "0.13.0"
-jsonwebtoken = {version = "10.4.0", features = ["aws_lc_rs"]}
-rand = "0.10.1"
-sha2 = "0.11.0"
+argon2 = {version = "0.5", features = ["std"]}
+base64 = "0.22"
+getrandom = {version = "0.4", features = ["wasm_js"]}
+hmac = "0.13"
+jsonwebtoken = {version = "10.4", features = ["aws_lc_rs"]}
+rand = "0.10"
+sha2 = "0.11"
 # Data structures
-dashmap = "6.1"
-indexmap = "2.14.0"
-smallvec = {version = "1.15.1", features = ["serde"]}
+dashmap = "6.2"
+indexmap = "2.14"
+smallvec = {version = "1.15", features = ["serde"]}
 
 # Time handling
-chrono = {version = "0.4.44", features = ["serde"]}
-time = "0.3.47"
+chrono = {version = "0.4", features = ["serde"]}
+time = "0.3"
 
 # Validation
 validator = {version = "0.20", features = ["derive"]}
 
 # Async utilities
-async-trait = "0.1.89"
-futures = "0.3.32"
-pin-project-lite = "0.2.17"
-tokio-util = {version = "0.7.18", features = ["rt"]}
+async-trait = "0.1"
+futures = "0.3"
+pin-project-lite = "0.2"
+tokio-util = {version = "0.7", features = ["rt"]}
 
 # Testing
-criterion = "0.8.2"
-serial_test = "3.4.0"
-tempfile = "3.27.0"
-tokio-tungstenite = "0.29.0"
-wasm-bindgen-test = "0.3.68"
+criterion = "0.8"
+serial_test = "3.4"
+tempfile = "3.27"
+tokio-tungstenite = "0.29"
+wasm-bindgen-test = "0.3"
 
 # Build tools
-trunk = "0.21.14"
+trunk = "0.21"
 
 [workspace.lints.rust]
 missing_docs = "warn"

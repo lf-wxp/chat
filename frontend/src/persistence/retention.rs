@@ -52,7 +52,9 @@ pub fn quota_fallback_count(total_messages: usize) -> usize {
 /// on the magnitude of the input value.
 ///
 /// # Examples
-/// ```ignore
+/// ```
+/// use chat_frontend::persistence::retention::format_bytes;
+///
 /// assert_eq!(format_bytes(1024), "1.00 KB");
 /// assert_eq!(format_bytes(5 * 1024 * 1024), "5.00 MB");
 /// ```

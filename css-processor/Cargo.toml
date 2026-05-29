@@ -1,18 +1,18 @@
 [package]
-name = "css-processor"
-version = "0.1.0"
-edition = "2024"
 description = "CSS preprocessor that expands CSS Modules `composes` property using LightningCSS"
+edition = "2024"
+name = "css-processor"
 publish = false
+version = "0.1.0"
 
 [[bin]]
 name = "css-processor"
 path = "src/main.rs"
 
 [dependencies]
-lightningcss = "1.0.0-alpha.66"
-anyhow = "1.0.102"
-notify = "8.0.0"
-notify-debouncer-mini = "0.6.0"
+anyhow = "1.0"
+lightningcss = "1.0.0-alpha.71"
+notify = "8.2"
+notify-debouncer-mini = "0.7"
 [dev-dependencies]
-tempfile = "3.27.0"
+tempfile = "3.27"
