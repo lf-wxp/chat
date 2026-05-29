@@ -76,19 +76,18 @@ pub async fn handle_sdp_offer<S>(
       .any(|inv| inv.from == sdp_offer.from);
 
     if !has_pending && !has_received {
-      warn!(
+      // Both users are online (target connectivity already checked above).
+      // This likely means the sender refreshed and the peer relationship
+      // was cleared on disconnect. Re-establish it automatically to allow
+      // seamless reconnection after page refresh.
+      debug!(
         from = %sdp_offer.from,
         to = %sdp_offer.to,
-        "SDP offer sent without active peer relationship or pending invitation"
+        "Re-establishing peer relationship for SDP offer (likely page refresh recovery)"
       );
-      send_error_response(
-        socket_tx,
-        "SIG103",
-        "No active connection with target user",
-        Some("no_peer_relationship"),
-      )
-      .await;
-      return;
+      ws_state
+        .discovery_state
+        .add_active_peer(&sdp_offer.from, &sdp_offer.to);
     }
   }
 

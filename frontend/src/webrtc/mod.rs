@@ -1035,24 +1035,20 @@ impl WebRtcManager {
     // both the connection and a stable signaling state under the same
     // borrow to avoid TOCTOU.
     //
-    // ICE restart glare handling: if the local side has already sent an
-    // ICE restart offer (signaling_state == HaveLocalOffer) and the
-    // remote also sends a restart offer, rollback the local offer and
-    // accept the remote one. This follows RFC 5763 / RFC 8445.
-    let renegotiation_pc = {
-      let inner = self.inner.borrow();
-      inner.connections.get(&peer_id).and_then(|pc| {
-        let rtc = pc.get_rtc_pc().ok()?;
-        let state = rtc.signaling_state();
-        let can_renegotiate = state == web_sys::RtcSignalingState::Stable
-          || state == web_sys::RtcSignalingState::HaveLocalOffer;
-        if can_renegotiate {
-          Some(pc.clone())
-        } else {
-          None
-        }
-      })
-    };
+    // Renegotiation fast path is intentionally disabled.
+    //
+    // When the remote peer refreshes, they send a brand-new SDP offer.
+    // The local DataChannel and ICE state may still appear healthy for
+    // several seconds (browser hasn't detected the remote end closing),
+    // making it impossible to reliably distinguish "peer refreshed" from
+    // "peer is adding a media track". Always tearing down and rebuilding
+    // guarantees correct behaviour for the common reconnection case.
+    //
+    // For mid-session media additions (calls), the initiator's
+    // `negotiationneeded` event will trigger a new offer → the answerer
+    // tears down and rebuilds → the call subsystem re-attaches tracks
+    // via `on_peer_connected`. This is slightly slower but always correct.
+    let renegotiation_pc: Option<PeerConnection> = None;
 
     if let Some(pc) = renegotiation_pc {
       // ICE restart glare: if we have a pending local offer, rollback
@@ -1221,6 +1217,18 @@ impl WebRtcManager {
       pc
     }; // inner borrow dropped here
 
+    // Store connection BEFORE handle_offer so that the `ondatachannel`
+    // callback (which fires during `setRemoteDescription` inside
+    // `handle_offer`) can find the connection in `inner.connections`
+    // and properly store the DataChannel on it. PeerConnection is
+    // Clone and shares the underlying RtcPeerConnection via JsValue,
+    // so mutations from handle_offer are visible through the stored clone.
+    self
+      .inner
+      .borrow_mut()
+      .connections
+      .insert(peer_id.clone(), pc.clone());
+
     // Handle offer and create answer (await without holding RefCell borrow)
     let answer_sdp = pc.handle_offer(sdp).await.map_err(|e| {
       WebRtcError::new(
@@ -1229,13 +1237,6 @@ impl WebRtcManager {
         Some(peer_id.clone()),
       )
     })?;
-
-    // Store connection
-    self
-      .inner
-      .borrow_mut()
-      .connections
-      .insert(peer_id.clone(), pc);
 
     // Apply any trickle-ICE candidates that arrived during the
     // multi-await PC setup above. See
@@ -1539,20 +1540,47 @@ impl WebRtcManager {
     };
 
     // Store crypto and pending key, then clear in-progress flag.
-    {
+    //
+    // RACE CONDITION GUARD: while we were awaiting the async crypto
+    // operations above, the remote peer's ECDH key may have arrived
+    // via `handle_ecdh_key`, which would have already inserted a
+    // fully-established crypto (with the peer's public key imported
+    // and the shared secret derived). If that happened, we must NOT
+    // overwrite it with our half-baked crypto that only has our local
+    // key pair. Instead, just clear the in-progress flag and bail out.
+    let crypto_already_established = {
       let mut inner = self.inner.borrow_mut();
-      inner.crypto.insert(peer_id.clone(), crypto);
-      if !dc_already_open {
-        // DataChannel not yet open — buffer the key for the onopen callback.
-        inner.pending_ecdh_keys.insert(
-          peer_id.clone(),
-          PendingEcdh {
-            public_key: public_key.clone(),
-            started_at_ms: js_sys::Date::now(),
-          },
-        );
+      if inner.crypto.contains_key(&peer_id) {
+        // Another path (handle_ecdh_key) already completed the
+        // handshake. Don't overwrite — just clean up.
+        inner.ecdh_in_progress.remove(&peer_id);
+        true
+      } else {
+        inner.crypto.insert(peer_id.clone(), crypto);
+        if !dc_already_open {
+          // DataChannel not yet open — buffer the key for the onopen callback.
+          inner.pending_ecdh_keys.insert(
+            peer_id.clone(),
+            PendingEcdh {
+              public_key: public_key.clone(),
+              started_at_ms: js_sys::Date::now(),
+            },
+          );
+        }
+        inner.ecdh_in_progress.remove(&peer_id);
+        false
       }
-      inner.ecdh_in_progress.remove(&peer_id);
+    };
+
+    if crypto_already_established {
+      web_sys::console::log_1(
+        &format!(
+          "[webrtc] ECDH for peer {} already completed by handle_ecdh_key, skipping insert",
+          peer_id
+        )
+        .into(),
+      );
+      return Ok(());
     }
 
     // If the DataChannel is already open, send the key immediately.
@@ -1661,6 +1689,11 @@ impl WebRtcManager {
 
     inner.crypto.remove(peer_id);
     inner.pending_ecdh_keys.remove(peer_id);
+    // Clear any in-progress ECDH flag so the new connection's
+    // `handle_data_channel_open` can proactively initiate a fresh
+    // exchange. Without this, a stale flag from the old connection
+    // would prevent the handshake from starting.
+    inner.ecdh_in_progress.remove(peer_id);
     // Task 19.1 C-1 — discard any queued control frames so a peer
     // that drops out mid-handshake cannot leak memory via
     // `pending_broadcast`.

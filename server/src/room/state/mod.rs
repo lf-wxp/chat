@@ -303,6 +303,16 @@ impl RoomState {
     self.rooms.get(room_id).map(|r| r.get_members())
   }
 
+  /// Set a member's nickname in a room. Used to fix the owner's nickname
+  /// after room creation (Room::new defaults to empty string).
+  pub fn set_member_nickname_in_room(&self, room_id: &RoomId, user_id: &UserId, nickname: String) {
+    if let Some(mut room) = self.rooms.get_mut(room_id)
+      && let Some(member) = room.get_member_mut(user_id)
+    {
+      member.nickname = nickname;
+    }
+  }
+
   /// Check if user has permission to perform an action.
   #[must_use]
   pub fn check_permission(

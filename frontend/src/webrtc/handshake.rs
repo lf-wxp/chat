@@ -38,7 +38,21 @@ impl WebRtcManager {
     let has_existing = self.inner.borrow().crypto.contains_key(&peer_id);
 
     if has_existing {
-      // Re-keying: remove, update, and re-insert to avoid holding borrow across await
+      // Re-keying: remove, update, and re-insert to avoid holding borrow across await.
+      // This path is hit when we already have crypto for this peer. Two cases:
+      //
+      // 1. INITIATOR side: A called `initiate_ecdh_exchange` (which inserted
+      //    crypto with only our local key pair, has_shared_key=false), and now
+      //    B's response key arrives. We import B's key to derive the shared
+      //    secret. We do NOT send our key back because A already sent it.
+      //
+      // 2. ANSWERER side after peer refresh: B had crypto for A from the
+      //    previous session (has_shared_key=true). A refreshed and sent a
+      //    brand-new key. B must re-derive the shared secret AND send its
+      //    own key back so A can also derive the shared secret.
+      //
+      // We distinguish the two cases by checking has_shared_key() on the
+      // existing crypto BEFORE importing the new peer key.
       let mut crypto = self
         .inner
         .borrow_mut()
@@ -52,6 +66,10 @@ impl WebRtcManager {
           )
         })?;
 
+      // If we already had a shared key, this is case 2 (answerer after peer
+      // refresh). We need to send our key back.
+      let need_send_back = crypto.has_shared_key();
+
       crypto
         .import_peer_public_key(public_key)
         .await
@@ -63,11 +81,31 @@ impl WebRtcManager {
           )
         })?;
 
-      self
-        .inner
-        .borrow_mut()
-        .crypto
-        .insert(peer_id.clone(), crypto);
+      if need_send_back {
+        // Export our public key to send back (case 2)
+        let our_public_key = crypto.export_public_key().await.map_err(|e| {
+          WebRtcError::new(
+            ErrorCode::new(ErrorModule::E2e, ErrorCategory::Security, 1),
+            format!("Failed to export public key (re-key): {}", e),
+            Some(peer_id.clone()),
+          )
+        })?;
+
+        self
+          .inner
+          .borrow_mut()
+          .crypto
+          .insert(peer_id.clone(), crypto);
+
+        // Send our public key back so the peer can derive the shared secret
+        self.send_datachannel_ecdh_key_direct(peer_id.clone(), &our_public_key);
+      } else {
+        self
+          .inner
+          .borrow_mut()
+          .crypto
+          .insert(peer_id.clone(), crypto);
+      }
     } else {
       // First time: create crypto and import peer's public key (all async, no borrow held)
       let mut crypto = PeerCrypto::new(peer_id.clone()).await.map_err(|e| {
@@ -161,8 +199,6 @@ impl WebRtcManager {
 
     let inner = self.inner.borrow();
     let Some(pc) = inner.connections.get(&peer_id) else {
-      // No connection at all — nothing we can do here; callers log the
-      // missing-peer case when they first look the peer up.
       return;
     };
 
@@ -170,11 +206,6 @@ impl WebRtcManager {
       // DataChannel not yet created. Drop the borrow before mutating
       // `pending_ecdh_keys` to avoid a nested borrow.
       drop(inner);
-      debug_assert!(
-        false,
-        "send_datachannel_ecdh_key_direct invoked before DataChannel exists for peer {}",
-        peer_id
-      );
       self.buffer_pending_ecdh_key(peer_id, public_key.to_vec());
       return;
     };
@@ -182,11 +213,6 @@ impl WebRtcManager {
     if dc.ready_state() != RtcDataChannelState::Open {
       // DataChannel exists but not yet Open. Same safety net as above.
       drop(inner);
-      debug_assert!(
-        false,
-        "send_datachannel_ecdh_key_direct invoked while DataChannel is not Open for peer {}",
-        peer_id
-      );
       self.buffer_pending_ecdh_key(peer_id, public_key.to_vec());
       return;
     }

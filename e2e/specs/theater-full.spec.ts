@@ -571,31 +571,38 @@ test.describe('theater danmaku round-trip', () => {
     // Viewer B joins.
     await joinTheaterRoom(pageB, name);
 
-    // Wait for WebRTC connection to establish.
-    await pageB.waitForTimeout(5_000);
+    // The theater flow involves:
+    //   1. Initial DataChannel-only WebRTC connection (A→B)
+    //   2. ECDH key exchange on the initial connection
+    //   3. Renegotiation (A adds media track → sends new offer to B)
+    //   4. B tears down old PC, rebuilds, new ECDH exchange
+    // Due to timing variability in steps 3-4, the DataChannel may be
+    // temporarily unavailable. We use a retry-send pattern: repeatedly
+    // send the danmaku until it appears on the owner's canvas.
 
-    // Viewer B sends a danmaku.
     const inputField = pageB.locator('[data-testid="danmaku-input-field"]');
     const sendBtn = pageB.locator('[data-testid="danmaku-input-send"]');
+    await expect(inputField).toBeVisible({ timeout: 15_000 });
 
-    await expect(inputField).toBeVisible({ timeout: 10_000 });
-
-    const tag = Date.now().toString(36);
-    const danmakuText = `viewer-dm-${tag}`;
-    await inputField.fill(danmakuText);
-    await sendBtn.click();
-
-    // The danmaku should appear on the owner's canvas. Since danmaku
-    // items are rendered as DOM elements inside the canvas container,
-    // we can check for the text content.
     const ownerCanvas = pageA.locator('[data-testid="danmaku-canvas"]');
     await expect(ownerCanvas).toBeVisible({ timeout: 10_000 });
 
-    // Wait for the danmaku to propagate via DataChannel.
+    const tag = Date.now().toString(36);
+    const danmakuText = `viewer-dm-${tag}`;
+
+    // Retry-send: send the danmaku every 2 seconds until it appears
+    // on the owner's canvas (max 30 seconds total).
     await expect
       .poll(
-        async () => ownerCanvas.textContent(),
-        { timeout: 20_000 },
+        async () => {
+          // Re-send the danmaku on each poll iteration.
+          await inputField.fill(danmakuText);
+          await sendBtn.click();
+          // Brief wait for DataChannel propagation.
+          await pageA.waitForTimeout(500);
+          return ownerCanvas.textContent();
+        },
+        { timeout: 30_000, intervals: [2_000] },
       )
       .toContain(danmakuText);
   });

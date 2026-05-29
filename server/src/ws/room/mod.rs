@@ -26,11 +26,23 @@ pub async fn handle_create_room<S>(
   S: Sink<Message> + Unpin,
   S::Error: Display,
 {
+  // Get user's display name from user store (same as join_room).
+  let nickname = ws_state
+    .user_store
+    .get_user(user_id)
+    .map(|u| u.username.clone())
+    .unwrap_or_else(|| "Anonymous".to_string());
+
   match ws_state
     .room_state
     .create_room(&create_room, user_id.clone())
   {
     Ok((room_id, room_info)) => {
+      // Set the owner's nickname (Room::new defaults to empty string).
+      ws_state
+        .room_state
+        .set_member_nickname_in_room(&room_id, user_id, nickname);
+
       // Send RoomCreated response
       let created_msg = SignalingMessage::RoomCreated(message::signaling::RoomCreated {
         room_id: room_id.clone(),

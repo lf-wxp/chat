@@ -168,8 +168,30 @@ pub fn handle_signaling_message(
         });
       }
     }
-    SignalingMessage::OwnerChanged(_) | SignalingMessage::MuteStatusChange(_) => {
-      log_debug("Room response received");
+    SignalingMessage::OwnerChanged(_) => {
+      log_debug("OwnerChanged received (state already updated via RoomMemberUpdate)");
+    }
+    SignalingMessage::MuteStatusChange(mute_change) => {
+      log_debug("MuteStatusChange received, updating local room_members");
+      if mute_change.mute_info.is_muted() {
+        let duration_secs = match &mute_change.mute_info {
+          message::types::MuteInfo::Timed { expires_at_nanos } => {
+            let now_nanos = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
+            let remaining_nanos = expires_at_nanos.saturating_sub(now_nanos);
+            Some((remaining_nanos / 1_000_000_000).max(1) as u64)
+          }
+          message::types::MuteInfo::Permanent => None,
+          message::types::MuteInfo::NotMuted => None,
+        };
+        apply_mute_update(
+          app_state,
+          mute_change.room_id,
+          mute_change.target,
+          duration_secs,
+        );
+      } else {
+        apply_unmute(app_state, mute_change.room_id, mute_change.target);
+      }
     }
 
     // ── Error Response ──
@@ -694,6 +716,38 @@ fn recover_active_peers(
       .filter(|p| online_user_ids.contains(p))
       .collect()
   };
+
+  // Fallback: if the server-provided list is empty (e.g. after a page
+  // refresh where the server cleared active peers on disconnect), look
+  // at local conversations to find peers we should reconnect to. This
+  // covers the common "refresh recovery" scenario where the user had
+  // active chats before the page reload.
+  let peers: Vec<message::UserId> = if peers.is_empty() && !online_user_ids.is_empty() {
+    let conversation_peers: Vec<message::UserId> =
+      app_state.conversations.with_untracked(|convs| {
+        convs
+          .iter()
+          .filter_map(|conv| {
+            if let crate::state::ConversationId::Direct(peer_id) = &conv.id
+              && online_user_ids.contains(peer_id)
+            {
+              return Some(peer_id.clone());
+            }
+            None
+          })
+          .collect()
+      });
+    if !conversation_peers.is_empty() {
+      log_debug(&format!(
+        "[signaling] Falling back to {} local conversation peer(s) for recovery",
+        conversation_peers.len()
+      ));
+    }
+    conversation_peers
+  } else {
+    peers
+  };
+
   if peers.is_empty() {
     log_debug("[signaling] No active peers to recover (all offline)");
     app_state.reconnecting.set(false);
@@ -737,7 +791,7 @@ fn recover_active_peers(
 
         wasm_bindgen_futures::spawn_local(async move {
           if let Err(e) = mgr.connect_to_peer(pid).await {
-            web_sys::console::warn_1(&format!("[webrtc] Recovery connection failed: {}", e).into());
+            log_debug(&format!("[webrtc] Recovery connection failed: {}", e));
             // Surface mesh-capacity rejections to the user (Req 3.10).
             if e.is_mesh_limit() {
               toast.show_error_message_with_key(

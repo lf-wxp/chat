@@ -5,7 +5,6 @@
  * clickable `<a>` elements with `target="_blank"` and `rel="noopener"`.
  */
 
-import { sel } from '../utils/selectors.ts';
 import { establishConnection, registerAndLogin, sendAndVerifyMessage } from '../fixtures/helpers.ts';
 import { expect, test } from '../fixtures/test-base.ts';
 
