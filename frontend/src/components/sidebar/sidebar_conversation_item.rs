@@ -136,6 +136,9 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
     Signal::derive(move || app_state.active_conversation.get() == Some(conv_id_active.clone()));
 
   let menu_open = RwSignal::new(false);
+  // Trigger button reference so the popover menu can compute its
+  // fixed-position coordinates (see `SidebarConversationMenu`).
+  let menu_trigger_ref = NodeRef::<leptos::html::Button>::new();
   // G21 — delete confirmation modal. Local to this row so the
   // dialog is reachable even when there is no active chat view.
   let delete_modal_open = RwSignal::new(false);
@@ -274,7 +277,8 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
       // Context menu trigger
       <button
         type="button"
-        class="sidebar-conversation-actions-btn"
+        node_ref=menu_trigger_ref
+        class="sidebar-conversation-actions-btn dropdown-menu-trigger"
         aria-haspopup="menu"
         aria-expanded=move || if menu_open.get() { "true" } else { "false" }
         aria-label=move || t_string!(i18n, sidebar.open_conversation_actions)
@@ -303,6 +307,7 @@ pub fn SidebarConversationItem(conversation: crate::state::Conversation) -> impl
           archived=archived_sig
           open=menu_open
           on_delete=Callback::new(move |_: ()| delete_modal_open.set(true))
+          trigger=menu_trigger_ref
         />
       </Show>
 

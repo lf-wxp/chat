@@ -187,11 +187,18 @@ features = [
   "StorageEstimate", # Resize observer (virtual scroll height measurement)
   "ResizeObserver",
   "ResizeObserverEntry",
+  "DomRect",
   "DomRectReadOnly", # Browser Notification API (Req 7.4 — incoming-call OS notification)
   "Notification",
   "NotificationOptions",
   "NotificationPermission",
-  "VisibilityState",
+  "VisibilityState", # WebGL (background effects — Light Rays / Gradient Waves / Particles)
+  "WebGl2RenderingContext",
+  "WebGlBuffer",
+  "WebGlProgram",
+  "WebGlShader",
+  "WebGlUniformLocation",
+  "WebGlVertexArrayObject",
 ]
 version = "0.3"
 

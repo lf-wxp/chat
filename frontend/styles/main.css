@@ -33,6 +33,7 @@
 @import url("./components/chat-view.css") layer(components);
 @import url("./components/sidebar.css") layer(components);
 @import url("./components/conversation-menu.css") layer(components);
+@import url("./components/dropdown-menu.css") layer(components);
 @import url("./components/top-bar.css") layer(components);
 @import url("./components/drawer.css") layer(components);
 @import url("./components/settings-background.css") layer(components);

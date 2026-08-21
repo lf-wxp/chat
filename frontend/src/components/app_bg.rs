@@ -20,6 +20,7 @@
 
 use leptos::prelude::*;
 
+use crate::components::webgl_background::WebGlBackground;
 use crate::settings::use_settings_state;
 use crate::state::use_app_state;
 
@@ -62,9 +63,13 @@ pub fn AppBg() -> impl IntoView {
     wasm_impl::cleanup_object_url();
   });
 
+  let effects = Signal::derive(move || settings.get().background.effects);
+  let waves = Signal::derive(move || settings.get().background.waves);
+
   view! {
     <div class="app-bg" aria-hidden="true" data-testid="app-bg">
       <div class="app-bg__image"></div>
+      <WebGlBackground effects waves />
       <div class="app-bg__overlay"></div>
     </div>
   }

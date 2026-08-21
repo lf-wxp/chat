@@ -6,8 +6,10 @@
 //! updates local auth state, persists it to localStorage and
 //! broadcasts the change via signaling.
 
+use icondata as i;
 use leptos::prelude::*;
 use leptos_i18n::{t, t_string};
+use leptos_icons::Icon;
 use message::error::validation::validate_nickname;
 
 use crate::error_handler::use_error_toast_manager;
@@ -135,7 +137,8 @@ pub fn NicknameEditor() -> impl IntoView {
           on:click=move |_| handle_save()
           data-testid="nickname-editor-save"
         >
-          {t!(i18n, common.save)}
+          <Icon icon=i::LuCheck />
+          <span>{t!(i18n, common.save)}</span>
         </button>
       </div>
     </section>

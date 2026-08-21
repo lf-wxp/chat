@@ -1,0 +1,142 @@
+/**
+ * Generic anchored dropdown menu.
+ *
+ * Companion stylesheet for `components/dropdown_menu.rs`. Provides the
+ * visual chrome (popover panel, items, hover / danger states, entrance
+ * animation) for any anchored menu in the app. Behaviour (positioning,
+ * dismissal) lives in the Rust component.
+ */
+
+/* ── Popover panel ──
+ * `position: fixed` so the menu escapes `overflow: hidden` /
+ * `backdrop-filter` containing blocks on ancestors. The inline
+ * `left` / `top` are computed from the trigger's bounding rect by the
+ * Rust component. */
+.dropdown-menu {
+  position: fixed;
+  z-index: var(--z-popover, 500);
+  display: flex;
+  flex-direction: column;
+  /* Wide enough that a typical action label ("Mute notifications")
+     stays on one line, narrow enough to still read as a compact
+     popover. */
+  min-width: 11.5rem;
+  max-width: min(16rem, calc(100vw - 2 * var(--space-4, 1rem)));
+  padding: var(--space-1, 0.25rem);
+  /* Background / border / box-shadow are owned by the effects layer
+   * (glass.css); shape tokens and layout stay here. */
+  border-radius: var(--radius-lg, 0.5rem);
+  /* Entrance animation: springs up from the trigger. */
+  animation: dropdown-menu-enter var(--duration-slow, 300ms)
+    var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+}
+
+@starting-style {
+  .dropdown-menu {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes dropdown-menu-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(0) scale(1.02);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Opening upward (near viewport bottom) flips the entrance transform
+   so the popover still appears to grow out of the trigger. */
+.dropdown-menu--above {
+  animation-name: dropdown-menu-enter-above;
+}
+
+@keyframes dropdown-menu-enter-above {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(0) scale(1.02);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Menu item ── */
+.dropdown-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+  width: 100%;
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md, 0.375rem);
+  color: var(--text-primary, #0f172a);
+  font-size: var(--font-sm, 0.875rem);
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast, 150ms) var(--ease-default, ease);
+  /* Keep labels on one line — truncation is the correct escape hatch
+     for over-long translations. A two-line menu item looks broken
+     rather than informative. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdown-menu__item:hover,
+.dropdown-menu__item:focus-visible {
+  background-color: var(--bg-tertiary, #f1f5f9);
+}
+
+.dropdown-menu__item:focus-visible {
+  outline: 2px solid var(--color-primary, #3b82f6);
+  outline-offset: -2px;
+}
+
+.dropdown-menu__item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dropdown-menu__item svg {
+  width: 1rem;
+  height: 1rem;
+  color: var(--text-secondary, #475569);
+  flex-shrink: 0;
+}
+
+/* Danger variant — destructive action (Delete / Revoke / Leave).
+   Hover reveals a tinted red background and matching icon/label so
+   the destructive affordance is unmistakable before the click lands. */
+.dropdown-menu__item--danger:hover,
+.dropdown-menu__item--danger:focus-visible {
+  background-color: color-mix(in oklch, var(--color-error, #ef4444) 8%, transparent);
+  color: var(--color-error, #ef4444);
+}
+
+.dropdown-menu__item--danger:hover svg,
+.dropdown-menu__item--danger:focus-visible svg {
+  color: var(--color-error, #ef4444);
+}
+
+/* Reduced motion: disable the entrance animation */
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-menu {
+    animation: none;
+  }
+}

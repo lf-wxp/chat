@@ -420,6 +420,37 @@ fn background_settings_sanitised_clamps_overlay_alpha() {
 }
 
 #[test]
+fn background_settings_default_has_wave_defaults() {
+  let s = BackgroundSettings::default();
+  assert_eq!(
+    s.waves,
+    crate::settings::background_waves::WaveConfig::default()
+  );
+}
+
+#[test]
+fn background_settings_sanitised_delegates_to_wave_config() {
+  // Detailed per-field clamp coverage lives in
+  // `settings::background_waves::tests` — this test only checks
+  // that `BackgroundSettings::sanitised()` actually calls through.
+  let waves = crate::settings::background_waves::WaveConfig {
+    scale: 999.0,
+    ..crate::settings::background_waves::WaveConfig::default()
+  };
+  let s = BackgroundSettings {
+    waves,
+    ..BackgroundSettings::default()
+  };
+  assert_eq!(
+    s.sanitised().waves,
+    crate::settings::background_waves::WaveConfig {
+      scale: crate::settings::background_waves::BACKGROUND_WAVE_SCALE_MAX,
+      ..crate::settings::background_waves::WaveConfig::default()
+    }
+  );
+}
+
+#[test]
 fn background_settings_solid_without_color_falls_back_to_preset() {
   let s = BackgroundSettings {
     mode: BackgroundMode::Solid,
@@ -624,6 +655,12 @@ fn background_settings_serde_round_trip_preserves_all_fields() {
       solid_color: Some("#112233".into()),
       ..BackgroundVariantData::default()
     })),
+    effects: crate::settings::BackgroundEffects::Waves,
+    waves: crate::settings::background_waves::WaveConfig {
+      scale: 1.4,
+      ratio: 3.0,
+      ..crate::settings::background_waves::WaveConfig::default()
+    },
   };
   let json = serde_json::to_string(&original).expect("serialise");
   let decoded: BackgroundSettings = serde_json::from_str(&json).expect("deserialise");

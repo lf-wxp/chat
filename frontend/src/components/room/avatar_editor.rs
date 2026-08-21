@@ -11,9 +11,11 @@
 //! resolver and the cap goes away — the `AvatarChange` protocol
 //! field is already `Option<String>` so no break-change is needed.
 
+use icondata as i;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use leptos_i18n::{t, t_string};
+use leptos_icons::Icon;
 use wasm_bindgen::{JsCast, prelude::Closure};
 use web_sys::{Event, FileReader, HtmlInputElement, ProgressEvent};
 
@@ -22,10 +24,12 @@ use crate::i18n;
 use crate::signaling::use_signaling_client;
 use crate::state::use_app_state;
 
-/// Hard cap on the encoded data-URL payload size. 16 KiB is enough
-/// for a 64×64 WebP avatar at q≈80 while staying well below the
-/// server's 64 KiB defensive ceiling.
-const MAX_AVATAR_BYTES: usize = 16 * 1024;
+/// Hard cap on the encoded data-URL payload size. 48 KiB is enough
+/// for a 192×192 WebP avatar at q≈85 while leaving ~25 % headroom
+/// under the server's 64 KiB defensive ceiling (base64 inflates
+/// ~33 %, so a 64 KiB raw file maps to ~85 KiB encoded — the raw
+/// cap below stops that pathological case before it hits the wire).
+const MAX_AVATAR_BYTES: usize = 48 * 1024;
 
 /// Allowed MIME prefixes — keeps `<input accept="image/*">` honest
 /// against a user who edits the file dialog to pick a non-image.
@@ -83,12 +87,12 @@ pub fn AvatarEditor() -> impl IntoView {
     let Some(file) = files.get(0) else { return };
 
     // Cheap up-front size check on the raw file bytes — saves the
-    // base64 round-trip when the input is clearly oversized. Base64
-    // inflation is ~33 %, so a raw 32 KiB cap maps to ~43 KiB
-    // encoded, still under the server's 64 KiB limit but loose
-    // enough to give the client-side `validate_avatar_data_url`
-    // the authoritative say.
-    if file.size() as usize > 32 * 1024 {
+    // base64 round-trip when the input is clearly oversized. The
+    // 64 KiB raw cap is deliberately loose: the authoritative
+    // `validate_avatar_data_url` below enforces the tighter 48 KiB
+    // encoded cap, which is the number that actually has to stay
+    // under the server's 64 KiB ceiling.
+    if file.size() as usize > 64 * 1024 {
       toast.show_error_message_with_key(
         "PRO001",
         "settings.avatar_too_large",
@@ -184,35 +188,83 @@ pub fn AvatarEditor() -> impl IntoView {
     saving.set(false);
   };
 
+  // Reference to the hidden <input type="file"> so the visible
+  // "Choose image" button can trigger the native picker without
+  // exposing the unstyleable default control.
+  let file_input_ref = NodeRef::<leptos::html::Input>::new();
+  let trigger_file_picker = move |_| {
+    if let Some(input) = file_input_ref.get() {
+      input.click();
+    }
+  };
+
   view! {
     <section class="avatar-editor" data-testid="avatar-editor">
       <label class="avatar-editor__label" for="avatar-editor-input">
         {t!(i18n, settings.avatar)}
       </label>
       <div class="avatar-editor__row">
-        <img
-          class="avatar avatar-md avatar-editor__preview"
-          src=move || current_avatar.get()
-          alt=move || t_string!(i18n, settings.avatar_preview_alt)
-          data-testid="avatar-editor-preview"
-        />
+        // Show a placeholder user icon when no avatar is set so the
+        // preview slot never looks like an empty hole. When an avatar
+        // exists we render the image; otherwise the icon fills the
+        // same `.avatar-md` box.
+        {move || {
+          let src = current_avatar.get();
+          if src.is_empty() {
+            view! {
+              <div
+                class="avatar avatar-md avatar-editor__preview avatar-editor__preview--empty"
+                role="img"
+                aria-label=move || t_string!(i18n, settings.avatar_preview_alt)
+                data-testid="avatar-editor-preview"
+              >
+                <Icon icon=i::LuUser attr:class="avatar-editor__preview-icon" />
+              </div>
+            }.into_any()
+          } else {
+            view! {
+              <img
+                class="avatar avatar-md avatar-editor__preview"
+                src=src
+                alt=move || t_string!(i18n, settings.avatar_preview_alt)
+                data-testid="avatar-editor-preview"
+              />
+            }.into_any()
+          }
+        }}
         <div class="avatar-editor__actions">
+          // Visually-hidden but still keyboard-accessible — the styled
+          // button below triggers the picker via .click().
           <input
             id="avatar-editor-input"
+            node_ref=file_input_ref
             class="avatar-editor__file-input"
             type="file"
             accept="image/*"
             on:change=handle_file_change
             data-testid="avatar-editor-input"
+            aria-hidden="true"
+            tabindex="-1"
           />
           <button
             type="button"
-            class="btn btn--ghost"
+            class="btn btn--secondary avatar-editor__choose-btn"
+            disabled=move || saving.get()
+            on:click=trigger_file_picker
+            data-testid="avatar-editor-choose"
+          >
+            <Icon icon=i::LuImagePlus />
+            <span>{t!(i18n, settings.avatar_choose)}</span>
+          </button>
+          <button
+            type="button"
+            class="btn btn--ghost avatar-editor__remove-btn"
             disabled=move || saving.get()
             on:click=handle_remove
             data-testid="avatar-editor-remove"
           >
-            {t!(i18n, settings.avatar_remove)}
+            <Icon icon=i::LuTrash2 />
+            <span>{t!(i18n, settings.avatar_remove)}</span>
           </button>
         </div>
       </div>
@@ -253,8 +305,8 @@ mod tests {
 
   #[test]
   fn validate_rejects_oversized_payload() {
-    // 17 KiB encoded → over the 16 KiB cap.
-    let big = format!("data:image/webp;base64,{}", "A".repeat(17 * 1024));
+    // 49 KiB encoded → over the 48 KiB cap.
+    let big = format!("data:image/webp;base64,{}", "A".repeat(49 * 1024));
     assert_eq!(
       validate_avatar_data_url(&big),
       Err("settings.avatar_too_large")
@@ -263,7 +315,7 @@ mod tests {
 
   #[test]
   fn validate_allows_exactly_at_cap() {
-    // Encoded payload exactly at the 16 KiB cap is OK — `>` not `>=`.
+    // Encoded payload exactly at the 48 KiB cap is OK — `>` not `>=`.
     let prefix = "data:image/webp;base64,";
     let body_len = MAX_AVATAR_BYTES - prefix.len();
     let exactly = format!("{prefix}{}", "A".repeat(body_len));

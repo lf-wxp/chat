@@ -330,10 +330,21 @@ description = "Run all tests (unit + integration + WASM)"
 workspace = false
 
 [tasks.test-unit]
-args = ["test", "--lib"]
-command = "cargo"
-description = "Run unit tests for all workspace members"
+description = "Run unit tests for all workspace members (skips bin-only crates)"
 workspace = false
+script = '''
+#!/bin/bash
+# cargo-make runs this once per workspace member (workspace = false) with
+# cwd = the member crate dir. `cargo test --lib` fails on crates that have
+# no library target (e.g. css-processor is bin-only). Detect that case and
+# skip so the rest of the workspace still runs its unit tests.
+set -euo pipefail
+if ! cargo read-manifest 2>/dev/null | grep -q '"kind":\s*\[\s*"lib"'; then
+  echo "[test-unit] No lib target in $(basename "$PWD") — skipping."
+  exit 0
+fi
+exec cargo test --lib
+'''
 
 [tasks.test-integration]
 args = ["test", "--workspace", "--test", "*", "--exclude", "chat-frontend"]
@@ -411,9 +422,20 @@ def get_keys(obj, prefix=""):
             keys.add(full)
     return keys
 
-with open("frontend/locales/en.json") as f:
+import os
+
+# cargo-make runs this task once per workspace member (workspace = false),
+# with the cwd set to the member crate directory (e.g. `message/`,
+# `server/`). Anchor the locale paths to the repository root so the check
+# succeeds regardless of which member's cwd the script is invoked from.
+_ROOT = os.path.dirname(os.path.abspath(__file__))
+# cargo-make materialises the script in a temp dir, so __file__ is not
+# inside the repo. Prefer the workspace-root env var it exports.
+_ROOT = os.environ.get("CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY", _ROOT)
+
+with open(os.path.join(_ROOT, "frontend/locales/en.json")) as f:
     en_keys = get_keys(json.load(f))
-with open("frontend/locales/zh-CN.json") as f:
+with open(os.path.join(_ROOT, "frontend/locales/zh-CN.json")) as f:
     zh_keys = get_keys(json.load(f))
 
 missing_in_zh = en_keys - zh_keys

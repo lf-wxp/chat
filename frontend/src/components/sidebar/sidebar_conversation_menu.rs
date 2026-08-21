@@ -7,26 +7,19 @@
 //! The conversation state mutations themselves live on [`AppState`] so
 //! the menu is purely presentational and can be unit-tested against the
 //! same toggle methods used elsewhere in the app.
+//!
+//! Positioning / dismissal are provided by the generic
+//! [`DropdownMenu`] component; this file only owns the conversation-
+//! specific action wiring.
 
+use crate::components::dropdown_menu::{DropdownMenu, DropdownMenuItem};
 use crate::i18n;
 use crate::state::{ConversationId, MAX_PINS, use_app_state};
 use icondata as i;
-use leptos::ev;
+use leptos::html;
 use leptos::prelude::*;
 use leptos_i18n::t_string;
 use leptos_icons::Icon;
-use leptos_use::use_event_listener;
-use wasm_bindgen::JsCast;
-use web_sys::Element;
-
-/// Returns whether an event target is nested inside the menu popover
-/// or its trigger button. Exposed as a pure function so the outside-
-/// click heuristic can be exercised without a DOM (the parameter
-/// emulates the closest-matching selector probe).
-#[must_use]
-pub fn is_inside_menu_chrome(inside_menu: bool, on_trigger: bool) -> bool {
-  inside_menu || on_trigger
-}
 
 /// Decision emitted by [`pin_click_action`] for the click handler on
 /// the "Pin" menu item.
@@ -72,6 +65,8 @@ pub fn pin_click_action(currently_pinned: bool, at_cap: bool) -> PinClickAction 
 ///   `ModalWrapper`) so the menu can stay decoupled from any global
 ///   `DialogState` and remains usable from sidebar paths that mount
 ///   without an active chat view (G21).
+/// * `trigger` — reference to the more-actions button so the generic
+///   [`DropdownMenu`] can compute its fixed-position coordinates.
 #[component]
 pub fn SidebarConversationMenu(
   conversation_id: ConversationId,
@@ -80,6 +75,7 @@ pub fn SidebarConversationMenu(
   archived: Signal<bool>,
   open: RwSignal<bool>,
   on_delete: Callback<()>,
+  trigger: NodeRef<html::Button>,
 ) -> impl IntoView {
   let app_state = use_app_state();
   let i18n = i18n::use_i18n();
@@ -102,50 +98,6 @@ pub fn SidebarConversationMenu(
         .with(|list| list.iter().filter(|c| c.pinned).count() >= MAX_PINS)
     }
   });
-
-  // Close the menu on Escape. `stop_propagation()` prevents the
-  // global Escape handler (app.rs) from also firing — without it,
-  // a modal underneath would close simultaneously (review §3.1).
-  let _ = use_event_listener(
-    leptos_use::use_window(),
-    ev::keydown,
-    move |ev: web_sys::KeyboardEvent| {
-      if crate::utils::safe_key(&ev) == "Escape" && open.get_untracked() {
-        open.set(false);
-        ev.stop_propagation();
-      }
-    },
-  );
-
-  // Close on outside pointer-down. We inspect the event target to let
-  // clicks on the menu itself or the trigger button pass through —
-  // the trigger is handled by the parent row and would otherwise flap
-  // the menu open-and-closed on a single click.
-  let _ = use_event_listener(
-    leptos_use::use_window(),
-    ev::pointerdown,
-    move |ev: web_sys::PointerEvent| {
-      if !open.get_untracked() {
-        return;
-      }
-      let Some(target) = ev.target().and_then(|t| t.dyn_into::<Element>().ok()) else {
-        return;
-      };
-      let inside_menu = target
-        .closest(".sidebar-conversation-menu")
-        .ok()
-        .flatten()
-        .is_some();
-      let on_trigger = target
-        .closest(".sidebar-conversation-actions-btn")
-        .ok()
-        .flatten()
-        .is_some();
-      if !is_inside_menu_chrome(inside_menu, on_trigger) {
-        open.set(false);
-      }
-    },
-  );
 
   let id_for_pin = conversation_id.clone();
   let id_for_mute = conversation_id.clone();
@@ -175,20 +127,14 @@ pub fn SidebarConversationMenu(
   let delete_label = move || t_string!(i18n, sidebar.delete);
 
   view! {
-    <div
-      class="sidebar-conversation-menu"
-      role="menu"
-      aria-orientation="vertical"
-      on:click=move |ev: ev::MouseEvent| ev.stop_propagation()
-      data-testid="sidebar-conversation-menu"
+    <DropdownMenu
+      open=open
+      trigger=trigger
+      estimated_items=4
+      testid="sidebar-conversation-menu"
     >
-      <button
-        type="button"
-        class="sidebar-conversation-menu__item"
-        role="menuitem"
-        aria-label=pin_label
-        aria-disabled=move || if pin_at_cap.get() { "true" } else { "false" }
-        data-testid="sidebar-conversation-menu-pin"
+      <DropdownMenuItem
+        aria_label=pin_label()
         title=move || {
           if pin_at_cap.get() {
             t_string!(i18n, sidebar.pin_limit_reached)
@@ -196,9 +142,10 @@ pub fn SidebarConversationMenu(
             pin_label()
           }
         }
-        on:click={
+        testid="sidebar-conversation-menu-pin"
+        on_click={
           let id = id_for_pin;
-          move |_| {
+          Callback::new(move |_: ()| {
             // Req 7.7c — drive the user-visible feedback through the
             // pure `pin_click_action` decision helper so the toast /
             // toggle behaviour is unit-testable in isolation.
@@ -217,84 +164,68 @@ pub fn SidebarConversationMenu(
               }
             }
             open.set(false);
-          }
+          })
         }
       >
         <Icon icon=i::LuPin />
         <span>{pin_label}</span>
-      </button>
+      </DropdownMenuItem>
 
-      <button
-        type="button"
-        class="sidebar-conversation-menu__item"
-        role="menuitem"
-        aria-label=mute_label
-        title=mute_label
-        data-testid="sidebar-conversation-menu-mute"
-        on:click={
+      <DropdownMenuItem
+        aria_label=mute_label()
+        title=mute_label()
+        testid="sidebar-conversation-menu-mute"
+        on_click={
           let id = id_for_mute;
-          move |_| {
+          Callback::new(move |_: ()| {
             app_state.toggle_mute(&id);
             open.set(false);
-          }
+          })
         }
       >
         <Icon icon=move || if muted.get() { i::LuBell } else { i::LuBellOff } />
         <span>{mute_label}</span>
-      </button>
+      </DropdownMenuItem>
 
-      <button
-        type="button"
-        class="sidebar-conversation-menu__item"
-        role="menuitem"
-        aria-label=archive_label
-        title=archive_label
-        data-testid="sidebar-conversation-menu-archive"
-        on:click={
+      <DropdownMenuItem
+        aria_label=archive_label()
+        title=archive_label()
+        testid="sidebar-conversation-menu-archive"
+        on_click={
           let id = id_for_archive;
-          move |_| {
+          Callback::new(move |_: ()| {
             app_state.toggle_archive(&id);
             open.set(false);
-          }
+          })
         }
       >
         <Icon icon=i::LuArchive />
         <span>{archive_label}</span>
-      </button>
+      </DropdownMenuItem>
 
       // G21 — Delete conversation. Closes the menu first so the
       // outside-click listener does not race the modal that the
       // parent will open.
-      <button
-        type="button"
-        class="sidebar-conversation-menu__item sidebar-conversation-menu__item--danger"
-        role="menuitem"
-        aria-label=delete_label
-        title=delete_label
-        data-testid="sidebar-conversation-menu-delete"
-        on:click=move |_| {
+      <DropdownMenuItem
+        danger=true
+        aria_label=delete_label()
+        title=delete_label()
+        testid="sidebar-conversation-menu-delete"
+        on_click=Callback::new(move |_: ()| {
           open.set(false);
           on_delete.run(());
-        }
+        })
       >
         <Icon icon=i::LuTrash2 />
         <span>{delete_label}</span>
-      </button>
-    </div>
+      </DropdownMenuItem>
+    </DropdownMenu>
   }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
-
-  #[test]
-  fn outside_click_detector_respects_menu_chrome() {
-    assert!(is_inside_menu_chrome(true, false));
-    assert!(is_inside_menu_chrome(false, true));
-    assert!(is_inside_menu_chrome(true, true));
-    assert!(!is_inside_menu_chrome(false, false));
-  }
 
   // ── T3: pin click decision matrix ──
 

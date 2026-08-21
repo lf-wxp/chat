@@ -19,18 +19,28 @@
 
 /* Mobile adjustments for chat view */
 @media (max-width: 767px) {
+	/* Composer becomes flush with the screen edge so the keyboard
+	   toolbar and the home indicator have room to breathe. Side
+	   margins collapse to a slim gutter; bottom uses safe-area so
+	   the composer sits on the home-indicator line, not under it. */
 	.chat-input-bar {
-		padding: var(--space-2, 0.5rem);
+		margin: 0 var(--space-2, 0.5rem)
+			calc(var(--space-2, 0.5rem) + env(safe-area-inset-bottom, 0px));
+		padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+		border-radius: var(--radius-lg, 0.5rem);
 	}
 
 	.chat-input-textarea {
-		min-height: 32px;
+		min-height: 36px;
 		max-height: 120px;
 	}
 
+	/* Larger touch targets on coarse pointers — Apple HIG minimum
+	   44×44pt. We land at 40×40 because the surrounding padding
+	   brings the effective area to 44. */
 	.chat-input-btn {
-		width: 32px;
-		height: 32px;
+		width: 40px;
+		height: 40px;
 	}
 
 	.message-image {
@@ -66,6 +76,11 @@
 	}
 }
 
+/* ── Empty state ──
+ * Replaces the previous bare icon+text with a centered hero block:
+ * large gradient-tinted icon + short headline + subtle hint. Kept
+ * visually quiet so it doesn't compete with the sidebar affordance
+ * that actually drives the next action. */
 .chat-view-empty {
 	display: flex;
 	flex-direction: column;
@@ -73,24 +88,59 @@
 	justify-content: center;
 	height: 100%;
 	width: 100%;
-	min-height: 200px;
-	color: var(--text-tertiary, #94a3b8);
+	min-height: 240px;
+	color: var(--text-tertiary, #64748b);
 	font-size: var(--font-sm, 0.875rem);
 	text-align: center;
 	gap: var(--space-3, 0.75rem);
-	padding: var(--space-4, 1rem);
+	padding: var(--space-6, 2rem) var(--space-4, 1rem);
+	animation: fade-in-up var(--duration-slow, 300ms) var(--ease-out-expo) both;
 }
 
 .chat-view-empty svg {
-	width: 36px;
-	height: 36px;
-	opacity: 0.5;
+	width: 48px;
+	height: 48px;
+	/* Soft gradient "halo" behind the icon so it reads as a designed
+	   illustration rather than a lone glyph. */
+	padding: 14px;
+	box-sizing: content-box;
+	border-radius: var(--radius-full, 9999px);
+	background: linear-gradient(
+		135deg,
+		color-mix(in oklch, var(--color-primary, #3b82f6) 12%, transparent) 0%,
+		color-mix(in oklch, var(--color-primary, #3b82f6) 5%, transparent) 100%
+	);
+	color: var(--color-primary, #3b82f6);
+	opacity: 0.85;
 }
 
 .chat-view-scroll {
 	position: relative;
 	overflow-y: auto;
 	overscroll-behavior-y: contain;
+	/* Soft top fade — as messages scroll up they dip under a gradient
+	   instead of being hard-clipped, which gives the list a polished,
+	   "infinite canvas" feel. Implemented via a pseudo-element so the
+	   fade overlays content without needing an extra DOM node. */
+}
+
+.chat-view-scroll::before {
+	content: "";
+	position: sticky;
+	top: 0;
+	display: block;
+	height: 24px;
+	margin-bottom: -24px;
+	background: linear-gradient(
+		180deg,
+		var(--bg-primary, #ffffff) 0%,
+		transparent 100%
+	);
+	pointer-events: none;
+	z-index: 2;
+	/* Keep the fade inside the grid/flex flow: it spans the full
+	   scrollport width. */
+	grid-column: 1 / -1;
 }
 
 /* ── Mention ── */
@@ -144,41 +194,56 @@
 	font-weight: var(--font-weight-medium, 500);
 }
 
-/* ── Message actions (hover toolbar) ── */
+/* ── Message actions (hover toolbar) ──
+ * Floating pill that appears above the bubble's top-trailing corner
+ * on hover. Fade+slide entrance keeps it from feeling "bolt-on".
+ * Keyboard users get the same reveal via :focus-within. */
 .message-row {
 	position: relative;
 }
 
 .message-actions {
-	display: none;
+	display: inline-flex;
 	position: absolute;
-	top: -8px;
-	right: 4px;
+	top: -14px;
+	right: 8px;
 	gap: 1px;
 	background: var(--bg-elevated, #ffffff);
 	border: 1px solid var(--border-color, #e2e8f0);
-	border-radius: var(--radius-md, 0.375rem);
-	padding: 1px 3px;
-	box-shadow: var(--shadow-md);
+	border-radius: var(--radius-lg, 0.5rem);
+	padding: 2px 4px;
+	box-shadow: var(--shadow-lg);
 	z-index: var(--z-dropdown, 100);
 	white-space: nowrap;
+	/* Hidden-but-animated: opacity + slight rise replaces display:none
+	   so the entrance transition can run. */
+	opacity: 0;
+	transform: translateY(4px);
+	pointer-events: none;
+	transition:
+		opacity var(--duration-fast, 150ms) var(--ease-default, ease),
+		transform var(--duration-fast, 150ms) var(--ease-default, ease);
 }
 
 .message-row-incoming .message-actions {
 	right: auto;
-	left: 4px;
+	left: 8px;
 }
 
 .message-row:hover .message-actions,
 .message-row:focus-within .message-actions {
-	display: inline-flex;
+	opacity: 1;
+	transform: translateY(0);
+	pointer-events: auto;
 }
 
 /* On touch/mobile: always show message actions so they're accessible
    without hover. Use a more compact layout to save space. */
 @media (max-width: 767px) {
 	.message-actions {
-		display: inline-flex;
+		opacity: 1;
+		transform: none;
+		pointer-events: auto;
 		top: -16px;
 		right: 0;
 		box-shadow: var(--shadow-md);
@@ -251,23 +316,92 @@
 	opacity: 1;
 }
 
-/* ── Typing Indicator ── */
+/* ── Typing Indicator ──
+ * Appears above the input bar. Three bouncing dots sit alongside the
+ * "{name} is typing…" copy — the dots carry the "alive" cue so the
+ * text can stay terse. `hidden` collapses the strip entirely, so
+ * transitions run on the inner span which is always mounted. */
 .typing-indicator {
-	padding: 0 var(--space-4, 1rem) var(--space-1, 0.25rem);
+	display: flex;
+	align-items: center;
+	gap: var(--space-2, 0.5rem);
+	padding: var(--space-1, 0.25rem) var(--space-5, 1.5rem) var(--space-2, 0.5rem);
 	font-size: var(--font-xs, 0.75rem);
-	color: var(--text-tertiary, #94a3b8);
-	font-style: italic;
-	min-height: 1.25em;
+	font-weight: var(--font-weight-medium, 500);
+	letter-spacing: 0.01em;
+	color: var(--text-tertiary, #64748b);
+	min-height: 1.5em;
 }
 
-/* ── Input Bar ── */
+/* Three-dot pulse — classic chat affordance. The staggered delay is
+ * what makes it read as "typing" rather than a generic spinner. */
+.typing-indicator .typing-dots {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	flex-shrink: 0;
+}
+
+.typing-indicator .typing-dots::before,
+.typing-indicator .typing-dots::after,
+.typing-indicator .typing-dots span {
+	content: "";
+	width: 5px;
+	height: 5px;
+	border-radius: var(--radius-full, 9999px);
+	background: currentcolor;
+	opacity: 0.45;
+	animation: typing-bounce 1.4s ease-in-out infinite;
+}
+
+.typing-indicator .typing-dots span {
+	animation-delay: 0.16s;
+}
+
+.typing-indicator .typing-dots::after {
+	animation-delay: 0.32s;
+}
+
+@keyframes typing-bounce {
+	0%,
+	60%,
+	100% {
+		transform: translateY(0);
+		opacity: 0.45;
+	}
+	30% {
+		transform: translateY(-3px);
+		opacity: 1;
+	}
+}
+
+/* ── Input Bar ──
+ * Floating composer card instead of a hard-edged bottom strip. The
+ * card floats above the chat background on all four sides, which
+ * reads as modern (Slack / Linear / Telegram Desktop) and leaves
+ * room for the home-indicator safe area on mobile. */
 .chat-input-bar {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2, 0.5rem);
-	padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
-	border-top: 1px solid var(--border-color, #e2e8f0);
+	padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+	margin: 0 var(--space-3, 0.75rem) var(--space-3, 0.75rem);
+	border: 1px solid var(--border-color, #e2e8f0);
+	border-radius: var(--radius-xl, 0.75rem);
 	background-color: var(--bg-elevated, #ffffff);
+	box-shadow: var(--shadow-md);
+	/* Gentle lift on focus-within so the composer feels alive when
+	   the user starts typing. */
+	transition:
+		box-shadow var(--duration-normal, 200ms) var(--ease-default, ease),
+		border-color var(--duration-normal, 200ms) var(--ease-default, ease);
+}
+
+.chat-input-bar:focus-within {
+	border-color: color-mix(in oklch, var(--color-primary, #3b82f6) 45%, var(--border-color, #e2e8f0));
+	box-shadow:
+		var(--shadow-md),
+		0 0 0 3px color-mix(in oklch, var(--color-primary, #3b82f6) 12%, transparent);
 }
 
 .chat-reply-preview-bar {
@@ -275,10 +409,12 @@
 	align-items: center;
 	gap: var(--space-2, 0.5rem);
 	padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
-	background-color: var(--bg-tertiary, #f1f5f9);
+	background: color-mix(in oklch, var(--color-primary, #3b82f6) 6%, var(--bg-tertiary, #f1f5f9));
+	border-left: 3px solid var(--color-primary, #3b82f6);
 	border-radius: var(--radius-md, 0.375rem);
 	font-size: var(--font-xs, 0.75rem);
 	color: var(--text-secondary, #475569);
+	animation: slide-up-in var(--duration-normal, 200ms) var(--ease-out-expo) both;
 }
 
 .chat-reply-preview-bar .reply-preview-label {
@@ -296,28 +432,35 @@
 .chat-input-row {
 	display: flex;
 	align-items: flex-end;
-	gap: var(--space-2, 0.5rem);
+	gap: 2px;
 }
 
 .chat-input-textarea {
 	flex: 1;
-	min-height: 36px;
+	min-height: 40px;
 	max-height: 144px;
 	resize: none;
-	padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
-	border: 1px solid var(--border-color, #e2e8f0);
-	border-radius: var(--radius-lg, 0.5rem);
-	background-color: var(--bg-primary, #ffffff);
+	padding: 8px var(--space-2, 0.5rem);
+	border: 0;
+	background-color: transparent;
 	color: var(--text-primary, #0f172a);
 	font-family: var(--font-family);
 	font-size: var(--font-sm, 0.875rem);
 	line-height: var(--line-height-normal, 1.5);
-	transition: border-color var(--duration-fast, 150ms) var(--ease-default, ease);
+	/* Remove default focus ring — the composer card itself glows
+	   via `.chat-input-bar:focus-within` so the inner control stays
+	   visually quiet. */
+	outline: none;
+	transition: none;
+}
+
+.chat-input-textarea::placeholder {
+	color: var(--text-tertiary, #64748b);
 }
 
 .chat-input-textarea:focus-visible {
 	outline: none;
-	border-color: var(--color-primary, #3b82f6);
+	border: 0;
 }
 
 .chat-input-btn {
@@ -327,14 +470,17 @@
 	justify-content: center;
 	width: 36px;
 	height: 36px;
-	border: 1px solid var(--border-color, #e2e8f0);
-	background: var(--bg-primary, #ffffff);
+	border: 0;
+	background: transparent;
 	color: var(--text-secondary, #475569);
 	border-radius: var(--radius-md, 0.375rem);
 	font-size: var(--font-base, 1rem);
 	cursor: pointer;
 	padding: 0;
-	transition: all var(--duration-fast, 150ms) var(--ease-default, ease);
+	transition:
+		background-color var(--duration-fast, 150ms) var(--ease-default, ease),
+		color var(--duration-fast, 150ms) var(--ease-default, ease),
+		transform var(--duration-fast, 150ms) var(--ease-default, ease);
 
 	& svg {
 		width: 18px;
@@ -347,14 +493,44 @@
 	color: var(--text-primary, #0f172a);
 }
 
+.chat-input-btn:active {
+	transform: scale(0.94);
+}
+
 .chat-input-btn.primary {
-	background: var(--color-primary, #3b82f6);
+	/* Rounded-square "send" — solid primary with a slight gradient so
+	   it reads as a button rather than a flat swatch. */
+	background: linear-gradient(
+		180deg,
+		color-mix(in oklch, var(--color-primary, #3b82f6) 100%, white 8%) 0%,
+		var(--color-primary, #3b82f6) 100%
+	);
 	color: #ffffff;
-	border-color: var(--color-primary, #3b82f6);
+	border: 0;
+	box-shadow:
+		0 1px 2px 0 rgb(0 0 0 / 0.08),
+		0 2px 8px -2px color-mix(in oklch, var(--color-primary, #3b82f6) 50%, transparent);
 }
 
 .chat-input-btn.primary:hover {
-	background: var(--color-primary-hover, #2563eb);
+	background: linear-gradient(
+		180deg,
+		color-mix(in oklch, var(--color-primary-hover, #2563eb) 100%, white 8%) 0%,
+		var(--color-primary-hover, #2563eb) 100%
+	);
+	box-shadow:
+		0 2px 4px 0 rgb(0 0 0 / 0.10),
+		0 4px 12px -2px color-mix(in oklch, var(--color-primary, #3b82f6) 60%, transparent);
+}
+
+.chat-input-btn.primary:active {
+	transform: scale(0.94);
+}
+
+.chat-input-btn.primary[disabled] {
+	background: var(--bg-tertiary, #f1f5f9);
+	color: var(--text-tertiary, #64748b);
+	box-shadow: none;
 }
 
 .chat-input-btn.danger {
@@ -366,37 +542,81 @@
 	cursor: not-allowed;
 }
 
+/* Character counter: hidden by default; reveals itself when the user
+   is approaching the limit (JS toggles `.visible`). Keeps the composer
+   minimal during normal typing. */
 .chat-input-counter {
 	align-self: flex-end;
 	font-size: var(--font-xs, 0.75rem);
-	color: var(--text-tertiary, #94a3b8);
+	color: var(--text-tertiary, #64748b);
 	font-variant-numeric: tabular-nums;
+	padding-inline: var(--space-2, 0.5rem);
+	opacity: 0;
+	max-height: 0;
+	overflow: hidden;
+	transition:
+		opacity var(--duration-fast, 150ms) var(--ease-default, ease),
+		max-height var(--duration-fast, 150ms) var(--ease-default, ease);
+}
+
+.chat-input-counter.visible {
+	opacity: 1;
+	max-height: 1.5em;
 }
 
 .chat-input-counter.over-limit {
 	color: var(--color-error, #ef4444);
+	font-weight: var(--font-weight-semibold, 600);
+	opacity: 1;
+	max-height: 1.5em;
 }
 
-/* ── Back-to-Latest Button ── */
+/* ── Back-to-Latest Button ──
+ * Floating chip anchored to the bottom-right of the message scroll
+ * container. A subtle pop-in on mount signals "new content is below".
+ */
 .back-to-latest {
 	position: absolute;
 	right: var(--space-4, 1rem);
 	bottom: var(--space-4, 1rem);
 	z-index: var(--z-sticky, 200);
 	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1, 0.25rem);
 	border: 1px solid var(--border-color, #e2e8f0);
 	background: var(--bg-elevated, #ffffff);
 	color: var(--color-primary, #3b82f6);
-	padding: var(--space-1, 0.25rem) var(--space-3, 0.75rem);
+	padding: 6px var(--space-3, 0.75rem);
 	border-radius: var(--radius-full, 9999px);
 	font-size: var(--font-xs, 0.75rem);
+	font-weight: var(--font-weight-medium, 500);
 	box-shadow: var(--shadow-md);
 	cursor: pointer;
-	transition: transform var(--duration-fast, 150ms) var(--ease-default, ease);
+	transition:
+		transform var(--duration-fast, 150ms) var(--ease-default, ease),
+		box-shadow var(--duration-fast, 150ms) var(--ease-default, ease);
+	animation: scale-pop-in var(--duration-normal, 200ms) var(--ease-spring) both;
 }
 
 .back-to-latest:hover {
 	transform: translateY(-2px);
+	box-shadow: var(--shadow-lg);
+}
+
+.back-to-latest:active {
+	transform: translateY(0);
+}
+
+/* Down-arrow glyph rendered via CSS so no extra markup is needed. */
+.back-to-latest::before {
+	content: "";
+	width: 6px;
+	height: 6px;
+	border-right: 2px solid currentcolor;
+	border-bottom: 2px solid currentcolor;
+	transform: rotate(45deg) translateY(-1px);
+	flex-shrink: 0;
 }
 
 /* ── Image Content ── */

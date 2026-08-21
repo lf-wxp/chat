@@ -3,10 +3,17 @@
  * Covers login/register forms and the auth page layout.
  */
 
-/* ── Auth Page ── */
+/* ── Auth Page ──
+ * Transparent so the decorative `AppBg` layer (gradient / WebGL
+ * effects) shows through — the auth page used to paint an opaque
+ * `--bg-secondary` here, which completely hid the background layer
+ * behind it (confirmed via DOM inspection: the WebGL canvas was
+ * rendering correctly the entire time, just fully covered by this
+ * div). The auth card itself still has its own opaque surface for
+ * readability. */
 .auth-page {
   min-height: 100vh;
-  background-color: var(--bg-secondary, #f8fafc);
+  background-color: transparent;
 }
 
 /* ── Auth Card ── */

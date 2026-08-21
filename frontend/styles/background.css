@@ -57,6 +57,37 @@
   pointer-events: none;
 }
 
+/* ── WebGL background canvas ──
+ * Single full-viewport canvas hosting three WebGL effects:
+ * Gradient Waves (raymarched plasma), Light Rays (volumetric
+ * beams), and Particles (point sprites). Sits between the image
+ * layer and the overlay tint so the effects are dimmed but still
+ * visible.
+ *
+ * Deliberately uses the browser's *default* compositing (no
+ * `mix-blend-mode`) — i.e. standard alpha-over:
+ * `Co = Cs·α + Cb·(1-α)`. Both `screen` and `multiply` were tried
+ * and measured (via `gl.readPixels`) to produce a nearly invisible
+ * result on at least one theme:
+ *   * `screen` on the light theme: screen(bright, pale) ≈ pale — a
+ *     near no-op regardless of shader alpha.
+ *   * `multiply` on the dark theme (and even on light, once alpha
+ *     stayed in the 0.4-0.6 range the shaders actually use):
+ *     multiply(color, bg) only removes light, so at typical shader
+ *     alpha the darkening was too subtle to read as an "effect".
+ * Default alpha-over composites `Cs·α` directly on top of the
+ * backdrop, so visibility depends only on shader alpha and the
+ * color contrast baked into `Palette::for_theme` (bright glow colors
+ * on dark, deep ink colors on light) — not on a blend-mode's
+ * nonlinear math working out favorably. */
+.webgl-background {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 /* ── Host transparency ──
  * The main shell defaults to an opaque theme surface. Flip it to
  * transparent so the `.app-bg` layer is visible behind it. Any

@@ -169,14 +169,38 @@ pub fn InputBar(
   };
 
   // Keep the DOM textarea value in sync with the signal (so setting it
-  // to "" after send clears the field).
+  // to "" after send clears the field), and grow/shrink the textarea
+  // to fit its content up to the CSS `max-height`. Growing on input
+  // avoids the scrollbar-then-jump feel of a fixed-height field and
+  // matches how modern chat composers behave (Slack / iMessage).
   Effect::new(move |_| {
     let value = draft.get();
-    if let Some(el) = textarea_ref.get()
-      && el.value() != value
-    {
-      el.set_value(&value);
+    if let Some(el) = textarea_ref.get() {
+      if el.value() != value {
+        el.set_value(&value);
+      }
+      // Auto-resize: reset to a single row so scrollHeight reflects
+      // the actual content height, then expand. Capped by CSS
+      // `max-height` so overflow still scrolls past the limit.
+      //
+      // NB: `el` is a Leptos element wrapper whose `.style()` resolves
+      // to tachys' builder method, so we go through `web_sys::HtmlElement`
+      // directly for inline-style mutation.
+      if let Some(html_el) = el.dyn_ref::<web_sys::HtmlElement>() {
+        let _ = html_el.style().set_property("height", "auto");
+        let next = html_el.scroll_height();
+        let _ = html_el.style().set_property("height", &format!("{next}px"));
+      }
     }
+  });
+
+  // Reveal the character counter only when the user is approaching
+  // the limit (≥90%) or already over — keeps the composer visually
+  // quiet during normal typing. The `.over-limit` class (set below)
+  // always shows it regardless.
+  let near_limit = Memo::new(move |_| {
+    let n = char_count.get();
+    n > 0 && n >= (MAX_TEXT_LENGTH as f64 * 0.9) as usize
   });
 
   let cancel_reply = move |_| reply_target.set(None);
@@ -317,11 +341,13 @@ pub fn InputBar(
 
       <div
         class=move || {
+          let mut cls = String::from("chat-input-counter");
           if over_limit.get() {
-            "chat-input-counter over-limit".to_string()
-          } else {
-            "chat-input-counter".to_string()
+            cls.push_str(" over-limit");
+          } else if near_limit.get() {
+            cls.push_str(" visible");
           }
+          cls
         }
         aria-live="polite"
       >

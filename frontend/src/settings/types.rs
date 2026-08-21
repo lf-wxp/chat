@@ -7,6 +7,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::background_waves::WaveConfig;
+
 /// Maximum allowed speaker volume (0.0 – 1.0 inclusive).
 pub const VOLUME_MAX: f32 = 1.0;
 
@@ -214,6 +216,49 @@ impl BackgroundMode {
   }
 }
 
+/// Which WebGL background effects to render. Independent of
+/// [`BackgroundMode`] — the effects layer sits on top of whatever
+/// static background (preset / solid / gradient / image) is active.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum BackgroundEffects {
+  /// All three effects layered (waves + rays + particles).
+  #[default]
+  All,
+  /// Only the raymarched gradient waves.
+  Waves,
+  /// Only the volumetric light rays.
+  Rays,
+  /// Only the drifting particles.
+  Particles,
+  /// No WebGL effects — plain static background.
+  None,
+}
+
+impl BackgroundEffects {
+  #[must_use]
+  pub fn parse(value: &str) -> Self {
+    match value {
+      "waves" => Self::Waves,
+      "rays" => Self::Rays,
+      "particles" => Self::Particles,
+      "none" => Self::None,
+      _ => Self::All,
+    }
+  }
+
+  #[must_use]
+  pub const fn as_str(self) -> &'static str {
+    match self {
+      Self::All => "all",
+      Self::Waves => "waves",
+      Self::Rays => "rays",
+      Self::Particles => "particles",
+      Self::None => "none",
+    }
+  }
+}
+
 /// Gradient shape. Kept narrow on purpose — radial + linear cover
 /// 95 % of decorative backgrounds while keeping the CSS generator
 /// trivial.
@@ -392,6 +437,17 @@ pub struct BackgroundSettings {
   /// been switched on at least once. Boxed to keep
   /// `BackgroundSettings` small (the enum-free branch dominates).
   pub dark: Option<Box<BackgroundVariantData>>,
+  /// Which WebGL effects to render on top of the static background.
+  /// Defaults to [`BackgroundEffects::All`].
+  #[serde(default)]
+  pub effects: BackgroundEffects,
+  /// Gradient Waves shader configuration (scale, ratio, speed,
+  /// swell, turbulence, tilt, zoom, horizon height, fog depth,
+  /// brightness, opacity). See [`WaveConfig`]. `#[serde(default)]`
+  /// keeps older persisted payloads (predating this field)
+  /// deserialising with the original hard-coded shader look.
+  #[serde(default)]
+  pub waves: WaveConfig,
 }
 
 impl Default for BackgroundSettings {
@@ -408,6 +464,8 @@ impl Default for BackgroundSettings {
       overlay_alpha: 0.2,
       theme_aware: false,
       dark: None,
+      effects: BackgroundEffects::All,
+      waves: WaveConfig::default(),
     }
   }
 }
@@ -430,6 +488,7 @@ impl BackgroundSettings {
       self.blur_px = BACKGROUND_BLUR_MAX_PX;
     }
     self.overlay_alpha = self.overlay_alpha.clamp(0.0, BACKGROUND_OVERLAY_ALPHA_MAX);
+    self.waves = self.waves.sanitised();
 
     if let Some(g) = self.gradient {
       self.gradient = Some(g.sanitised());

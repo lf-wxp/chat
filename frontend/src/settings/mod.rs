@@ -21,6 +21,7 @@
 //! * [`state`] — reactive `SettingsState` + localStorage persistence.
 //! * [`export`] — `ExportPayload` and JSON / HTML rendering.
 
+mod background_waves;
 mod export;
 mod state;
 mod types;
@@ -28,6 +29,21 @@ mod types;
 // Re-export the public API so existing callers remain unchanged.
 pub use export::ExportPayload;
 // Re-export for test access (via `use super::*` in tests.rs).
+pub use background_waves::{
+  BACKGROUND_WAVE_BRIGHTNESS_DEFAULT, BACKGROUND_WAVE_BRIGHTNESS_MAX,
+  BACKGROUND_WAVE_BRIGHTNESS_MIN, BACKGROUND_WAVE_FOG_DEPTH_DEFAULT, BACKGROUND_WAVE_FOG_DEPTH_MAX,
+  BACKGROUND_WAVE_FOG_DEPTH_MIN, BACKGROUND_WAVE_HORIZON_HEIGHT_DEFAULT,
+  BACKGROUND_WAVE_HORIZON_HEIGHT_MAX, BACKGROUND_WAVE_HORIZON_HEIGHT_MIN,
+  BACKGROUND_WAVE_OPACITY_DEFAULT, BACKGROUND_WAVE_OPACITY_MAX, BACKGROUND_WAVE_OPACITY_MIN,
+  BACKGROUND_WAVE_RATIO_DEFAULT, BACKGROUND_WAVE_RATIO_MAX, BACKGROUND_WAVE_RATIO_MIN,
+  BACKGROUND_WAVE_SCALE_DEFAULT, BACKGROUND_WAVE_SCALE_MAX, BACKGROUND_WAVE_SCALE_MIN,
+  BACKGROUND_WAVE_SPEED_DEFAULT, BACKGROUND_WAVE_SPEED_MAX, BACKGROUND_WAVE_SPEED_MIN,
+  BACKGROUND_WAVE_SWELL_DEFAULT, BACKGROUND_WAVE_SWELL_MAX, BACKGROUND_WAVE_SWELL_MIN,
+  BACKGROUND_WAVE_TILT_DEFAULT, BACKGROUND_WAVE_TILT_MAX, BACKGROUND_WAVE_TILT_MIN,
+  BACKGROUND_WAVE_TURBULENCE_DEFAULT, BACKGROUND_WAVE_TURBULENCE_MAX,
+  BACKGROUND_WAVE_TURBULENCE_MIN, BACKGROUND_WAVE_ZOOM_DEFAULT, BACKGROUND_WAVE_ZOOM_MAX,
+  BACKGROUND_WAVE_ZOOM_MIN, WaveConfig,
+};
 #[cfg(test)]
 pub(crate) use export::html_escape;
 pub use state::{
@@ -35,9 +51,9 @@ pub use state::{
   provide_settings_state, use_settings_state,
 };
 pub use types::{
-  BACKGROUND_BLUR_MAX_PX, BACKGROUND_OVERLAY_ALPHA_MAX, BackgroundMode, BackgroundSettings,
-  BackgroundVariantData, BackgroundVariantView, DndWindow, FontScale, GradientKind, GradientSpec,
-  GradientStop, UserSettings, VOLUME_MAX, VideoQualityPref,
+  BACKGROUND_BLUR_MAX_PX, BACKGROUND_OVERLAY_ALPHA_MAX, BackgroundEffects, BackgroundMode,
+  BackgroundSettings, BackgroundVariantData, BackgroundVariantView, DndWindow, FontScale,
+  GradientKind, GradientSpec, GradientStop, UserSettings, VOLUME_MAX, VideoQualityPref,
 };
 
 #[cfg(test)]

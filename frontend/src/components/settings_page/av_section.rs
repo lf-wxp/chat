@@ -148,11 +148,12 @@ pub fn AvSection() -> impl IntoView {
 
       <Show when=move || needs_permission.get()>
         <div class="settings-row">
-          <p class="settings-hint">
-            {t!(i18n, settings.default_device_permission_hint)}
-            " "
+          <div class="settings-permission-row">
+            <p class="settings-hint">
+              {t!(i18n, settings.default_device_permission_hint)}
+            </p>
             <PermissionBadge state=Signal::derive(|| PermissionState::Prompt) />
-          </p>
+          </div>
           <button
             class="btn-primary settings-action"
             on:click=move |_| {
@@ -174,11 +175,12 @@ pub fn AvSection() -> impl IntoView {
       </Show>
       <Show when=move || permission_denied.get()>
         <div class="settings-row">
-          <p class="settings-error">
-            {t!(i18n, settings.device_permission_denied)}
-            " "
+          <div class="settings-permission-row">
+            <p class="settings-error">
+              {t!(i18n, settings.device_permission_denied)}
+            </p>
             <PermissionBadge state=Signal::derive(|| PermissionState::Denied) />
-          </p>
+          </div>
         </div>
       </Show>
       <Show when=move || load_error.get().is_some()>

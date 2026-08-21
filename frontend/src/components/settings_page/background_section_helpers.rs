@@ -155,5 +155,113 @@ pub fn overlay_alpha_to_slider_percent(alpha: f32) -> u8 {
   ((capped / crate::settings::BACKGROUND_OVERLAY_ALPHA_MAX) * 100.0).round() as u8
 }
 
+/// Convert a 0–100 slider percentage to a value linearly interpolated
+/// across `[min, max]`. Shared by every Gradient Waves slider, which
+/// (unlike blur/overlay) don't all start at zero.
+#[must_use]
+pub fn slider_percent_to_range(percent: u8, min: f32, max: f32) -> f32 {
+  let clamped = f32::from(percent.min(100)) / 100.0;
+  min + clamped * (max - min)
+}
+
+/// Reverse of [`slider_percent_to_range`].
+#[must_use]
+pub fn range_to_slider_percent(value: f32, min: f32, max: f32) -> u8 {
+  if max <= min {
+    return 0;
+  }
+  let capped = value.clamp(min, max);
+  (((capped - min) / (max - min)) * 100.0).round() as u8
+}
+
+/// Generates a `slider_percent_to_wave_*` / `wave_*_to_slider_percent`
+/// pair for a [`crate::settings::WaveConfig`]
+/// field, wired to the field's `BACKGROUND_WAVE_*_MIN`/`_MAX`
+/// constants. Keeps the eleven near-identical conversions (one per
+/// slider) from turning into 44 lines of copy-pasted boilerplate
+/// that would drift out of sync with the constants.
+macro_rules! wave_slider_pair {
+  ($to_value:ident, $to_percent:ident, $min:expr, $max:expr) => {
+    // Slider percentage (0-100) -> persisted value in `$min..=$max`.
+    #[must_use]
+    pub fn $to_value(percent: u8) -> f32 {
+      slider_percent_to_range(percent, $min, $max)
+    }
+
+    // Reverse of `$to_value` above.
+    #[must_use]
+    pub fn $to_percent(value: f32) -> u8 {
+      range_to_slider_percent(value, $min, $max)
+    }
+  };
+}
+
+wave_slider_pair!(
+  slider_percent_to_wave_scale,
+  wave_scale_to_slider_percent,
+  crate::settings::BACKGROUND_WAVE_SCALE_MIN,
+  crate::settings::BACKGROUND_WAVE_SCALE_MAX
+);
+wave_slider_pair!(
+  slider_percent_to_wave_ratio,
+  wave_ratio_to_slider_percent,
+  crate::settings::BACKGROUND_WAVE_RATIO_MIN,
+  crate::settings::BACKGROUND_WAVE_RATIO_MAX
+);
+wave_slider_pair!(
+  slider_percent_to_wave_speed,
+  wave_speed_to_slider_percent,
+  crate::settings::BACKGROUND_WAVE_SPEED_MIN,
+  crate::settings::BACKGROUND_WAVE_SPEED_MAX
+);
+wave_slider_pair!(
+  slider_percent_to_wave_swell,
+  wave_swell_to_slider_percent,
+  crate::settings::BACKGROUND_WAVE_SWELL_MIN,
+  crate::settings::BACKGROUND_WAVE_SWELL_MAX
+);
+wave_slider_pair!(
+  slider_percent_to_wave_turbulence,
+  wave_turbulence_to_slider_percent,
+  crate::settings::BACKGROUND_WAVE_TURBULENCE_MIN,
+  crate::settings::BACKGROUND_WAVE_TURBULENCE_MAX
+);
+wave_slider_pair!(
+  slider_percent_to_wave_tilt,
+  wave_tilt_to_slider_percent,
+  crate::settings::BACKGROUND_WAVE_TILT_MIN,
+  crate::settings::BACKGROUND_WAVE_TILT_MAX
+);
+wave_slider_pair!(
+  slider_percent_to_wave_zoom,
+  wave_zoom_to_slider_percent,
+  crate::settings::BACKGROUND_WAVE_ZOOM_MIN,
+  crate::settings::BACKGROUND_WAVE_ZOOM_MAX
+);
+wave_slider_pair!(
+  slider_percent_to_wave_horizon_height,
+  wave_horizon_height_to_slider_percent,
+  crate::settings::BACKGROUND_WAVE_HORIZON_HEIGHT_MIN,
+  crate::settings::BACKGROUND_WAVE_HORIZON_HEIGHT_MAX
+);
+wave_slider_pair!(
+  slider_percent_to_wave_fog_depth,
+  wave_fog_depth_to_slider_percent,
+  crate::settings::BACKGROUND_WAVE_FOG_DEPTH_MIN,
+  crate::settings::BACKGROUND_WAVE_FOG_DEPTH_MAX
+);
+wave_slider_pair!(
+  slider_percent_to_wave_brightness,
+  wave_brightness_to_slider_percent,
+  crate::settings::BACKGROUND_WAVE_BRIGHTNESS_MIN,
+  crate::settings::BACKGROUND_WAVE_BRIGHTNESS_MAX
+);
+wave_slider_pair!(
+  slider_percent_to_wave_opacity,
+  wave_opacity_to_slider_percent,
+  crate::settings::BACKGROUND_WAVE_OPACITY_MIN,
+  crate::settings::BACKGROUND_WAVE_OPACITY_MAX
+);
+
 #[cfg(test)]
 mod tests;

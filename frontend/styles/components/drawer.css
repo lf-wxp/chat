@@ -29,9 +29,16 @@
   z-index: calc(var(--z-modal, 400) + 1);
   display: flex;
   flex-direction: column;
-  width: min(28rem, 100vw);
+  /* Wider drawer so long section labels and the quick-nav icons
+     aren't cramped. Still caps at 100vw for narrow viewports. */
+  width: min(30rem, 100vw);
   background-color: var(--bg-elevated, #ffffff);
-  box-shadow: var(--shadow-xl);
+  /* Stronger shadow + a faint border for better elevation on light
+     wallpapers. The border is invisible on the dark theme where the
+     shadow alone carries the depth cue. */
+  box-shadow:
+    var(--shadow-xl),
+    -1px 0 0 0 var(--border-color, #e2e8f0);
   overflow: hidden;
   transition:
     transform var(--duration-slow, 300ms) var(--ease-default, ease),
@@ -74,14 +81,21 @@
   }
 }
 
-/* ── Drawer header ── */
+/* ── Drawer header ──
+ * Sticky header with a subtle blur backdrop so content scrolling
+ * beneath fades through rather than being hard-clipped at the border.
+ */
 .drawer-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-3, 0.75rem);
   padding: var(--space-4, 1rem) var(--space-5, 1.5rem);
   border-bottom: 1px solid var(--border-color, #e2e8f0);
   flex-shrink: 0;
+  background: color-mix(in oklch, var(--bg-elevated, #fff) 92%, transparent);
+  backdrop-filter: saturate(180%) blur(10px);
+  -webkit-backdrop-filter: saturate(180%) blur(10px);
 }
 
 .drawer-title {
@@ -90,6 +104,7 @@
   gap: var(--space-2, 0.5rem);
   font-size: var(--font-xl, 1.25rem);
   font-weight: var(--font-weight-bold, 700);
+  letter-spacing: -0.01em;
   color: var(--text-primary, #0f172a);
   margin: 0;
 }
@@ -97,7 +112,13 @@
 .drawer-title-icon {
   width: 1.375rem;
   height: 1.375rem;
+  /* Tinted "chip" background turns a lone glyph into a designed
+     badge — matches the modern "settings = branded panel" pattern. */
   color: var(--color-primary, #3b82f6);
+  padding: 6px;
+  box-sizing: content-box;
+  border-radius: var(--radius-md, 0.375rem);
+  background: color-mix(in oklch, var(--color-primary, #3b82f6) 10%, transparent);
 }
 
 .drawer-close {
@@ -112,12 +133,19 @@
   border-radius: var(--radius-md, 0.375rem);
   border: 1px solid transparent;
   cursor: pointer;
-  transition: all var(--duration-fast, 150ms) var(--ease-default, ease);
+  transition:
+    background-color var(--duration-fast, 150ms) var(--ease-default, ease),
+    color var(--duration-fast, 150ms) var(--ease-default, ease),
+    transform var(--duration-fast, 150ms) var(--ease-default, ease);
 }
 
 .drawer-close:hover {
   background-color: var(--bg-tertiary, #f1f5f9);
   color: var(--text-primary, #0f172a);
+}
+
+.drawer-close:active {
+  transform: scale(0.94);
 }
 
 .drawer-close svg {
@@ -131,30 +159,73 @@
   min-height: 0;
   overflow-y: auto;
   padding: var(--space-5, 1.5rem);
+  /* Smooth in-page anchor jumps from the quick-nav rail. */
+  scroll-behavior: smooth;
+  /* When jumping to a section heading, leave room for the sticky
+     quick-nav so the heading isn't hidden behind it. */
+  scroll-padding-top: calc(2.25rem + var(--space-4, 1rem));
 }
 
-/* ── Settings-specific layout ── */
+@media (prefers-reduced-motion: reduce) {
+  .drawer-body {
+    scroll-behavior: auto;
+  }
+}
+
+/* ── Settings-specific layout ──
+ * Each section is a "card": subtle background + border + padding so
+ * visually-grouped settings read as a coherent block instead of a
+ * long undifferentiated list. */
 .settings-section {
-  margin-bottom: var(--space-6, 2rem);
+  margin-bottom: var(--space-5, 1.5rem);
+  padding: var(--space-4, 1rem);
+  background-color: var(--bg-secondary, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-lg, 0.5rem);
+  /* Subtle entrance so the drawer content doesn't all pop in at
+     once when opened. */
+  animation: fade-in-up var(--duration-normal, 200ms) var(--ease-out-expo) both;
 }
 
 .settings-section:last-child {
   margin-bottom: 0;
 }
 
+/* Stagger section entrance so the eye reads top-to-bottom as the
+   drawer opens. Capped at 8 sections to avoid extreme delays on
+   very long settings pages. */
+.settings-section:nth-child(1) { animation-delay: 0ms; }
+.settings-section:nth-child(2) { animation-delay: 30ms; }
+.settings-section:nth-child(3) { animation-delay: 60ms; }
+.settings-section:nth-child(4) { animation-delay: 90ms; }
+.settings-section:nth-child(5) { animation-delay: 120ms; }
+.settings-section:nth-child(6) { animation-delay: 150ms; }
+.settings-section:nth-child(7) { animation-delay: 180ms; }
+.settings-section:nth-child(8) { animation-delay: 210ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-section {
+    animation: none;
+  }
+}
+
 .settings-section-title {
   display: flex;
   align-items: center;
   gap: var(--space-2, 0.5rem);
-  font-size: var(--font-base, 1rem);
+  font-size: var(--font-sm, 0.875rem);
   font-weight: var(--font-weight-semibold, 600);
-  color: var(--text-primary, #0f172a);
-  margin: 0 0 var(--space-3, 0.75rem);
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #475569);
+  margin: 0 0 var(--space-4, 1rem);
+  padding-bottom: var(--space-2, 0.5rem);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
 }
 
 .settings-section-icon {
-  width: 1.125rem;
-  height: 1.125rem;
+  width: 1rem;
+  height: 1rem;
   color: var(--color-primary, #3b82f6);
 }
 
@@ -181,48 +252,77 @@
   height: 0.875rem;
 }
 
-/* ── Segmented button group ── */
+/* ── Segmented button group ──
+ * Flex row, no wrap: every item gets an equal share (`flex: 1 1 0`
+ * + `min-width: 0`). Items stay on a single row so a "lone" trailing
+ * item can never stretch to 100% (the original `flex-wrap: wrap`
+ * had that bug — "Full HD (1080p)" would balloon to fill its own
+ * row). Long labels wrap to two lines within their column instead
+ * of forcing a row break. */
 .segmented {
-  display: inline-flex;
-  flex-wrap: wrap;
+  display: flex;
+  /* Never wrap — all items share a single row, even if some labels
+     end up on two lines. */
+  flex-wrap: nowrap;
   gap: 2px;
-  padding: 2px;
+  padding: 3px;
   background-color: var(--bg-tertiary, #f1f5f9);
-  border-radius: var(--radius-md, 0.375rem);
+  border-radius: var(--radius-lg, 0.5rem);
   width: 100%;
 }
 
 .segmented-item {
-  flex: 1 1 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-1, 0.25rem);
-  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
-  font-size: var(--font-sm, 0.875rem);
+  /* Equal share of the row, but never shrink below the intrinsic
+     width of icon + label. This prevents the icon from being
+     squeezed to invisibility when many items share a row. */
+  flex: 1 1 auto;
+  min-width: max-content;
+  padding: var(--space-2, 0.5rem) var(--space-2, 0.5rem);
+  font-size: var(--font-xs, 0.75rem);
   font-weight: var(--font-weight-medium, 500);
+  line-height: 1.25;
+  text-align: center;
   color: var(--text-secondary, #475569);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: calc(var(--radius-md, 0.375rem) - 2px);
+  border-radius: calc(var(--radius-lg, 0.5rem) - 3px);
   cursor: pointer;
-  white-space: nowrap;
-  transition: all var(--duration-fast, 150ms) var(--ease-default, ease);
+  /* Allow labels to wrap to two lines instead of truncating. */
+  white-space: normal;
+  overflow-wrap: break-word;
+  transition:
+    background-color var(--duration-fast, 150ms) var(--ease-default, ease),
+    color var(--duration-fast, 150ms) var(--ease-default, ease),
+    box-shadow var(--duration-fast, 150ms) var(--ease-default, ease),
+    transform var(--duration-fast, 150ms) var(--ease-default, ease);
 }
 
 .segmented-item svg {
   width: 1rem;
   height: 1rem;
+  flex-shrink: 0;
 }
 
 .segmented-item:hover {
   color: var(--text-primary, #0f172a);
+  background: color-mix(in oklch, var(--bg-elevated, #fff) 60%, transparent);
+}
+
+.segmented-item:active {
+  transform: scale(0.97);
 }
 
 .segmented-item.is-active {
   background-color: var(--bg-elevated, #ffffff);
   color: var(--color-primary, #3b82f6);
-  box-shadow: var(--shadow-sm);
+  font-weight: var(--font-weight-semibold, 600);
+  box-shadow:
+    var(--shadow-sm),
+    0 0 0 1px color-mix(in oklch, var(--color-primary, #3b82f6) 20%, transparent);
 }
 
 .segmented-item:focus-visible {
@@ -235,6 +335,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2, 0.5rem);
+  margin-top: var(--space-4, 1rem);
 }
 
 .settings-logout svg {
@@ -259,22 +360,43 @@
   margin-bottom: 0;
 }
 
-/* ── Toggle switch ── */
+/* ── Toggle switch ──
+ * iOS-style: slightly larger so the thumb is unmistakable at a glance,
+ * with a spring-eased thumb slide and a subtle track gradient when on. */
 .settings-toggle {
   position: relative;
   flex-shrink: 0;
-  width: 2.5rem;
-  height: 1.375rem;
+  width: 2.75rem;
+  height: 1.5rem;
   padding: 0;
   border: none;
   border-radius: 999px;
   background-color: var(--bg-tertiary, #e2e8f0);
   cursor: pointer;
-  transition: background-color var(--duration-fast, 150ms) var(--ease-default, ease);
+  transition:
+    background-color var(--duration-fast, 150ms) var(--ease-default, ease),
+    box-shadow var(--duration-fast, 150ms) var(--ease-default, ease);
+}
+
+.settings-toggle:hover {
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--text-tertiary, #64748b) 30%, transparent);
 }
 
 .settings-toggle.is-on {
-  background-color: var(--color-primary, #3b82f6);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--color-primary, #3b82f6) 100%, white 8%) 0%,
+    var(--color-primary, #3b82f6) 100%
+  );
+  box-shadow:
+    0 1px 2px 0 rgb(0 0 0 / 0.08),
+    0 2px 8px -2px color-mix(in oklch, var(--color-primary, #3b82f6) 40%, transparent);
+}
+
+.settings-toggle.is-on:hover {
+  box-shadow:
+    0 1px 2px 0 rgb(0 0 0 / 0.08),
+    0 4px 12px -2px color-mix(in oklch, var(--color-primary, #3b82f6) 50%, transparent);
 }
 
 .settings-toggle:focus-visible {
@@ -286,16 +408,19 @@
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 1.125rem;
-  height: 1.125rem;
+  width: 1.25rem;
+  height: 1.25rem;
   border-radius: 50%;
   background-color: #ffffff;
-  box-shadow: var(--shadow-sm);
-  transition: transform var(--duration-fast, 150ms) var(--ease-default, ease);
+  box-shadow:
+    0 1px 3px 0 rgb(0 0 0 / 0.15),
+    0 1px 1px 0 rgb(0 0 0 / 0.1);
+  transition: transform var(--duration-normal, 200ms) var(--ease-spring);
 }
 
 .settings-toggle.is-on .settings-toggle-thumb {
-  transform: translateX(1.125rem);
+  /* 2.75rem track - 1.25rem thumb - 4px insets = 1.25rem travel. */
+  transform: translateX(1.25rem);
 }
 
 /* ── Supplementary helpers ── */
@@ -464,32 +589,69 @@
   font-weight: var(--font-weight-medium, 500);
 }
 
-/* ── DND Banner at top of settings drawer (Req 13.4.5) ── */
+/* ── DND Banner at top of settings drawer (Req 13.4.5) ──
+ * Full-width pill with a soft moon-tinted background — informative
+ * but not alarming. */
 .settings-dnd-banner {
   display: flex;
   align-items: center;
   gap: var(--space-2, 0.5rem);
-  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
-  margin: 0 0 var(--space-2, 0.5rem) 0;
-  background-color: var(--color-primary-light, rgba(59, 130, 246, 0.1));
-  border: 1px solid var(--color-primary, #3b82f6);
-  border-radius: var(--radius-md, 0.375rem);
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  margin: 0 0 var(--space-3, 0.75rem) 0;
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--color-primary, #3b82f6) 12%, transparent) 0%,
+    color-mix(in oklch, var(--color-primary, #3b82f6) 6%, transparent) 100%
+  );
+  border: 1px solid color-mix(in oklch, var(--color-primary, #3b82f6) 25%, transparent);
+  border-radius: var(--radius-lg, 0.5rem);
   font-size: var(--font-sm, 0.875rem);
   font-weight: var(--font-weight-medium, 500);
   color: var(--color-primary, #3b82f6);
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  animation: fade-in-up var(--duration-normal, 200ms) var(--ease-out-expo) both;
 }
 
 .settings-dnd-banner-icon {
   flex-shrink: 0;
-  width: 1rem;
-  height: 1rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  /* Subtle breathing on the moon icon signals "active right now". */
+  animation: breathe 2.4s ease-in-out infinite;
+}
+
+/* ── Permission status row ──
+ * Pairs the explanatory hint with a status badge on a single flex
+ * row. Previously the badge was inlined into the hint's `<p>` so a
+ * long hint pushed the badge onto the next line, breaking it in
+ * half ("Not" / "requested"). Splitting into a row keeps the badge
+ * intact and aligns it to the trailing edge. */
+.settings-permission-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3, 0.75rem);
+  margin-top: var(--space-1, 0.25rem);
+}
+
+.settings-permission-row .settings-hint {
+  flex: 1;
+  margin: 0;
+  min-width: 0;
 }
 
 .settings-permission-badge {
-  padding: 0 var(--space-2, 0.5rem);
+  flex-shrink: 0;
+  padding: 2px var(--space-2, 0.5rem);
   border-radius: 999px;
   background-color: var(--bg-tertiary, #f1f5f9);
+  font-size: var(--font-xs, 0.75rem);
   font-weight: var(--font-weight-medium, 500);
+  /* Never break a badge across lines — the word pair "Not requested"
+     must stay together even in narrow viewports. */
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
 }
 
 /* ── Buttons & action rows ── */
@@ -554,26 +716,42 @@
   color: var(--text-primary, #0f172a);
 }
 
-/* ── "Saved" indicator (Req 13.6.3) ── */
+/* ── "Saved" indicator (Req 13.6.3) ──
+ * Floating pill anchored to the bottom-center of the drawer — always
+ * visible regardless of scroll position, doesn't compete with the
+ * header for attention. */
 .settings-saved-indicator {
+  position: fixed;
+  bottom: var(--space-6, 2rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: calc(var(--z-modal, 400) + 2);
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1, 0.25rem);
-  padding: 2px var(--space-2, 0.5rem);
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
   border-radius: 999px;
-  font-size: var(--font-xs, 0.75rem);
-  font-weight: var(--font-weight-medium, 500);
-  color: var(--color-success, #16a34a);
-  background-color: color-mix(in oklch, var(--color-success, #16a34a) 12%, transparent);
+  font-size: var(--font-sm, 0.875rem);
+  font-weight: var(--font-weight-semibold, 600);
+  letter-spacing: 0.01em;
+  color: #ffffff;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--color-success, #16a34a) 100%, white 8%) 0%,
+    var(--color-success, #16a34a) 100%
+  );
+  border: 1px solid color-mix(in oklch, var(--color-success, #16a34a) 70%, black);
+  box-shadow:
+    0 2px 8px -2px color-mix(in oklch, var(--color-success, #16a34a) 50%, transparent),
+    0 4px 16px -4px color-mix(in oklch, var(--color-success, #16a34a) 40%, transparent);
   opacity: 0;
-  transform: translateY(-2px);
   pointer-events: none;
   transition: none;
 }
 
 .settings-saved-indicator svg {
-  width: 0.875rem;
-  height: 0.875rem;
+  width: 1rem;
+  height: 1rem;
 }
 
 /* The `data-tick` attribute changes whenever the settings store is
@@ -585,19 +763,19 @@
 @keyframes settings-saved-flash {
   0% {
     opacity: 0;
-    transform: translateY(-2px);
+    transform: translate(-50%, 8px) scale(0.95);
   }
   15% {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(-50%, 0) scale(1);
   }
   70% {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(-50%, 0) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translateY(-2px);
+    transform: translate(-50%, -8px) scale(0.98);
   }
 }
 
@@ -605,7 +783,7 @@
   .settings-saved-indicator[data-active="true"] {
     animation: none;
     opacity: 1;
-    transform: none;
+    transform: translate(-50%, 0);
   }
 }
 
@@ -679,7 +857,7 @@
    * between the nav and the first settings section. */
   margin: calc(-1 * var(--space-5, 1.5rem));
   margin-bottom: var(--space-4, 1rem);
-  padding: 0.5rem var(--space-5, 1.5rem);
+  padding: 0.625rem var(--space-5, 1.5rem);
   border-bottom: 1px solid var(--border-color, #e2e8f0);
   position: sticky;
   /* Negative `top` pulls the sticky threshold up by the parent's
@@ -688,9 +866,9 @@
    * clamped by the default `top: 0` (which pins the element at
    * the padding-box edge). */
   top: calc(-1 * var(--space-5, 1.5rem));
-  background: color-mix(in oklch, var(--bg-elevated, #fff) 88%, transparent);
-  backdrop-filter: saturate(180%) blur(10px);
-  -webkit-backdrop-filter: saturate(180%) blur(10px);
+  background: color-mix(in oklch, var(--bg-elevated, #fff) 92%, transparent);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
   z-index: var(--z-sticky, 200);
 }
 
@@ -699,21 +877,27 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 2.25rem;
-  height: 2.25rem;
+  min-width: 2.5rem;
+  height: 2.5rem;
   border-radius: var(--radius-md, 0.375rem);
   color: var(--text-secondary, #475569);
+  background: var(--bg-secondary, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
   text-decoration: none;
   transition:
-    background var(--duration-fast, 150ms) var(--ease-out, ease),
-    color var(--duration-fast, 150ms) var(--ease-out, ease),
-    transform var(--duration-fast, 150ms) var(--ease-out, ease);
+    background-color var(--duration-fast, 150ms) var(--ease-default, ease),
+    color var(--duration-fast, 150ms) var(--ease-default, ease),
+    border-color var(--duration-fast, 150ms) var(--ease-default, ease),
+    box-shadow var(--duration-fast, 150ms) var(--ease-default, ease),
+    transform var(--duration-fast, 150ms) var(--ease-default, ease);
 }
 
 .settings-quick-nav-link:hover {
   background: var(--bg-tertiary, #f1f5f9);
   color: var(--text-primary, #0f172a);
+  border-color: color-mix(in oklch, var(--color-primary, #3b82f6) 30%, var(--border-color, #e2e8f0));
   transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .settings-quick-nav-link:active {
@@ -730,8 +914,16 @@
  * can see which icon represents the section they jumped to. */
 .settings-quick-nav-link.is-active,
 .settings-quick-nav-link:target {
-  color: var(--color-primary, #3b82f6);
-  background: color-mix(in oklch, var(--color-primary, #3b82f6) 12%, transparent);
+  color: #ffffff;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--color-primary, #3b82f6) 100%, white 8%) 0%,
+    var(--color-primary, #3b82f6) 100%
+  );
+  border-color: color-mix(in oklch, var(--color-primary, #3b82f6) 70%, black);
+  box-shadow:
+    0 1px 2px 0 rgb(0 0 0 / 0.08),
+    0 2px 8px -2px color-mix(in oklch, var(--color-primary, #3b82f6) 50%, transparent);
 }
 
 /* On very narrow viewports tighten the horizontal padding so the
@@ -770,4 +962,129 @@
 .settings-camera-preview-row {
   flex-direction: column;
   align-items: stretch;
+}
+
+/* ── Mobile / narrow viewport adjustments ── */
+@media (max-width: 767px) {
+  /* Drawer takes the full width on mobile — the "side panel" affordance
+     collapses into a full-screen sheet, which is what users expect on
+     phones. */
+  .drawer {
+    width: 100vw;
+    box-shadow: none;
+  }
+
+  /* Respect the iPhone home indicator — the logout button is the last
+     element and would otherwise sit on the indicator. */
+  .drawer-body {
+    padding-bottom: calc(var(--space-5, 1.5rem) + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Section cards collapse to slightly tighter padding on mobile. */
+  .settings-section {
+    padding: var(--space-3, 0.75rem);
+    border-radius: var(--radius-md, 0.375rem);
+  }
+
+  /* Larger touch targets for the toggle switch (Apple HIG 44pt). */
+  .settings-toggle {
+    width: 3rem;
+    height: 1.75rem;
+  }
+
+  .settings-toggle-thumb {
+    width: 1.5rem;
+    height: 1.5rem;
+    top: 2px;
+    left: 2px;
+  }
+
+  .settings-toggle.is-on .settings-toggle-thumb {
+    /* 3rem track - 1.5rem thumb - 4px insets = 1.25rem travel. */
+    transform: translateX(1.25rem);
+  }
+
+  /* Saved indicator: drop the floating pill closer to the bottom on
+     mobile so it doesn't fight the safe-area. */
+  .settings-saved-indicator {
+    bottom: calc(var(--space-4, 1rem) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ── Avatar editor ──
+ * The native `<input type="file">` renders with the browser's default
+ * chrome ("Choose File / No file chosen" in the user's locale) which
+ * clashes badly with the dark theme and the rest of the design
+ * system. Hide it visually but keep it functional, and trigger it
+ * from a styled button instead. */
+.avatar-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 0.75rem);
+}
+
+.avatar-editor__label {
+  font-size: var(--font-sm, 0.875rem);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--text-primary, #0f172a);
+}
+
+.avatar-editor__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4, 1rem);
+}
+
+.avatar-editor__preview {
+  flex-shrink: 0;
+}
+
+/* Empty-state placeholder: shown when no avatar has been uploaded.
+   Uses the same `.avatar-md` dimensions as the real preview so the
+   row layout never shifts; the user icon signals "this is where your
+   photo will go". */
+.avatar-editor__preview--empty {
+  background-color: var(--bg-tertiary, #f1f5f9);
+  color: var(--text-tertiary, #64748b);
+  border: 1px dashed var(--border-color, #e2e8f0);
+}
+
+/* leptos_icons renders <svg width="1em" height="1em"> by default —
+   explicit sizing here so the user icon is visibly centered inside
+   the 2.5rem avatar-md box. */
+.avatar-editor__preview-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.avatar-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+}
+
+.avatar-editor__file-input {
+  /* Visually hidden but still functional: the styled button
+     `.avatar-editor__choose-btn` triggers this input via .click().
+     We can't use `display: none` because that removes the input
+     from the a11y tree and prevents programmatic clicks in some
+     browsers; instead we collapse it to zero-size + transparent. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.avatar-editor__hint {
+  margin: 0;
+  font-size: var(--font-xs, 0.75rem);
+  color: var(--text-tertiary, #64748b);
+  line-height: 1.5;
 }

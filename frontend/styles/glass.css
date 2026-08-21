@@ -284,7 +284,7 @@ html[data-glass="off"] .drawer::before {
 
 /* ── Component bridges — L3 transient overlays (MVP batch 9) ──
  * Mirrors the `.glass-l3` treatment onto the five L3 surfaces:
- *   .modal .toast .error-toast .sidebar-conversation-menu .sticker-panel
+ *   .modal .toast .error-toast .dropdown-menu .sticker-panel
  * Kept separate from the `.glass-l3` utility so these components
  * do not need to add an extra class in their JSX. Because this file
  * is loaded into the `effects` cascade layer (above `components` in
@@ -298,13 +298,15 @@ html[data-glass="off"] .drawer::before {
  *   * `.error-toast` owns a distinctive `border-left: 4px` accent —
  *     we deliberately only write to `background` / `backdrop-filter`
  *     / `box-shadow` so the left stripe survives.
+ *   * `.dropdown-menu` uses `position: fixed` so it escapes
+ *     `overflow: hidden` ancestors — the L3 treatment works the
+ *     same regardless of positioning scheme.
  */
 .modal,
 .toast,
 .error-toast,
-.sidebar-conversation-menu,
+.dropdown-menu,
 .sticker-panel {
-  position: relative;
   isolation: isolate;
   background: var(--glass-bg-l3);
   backdrop-filter:
@@ -319,13 +321,25 @@ html[data-glass="off"] .drawer::before {
     var(--shadow-xl);
 }
 
+/* `position: relative` is required for the L3 grain overlay
+ * (`::before`) on most hosts, but the dropdown menu must stay
+ * `position: fixed` (set in dropdown-menu.css) so it escapes
+ * `overflow: hidden` ancestors. Only apply relative positioning
+ * to the hosts that need it. */
+.modal,
+.toast,
+.error-toast,
+.sticker-panel {
+  position: relative;
+}
+
 /* Noise grain for L3 surfaces. We keep the per-host `::before`
  * declarations flat (no nesting) so callers can opt out surgically
  * with `content: none` if they already own the pseudo-element. */
 .modal::before,
 .toast::before,
 .error-toast::before,
-.sidebar-conversation-menu::before,
+.dropdown-menu::before,
 .sticker-panel::before {
   content: '';
   position: absolute;
@@ -343,7 +357,7 @@ html[data-glass="off"] .drawer::before {
 .modal > *,
 .toast > *,
 .error-toast > *,
-.sidebar-conversation-menu > *,
+.dropdown-menu > *,
 .sticker-panel > * {
   position: relative;
   z-index: 1;
@@ -354,7 +368,7 @@ html[data-glass="off"] .drawer::before {
   .modal,
   .toast,
   .error-toast,
-  .sidebar-conversation-menu,
+  .dropdown-menu,
   .sticker-panel {
     background: color-mix(in srgb, var(--bg-elevated) 94%, transparent);
     backdrop-filter: none;
@@ -363,7 +377,7 @@ html[data-glass="off"] .drawer::before {
   .modal::before,
   .toast::before,
   .error-toast::before,
-  .sidebar-conversation-menu::before,
+  .dropdown-menu::before,
   .sticker-panel::before {
     content: none;
   }
@@ -373,7 +387,7 @@ html[data-glass="off"] .drawer::before {
 html[data-glass="off"] .modal,
 html[data-glass="off"] .toast,
 html[data-glass="off"] .error-toast,
-html[data-glass="off"] .sidebar-conversation-menu,
+html[data-glass="off"] .dropdown-menu,
 html[data-glass="off"] .sticker-panel {
   background: var(--bg-elevated);
   backdrop-filter: none;
@@ -383,7 +397,7 @@ html[data-glass="off"] .sticker-panel {
 html[data-glass="off"] .modal::before,
 html[data-glass="off"] .toast::before,
 html[data-glass="off"] .error-toast::before,
-html[data-glass="off"] .sidebar-conversation-menu::before,
+html[data-glass="off"] .dropdown-menu::before,
 html[data-glass="off"] .sticker-panel::before {
   content: none;
 }

@@ -44,6 +44,24 @@ rustflags = ["--cfg", "getrandom_backend=\"wasm_js\""]
 # Use all available CPU cores for compilation
 jobs = -1
 
+# =============================================================================
+# macOS Deployment Target
+# =============================================================================
+#
+# Without this, C dependencies built via `cc`/build scripts (e.g. aws-lc-sys,
+# pulled in transitively via jsonwebtoken -> aws-lc-rs) pick up the *installed*
+# macOS SDK version as their minimum OS version, while rustc's own default
+# minimum for aarch64-apple-darwin is 11.0. rust-lld checks this and warns:
+#
+#   warning: linker stderr: rust-lld: ... has version X.Y.Z, which is newer
+#   than target minimum of 11.0.0
+#
+# Setting MACOSX_DEPLOYMENT_TARGET aligns the C build with rustc's minimum,
+# eliminating the mismatch. Harmless if the warning appears without this,
+# but this keeps build output clean.
+[env]
+MACOSX_DEPLOYMENT_TARGET = "11.0"
+
 [term]
 # Enable colorful output
 color = "auto"

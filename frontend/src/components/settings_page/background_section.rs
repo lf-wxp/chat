@@ -17,9 +17,10 @@ use super::background_section_helpers::{
   UploadRejection, blur_px_to_slider_percent, overlay_alpha_to_slider_percent,
   slider_percent_to_blur_px, slider_percent_to_overlay_alpha, validate_background_upload,
 };
+use super::background_wave_section::BackgroundWaveSection;
 use super::class_helpers::{segmented_item_class, toggle_root_class};
 use crate::i18n;
-use crate::settings::{BackgroundMode, BackgroundSettings, use_settings_state};
+use crate::settings::{BackgroundEffects, BackgroundMode, BackgroundSettings, use_settings_state};
 use icondata as i;
 use leptos::prelude::*;
 use leptos_i18n::{t, t_string};
@@ -47,6 +48,11 @@ pub fn BackgroundSection() -> impl IntoView {
     Memo::new(move |_| overlay_alpha_to_slider_percent(settings.get().background.overlay_alpha));
   let theme_aware = Memo::new(move |_| settings.get().background.theme_aware);
   let has_image = Memo::new(move |_| settings.get().background.image_blob_key.is_some());
+  let effects = Memo::new(move |_| settings.get().background.effects);
+
+  let set_effects = move |next: BackgroundEffects| {
+    settings.update(|s| s.background.effects = next);
+  };
 
   // Transient user feedback — an upload failure message. `None` means
   // the alert is hidden.
@@ -199,6 +205,62 @@ pub fn BackgroundSection() -> impl IntoView {
         </div>
       </div>
 
+      // WebGL ambient effects selector — which shader-driven effects
+      // to layer on top of the static background.
+      <div class="settings-row">
+        <label class="settings-label">
+          <Icon icon=i::LuSparkles attr:class="settings-label-icon" />
+          {t!(i18n, settings.background_effects)}
+        </label>
+        <div class="segmented" role="group" data-testid="background-effects-group">
+          <button
+            class=move || segmented_item_class(effects.get() == BackgroundEffects::All)
+            on:click=move |_| set_effects(BackgroundEffects::All)
+            aria-pressed=move || (effects.get() == BackgroundEffects::All).to_string()
+            data-testid="bg-effects-all"
+          >
+            <Icon icon=i::LuLayers />
+            <span>{t!(i18n, settings.background_effects_all)}</span>
+          </button>
+          <button
+            class=move || segmented_item_class(effects.get() == BackgroundEffects::Waves)
+            on:click=move |_| set_effects(BackgroundEffects::Waves)
+            aria-pressed=move || (effects.get() == BackgroundEffects::Waves).to_string()
+            data-testid="bg-effects-waves"
+          >
+            <Icon icon=i::LuWaves />
+            <span>{t!(i18n, settings.background_effects_waves)}</span>
+          </button>
+          <button
+            class=move || segmented_item_class(effects.get() == BackgroundEffects::Rays)
+            on:click=move |_| set_effects(BackgroundEffects::Rays)
+            aria-pressed=move || (effects.get() == BackgroundEffects::Rays).to_string()
+            data-testid="bg-effects-rays"
+          >
+            <Icon icon=i::LuZap />
+            <span>{t!(i18n, settings.background_effects_rays)}</span>
+          </button>
+          <button
+            class=move || segmented_item_class(effects.get() == BackgroundEffects::Particles)
+            on:click=move |_| set_effects(BackgroundEffects::Particles)
+            aria-pressed=move || (effects.get() == BackgroundEffects::Particles).to_string()
+            data-testid="bg-effects-particles"
+          >
+            <Icon icon=i::LuSparkles />
+            <span>{t!(i18n, settings.background_effects_particles)}</span>
+          </button>
+          <button
+            class=move || segmented_item_class(effects.get() == BackgroundEffects::None)
+            on:click=move |_| set_effects(BackgroundEffects::None)
+            aria-pressed=move || (effects.get() == BackgroundEffects::None).to_string()
+            data-testid="bg-effects-none"
+          >
+            <Icon icon=i::LuX />
+            <span>{t!(i18n, settings.background_effects_none)}</span>
+          </button>
+        </div>
+      </div>
+
       // Solid colour picker — only rendered for Solid mode.
       <Show when=move || mode.get() == BackgroundMode::Solid>
         <div class="settings-row">
@@ -325,6 +387,12 @@ pub fn BackgroundSection() -> impl IntoView {
           </span>
         </div>
       </div>
+
+      // Gradient Waves tuning sliders (scale, ratio, speed, swell,
+      // turbulence, tilt, zoom, horizon height, fog depth,
+      // brightness, opacity) — self-hides while that shader isn't
+      // being rendered.
+      <BackgroundWaveSection />
 
       // Theme-aware toggle — stores independent payloads per theme.
       <div class="settings-row settings-toggle-row">

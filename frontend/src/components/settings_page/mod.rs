@@ -10,6 +10,7 @@ mod av_helpers;
 mod av_section;
 mod background_section;
 mod background_section_helpers;
+mod background_wave_section;
 mod camera_preview;
 mod class_helpers;
 mod data_management_helpers;

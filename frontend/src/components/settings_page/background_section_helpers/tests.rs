@@ -183,3 +183,125 @@ fn overlay_round_trip_is_idempotent_within_tolerance() {
     );
   }
 }
+
+// ── Gradient Waves sliders (scale / ratio / speed / swell /
+// turbulence / tilt / zoom / horizon height / fog depth /
+// brightness / opacity) ─────────────────────────────────────────────────
+//
+// All eleven sliders share the exact same linear-mapping shape (see
+// `slider_percent_to_range` / `range_to_slider_percent`), so instead
+// of writing 3 near-identical tests per slider (33 total), this
+// table-driven test exercises every slider's endpoints and
+// round-trip stability in one pass. Each entry pairs a slider's
+// `(to_value, to_percent)` functions with its own MIN/MAX constants.
+/// One slider's worth of table-driven test wiring: its slider ↔
+/// value converter pair, valid range, and a label for assertion
+/// failure messages.
+type WaveSliderCase = (fn(u8) -> f32, fn(f32) -> u8, f32, f32, &'static str);
+
+#[test]
+fn wave_sliders_hit_endpoints_and_round_trip() {
+  let cases: &[WaveSliderCase] = &[
+    (
+      slider_percent_to_wave_scale,
+      wave_scale_to_slider_percent,
+      crate::settings::BACKGROUND_WAVE_SCALE_MIN,
+      crate::settings::BACKGROUND_WAVE_SCALE_MAX,
+      "scale",
+    ),
+    (
+      slider_percent_to_wave_ratio,
+      wave_ratio_to_slider_percent,
+      crate::settings::BACKGROUND_WAVE_RATIO_MIN,
+      crate::settings::BACKGROUND_WAVE_RATIO_MAX,
+      "ratio",
+    ),
+    (
+      slider_percent_to_wave_speed,
+      wave_speed_to_slider_percent,
+      crate::settings::BACKGROUND_WAVE_SPEED_MIN,
+      crate::settings::BACKGROUND_WAVE_SPEED_MAX,
+      "speed",
+    ),
+    (
+      slider_percent_to_wave_swell,
+      wave_swell_to_slider_percent,
+      crate::settings::BACKGROUND_WAVE_SWELL_MIN,
+      crate::settings::BACKGROUND_WAVE_SWELL_MAX,
+      "swell",
+    ),
+    (
+      slider_percent_to_wave_turbulence,
+      wave_turbulence_to_slider_percent,
+      crate::settings::BACKGROUND_WAVE_TURBULENCE_MIN,
+      crate::settings::BACKGROUND_WAVE_TURBULENCE_MAX,
+      "turbulence",
+    ),
+    (
+      slider_percent_to_wave_tilt,
+      wave_tilt_to_slider_percent,
+      crate::settings::BACKGROUND_WAVE_TILT_MIN,
+      crate::settings::BACKGROUND_WAVE_TILT_MAX,
+      "tilt",
+    ),
+    (
+      slider_percent_to_wave_zoom,
+      wave_zoom_to_slider_percent,
+      crate::settings::BACKGROUND_WAVE_ZOOM_MIN,
+      crate::settings::BACKGROUND_WAVE_ZOOM_MAX,
+      "zoom",
+    ),
+    (
+      slider_percent_to_wave_horizon_height,
+      wave_horizon_height_to_slider_percent,
+      crate::settings::BACKGROUND_WAVE_HORIZON_HEIGHT_MIN,
+      crate::settings::BACKGROUND_WAVE_HORIZON_HEIGHT_MAX,
+      "horizon_height",
+    ),
+    (
+      slider_percent_to_wave_fog_depth,
+      wave_fog_depth_to_slider_percent,
+      crate::settings::BACKGROUND_WAVE_FOG_DEPTH_MIN,
+      crate::settings::BACKGROUND_WAVE_FOG_DEPTH_MAX,
+      "fog_depth",
+    ),
+    (
+      slider_percent_to_wave_brightness,
+      wave_brightness_to_slider_percent,
+      crate::settings::BACKGROUND_WAVE_BRIGHTNESS_MIN,
+      crate::settings::BACKGROUND_WAVE_BRIGHTNESS_MAX,
+      "brightness",
+    ),
+    (
+      slider_percent_to_wave_opacity,
+      wave_opacity_to_slider_percent,
+      crate::settings::BACKGROUND_WAVE_OPACITY_MIN,
+      crate::settings::BACKGROUND_WAVE_OPACITY_MAX,
+      "opacity",
+    ),
+  ];
+
+  for (to_value, to_percent, min, max, name) in cases {
+    // Endpoints.
+    assert!(
+      (to_value(0) - min).abs() < f32::EPSILON,
+      "{name}: 0% should map to MIN"
+    );
+    assert!(
+      (to_value(100) - max).abs() < f32::EPSILON,
+      "{name}: 100% should map to MAX"
+    );
+    assert_eq!(to_percent(*min), 0, "{name}: MIN should map to 0%");
+    assert_eq!(to_percent(*max), 100, "{name}: MAX should map to 100%");
+
+    // Round-trip stability.
+    for percent in [0u8, 25, 50, 75, 100] {
+      let value = to_value(percent);
+      let back = to_percent(value);
+      assert!(
+        (i32::from(back) - i32::from(percent)).abs() <= 1,
+        "{name}: round-trip drift too large: {percent}% → {value} → {back}%"
+      );
+    }
+  }
+}

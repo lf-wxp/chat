@@ -231,14 +231,15 @@ pub fn NotificationsSection() -> impl IntoView {
         </Show>
       </Show>
 
-      <p class="settings-hint">
-        {t!(i18n, settings.dnd_permission_note)}
-        " "
+      <div class="settings-permission-row">
+        <p class="settings-hint">
+          {t!(i18n, settings.dnd_permission_note)}
+        </p>
         <PermissionBadge state=Signal::derive({
           let ps = permission_state.clone();
           move || PermissionState::from_browser_str(&ps.get())
         }) />
-      </p>
+      </div>
 
       // "Request Notification Permission" button (Req 13.4.6). Only
       // rendered when the browser exposes the API and the user has

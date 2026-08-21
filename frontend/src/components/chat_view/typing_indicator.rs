@@ -53,6 +53,12 @@ pub fn TypingIndicator(conv: Signal<Option<ConversationId>>) -> impl IntoView {
       data-testid="typing-indicator"
       hidden=move || !is_typing.get()
     >
+      // Animated three-dot pulse. Purely decorative; the label carries
+      // the accessible text. The outer `.typing-dots` provides the
+      // ::before/::after dots; the inner <span> is the middle dot.
+      <span class="typing-dots" aria-hidden="true">
+        <span></span>
+      </span>
       {move || label.get()}
     </div>
   }
