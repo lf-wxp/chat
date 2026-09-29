@@ -20,6 +20,12 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      no-cache:
+        description: Skip GitHub Actions cache and build from scratch
+        type: boolean
+        required: false
+        default: false
 
 env:
   # Image name is namespaced under the Docker Hub username (lowercased).
@@ -73,5 +79,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: ${{ !inputs.no-cache && 'type=gha' || '' }}
+          cache-to: ${{ !inputs.no-cache && 'type=gha,mode=max' || '' }}
