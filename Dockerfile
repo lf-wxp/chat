@@ -18,7 +18,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install trunk for frontend builds
-RUN cargo install trunk@0.21.14
+# `--locked` forces Cargo to use trunk's own Cargo.lock, avoiding a
+# dependency-resolution mismatch where lightningcss 1.0.0-alpha.65 gets
+# paired with incompatible cssparser versions (0.37.0 vs 0.33.0).
+RUN cargo install trunk@0.21.14 --locked
 
 # Install WASM target for frontend builds
 RUN rustup target add wasm32-unknown-unknown
